@@ -31,7 +31,8 @@ PostgreSQL portability requirement, and it is cheap now and expensive later.
    recording `schema_migrations`. It **refuses to start** when the database version exceeds the
    binary's highest known migration.
 6. `001_foundation.sql` creates `schema_migrations`, `store_profile`, `system_settings`, `users`,
-   `audit_logs` per `05_TECH_SPEC.md` §3.4.
+   `audit_logs` per `05_TECH_SPEC.md` §3.4. `audit_logs.shift_id` carries **no** foreign key —
+   see the annotation in §3.4 and the convention 8 exception in §3.1; guarded by `TC-INT-05`.
 7. `GET /api/v1/health` returns schema version, database size and row counts (`OPS-006`).
 8. A test runner exists and `npm run test`, `test:unit`, `test:all`, `build:exe` are wired.
 
@@ -68,6 +69,7 @@ PostgreSQL portability requirement, and it is cheap now and expensive later.
 | `TC-UT-99` | Layering: no SQL or driver import outside the permitted layers |
 | `TC-UT-90` | UTC storage, `Asia/Manila` render |
 | `TC-INT-01` | Migration applies once, is idempotent, and refuses a newer database |
+| `TC-INT-05` | An audit row is writable at schema version 1, before `cashier_shifts` exists |
 
 ---
 

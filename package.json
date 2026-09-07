@@ -1,0 +1,44 @@
+{
+  "name": "chachi-agrivet-pos",
+  "productName": "Chachi Agrivet POS",
+  "version": "0.1.0",
+  "description": "Agrivet store POS and inventory management — local-first, offline-capable, one Windows PC.",
+  "author": "Chachi's Software Development Service",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:electron": "electron .",
+    "migrate": "node src/config/migrate.js",
+    "test:unit": "node src/tests/run.js unit",
+    "test": "node src/tests/run.js unit integration",
+    "test:e2e": "node src/tests/run.js e2e",
+    "test:perf": "node src/tests/run.js perf",
+    "test:all": "node src/tests/run.js unit integration e2e",
+    "build:exe": "electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "store.chachisoftware.agrivetpos",
+    "productName": "ChachiAgrivetPOS",
+    "artifactName": "ChachiAgrivetPOS-Setup-${version}.${ext}",
+    "files": ["main.js", "src/**/*", "public/**/*", "package.json"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": { "target": "nsis", "requestedExecutionLevel": "asInvoker" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

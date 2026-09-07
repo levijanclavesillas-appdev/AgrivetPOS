@@ -81,7 +81,7 @@ no bundler, no runtime network dependency. Every dependency must survive being o
 | 5 | `created_at`, `created_by` on every business table; `updated_at`, `updated_by` where mutable. |
 | 6 | Soft delete only: `is_active INTEGER NOT NULL DEFAULT 1`. No `DELETE` on a business table. |
 | 7 | Enumerations are `TEXT` with a `CHECK` constraint — readable in a dump, portable to PostgreSQL. |
-| 8 | Every foreign key is declared and enforced (`PRAGMA foreign_keys = ON`). |
+| 8 | Every foreign key is declared and enforced (`PRAGMA foreign_keys = ON`). **One deliberate exception**, annotated where it lives: `audit_logs.shift_id` (§3.4). |
 | 9 | No SQLite-only syntax: no `WITHOUT ROWID`, no `AUTOINCREMENT`, no type affinity games. |
 
 ### 3.2 Pragmas
@@ -192,7 +192,17 @@ CREATE TABLE audit_logs (                -- AUD-605/606: append-only, never dele
   before_value  TEXT,                    -- JSON
   after_value   TEXT,                    -- JSON
   reason        TEXT,
-  shift_id      TEXT REFERENCES cashier_shifts(id)
+  -- NOT a foreign key, deliberately. SQLite resolves a foreign key's parent table at
+  -- INSERT time, so a declared REFERENCES cashier_shifts(id) makes *every* audit write
+  -- fail with "no such table" until migration 005 creates that table — including a
+  -- write whose shift_id is NULL. Audit would be unwritable from first-run setup
+  -- (AUD-604) onwards, which is the one thing an audit trail may never be.
+  --
+  -- Enforcing it later would mean rebuilding the table in 005. It is not worth it: the
+  -- trail is append-only (AUD-605), nothing deletes a shift (POS-511), and an audit row
+  -- must be writable in every circumstance, including ones where its referents are gone.
+  -- This is the same reasoning that denormalises actor_username in AUD-606.
+  shift_id      TEXT                     -- soft reference to cashier_shifts(id)
 );
 CREATE INDEX idx_audit_time   ON audit_logs (occurred_at DESC);
 CREATE INDEX idx_audit_entity ON audit_logs (entity_type, entity_id);

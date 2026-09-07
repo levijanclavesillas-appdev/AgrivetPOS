@@ -63,6 +63,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-INT-02` | 5 failures lock for 15 minutes; the lock survives a restart | `SEC-3` |
 | `TC-INT-03` | PIN unlock reaches POS; refused on settings, users, cost fields | `SEC-2`, `SEC-6` |
 | `TC-INT-04` | Recovery code works once, is replaced, and is audited before the reset | `SEC-5`, `AUD-604` |
+| `TC-INT-05` | An audit row is writable at schema version 1, before `cashier_shifts` exists — with `shift_id` null and populated | `AUD-605`, `05` §3.4 |
 | `TC-INT-20` | `SUM(movements) = inventory.qty_on_hand` for every product after the E2E day | `INV-101` |
 | `TC-INT-21` | Negative stock blocked; and permitted-with-flag when the setting is on | `INV-104` |
 | `TC-INT-22` | Selling to the threshold surfaces the product in low stock | `INV-109` |
