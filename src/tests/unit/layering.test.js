@@ -25,6 +25,10 @@ const EXCLUDED = ['node_modules', 'dist', '.git', 'src/tests'];
 
 const SCANNED_ROOTS = ['src', 'public', 'main.js'];
 
+// SQL is looked for inside string literals only. Scanning raw source matches English
+// prose — "the on-hand update", "select a customer" — and a guard that cries wolf gets
+// weakened until it catches nothing. Real SQL is always in a string.
+//
 // Keywords are assembled from fragments so that this file does not match its own
 // patterns — the scanner reads every file it is told to, including this one.
 const SQL_PATTERNS = [
@@ -36,6 +40,11 @@ const DRIVER_PATTERNS = [
   new RegExp(`require\\(['"\`]better-${'sqlite'}3['"\`]\\)`),
   new RegExp(`from\\s+['"\`]better-${'sqlite'}3['"\`]`),
 ];
+
+/** Every string literal on a line: single, double and backtick quoted. */
+function stringLiterals(line) {
+  return (line.match(/'[^']*'|"[^"]*"|`[^`]*`/g) || []);
+}
 
 function walk(target, out = []) {
   const full = path.join(root, target);
@@ -73,10 +82,13 @@ test('TC-UT-99: no SQL outside repositories/ and config/', () => {
   const offenders = [];
   for (const rel of filesUnderReview()) {
     const source = fs.readFileSync(path.join(root, rel), 'utf8');
-    for (const pattern of SQL_PATTERNS) {
-      const line = source.split('\n').findIndex((l) => pattern.test(l));
-      if (line >= 0) offenders.push(`${rel}:${line + 1} matches ${pattern}`);
-    }
+    source.split('\n').forEach((line, i) => {
+      for (const literal of stringLiterals(line)) {
+        for (const pattern of SQL_PATTERNS) {
+          if (pattern.test(literal)) offenders.push(`${rel}:${i + 1} matches ${pattern}`);
+        }
+      }
+    });
   }
   assert.deepEqual(offenders, [], `SQL outside the permitted layers:\n${offenders.join('\n')}`);
 });
