@@ -32,13 +32,15 @@ test('GET /api/v1/health reports schema version, size and row counts (OPS-006)',
   const body = await res.json();
 
   assert.equal(body.status, 'ok');
-  assert.equal(body.schema.version, 1);
-  assert.equal(body.schema.binary_version, 1);
+  assert.equal(body.schema.version, body.schema.binary_version, 'a started server is fully migrated');
+  assert.equal(body.schema.binary_version, require('../../config/migrate').binaryVersion());
   assert.ok(body.database.size_bytes > 0, 'a migrated database has a size');
   assert.deepEqual(Object.keys(body.database.row_counts).sort(), [
-    'audit_logs', 'schema_migrations', 'store_profile', 'system_settings', 'users',
+    'audit_logs', 'brands', 'categories', 'product_barcodes', 'product_packs',
+    'product_prices', 'products', 'schema_migrations', 'store_profile',
+    'system_settings', 'units', 'users',
   ]);
-  assert.equal(body.database.row_counts.schema_migrations, 1);
+  assert.equal(body.database.row_counts.schema_migrations, body.schema.binary_version);
   assert.match(body.checked_at, /Z$/, 'UTC (VR-102)');
 
   // TASK-017 fills these; the keys exist now so the payload shape does not change.

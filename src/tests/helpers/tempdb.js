@@ -88,6 +88,26 @@ function seedStore({ storeName = 'Test Agrivet Supply', taxMode = 'NONE', withOw
   return profile;
 }
 
+/**
+ * The reference rows every product needs: a category, a brand, and KG / SACK / PC.
+ *
+ * Returned by kind so a case can say `cat.categories.feeds.id` rather than carrying
+ * six ids around.
+ */
+function seedCatalog(actor = SETUP_ACTOR) {
+  const referenceService = require('../../services/referenceService');
+  const make = (kind, input) => referenceService.create(kind, input, actor);
+
+  return {
+    category: make('categories', { name: 'Feeds' }),
+    otherCategory: make('categories', { name: 'Veterinary' }),
+    brand: make('brands', { name: 'B-MEG' }),
+    kg: make('units', { code: 'KG', name: 'Kilogram', allowsFraction: true }),
+    sack: make('units', { code: 'SACK', name: 'Sack', allowsFraction: false }),
+    piece: make('units', { code: 'PC', name: 'Piece', allowsFraction: false }),
+  };
+}
+
 /** Create a user directly through the service, as an administrator would. */
 function seedUser({ username, role = 'CASHIER', password = 'correct-horse-battery', pin = null, fullName = null }) {
   const userService = require('../../services/userService');
@@ -97,4 +117,4 @@ function seedUser({ username, role = 'CASHIER', password = 'correct-horse-batter
   );
 }
 
-module.exports = { freshDir, openEmpty, openMigrated, reopen, cleanup, seedStore, seedUser, SETUP_ACTOR };
+module.exports = { freshDir, openEmpty, openMigrated, reopen, cleanup, seedStore, seedCatalog, seedUser, SETUP_ACTOR };

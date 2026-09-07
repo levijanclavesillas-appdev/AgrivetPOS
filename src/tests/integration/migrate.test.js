@@ -18,21 +18,26 @@ const temp = require('../helpers/tempdb');
 
 test.afterEach(() => temp.cleanup());
 
-test('TC-INT-01: a fresh database applies 001 and records it in schema_migrations', () => {
+test('TC-INT-01: a fresh database applies every migration and records each one', () => {
   temp.openEmpty('migrate-fresh');
   assert.equal(migrate.schemaVersion(), 0, 'an empty database is at version 0');
 
   const result = migrate.migrate();
 
+  // Asserted against the binary rather than a literal: a task that adds a migration
+  // should not have to come back and edit this number, but it must still be true that
+  // a fresh database ends up at exactly what this build ships.
   assert.equal(result.from, 0);
-  assert.equal(result.to, 1);
-  assert.deepEqual(result.applied, ['001_foundation.sql']);
+  assert.equal(result.to, migrate.binaryVersion());
+  assert.deepEqual(result.applied, migrate.available().map((m) => m.file));
+  assert.deepEqual(result.applied.slice(0, 2), ['001_foundation.sql', '002_catalog.sql']);
 
   const rows = migrate.applied();
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].version, 1);
+  assert.equal(rows.length, migrate.binaryVersion());
+  assert.deepEqual(rows.map((r) => r.version), rows.map((_, i) => i + 1), 'contiguous, ascending');
   assert.equal(rows[0].name, 'foundation');
-  assert.match(rows[0].applied_at, /Z$/, 'applied_at is stored UTC (VR-102)');
+  assert.equal(rows[1].name, 'catalog');
+  for (const row of rows) assert.match(row.applied_at, /Z$/, 'applied_at is stored UTC (VR-102)');
 });
 
 test('TC-INT-01: re-running migrations is a no-op', () => {
@@ -56,7 +61,7 @@ test('TC-INT-01: a database ahead of the binary refuses to start, with a clear m
     .run(99, 'from_the_future', new Date().toISOString());
 
   assert.equal(migrate.schemaVersion(), 99);
-  assert.equal(migrate.binaryVersion(), 1);
+  assert.ok(migrate.binaryVersion() < 99, 'the binary is behind this database');
 
   let err;
   try {
@@ -64,12 +69,13 @@ test('TC-INT-01: a database ahead of the binary refuses to start, with a clear m
   } catch (caught) {
     err = caught;
   }
+  const binary = migrate.binaryVersion();
   assert.ok(err instanceof migrate.SchemaAheadOfBinaryError, 'it must refuse, not proceed');
   assert.equal(err.dbVersion, 99);
-  assert.equal(err.binaryVersion, 1);
+  assert.equal(err.binaryVersion, binary);
   // The message is read by a store owner, not a developer.
   assert.match(err.message, /schema version 99/);
-  assert.match(err.message, /only knows up to 1/);
+  assert.match(err.message, new RegExp(`only knows up to ${binary}`));
   assert.match(err.message, /newer installation/);
   assert.ok(!/stack|undefined|\[object/i.test(err.message), 'no developer debris in the message');
 });
@@ -95,27 +101,34 @@ test('TC-INT-01: a failing migration leaves the database at its previous version
   assert.ok(!tables.includes('should_not_exist'), 'the half-applied table was rolled back');
 });
 
-test('001_foundation creates exactly the foundation tables of 05_TECH_SPEC.md §3.4', () => {
+test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => {
   temp.openMigrated('migrate-shape');
   const repo = require('../../repositories/schemaRepository');
 
   assert.deepEqual(repo.listTables().sort(), [
+    // 001_foundation
     'audit_logs', 'schema_migrations', 'store_profile', 'system_settings', 'users',
-  ]);
-  assert.ok(repo.listIndexes().includes('idx_audit_time'));
-  assert.ok(repo.listIndexes().includes('idx_audit_entity'));
+    // 002_catalog
+    'brands', 'categories', 'product_barcodes', 'product_packs', 'product_prices',
+    'products', 'units',
+  ].sort());
+
+  for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
+    'idx_products_name', 'idx_products_category', 'idx_products_active']) {
+    assert.ok(repo.listIndexes().includes(index), `missing index ${index}`);
+  }
   assert.ok(repo.integrityCheck().ok, 'a freshly migrated database passes integrity_check');
   assert.deepEqual(repo.foreignKeyCheck(), [], 'no foreign key violations');
 });
 
-test('TC-INT-05: an audit row is writable at schema version 1, before cashier_shifts exists', () => {
+test('TC-INT-05: an audit row is writable before cashier_shifts exists', () => {
   // The guard on 05_TECH_SPEC.md §3.4: audit_logs.shift_id carries no foreign key.
   // Declaring one makes SQLite resolve cashier_shifts at INSERT time, and that table
   // does not exist until migration 005 — so every audit write, NULL shift_id included,
   // would fail from first-run setup (AUD-604) onwards.
   temp.openMigrated('audit-writable');
   const repo = require('../../repositories/schemaRepository');
-  assert.ok(!repo.listTables().includes('cashier_shifts'), 'shifts arrive in 005, not 001');
+  assert.ok(!repo.listTables().includes('cashier_shifts'), 'shifts arrive in 005');
 
   const insert = db.get().prepare(
     'INSERT INTO audit_logs (id, occurred_at, actor_username, action, entity_type, shift_id) ' +

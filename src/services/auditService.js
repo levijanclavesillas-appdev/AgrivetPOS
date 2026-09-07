@@ -39,6 +39,13 @@ const ACTIONS = Object.freeze({
   DISCOUNT_RULE_CHANGED: { what: 'Discount rule changed', rule: 'AUD-601' },
   PRODUCT_CREATED: { what: 'Product created', rule: 'AUD-601' },
   PRODUCT_MODIFIED: { what: 'Product modified', rule: 'AUD-601' },
+  PRODUCT_DEACTIVATED: { what: 'Product deactivated', rule: 'VR-206' },
+  BARCODE_ATTACHED: { what: 'Barcode attached to a product', rule: 'VR-205' },
+  BARCODE_DETACHED: { what: 'Barcode detached from a product', rule: 'VR-205' },
+  // Categories, brands and units. Not on AUD-601's list — they are reference data,
+  // not a mutation of money or stock — but a renamed category silently re-labels every
+  // report that groups by it, so the change is recorded rather than invisible.
+  REFERENCE_DATA_CHANGED: { what: 'Category, brand or unit changed', rule: 'VR-209' },
 
   // ── AUD-601: inventory ────────────────────────────────────────────────────
   INVENTORY_ADJUSTED: { what: 'Inventory adjusted', rule: 'AUD-601' },
