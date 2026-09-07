@@ -10,6 +10,8 @@
 const express = require('express');
 const path = require('path');
 const healthRoutes = require('./routes/health');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 
 const API_BASE = '/api/v1';
 
@@ -19,6 +21,8 @@ function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   app.use(API_BASE, healthRoutes);
+  app.use(API_BASE, authRoutes);
+  app.use(API_BASE, userRoutes);
 
   // The renderer. Vanilla ES modules, no build step (05_TECH_SPEC.md §2).
   app.use(express.static(path.join(__dirname, '..', 'public')));

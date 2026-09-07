@@ -45,7 +45,10 @@ for (const level of levels) {
   const res = spawnSync(process.execPath, ['--test', '--test-reporter=spec', ...files], {
     stdio: 'inherit',
     cwd: root,
-    env: { ...process.env, NODE_ENV: 'test' },
+    // AGRIVET_BCRYPT_COST is honoured only when NODE_ENV is 'test' (authService
+    // .workFactor). Cost 12 is ~300 ms a hash, which a suite that seeds users in every
+    // case cannot afford; the production cost is asserted by TC-UT-01 regardless.
+    env: { ...process.env, NODE_ENV: 'test', AGRIVET_BCRYPT_COST: process.env.AGRIVET_BCRYPT_COST || '4' },
   });
   if (res.status !== 0) failed = true;
   summary.push(`${level}: ${files.length} file(s) — ${res.status === 0 ? 'pass' : 'FAIL'}`);

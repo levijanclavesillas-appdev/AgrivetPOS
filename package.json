@@ -19,8 +19,10 @@
     "build:exe": "electron-builder --win --publish never"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.10.0",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
     "electron": "^33.4.11",
@@ -30,9 +32,20 @@
     "appId": "store.chachisoftware.agrivetpos",
     "productName": "ChachiAgrivetPOS",
     "artifactName": "ChachiAgrivetPOS-Setup-${version}.${ext}",
-    "files": ["main.js", "src/**/*", "public/**/*", "package.json"],
-    "directories": { "output": "dist", "buildResources": "build" },
-    "win": { "target": "nsis", "requestedExecutionLevel": "asInvoker" },
+    "files": [
+      "main.js",
+      "src/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "requestedExecutionLevel": "asInvoker"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
