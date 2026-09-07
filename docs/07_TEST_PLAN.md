@@ -34,6 +34,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-UT-01` | bcrypt verify; wrong password rejected; hash never returned | `SEC-1` |
 | `TC-UT-05` | An audited mutation writes exactly one row with before and after | `AUD-601`, `AUD-606` |
 | `TC-UT-06` | The settings registry is the whole `OPS-005` list, typed and bounded; no service declares a figure of its own | `OPS-005` |
+| `TC-UT-07` | Every action `AUD-601`/`AUD-603` names is registered; credentials are stripped from a payload; no repository has an `UPDATE` or `DELETE` path on `audit_logs` | `AUD-601`, `AUD-603`, `AUD-605`, `SEC-11` |
 | `TC-UT-10` | Base unit immutable once a movement exists | `UOM-001`, `UOM-003` |
 | `TC-UT-11` | 1 sack (factor 50,000) from 500.000 KG leaves 450.000 KG | `UOM-002` |
 | `TC-UT-12` | 1.255 KG × ₱62.50 = ₱78.44 half-up; 1,000 lines sum with zero drift | `MON-002`, `MON-003` |

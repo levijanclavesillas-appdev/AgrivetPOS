@@ -339,7 +339,7 @@ function set(key, raw, actor, { reason = null } = {}) {
   const at = clock.nowUtc();
   put(key, value, { updatedAt: at, updatedBy: actor && actor.id ? actor.id : null });
 
-  auditService.record({
+  auditService.write({
     actor,
     action: 'SETTING_CHANGED',
     entityType: 'system_settings',

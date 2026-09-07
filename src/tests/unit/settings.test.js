@@ -42,10 +42,15 @@ const OPS_005_FIGURES = {
   'cash rounding': ['cash_rounding_centavos'],
 };
 
+/**
+ * OPS-005's own definition row, anchored on the start of the table row rather than
+ * found by first mention — a rule is cited by other rules before it is defined, and
+ * matching a cross-reference means checking the wrong sentence.
+ */
 function ops005Text() {
   const rules = fs.readFileSync(path.join(root, 'docs', '03_BUSINESS_RULES.md'), 'utf8');
-  const line = rules.split('\n').find((l) => l.includes('`OPS-005`'));
-  assert.ok(line, 'OPS-005 is missing from 03_BUSINESS_RULES.md');
+  const line = rules.split('\n').find((l) => l.startsWith('| `OPS-005` |'));
+  assert.ok(line, 'OPS-005 has no definition row in 03_BUSINESS_RULES.md');
   return line;
 }
 

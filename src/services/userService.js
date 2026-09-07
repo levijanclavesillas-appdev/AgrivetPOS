@@ -83,7 +83,7 @@ function create({ username, fullName, password, role, pin = null }, actor) {
 
   return db.transaction(() => {
     const created = userRepository.insert(row);
-    auditService.record({
+    auditService.write({
       actor,
       action: 'USER_CREATED',
       entityType: 'users',
@@ -155,9 +155,9 @@ function update(id, changes, actor) {
 
   return db.transaction(() => {
     const updated = userRepository.updateFields(id, fields);
-    auditService.record({
+    auditService.write({
       actor,
-      action: changes.isActive === false ? 'USER_DEACTIVATED' : 'USER_MODIFIED',
+      action: actionFor(changes, before, after),
       entityType: 'users',
       entityId: id,
       before: Object.keys(before).length ? before : null,
@@ -165,6 +165,28 @@ function update(id, changes, actor) {
     });
     return auth.toPublic(updated);
   });
+}
+
+/**
+ * One save is one row, and this chooses which action it is written under.
+ *
+ * AUD-601 lists "user create/modify/deactivate" together and "role change" separately,
+ * so a demotion has to be findable on its own rather than buried in a generic modify.
+ * SCR-701 edits a user in one form, though, and splitting one save into three rows
+ * makes the trail harder to read than the thing it is recording — so the row takes the
+ * most significant action of the save, and its before/after carries every field that
+ * moved regardless.
+ *
+ * The one case this flattens is a save that both demotes and deactivates: it reads as
+ * a deactivation, and the role move is visible in the values rather than the action.
+ */
+function actionFor(changes, before, after) {
+  if (changes.isActive === false) return 'USER_DEACTIVATED';
+  // Submitted-and-unchanged is not a change: SCR-701 posts the whole form, so a role
+  // that came back identical must not be recorded as a demotion nobody performed.
+  if (after.role !== undefined && after.role !== before.role) return 'ROLE_CHANGED';
+  if (changes.password !== undefined) return 'PASSWORD_RESET';
+  return 'USER_MODIFIED';
 }
 
 module.exports = { list, get, create, update, assertNotLastOwner };

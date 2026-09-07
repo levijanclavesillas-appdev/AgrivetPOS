@@ -161,7 +161,7 @@ function registerFailure(user) {
   if (attempts >= threshold) {
     lockedUntilAt = new Date(Date.now() + minutes * 60000).toISOString();
     // AUD-601: failures beyond the threshold are audited.
-    auditService.record({
+    auditService.write({
       actor: { id: user.id, username: user.username },
       action: 'LOGIN_LOCKED',
       entityType: 'users',
@@ -339,7 +339,7 @@ function recover({ username, recoveryCode, newPassword }) {
   const replacement = generateRecoveryCode();
 
   db.transaction(() => {
-    auditService.record({
+    auditService.write({
       actor: { id: user.id, username: user.username },
       action: 'OWNER_PASSWORD_RECOVERED',
       entityType: 'users',

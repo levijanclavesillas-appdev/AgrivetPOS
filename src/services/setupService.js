@@ -239,7 +239,7 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
       overrides: { backup_folder: folder },
     });
 
-    auditService.record({
+    auditService.write({
       actor: SETUP_ACTOR,
       action: 'INSTALLATION_SET_UP',
       entityType: 'store_profile',

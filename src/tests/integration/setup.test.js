@@ -116,8 +116,8 @@ test('completion is one transaction: a failure inside it leaves nothing behind',
 
   // Fail at the last write inside the transaction — the audit row — which is as late
   // as anything can fail once the profile and the owner are already inserted.
-  const original = auditService.record;
-  t.mock.method(auditService, 'record', () => { throw new Error('disk full'); });
+  const original = auditService.write;
+  t.mock.method(auditService, 'write', () => { throw new Error('disk full'); });
 
   assert.throws(() => setupService.complete(validPayload('atomic')), /disk full/);
 
@@ -127,7 +127,7 @@ test('completion is one transaction: a failure inside it leaves nothing behind',
   assert.equal(setupService.isComplete(), false);
 
   t.mock.restoreAll();
-  assert.equal(auditService.record, original);
+  assert.equal(auditService.write, original);
 });
 
 test('killing the app mid-wizard resumes at step 1 with nothing written', () => {

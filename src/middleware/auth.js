@@ -63,7 +63,7 @@ function requirePermission(txId, { level = null } = {}) {
       const pinBlocked = req.session.scope === 'PIN' && !permissions.PIN_SCOPE.includes(txId);
       const holders = permissions.rolesHolding(txId, level);
 
-      auditService.record({
+      auditService.write({
         actor: { id: req.session.id, username: req.session.username },
         action: 'PERMISSION_REFUSED',
         entityType: 'permission',

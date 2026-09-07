@@ -138,7 +138,7 @@ function update(changes, actor) {
 
   return db.transaction(() => {
     const updated = storeProfileRepository.updateFields(current.id, fields);
-    auditService.record({
+    auditService.write({
       actor,
       action: 'STORE_PROFILE_CHANGED',
       entityType: 'store_profile',
@@ -171,7 +171,7 @@ function setTaxMode(mode, actor, { reason = null } = {}) {
       updated_at: clock.nowUtc(),
       updated_by: actor && actor.id ? actor.id : null,
     });
-    auditService.record({
+    auditService.write({
       actor,
       action: 'TAX_MODE_CHANGED',
       entityType: 'store_profile',
