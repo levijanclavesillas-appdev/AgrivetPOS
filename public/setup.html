@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set up Chachi Agrivet POS</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <!--
+    SCR-001 — first-run setup wizard. Five steps, no exit (04_UX_SPEC.md §3).
+
+    Nothing here writes anything: the server holds no wizard state and the whole
+    installation is one POST at the end. Closing the window at step 4 leaves a database
+    that is still empty, which is what "killing the app resumes at step 1" means.
+  -->
+  <main class="wizard">
+    <header class="wizard-head">
+      <h1>Set up Chachi Agrivet POS</h1>
+      <p class="muted">Five steps. Nothing is saved until the last one.</p>
+      <ol class="steps" id="steps" aria-label="Setup progress"></ol>
+    </header>
+
+    <form id="wizard" novalidate>
+      <!-- 1 — Store -->
+      <section class="step" data-step="store" hidden>
+        <h2>1 · Your store</h2>
+        <label>Store name <span class="req" aria-hidden="true">*</span>
+          <input name="storeName" required maxlength="120" autocomplete="organization">
+        </label>
+        <label>Address
+          <input name="address" maxlength="200" autocomplete="street-address">
+        </label>
+        <label>Contact number
+          <input name="contactNo" maxlength="40" autocomplete="tel">
+        </label>
+        <label>TIN <span class="muted">(optional)</span>
+          <input name="tin" maxlength="40">
+        </label>
+      </section>
+
+      <!-- 2 — Tax mode (TAX-001) -->
+      <section class="step" data-step="tax" hidden>
+        <h2>2 · Tax</h2>
+        <p class="muted">
+          This sets how prices are treated on every sale. Only the owner can change it
+          later, and the change is recorded.
+        </p>
+        <div id="tax-modes" class="choices"></div>
+      </section>
+
+      <!-- 3 — Owner (VR-501, VR-502) -->
+      <section class="step" data-step="owner" hidden>
+        <h2>3 · Owner account</h2>
+        <p class="muted">The first account. It can do everything, including creating the rest.</p>
+        <label>Full name <span class="req" aria-hidden="true">*</span>
+          <input name="fullName" required maxlength="120" autocomplete="name">
+        </label>
+        <label>Username <span class="req" aria-hidden="true">*</span>
+          <input name="username" required minlength="3" maxlength="32" autocomplete="username" autocapitalize="none">
+        </label>
+        <label>Password <span class="req" aria-hidden="true">*</span>
+          <input name="password" type="password" required minlength="10" autocomplete="new-password">
+          <small class="muted">At least 10 characters.</small>
+        </label>
+        <label>Confirm password <span class="req" aria-hidden="true">*</span>
+          <input name="passwordConfirm" type="password" required autocomplete="new-password">
+        </label>
+        <label>Counter PIN <span class="muted">(optional, 6 digits)</span>
+          <input name="pin" inputmode="numeric" pattern="\d{6}" maxlength="6" autocomplete="off">
+          <small class="muted">Unlocks your own open shift at the counter. Not a second password.</small>
+        </label>
+      </section>
+
+      <!-- 4 — Recovery code (SEC-5) -->
+      <section class="step" data-step="recovery" hidden>
+        <h2>4 · Recovery code</h2>
+        <p>
+          This application runs offline, so there is no "forgot password" email. This code
+          is the only way back into the owner account if the password is lost.
+        </p>
+        <p class="warn">
+          It is shown <strong>once</strong>, on the last screen of this wizard, and cannot be
+          shown again. Write it down and keep it somewhere away from the computer.
+        </p>
+        <label class="check">
+          <input type="checkbox" name="acknowledgedRecoveryCode" required>
+          I understand the code is shown once and I am ready to write it down.
+        </label>
+      </section>
+
+      <!-- 5 — Backup folder (OPS-001) -->
+      <section class="step" data-step="backup" hidden>
+        <h2>5 · Backup folder</h2>
+        <p class="muted">
+          Backups run at every shift close and once a day. This folder must be
+          <strong>outside</strong> the application's own folder — ideally another drive — so a
+          backup survives losing the computer's disk.
+        </p>
+        <label>Backup folder <span class="req" aria-hidden="true">*</span>
+          <input name="backupFolder" required spellcheck="false">
+        </label>
+        <small class="muted">
+          The folder is created if it does not exist, and is tested by writing a file to it
+          before setup finishes.
+        </small>
+      </section>
+
+      <!-- Done -->
+      <section class="step" data-step="done" hidden>
+        <h2>Setup complete</h2>
+        <p>Write this recovery code down now. It will not be shown again.</p>
+        <p class="code" id="recovery-code" aria-live="polite"></p>
+        <p class="muted" id="done-detail"></p>
+        <button type="button" id="go-to-app" class="primary">Go to the application</button>
+      </section>
+
+      <p class="error" id="error" role="alert" hidden></p>
+
+      <nav class="wizard-nav">
+        <button type="button" id="back">Back</button>
+        <button type="submit" id="next" class="primary">Next</button>
+      </nav>
+    </form>
+  </main>
+  <script type="module" src="/js/setup.js"></script>
+</body>
+</html>

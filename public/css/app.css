@@ -18,3 +18,39 @@ dl { margin: 0; border-top: 1px solid var(--rule); }
 .row { display: flex; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid var(--rule); }
 dt { flex: 0 0 11rem; color: var(--muted); margin: 0; }
 dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* ── SCR-001 setup wizard (TASK-004) ─────────────────────────────────────── */
+:root { --accent: #1f5c3d; --warn-bg: #fff6e0; --warn-ink: #6b4b00; }
+.wizard { max-width: 38rem; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+.wizard-head h1 { margin-bottom: .25rem; }
+.steps { display: flex; flex-wrap: wrap; gap: .75rem; list-style: none;
+  margin: 1.5rem 0 2rem; padding: 0; font-size: .8125rem; color: var(--muted); }
+.steps li span { display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem;
+  margin-right: .3rem; border: 1px solid var(--rule); border-radius: 50%; }
+.steps li.current { color: var(--ink); font-weight: 600; }
+.steps li.current span { border-color: var(--accent); color: var(--accent); }
+.steps li.done span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.step h2 { font-size: 1.125rem; margin: 0 0 .75rem; }
+.step p { margin: 0 0 1rem; line-height: 1.5; }
+label { display: block; margin: 0 0 1rem; font-size: .875rem; }
+label input[type="text"], label input[type="password"], label input:not([type]) {
+  display: block; width: 100%; margin-top: .3rem; padding: .55rem .6rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+label small { display: block; margin-top: .3rem; }
+.req { color: var(--error); }
+.check, .choice { display: flex; gap: .6rem; align-items: flex-start; }
+.choices { display: grid; gap: .6rem; }
+.choice { padding: .75rem; border: 1px solid var(--rule); border-radius: 6px; background: #fff; }
+.choice:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.choice-body { display: grid; gap: .2rem; }
+.warn { background: var(--warn-bg); color: var(--warn-ink); padding: .75rem;
+  border-radius: 4px; border: 1px solid #f0dcae; }
+.code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 1.5rem;
+  letter-spacing: .08em; padding: 1rem; background: #fff; border: 1px dashed var(--accent);
+  border-radius: 6px; text-align: center; user-select: all; }
+.wizard-nav { display: flex; gap: .75rem; justify-content: flex-end; margin-top: 2rem;
+  padding-top: 1.25rem; border-top: 1px solid var(--rule); }
+button { padding: .55rem 1.1rem; border: 1px solid var(--rule); border-radius: 4px;
+  background: #fff; font: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button[disabled] { opacity: .5; cursor: progress; }

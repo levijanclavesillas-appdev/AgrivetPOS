@@ -10,22 +10,60 @@
 const express = require('express');
 const path = require('path');
 const healthRoutes = require('./routes/health');
+const setupRoutes = require('./routes/setup');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const settingsRoutes = require('./routes/settings');
+const setupService = require('./services/setupService');
+const { requireSetup } = require('./middleware/setup');
 
 const API_BASE = '/api/v1';
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
 
+  // FR_1.1: until the wizard has finished, /setup and /health are the only API this
+  // installation has. The gate is mounted before every route rather than checked
+  // inside them, so a route added later is refused by default rather than by memory.
+  app.use(API_BASE, requireSetup);
+
+  app.use(API_BASE, setupRoutes);
   app.use(API_BASE, healthRoutes);
   app.use(API_BASE, authRoutes);
   app.use(API_BASE, userRoutes);
+  app.use(API_BASE, settingsRoutes);
 
   // The renderer. Vanilla ES modules, no build step (05_TECH_SPEC.md §2).
-  app.use(express.static(path.join(__dirname, '..', 'public')));
+  //
+  // An unconfigured installation is served the wizard at the root, so double-clicking
+  // the shortcut on a fresh install lands on SCR-001 rather than on a shell whose every
+  // request is refused. The server-side gate above is what actually enforces it; this
+  // only decides which page a person sees.
+  app.get('/', (req, res, next) => {
+    try {
+      const page = setupService.isComplete() ? 'index.html' : 'setup.html';
+      res.sendFile(path.join(PUBLIC_DIR, page));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // The shell itself is not reachable before setup either. Its every request would be
+  // refused by the gate above, so serving it would only show a person a screen that
+  // cannot work — requirement 1's "no other screen is reachable", applied to the one
+  // path express.static would otherwise answer directly.
+  app.get('/index.html', (req, res, next) => {
+    try {
+      return setupService.isComplete() ? next() : res.redirect(302, '/');
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.use(express.static(PUBLIC_DIR));
 
   app.use(API_BASE, (req, res) => {
     res.status(404).json({
@@ -53,4 +91,4 @@ function createApp() {
   return app;
 }
 
-module.exports = { createApp, API_BASE };
+module.exports = { createApp, API_BASE, PUBLIC_DIR };

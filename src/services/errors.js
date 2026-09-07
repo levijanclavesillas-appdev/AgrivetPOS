@@ -23,4 +23,10 @@ const notFound = (message, opts = {}) => new AppError(message, { status: 404, co
 const conflict = (message, opts = {}) => new AppError(message, { status: 409, code: 'CONFLICT', ...opts });
 const locked = (message, opts = {}) => new AppError(message, { status: 423, code: 'ACCOUNT_LOCKED', ...opts });
 
-module.exports = { AppError, badRequest, unauthorized, forbidden, notFound, conflict, locked };
+// FR_1.1: a request that arrives before the setup wizard has finished. 409 rather than
+// 503: nothing is temporarily down — the request conflicts with the state of an
+// installation that has not been configured yet, and retrying it unchanged will fail
+// the same way until someone finishes the wizard.
+const setupRequired = (message, opts = {}) => new AppError(message, { status: 409, code: 'SETUP_REQUIRED', ruleId: 'FR_1.1', ...opts });
+
+module.exports = { AppError, badRequest, unauthorized, forbidden, notFound, conflict, locked, setupRequired };

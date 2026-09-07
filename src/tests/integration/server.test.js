@@ -18,6 +18,7 @@ let instance;
 test.before(async () => {
   temp.openEmpty('server');          // migrate() inside start() brings it to current
   instance = await server.start({ listenPort: PORT });
+  temp.seedStore();                  // past the FR_1.1 setup gate; the wizard has its own cases
 });
 
 test.after(async () => {

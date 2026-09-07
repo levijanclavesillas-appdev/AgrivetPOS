@@ -259,7 +259,7 @@ test('a session times out, and the message says so without leaking why', () => {
   temp.openMigrated('session-expiry');
   const user = temp.seedUser({ username: 'cashier1', password: PASSWORD });
 
-  settingsService.set('idle_timeout_minutes', 15);
+  settingsService.set('idle_timeout_minutes', 15, temp.SETUP_ACTOR);
   const token = authService.issueToken({ user: { id: user.id, username: user.username, role: user.role } });
   assert.equal(authService.verifyToken(token).username, 'cashier1');
 
@@ -271,7 +271,7 @@ test('the idle timeout comes from settings, not from a literal (OPS-005)', () =>
   temp.openMigrated('idle-setting');
   assert.equal(settingsService.get('idle_timeout_minutes'), 15, 'the declared default');
 
-  settingsService.set('idle_timeout_minutes', 30);
+  settingsService.set('idle_timeout_minutes', 30, temp.SETUP_ACTOR);
   assert.equal(settingsService.get('idle_timeout_minutes'), 30, 'the store may change it');
 });
 

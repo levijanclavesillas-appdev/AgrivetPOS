@@ -60,8 +60,33 @@ function cleanup() {
   for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/** The system actor a first-run setup uses before any user exists (TASK-004 owns it). */
-const SETUP_ACTOR = Object.freeze({ id: null, username: 'setup' });
+/** The system actor a first-run setup uses before any user exists (TASK-004). */
+const SETUP_ACTOR = require('../../services/setupService').SETUP_ACTOR;
+
+/**
+ * Bring a migrated database to "installed": a store profile and the seeded settings.
+ *
+ * Most cases need an installation rather than a wizard — the setup gate refuses every
+ * route until one exists (FR_1.1), so a test that skips this is testing the gate
+ * whether it meant to or not. Cases that *are* about the wizard use a bare
+ * openMigrated() and drive setupService themselves.
+ */
+function seedStore({ storeName = 'Test Agrivet Supply', taxMode = 'NONE', withOwner = true } = {}) {
+  const storeProfileService = require('../../services/storeProfileService');
+  const settingsService = require('../../services/settingsService');
+  const userRepository = require('../../repositories/userRepository');
+
+  const profile = storeProfileService.create({ storeName, taxMode });
+  settingsService.seedDefaults();
+
+  // setupService.isComplete() is profile AND active owner, so an installation without
+  // one is still behind the gate. Cases that seed their own owner pass withOwner:false
+  // rather than end up with two, which would quietly disarm VR-503.
+  if (withOwner && userRepository.countActiveOwners() === 0) {
+    seedUser({ username: 'installowner', role: 'OWNER', fullName: 'Install Owner' });
+  }
+  return profile;
+}
 
 /** Create a user directly through the service, as an administrator would. */
 function seedUser({ username, role = 'CASHIER', password = 'correct-horse-battery', pin = null, fullName = null }) {
@@ -72,4 +97,4 @@ function seedUser({ username, role = 'CASHIER', password = 'correct-horse-batter
   );
 }
 
-module.exports = { freshDir, openEmpty, openMigrated, reopen, cleanup, seedUser, SETUP_ACTOR };
+module.exports = { freshDir, openEmpty, openMigrated, reopen, cleanup, seedStore, seedUser, SETUP_ACTOR };

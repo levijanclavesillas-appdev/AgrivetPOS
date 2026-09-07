@@ -31,6 +31,7 @@ const call = (path, { token = null, method = 'GET', body = null } = {}) => fetch
 test.before(async () => {
   temp.openEmpty('authz');
   instance = await server.start({ listenPort: PORT });
+  temp.seedStore({ withOwner: false });   // the roles below include the owner
 
   for (const role of permissions.ROLES) {
     const username = role.toLowerCase();
