@@ -13,9 +13,9 @@ and current gate status**.
 | Unit | `node:test` | Pure calculation: money, rounding, unit conversion, price resolution, tax, ageing | `npm run test:unit` |
 | Integration | project runner | Service + repository against a temp SQLite file, real transactions | `npm run test` |
 | API | project runner | Every endpoint, including authorisation refusals | `npm run test` |
-| E2E | project runner | A scripted trading day end to end | `npm run test:e2e` |
+| E2E | project runner | Whole scripted journeys: a trading day, a cutover from nothing, a cashier's shift to a counted close, a credit customer's life, an install configured, a day read back off the audit trail, and the offline and power-loss cases | `npm run test:e2e` |
 | Performance | project runner | `NFR_1.*` budgets against a seeded 5,000-product database | `npm run test:perf` |
-| Browser smoke | scripted, out of gate | The real renderer in Chromium: sign in, open the shift, scan, park, resume, pay, receipt, reports, backups, health | `./tools/browser-smoke/run.sh` |
+| Browser smoke | scripted, out of gate | The real renderer in Chromium: sign in, open a shift, scan, park, resume, pay, receipt, catalogue, adjustment, customers, a collection, the shift close, reports, users, settings, backups, restore confirmation, health and the audit trail | `./tools/browser-smoke/run.sh` |
 | Installer macros | scripted, out of gate | `build/installer.nsh` compiles, and the uninstaller never removes the database or the backup folder | `./tools/installer/check.sh` |
 | Installer | manual, scripted | The signed `.exe` on the reference machine: clean install, upgrade, uninstall | — |
 | UAT | manual | `07_TEST_PLAN.md` §8, on the store's own hardware | — |
@@ -227,14 +227,14 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ **built, tested and reachable.** All 26 screens in `04_UX_SPEC.md` §3 exist, asserted by `TC-UI-10`. The acceptance criteria themselves are confirmed on the store's hardware at UAT (item 9) |
-| 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 12 |
-| 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; it found `UOM-004` and `POS-103` untested on its first run and both now have cases |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ **built, tested and reachable.** All 26 screens in `04_UX_SPEC.md` §3 exist, asserted by `TC-UI-10`. The criteria are *confirmed* on the store's hardware at UAT (item 9) |
+| 2 | `npm run test:all` green | ☑ green — **750 cases**: 195 unit, 437 integration and API, 118 E2E, across 48 files |
+| 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; 51 of 51 outside §2's obligation as well |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
 | 5 | Zero open S1 or S2 defects | ◐ **none known, and nothing has run in the store.** Settled at UAT sign-off (`docs/UAT_RECORD.md`) |
-| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ all five written and measuring. **Every figure below is from a build machine, not the reference spec, and therefore establishes nothing about the budget** (§6) |
-| 7 | `TC-E2E-08` passes with networking disabled | ◐ written and green with `dns`, `net`, `tls`, `http`, `https` and `fetch` replaced by throwing stubs — the application reaches for nothing. **The machine-level version, cable out at the wall, is UAT check F** |
-| 8 | `TC-E2E-09` passes — power-loss durability | ◐ written and green against `SIGKILL`, which proves the process-death half and would pass with `synchronous = OFF`. **The plug-pull is UAT check 7** |
+| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ all five written, measuring and green. **Every figure below is from a build machine, not the reference spec, and establishes nothing about the budget** (§6) |
+| 7 | `TC-E2E-08` passes with networking disabled | ◐ green with `dns`, `net`, `tls`, `http`, `https` and `fetch` replaced by throwing stubs — the application reaches for nothing. **The machine-level version, cable out at the wall, is UAT check F** |
+| 8 | `TC-E2E-09` passes — power-loss durability | ◐ green against `SIGKILL`, which proves the process-death half and would pass with `synchronous = OFF`. **The plug-pull is UAT check 7** |
 | 9 | UAT §8 complete on the store's hardware, owner signed | ☐ **not started.** `docs/UAT_RECORD.md` is the sheet it is recorded on |
 | 10 | Backup verified restorable onto a second machine | ☐ **not done.** `TC-INT-74` restores in place; the second machine is UAT check G |
 | 11 | `TAX-006` confirmed on the printed document | ☐ **not done.** Asserted in the encoder's output and in `TC-E2E-08`; never read on paper. UAT check 10 |
@@ -243,57 +243,60 @@ Measured on a build machine, reported for regression purposes and for nothing el
 
 | Case | Budget | Measured here | On the reference machine |
 | :--- | :--- | :--- | :--- |
-| `TC-PERF-01` — sale, confirm to receipt | `NFR_1.1` ≤ 2 s | median 12 ms | not measured |
-| `TC-PERF-02` — scan to cart line | `NFR_1.2` ≤ 300 ms | median 0.6 ms | not measured |
-| `TC-PERF-03` — product search | `NFR_1.3` ≤ 500 ms | median 20 ms | not measured |
-| `TC-PERF-04` — cold start to login | `NFR_1.4` ≤ 8 s | median 713 ms, server only | not measured; excludes Electron and Chromium starting |
-| `TC-PERF-05` — dashboard at 100,000 lines | `NFR_1.5` ≤ 3 s | median 125 ms | not measured |
+| `TC-PERF-01` — sale, confirm to receipt | `NFR_1.1` ≤ 2 s | median 20 ms | not measured |
+| `TC-PERF-02` — scan to cart line | `NFR_1.2` ≤ 300 ms | median 0.9 ms | not measured |
+| `TC-PERF-03` — product search | `NFR_1.3` ≤ 500 ms | median 37 ms | not measured |
+| `TC-PERF-04` — cold start to login | `NFR_1.4` ≤ 8 s | median 766 ms, server only | not measured; excludes Electron and Chromium starting |
+| `TC-PERF-05` — dashboard at 100,000 lines | `NFR_1.5` ≤ 3 s | median 355 ms | not measured |
 
-> ### Gate status, 2026-09-08 — **NOT SHIPPABLE, and one step from being assessable**
+**How little these figures mean, measured.** The same suite on the same machine produced
+figures two to three times apart depending on what else the host was doing — the quarter-wide
+report took 2,143 ms running alone and 3,687 ms alongside three other perf files on a box
+carrying a load average of fifteen. That is the whole of §6's point, observed rather than
+asserted: a budget measured anywhere but the reference machine is not a budget. The cases
+assert a ceiling at four times the budget, which catches a structural regression — a full scan,
+a query per row, a dropped index — and nothing finer.
+
+> ### Gate status, 2026-09-08 — **NOT SHIPPABLE. Everything that can be settled here is.**
 >
-> `TASK-001` through `TASK-018` are built. Every automatable criterion is green: the suite
-> passes, the layering holds, every covered rule is cited by a test, and the offline and
-> durability cases that were unwritten a day ago now exist.
+> `TASK-001` through `TASK-018`, and `TASK-036` through `TASK-041`, are built. **Four of the
+> eleven criteria are met and cannot be advanced further from a build machine.** The remaining
+> seven all reduce to one thing: nothing has run in the store.
 >
-> **Nine of the twenty-six screens in `04_UX_SPEC.md` do not exist.** The backlog assigned
-> screens to `TASK-015`, `016` and `017` and never assigned the catalogue, customers, shift
-> close, users, settings or the audit viewer. Nothing here caught it, because every one of
-> those screens has a working, tested API underneath and this suite tests the API.
+> **The screen gap is closed.** `04_UX_SPEC.md` specifies 26 screens; 13 existed when the gap
+> was found while writing `DEPLOYMENT.md`, which told an installer to open a settings screen
+> that did not exist. Every service and API behind the missing thirteen was built and tested,
+> which is exactly why nothing caught it — the suite was green because the suite tests the API.
+> `TC-UI-10` now asserts the whole of §3 has a view, so it cannot reopen quietly, and
+> `TC-E2E-10` to `TC-E2E-15` walk the paths end to end: a store can be installed, configured,
+> stocked, staffed and traded from the application, its till counted, its credit customers paid
+> off, and its audit trail read by the owner it was written for.
 >
-> **The screen gap is closed.** All six tasks are done and `TC-UI-10` asserts every screen in
-> `04_UX_SPEC.md` §3 has a view — thirteen were missing when it was found. `TC-E2E-10` to
-> `TC-E2E-15` walk the paths end to end: a store can be installed, configured, stocked, staffed
-> and traded from the application, its till counted, its credit customers paid off, and its
-> audit trail read by the owner it was written for.
+> **What is left needs the store, and none of it is paperwork:**
 >
-> **Everything that can be settled from a build machine now is.** What remains needs the store.
->
-> **Four further criteria need the store.** They are not paperwork:
->
-> - **Nothing has run on the store's hardware** (5, 6, 9). No receipt has been printed on
->   paper, no drawer has opened, no scanner has been used, and every performance figure
->   above came from a machine that is not the one the store will use. §6 says plainly that
->   a budget measured anywhere else is not a budget.
+> - **Nothing has run on the store's hardware** (5, 6, 9). No receipt has been printed on paper,
+>   no drawer has opened, no scanner has been used, and every performance figure above came from
+>   a machine that is not the one the store will use.
 > - **A backup has never been restored onto a second machine** (10). This is the scenario
->   `05_TECH_SPEC.md` §7's disaster-recovery table actually describes, and until it has
->   been done once the store's backups are untested where it counts.
-> - **`TAX-006` has never been read on paper** (11). It is a legal requirement about a
->   physical document handed to a customer, and it has only ever been asserted against a
->   byte stream.
-> - **The two hardest guarantees are half-proved** (7, 8). `TC-E2E-08` proves the
->   application reaches for no network; it does not prove the machine has none.
->   `TC-E2E-09` proves a killed process loses nothing; `SIGKILL` does not empty the
->   operating system's write cache, and a power cut does.
+>   `05_TECH_SPEC.md` §7's disaster-recovery table actually describes, and until it has been
+>   done once the store's backups are untested where it counts.
+> - **`TAX-006` has never been read on paper** (11). It is a legal requirement about a physical
+>   document handed to a customer, and it has only ever been asserted against a byte stream.
+> - **The two hardest guarantees are half-proved** (7, 8). `TC-E2E-08` proves the application
+>   reaches for no network; it does not prove the machine has none. `TC-E2E-09` proves a killed
+>   process loses nothing; `SIGKILL` does not empty the operating system's write cache, and a
+>   power cut does.
 >
-> **The installer is built but not produced.** `npm run build:exe` packages the application
-> correctly and then stops: assembling and signing a Windows installer needs Windows or
-> `wine`, and signing needs a certificate the business holds. The NSIS macros are compiled
-> and checked by `tools/installer/check.sh`, so the hand-written half is verified — but no
-> `.exe` has been produced, installed, upgraded over or uninstalled.
+> **The installer is configured but not produced.** `npm run build:exe` packages the application
+> correctly and then stops: assembling and signing a Windows installer needs Windows or `wine`,
+> and signing needs a certificate the business holds. `tools/installer/check.sh` compiles the
+> hand-written NSIS macros and checks they say what requirement 6 requires — so the half that
+> can be wrong is verified — but no `.exe` has been produced, installed, upgraded over or
+> uninstalled.
 >
-> The path to a shippable gate is: close the screen gap (`TASK-036`–`TASK-041`), build and
-> sign the installer on a Windows machine, then work down `docs/UAT_RECORD.md` on the store's
-> own counter. The visit is the last step, not the next one.
+> **The path to a shippable gate is one visit, and it is now the next step rather than the last
+> one.** Build and sign the installer on a Windows machine, then work down
+> `docs/UAT_RECORD.md` on the store's own counter.
 
 ---
 
