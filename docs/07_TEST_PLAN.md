@@ -84,6 +84,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-INT-43` | Collection prints an acknowledgement with a `COLL-` number | `CR-206` |
 | `TC-INT-45` | Overpayment requires confirmation and becomes store credit | `CR-204` |
 | `TC-INT-46` | Balance always equals the sum of its credit transactions | `CR-103` |
+| `TC-INT-47` | A credit transaction is writable before `sales` and `cashier_shifts` exist — `sale_id` and `shift_id` are soft references | `CR-103`, `05` §3.4 |
 | `TC-INT-50` | Sale and collection both refused with no open shift | `POS-501` |
 | `TC-INT-51` | Expected cash arithmetic asserted against a scripted shift | `POS-509` |
 | `TC-INT-52` | A ₱200 short close demands a reason and writes the audit row | `POS-510`, `AUD-602` |

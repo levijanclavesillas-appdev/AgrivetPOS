@@ -30,7 +30,9 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(result.from, 0);
   assert.equal(result.to, migrate.binaryVersion());
   assert.deepEqual(result.applied, migrate.available().map((m) => m.file));
-  assert.deepEqual(result.applied.slice(0, 3), ['001_foundation.sql', '002_catalog.sql', '003_inventory.sql']);
+  assert.deepEqual(result.applied.slice(0, 4), [
+    '001_foundation.sql', '002_catalog.sql', '003_inventory.sql', '004_customers_credit.sql',
+  ]);
 
   const rows = migrate.applied();
   assert.equal(rows.length, migrate.binaryVersion());
@@ -38,6 +40,7 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(rows[0].name, 'foundation');
   assert.equal(rows[1].name, 'catalog');
   assert.equal(rows[2].name, 'inventory');
+  assert.equal(rows[3].name, 'customers_credit');
   for (const row of rows) assert.match(row.applied_at, /Z$/, 'applied_at is stored UTC (VR-102)');
 });
 
@@ -114,11 +117,15 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'products', 'units',
     // 003_inventory
     'inventory', 'inventory_movements',
+    // 004_customers_credit
+    'credit_allocations', 'customer_credit_accounts', 'customer_credit_transactions', 'customers',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
     'idx_products_name', 'idx_products_category', 'idx_products_active',
-    'idx_move_product', 'idx_move_ref', 'idx_move_corrects']) {
+    'idx_move_product', 'idx_move_ref', 'idx_move_corrects',
+    'idx_customers_name', 'idx_credit_account', 'idx_credit_due',
+    'idx_alloc_collection', 'idx_alloc_sale']) {
     assert.ok(repo.listIndexes().includes(index), `missing index ${index}`);
   }
   assert.ok(repo.integrityCheck().ok, 'a freshly migrated database passes integrity_check');

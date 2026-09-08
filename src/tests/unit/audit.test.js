@@ -106,7 +106,7 @@ test('every registered action carries a label and the rule that requires it', ()
   for (const [name, declared] of Object.entries(auditService.ACTIONS)) {
     assert.match(name, /^[A-Z][A-Z0-9_]*$/, `${name}: actions are SCREAMING_SNAKE_CASE`);
     assert.ok(declared.what && declared.what.length > 5, `${name}: SCR-703 lists this label`);
-    assert.match(declared.rule, /^(AUD-60[1-6]|SEC-\d+|VR-\d+|FR_[\d.]+)$/, `${name}: name the rule requiring it`);
+    assert.match(declared.rule, /^(AUD-60[1-6]|SEC-\d+|VR-\d+|CR-\d+|FR_[\d.]+)$/, `${name}: name the rule requiring it`);
   }
 });
 

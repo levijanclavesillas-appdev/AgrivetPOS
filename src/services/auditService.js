@@ -59,6 +59,14 @@ const ACTIONS = Object.freeze({
   // ── AUD-601: credit ───────────────────────────────────────────────────────
   CREDIT_LIMIT_CHANGED: { what: 'Credit limit changed', rule: 'AUD-601' },
   BALANCE_WRITTEN_OFF: { what: 'Balance written off', rule: 'AUD-601' },
+  // Not on AUD-601's list — a customer record is not a mutation of money or stock.
+  // Recorded anyway: a renamed or merged farm re-labels every statement that has
+  // ever been issued to it, and deactivating one hides a debt from the screens that
+  // filter to active customers (VR-305).
+  CUSTOMER_CREATED: { what: 'Customer created', rule: 'VR-301' },
+  CUSTOMER_MODIFIED: { what: 'Customer modified', rule: 'VR-301' },
+  CUSTOMER_DEACTIVATED: { what: 'Customer deactivated', rule: 'VR-304' },
+  CREDIT_ADJUSTED: { what: 'Credit balance adjusted', rule: 'CR-103' },
 
   // ── AUD-601: users and access ─────────────────────────────────────────────
   USER_CREATED: { what: 'User created', rule: 'AUD-601' },
