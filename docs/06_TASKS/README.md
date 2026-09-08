@@ -3,8 +3,9 @@
 Open work items. Each task is self-contained: an implementer should need this file, plus the
 specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-The repository contains **documentation only** — the last commit before the 2026-09-07
-restructuring was `2c3218e Add PRD documentation`. Every task below is open.
+**`TASK-001` through `TASK-018` are built, committed and green** (`c08f3af`, 2026-09-08). The
+v1.0 backlog as written is closed. What that does **not** mean is that v1.0 is finished — see
+[Status](#status) below, which names a screen gap the backlog never assigned to anybody.
 
 ---
 
@@ -26,28 +27,53 @@ not preference.
                                                                               017 backup
 ```
 
-## Open — v1.0 "Till"
+## Closed — v1.0 "Till"
 
-| ID | Task | Priority | Blocks release? |
+Every task below is implemented, tested and committed. The commit is the one that closed it.
+
+| ID | Task | Commit | What it left behind |
 | :--- | :--- | :--- | :--- |
-| [TASK-001](TASK-001-app-skeleton-and-migrations.md) | Application skeleton, layering, migrations, pragmas | P1 | Yes — everything |
-| [TASK-002](TASK-002-money-and-unit-primitives.md) | Money, quantity and unit-conversion primitives | P1 | Yes — `MON-*`, `UOM-*` |
-| [TASK-003](TASK-003-auth-rbac-and-recovery.md) | Authentication, RBAC, session, PIN, lockout, recovery | P1 | Yes — `FR_1.2`–`FR_1.4` |
-| [TASK-004](TASK-004-setup-wizard-and-settings.md) | First-run setup, store profile, tax mode, settings registry | P1 | Yes — `FR_1.1` |
-| [TASK-005](TASK-005-audit-service.md) | Audit service and trail | P1 | Yes — `FR_1.5` |
-| [TASK-006](TASK-006-catalog.md) | Catalog: categories, brands, units, products, barcodes, packs, prices | P1 | Yes — `FR_2.1`, `FR_2.2` |
-| [TASK-007](TASK-007-inventory-ledger.md) | Inventory ledger, on-hand, adjustments, low stock | P1 | Yes — `FR_2.4`–`FR_2.6` |
-| [TASK-008](TASK-008-customers-and-credit-accounts.md) | Customers and credit accounts | P1 | Yes — `FR_4.1` |
-| [TASK-009](TASK-009-pricing-and-tax-engine.md) | Price resolution and the three-mode tax engine | P1 | Yes — `FR_3.2`, `TAX-*` |
-| [TASK-010](TASK-010-shift-and-till.md) | Cashier shift, till cash in/out, expected cash | P1 | Yes — `FR_5.1`, `FR_5.2` |
-| [TASK-011](TASK-011-the-sale-transaction.md) | **The sale transaction** — `POST /sales` | P1 | Yes — `FR_3.3`–`FR_3.6` |
-| [TASK-012](TASK-012-collections.md) | Credit collections and allocation | P1 | Yes — `FR_4.3`, `FR_4.4` |
-| [TASK-013](TASK-013-shift-close-and-variance.md) | Shift close, per-method variance, backup trigger | P1 | Yes — `FR_5.3`, `FR_5.4` |
-| [TASK-014](TASK-014-escpos-printing-and-drawer.md) | ESC/POS receipt, cash drawer, reprint, collection acknowledgement | P1 | Yes — `FR_3.7`, `TAX-006` |
-| [TASK-015](TASK-015-pos-user-interface.md) | POS, payment and receipt screens | P1 | Yes — `SCR-301`–`SCR-304` |
-| [TASK-016](TASK-016-dashboard-and-reports.md) | Dashboard and the v1.0 reports | P2 | Yes — `FR_6.1`, `FR_6.2` |
-| [TASK-017](TASK-017-backup-restore-health-alerts.md) | Automatic backup, verification, restore, health, alerts | P1 | Yes — `FR_7.1`–`FR_7.4` |
-| [TASK-018](TASK-018-installer-and-uat.md) | Windows installer, first-run migration, UAT on store hardware | P1 | Yes — the gate |
+| [TASK-001](TASK-001-app-skeleton-and-migrations.md) | Application skeleton, layering, migrations, pragmas | `9f1a03e` | `TC-UT-99` layering guard, forward-only runner |
+| [TASK-002](TASK-002-money-and-unit-primitives.md) | Money, quantity and unit-conversion primitives | `6bb30d8` | Integer centavos and thousandths everywhere since |
+| [TASK-003](TASK-003-auth-rbac-and-recovery.md) | Authentication, RBAC, session, PIN, lockout, recovery | `d668379` | The `TX-*` matrix; `OWN_SHIFT` went unused until `TASK-016` |
+| [TASK-004](TASK-004-setup-wizard-and-settings.md) | First-run setup, store profile, tax mode, settings registry | `5d5c8de` | `SCR-001`; `TC-UT-06`, which has caught four constants since |
+| [TASK-005](TASK-005-audit-service.md) | Audit service and trail | `4722384` | `assertKnownAction`, which has caught every unregistered action since |
+| [TASK-006](TASK-006-catalog.md) | Catalog: categories, brands, units, products, barcodes, packs, prices | `2e3e76d` | Search at 12 ms after a 500× index fix |
+| [TASK-007](TASK-007-inventory-ledger.md) | Inventory ledger, on-hand, adjustments, low stock | `c19c314` | `INV-101` derived, never stored |
+| [TASK-008](TASK-008-customers-and-credit-accounts.md) | Customers and credit accounts | `975b4bd` | `CR-103` derived; ageing on Manila days |
+| [TASK-009](TASK-009-pricing-and-tax-engine.md) | Price resolution and the three-mode tax engine | `05756c2` | Every blocking decision per line, not the first |
+| [TASK-010](TASK-010-shift-and-till.md) | Cashier shift, till cash in/out, expected cash | `f32d0bc` | `POS-509` derived from the ledger |
+| [TASK-011](TASK-011-the-sale-transaction.md) | **The sale transaction** — `POST /sales` | `c361267` | One transaction; the pack factor resolved server-side |
+| [TASK-012](TASK-012-collections.md) | Credit collections and allocation | `dead8e6` | Oldest-first allocation |
+| [TASK-013](TASK-013-shift-close-and-variance.md) | Shift close, per-method variance, backup trigger | `2ae68ec` | `CREDIT` reported but not counted against the drawer |
+| [TASK-014](TASK-014-escpos-printing-and-drawer.md) | ESC/POS receipt, cash drawer, reprint, collection acknowledgement | `dac24f2` | Driver seams filled; printing never unwinds a sale |
+| [TASK-015](TASK-015-pos-user-interface.md) | POS, payment and receipt screens | `c91a78d` | `SCR-301`–`304`; carts in the database, not the renderer |
+| [TASK-016](TASK-016-dashboard-and-reports.md) | Dashboard and the v1.0 reports | `4f969b6` | `SCR-601`–`604`; gross profit pulled into v1.0 |
+| [TASK-017](TASK-017-backup-restore-health-alerts.md) | Automatic backup, verification, restore, health, alerts | `812a82b` | `SCR-704`, `705`; verified `.zip` backups, restore, `TC-E2E-09` |
+| [TASK-018](TASK-018-installer-and-uat.md) | Windows installer, first-run migration, UAT on store hardware | `c08f3af` | NSIS config, `TC-UT-98`, `TC-E2E-08`, handover and UAT sheets |
+
+## Open — v1.0 "Till", the screen gap
+
+**These are new, and they are release-blocking.** The v1.0 backlog assigned screens to three
+tasks — `TASK-015` (`SCR-301`–`304`), `TASK-016` (`SCR-601`–`604`) and `TASK-017` (`SCR-704`,
+`705`). Nobody was given the rest. `04_UX_SPEC.md` specifies **26 screens and 13 exist**; every
+service and API behind the missing thirteen is built and tested, but there is no screen to
+reach them from.
+
+The store can sell. It cannot be set up, stocked, or administered from the application.
+
+| ID | Task | Screens | Why it blocks release |
+| :--- | :--- | :--- | :--- |
+| `TASK-036` | Catalogue screens | `SCR-201`–`SCR-204` | No way to add a product, a barcode, a pack or a price. The cutover in `DEPLOYMENT.md` §6 cannot be performed |
+| `TASK-037` | Customer and credit screens | `SCR-401`–`SCR-403` | No way to add a customer, set a limit, or take a payment on account (`FR_4.3`) |
+| `TASK-038` | Shift screens | `SCR-501`–`SCR-503` | Shift open exists inside the POS screen; **there is no close screen**, so `FR_5.3` cannot be performed by a cashier |
+| `TASK-039` | Settings screen | `SCR-702` | No way to set the printer, the receipt width, the backup folder or any `OPS-005` figure |
+| `TASK-040` | User administration | `SCR-701` | No way to create the cashiers. The store would trade on the owner login, which defeats `TX-412` and every audit row |
+| `TASK-041` | Audit trail viewer | `SCR-703` | The trail is written and queryable but cannot be read by the owner (`FR_1.5`) |
+
+`TASK-038` is the sharpest: a shift that can be opened and not closed is a till that cannot be
+counted, and the close is where `POS-509`, `POS-510`, the variance and the automatic backup all
+happen.
 
 ## Open — v1.1 "Supply" (no task files yet; write them at v1.0 close)
 
@@ -67,6 +93,9 @@ not preference.
 > `TASK-026` is v1.1 by release but is needed **at cutover**, before the store's first real day.
 > If the client's SKU count makes manual entry impractical (`01_PRODUCT_BRIEF.md` `Q-4`), it is
 > pulled into v1.0 and the backlog is re-ordered — that is the one planned exception.
+>
+> **`Q-4` is answered:** the list is small enough to key in by hand, so `TASK-026` stays in v1.1
+> and the exception is not taken. Hand entry needs `TASK-036` above.
 
 ## Open — v1.2 "Trace"
 
@@ -82,23 +111,49 @@ not preference.
 
 ## Closed
 
-*None. Work has not started.*
+`TASK-001` – `TASK-018`, listed above with their commits.
 
 ---
 
-**Status of everything else.** Zero percent of `02_PRD.md` is built and zero percent is covered
-by tests. `07_TEST_PLAN.md` §10 gates v1.0 **not shippable** for the plainest possible reason:
-there is no application. The specifications are complete enough to implement from — every rule
-carries an ID, the v1.0 schema is written out in full in `05_TECH_SPEC.md` §3.4, and the sale
-transaction's step order is fixed in §4.1. Four business questions remain open
-(`01_PRODUCT_BRIEF.md` §9); only `Q-4` (the client's existing product list) can delay a task, and
-it delays `TASK-026`, not the critical path.
+<a id="status"></a>
+## Status — 2026-09-08
 
-**What remains.** Ten of the eleven v1.0 gate criteria are automated and belong to the tasks
-above. The eleventh — UAT on the store's own scanner, printer, drawer and PC — cannot be
-automated and is `TASK-018`. The off-machine backup copy in `05_TECH_SPEC.md` §7 is a **process
-control handed to the owner, not a software control**, and it is called out as such at handover
-rather than quietly assumed.
+**What is built.** 19,700 lines across 113 source files, 9 migrations, and 14,700 lines of
+tests. `npm run test:all` is green: **642 cases** — 160 unit, 436 integration and API, 46
+end-to-end — plus 4 performance files and two out-of-gate harnesses (`tools/browser-smoke`
+drives the real renderer in Chromium; `tools/installer/check.sh` compiles the NSIS macros).
+
+Every v1.0 service, repository, API route and business rule is implemented and tested.
+`TC-UT-98` asserts the coverage obligation mechanically: **62 covered v1.0 rules, all cited by
+a test**, and 51 of 51 rules outside the obligation as well.
+
+**What is not built, and it is not small.** Thirteen of the twenty-six screens in
+`04_UX_SPEC.md` do not exist — see [the screen gap](#open--v10-till-the-screen-gap) above.
+The backlog assigned screens to `TASK-015`, `016` and `017` and never assigned the rest, and
+nothing caught it because every one of those screens has a working, tested API underneath. The
+suite is green because the suite tests the API.
+
+In practical terms: a cashier can sell, take a split tender, park a cart, print a receipt and
+read the day's reports. Nobody can add a product, add a customer, close a shift, create a user,
+change a setting, or read the audit trail from the application.
+
+**Where the release gate stands.** `07_TEST_PLAN.md` §10 carries the per-criterion outcome.
+Seven of eleven criteria are green. Four need the store and cannot be settled from a build
+machine — the store's own hardware, a backup restored onto a second machine, `TAX-006` read on
+paper, and the power-cut half of `OPS-008`. The screen gap above is now a fifth reason, and
+unlike the other four it is code, not a visit.
+
+**The two open business questions are answered.** `Q-1`: the store is **not BIR-registered**,
+so `tax_mode` is `NONE` at install. `Q-4`: the product list is small enough to key in by hand,
+so `TASK-026` stays in v1.1 — though hand entry needs `TASK-036`.
+
+`Q-2` (cold-chain veterinary stock) and `Q-3` (delivery charges) remain open and affect only
+v1.2 scope.
+
+**One thing that is deliberately not software.** The off-machine backup copy in
+`05_TECH_SPEC.md` §7 is a **process control handed to the owner**, not something the
+application does. It is stated as such in `HANDOVER.md` §2 rather than quietly assumed, and
+the store is told in those words that backups on the shop PC do not survive the shop PC.
 
 ---
 

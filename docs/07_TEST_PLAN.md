@@ -207,7 +207,7 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ built and green in the suite. `FR_1.2` (offline) is asserted by `TC-E2E-08`; item 7 below is the same claim on the store's own machine |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ **every service, API and rule is built and tested; 13 of the 26 screens in `04_UX_SPEC.md` are not.** `FR_1.5` (audit readable), `FR_2.*` (catalogue), `FR_4.3` (collections) and `FR_5.3` (shift close) have no screen a user can reach — `06_TASKS/README.md`, the screen gap |
 | 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 6 |
 | 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; it found `UOM-004` and `POS-103` untested on its first run and both now have cases |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
@@ -235,7 +235,16 @@ Measured on a build machine, reported for regression purposes and for nothing el
 > passes, the layering holds, every covered rule is cited by a test, and the offline and
 > durability cases that were unwritten a day ago now exist.
 >
-> **Four criteria remain, and all four need the store.** They are not paperwork:
+> **Thirteen of the twenty-six screens in `04_UX_SPEC.md` do not exist.** The backlog assigned
+> screens to `TASK-015`, `016` and `017` and never assigned the catalogue, customers, shift
+> close, users, settings or the audit viewer. Nothing here caught it, because every one of
+> those screens has a working, tested API underneath and this suite tests the API. A store
+> could sell on this build and could not be set up, stocked, or administered on it — and a
+> shift that opens but cannot be closed is a till that cannot be counted. This is criterion 1,
+> and unlike the four below it is code rather than a visit. `06_TASKS/README.md` carries the
+> six tasks.
+>
+> **Four further criteria need the store.** They are not paperwork:
 >
 > - **Nothing has run on the store's hardware** (5, 6, 9). No receipt has been printed on
 >   paper, no drawer has opened, no scanner has been used, and every performance figure
@@ -258,8 +267,9 @@ Measured on a build machine, reported for regression purposes and for nothing el
 > and checked by `tools/installer/check.sh`, so the hand-written half is verified — but no
 > `.exe` has been produced, installed, upgraded over or uninstalled.
 >
-> The path to a shippable gate is one visit: build and sign the installer on a Windows
-> machine, then work down `docs/UAT_RECORD.md` on the store's own counter.
+> The path to a shippable gate is: close the screen gap (`TASK-036`–`TASK-041`), build and
+> sign the installer on a Windows machine, then work down `docs/UAT_RECORD.md` on the store's
+> own counter. The visit is the last step, not the next one.
 
 ---
 
