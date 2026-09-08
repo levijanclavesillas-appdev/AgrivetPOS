@@ -26,6 +26,8 @@ const money = require('./money');
 const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const drawerService = require('./drawerService');
+const documentService = require('./documentService');
+const permissions = require('./permissions');
 const shiftRepository = require('../repositories/shiftRepository');
 
 /** POS-201's tender types, which are also the methods a closing counts per (POS-510). */
@@ -33,6 +35,14 @@ const METHODS = Object.freeze(['CASH', 'GCASH', 'QRPH', 'CREDIT']);
 
 /** The methods that put money in the drawer. CREDIT puts none — it creates a debt. */
 const CASH_METHODS = Object.freeze(['CASH']);
+
+/**
+ * The methods a close is counted against (POS-510).
+ *
+ * CREDIT is absent for the reason given at the close itself: it is money *not*
+ * received, settled later by a collection (CR-201).
+ */
+const RECONCILABLE_METHODS = Object.freeze(['CASH', 'GCASH', 'QRPH']);
 
 const textOrNull = (value) => {
   const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -320,6 +330,276 @@ function computeExpected(shiftId) {
   };
 }
 
+// ── POS-510, POS-511, AUD-602 — the close ───────────────────────────────────
+
+/**
+ * Close a shift against a counted drawer.
+ *
+ * This is the screen that tells the owner whether the day was right, and the one place
+ * where the temptation to "make it balance" is strongest. POS-510 therefore forbids a
+ * silent forced balance: a variance beyond tolerance **requires a reason**, and the
+ * reason is audited (AUD-602). Closing is never adjusted to match the count, and the
+ * count is never adjusted to match the expectation — both figures are recorded and the
+ * difference between them is the report.
+ *
+ * The backup runs after the commit and its failure never reopens the shift: a drawer
+ * that has been counted and signed off is not un-counted because a USB stick was full.
+ */
+function close({
+  shiftId, actualCashCentavos, actualByMethod = {}, varianceReason = null,
+  approver = null, actor,
+}, session = actor) {
+  if (!actor || !actor.id) throw new TypeError('a close needs an acting user (POS-510)');
+
+  const shift = shiftRepository.findById(shiftId);
+  if (!shift) throw errors.notFound('No such shift');
+  if (shift.status !== 'OPEN') {
+    // POS-511: a closed shift is immutable, and that includes closing it twice.
+    throw errors.conflict('That shift is already closed.', { ruleId: 'POS-511' });
+  }
+
+  // TX-419 — closing another user's shift is a different permission from closing your
+  // own. A cashier may close their drawer; only a manager or owner closes somebody
+  // else's, because that is a count they did not make.
+  if (shift.user_id !== actor.id && !permissions.can(session, 'TX-419')) {
+    throw errors.forbidden(
+      "That is another user's shift. A manager or owner may close it for them.",
+      { ruleId: 'TX-419', requiresRole: permissions.rolesHolding('TX-419').join(' or ') }
+    );
+  }
+
+  const expected = computeExpected(shiftId);
+  const countedCash = normaliseAmount(actualCashCentavos, 'The counted cash');
+
+  // POS-510: actual counted cash **and** actual non-cash totals per method. A method
+  // the closer did not count is recorded as zero counted, not as "assume it matched" —
+  // the second would hide exactly the discrepancy the close exists to find.
+  //
+  // CREDIT is the exception, and it is not a loophole: a credit sale takes no money, so
+  // there is nothing to count against it. Its figure is the credit *given* today, which
+  // is settled later by a collection — reconciling it here would ask the closer for a
+  // count nobody can make, and would count the same peso twice, once as credit given
+  // today and once as cash collected next week. It is reported with the rest so the
+  // day's takings read as a whole, and carries no variance by construction.
+  const lines = METHODS.map((method) => {
+    const expectedCentavos = method === 'CASH'
+      ? expected.expected_cash_centavos
+      : expected.by_method[method].expected_centavos;
+
+    if (!RECONCILABLE_METHODS.includes(method)) {
+      return {
+        method,
+        expected_centavos: expectedCentavos,
+        actual_centavos: expectedCentavos,
+        variance_centavos: 0,
+        reconcilable: false,
+      };
+    }
+
+    const actual = method === 'CASH'
+      ? countedCash
+      : normaliseAmount(actualByMethod[method] ?? 0, `The counted ${method} total`);
+
+    return {
+      method,
+      expected_centavos: expectedCentavos,
+      actual_centavos: actual,
+      variance_centavos: actual - expectedCentavos,
+      reconcilable: true,
+    };
+  });
+
+  const cashLine = lines.find((line) => line.method === 'CASH');
+  const variance = cashLine.variance_centavos;
+  const tolerance = settingsService.get('cash_variance_tolerance_centavos');
+  const beyondTolerance = lines.some((line) => Math.abs(line.variance_centavos) > tolerance);
+  const reason = textOrNull(varianceReason);
+
+  if (beyondTolerance && !reason) {
+    const worst = lines.reduce((a, b) => (Math.abs(b.variance_centavos) > Math.abs(a.variance_centavos) ? b : a));
+    throw errors.badRequest(
+      `${worst.method} is ${money.toDisplay(Math.abs(worst.variance_centavos))} `
+      + `${worst.variance_centavos < 0 ? 'short' : 'over'}, beyond the `
+      + `${money.toDisplay(tolerance)} tolerance. Closing needs a reason — the count is never `
+      + 'silently forced to balance.',
+      { ruleId: 'POS-510' }
+    );
+  }
+
+  // POS-508: a shift open past the configured maximum requires owner authorisation to
+  // close with a variance. Not to close at all — a clean close of a long shift is
+  // still just a close — but a long shift *and* a discrepancy is the shape of a
+  // problem somebody should look at.
+  const stale = staleShifts().some((s) => s.shift_id === shiftId);
+  if (stale && beyondTolerance) {
+    const authorised = session && session.role === 'OWNER'
+      ? session
+      : (approver && approver.role === 'OWNER' ? approver : null);
+
+    if (!authorised) {
+      throw errors.forbidden(
+        `This shift has been open longer than the ${settingsService.get('shift_max_open_hours')}-hour `
+        + 'maximum and is closing with a variance. An owner must authorise it.',
+        { ruleId: 'POS-508', requiresRole: 'OWNER' }
+      );
+    }
+  }
+
+  const at = clock.nowUtc();
+
+  const result = db.transaction(() => {
+    const closingId = ids.uuidv7();
+
+    shiftRepository.insertClosing({
+      id: closingId,
+      shift_id: shiftId,
+      expected_cash_centavos: cashLine.expected_centavos,
+      actual_cash_centavos: cashLine.actual_centavos,
+      variance_centavos: variance,
+      variance_reason: reason,
+      closed_at: at,
+      closed_by: actor.id,
+    });
+
+    for (const { reconcilable, ...line } of lines) {
+      // `reconcilable` is a property of the method, not of this closing, so it is
+      // reported and not stored — closing_method_lines carries figures only.
+      shiftRepository.insertClosingLine({ id: ids.uuidv7(), closing_id: closingId, ...line });
+    }
+
+    const closed = shiftRepository.close(shiftId, { closedAt: at });
+
+    auditService.write({
+      actor,
+      approver: approver && approver.id && approver.id !== actor.id ? approver : null,
+      action: beyondTolerance ? 'SHIFT_CLOSED_WITH_VARIANCE' : 'SHIFT_CLOSED',
+      entityType: 'cashier_shifts',
+      entityId: shiftId,
+      before: { status: 'OPEN', expected_cash_centavos: cashLine.expected_centavos },
+      after: {
+        status: 'CLOSED',
+        actual_cash_centavos: cashLine.actual_centavos,
+        variance_centavos: variance,
+        beyond_tolerance: beyondTolerance,
+        tolerance_centavos: tolerance,
+        by_method: Object.fromEntries(lines.map((l) => [l.method, l.variance_centavos])),
+      },
+      // AUD-602: the row carries the variance, the reason and the closing user.
+      reason: reason || (beyondTolerance ? null : 'Closed within tolerance'),
+      shiftId,
+    });
+
+    return { closingId, closed, lines };
+  });
+
+  // ── After the commit (OPS-001) ────────────────────────────────────────────
+  //
+  // The backup is the last thing, and its failure is reported rather than thrown. The
+  // shift is closed; a full disk does not un-count a drawer.
+  const backupService = require('./backupService');
+  const backup = backupService.run({ trigger: 'SHIFT_CLOSE', actor });
+  const backupAlert = backupService.alertFor(backup);
+
+  const summary = buildClosingSummary({
+    shift: result.closed, expected, lines: result.lines, variance,
+    beyondTolerance, tolerance, reason, actor, at,
+  });
+  const printed = documentService.print(summary);
+
+  return {
+    closing_id: result.closingId,
+    shift: present(result.closed),
+    expected,
+    lines: result.lines,
+    variance_centavos: variance,
+    tolerance_centavos: tolerance,
+    beyond_tolerance: beyondTolerance,
+    variance_reason: reason,
+    backup,
+    summary,
+    printed,
+    alerts: backupAlert ? [backupAlert] : [],
+  };
+}
+
+/**
+ * The printable closing summary (requirement 7), subject to TAX-006.
+ *
+ * It is not a receipt and does not claim to be. The store keeps it with the drawer
+ * count, which is the whole reason the variance and its reason are on the paper rather
+ * than only in the database.
+ */
+function buildClosingSummary({ shift, expected, lines, variance, beyondTolerance, tolerance, reason, actor, at }) {
+  const storeProfileService = require('./storeProfileService');
+  const profile = storeProfileService.profile();
+
+  const rows = lines.map((line) => {
+    const sign = line.variance_centavos === 0 ? '' : (line.variance_centavos < 0 ? ' short' : ' over');
+    return `  ${line.method.padEnd(7)} expected ${money.toDisplay(line.expected_centavos).padStart(12)}`
+      + `  counted ${money.toDisplay(line.actual_centavos).padStart(12)}`
+      + `  ${money.toDisplay(Math.abs(line.variance_centavos))}${sign}`;
+  });
+
+  const text = [
+    profile.store_name,
+    profile.address || null,
+    '',
+    'SHIFT CLOSING SUMMARY',
+    `Shift opened ${clock.toManila(shift.opened_at)}`,
+    `Shift closed ${clock.toManila(at)}`,
+    `Closed by:   ${actor.username}`,
+    '',
+    `Opening float:    ${money.toDisplay(expected.opening_float_centavos)}`,
+    `Cash sales:       ${money.toDisplay(expected.cash_sales_centavos)}`,
+    `Cash collections: ${money.toDisplay(expected.cash_collections_centavos)}`,
+    `Cash in:          ${money.toDisplay(expected.cash_in_centavos)}`,
+    `Cash out:        -${money.toDisplay(expected.cash_out_centavos)}`,
+    `Change given:    -${money.toDisplay(expected.change_given_centavos)}`,
+    '',
+    ...rows,
+    '',
+    `Cash variance: ${money.toDisplay(Math.abs(variance))}`
+      + `${variance === 0 ? ' — balanced' : (variance < 0 ? ' short' : ' over')}`,
+    beyondTolerance ? `Beyond the ${money.toDisplay(tolerance)} tolerance.` : null,
+    reason ? `Reason: ${reason}` : null,
+    '',
+    documentService.REQUIRED_NOTICE,
+  ].filter((line) => line !== null).join('\n');
+
+  return {
+    kind: 'SHIFT_CLOSING',
+    document_no: null,
+    shift_id: shift.id,
+    closed_by: actor.username,
+    closed_at: at,
+    expected_cash_centavos: expected.expected_cash_centavos,
+    variance_centavos: variance,
+    beyond_tolerance: beyondTolerance,
+    variance_reason: reason,
+    lines,
+    text,
+  };
+}
+
+/** The closing of a shift that has one — SCR-503 read back, and TASK-016's report. */
+function closingFor(shiftId) {
+  const closing = shiftRepository.findClosingByShift(shiftId);
+  if (!closing) return null;
+
+  return {
+    id: closing.id,
+    shift_id: closing.shift_id,
+    expected_cash_centavos: closing.expected_cash_centavos,
+    actual_cash_centavos: closing.actual_cash_centavos,
+    variance_centavos: closing.variance_centavos,
+    variance_reason: closing.variance_reason,
+    closed_at: closing.closed_at,
+    closed_at_manila: clock.toManila(closing.closed_at),
+    closed_by: closing.closed_by,
+    lines: shiftRepository.closingLinesFor(closing.id),
+  };
+}
+
 // ── POS-508 — the long-open shift ───────────────────────────────────────────
 
 /**
@@ -396,9 +676,9 @@ function get(shiftId) {
 }
 
 module.exports = {
-  METHODS, CASH_METHODS,
-  open, requireOpenShift, openShiftFor,
+  METHODS, CASH_METHODS, RECONCILABLE_METHODS,
+  open, close, requireOpenShift, openShiftFor,
   tillReasons, assertReasonListed, moveTillCash,
   computeExpected, staleShifts, alerts,
-  present, get,
+  present, get, closingFor, buildClosingSummary,
 };

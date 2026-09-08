@@ -574,10 +574,18 @@ test('the till reason list is served rather than hard-coded in the screen', asyn
   assert.deepEqual(body.methods, ['CASH', 'GCASH', 'QRPH', 'CREDIT']);
 });
 
-test('closing a shift is deliberately absent rather than pending', async () => {
+test('closing is reachable, and is covered by shift-close.test.js', async () => {
+  // The placeholder that stood here while TASK-013 was outstanding is gone: closing
+  // exists now, and its rules — POS-510's mandatory reason, POS-511's immutability,
+  // AUD-602 and the OPS-001 backup — have their own file.
   const current = await (await call('/shifts/current', { token: tokens.CASHIER })).json();
-  const res = await call(`/shifts/${current.shift.id}/close`, { token: tokens.CASHIER, method: 'POST' });
+  const res = await call(`/shifts/${current.shift.id}/close`, {
+    token: tokens.CASHIER, method: 'POST',
+    body: { actualCashCentavos: current.expected.expected_cash_centavos },
+  });
 
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).error.rule_id, 'POS-510');
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.variance_centavos, 0, 'a counted drawer that matches');
+  assert.equal(body.shift.status, 'CLOSED');
 });

@@ -10,12 +10,12 @@
 // — add the rows. SCR-501 and SCR-502 need each of them, and the reason list is served
 // rather than hard-coded because POS-504's list is a setting (OPS-005).
 //
-// TX-419 — closing another user's shift — belongs to TASK-013 along with the close
-// itself; nothing here closes a shift.
+// POST /shifts/:id/close and GET /shifts/:id/summary are in TASK-013's API list.
+// Closing another user's shift additionally needs TX-419 (POS-511's sibling), checked
+// in the service because that is the layer that knows whose shift it is.
 
 const express = require('express');
 const shiftService = require('../services/shiftService');
-const errors = require('../services/errors');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
@@ -104,13 +104,37 @@ router.post('/shifts/:id/till', moveTillCash, (req, res, next) => {
   }
 });
 
-// POS-511: a closed shift is immutable, and TASK-013 owns closing. The absence of a
-// close route here is deliberate rather than pending — this one says so.
+/**
+ * POS-510 — close against a counted drawer.
+ *
+ * TX-418 opens the door; closing *another user's* shift additionally needs TX-419, and
+ * the service checks that because it is the service that knows whose shift it is.
+ */
 router.post('/shifts/:id/close', ownShift, (req, res, next) => {
-  next(errors.conflict(
-    'Closing a shift arrives with the close-and-variance screen (SCR-503).',
-    { ruleId: 'POS-510' }
-  ));
+  try {
+    const { actualCashCentavos, actualByMethod = {}, varianceReason = null, approver = null } = req.body || {};
+
+    res.status(201).json(shiftService.close({
+      shiftId: req.params.id,
+      actualCashCentavos,
+      actualByMethod,
+      varianceReason,
+      approver,
+      actor: req.session,
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** SCR-503 read back, and what TASK-016's daily report joins to. */
+router.get('/shifts/:id/summary', ownShift, (req, res, next) => {
+  try {
+    const shift = shiftService.get(req.params.id);
+    res.json({ ...shift, closing: shiftService.closingFor(req.params.id) });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

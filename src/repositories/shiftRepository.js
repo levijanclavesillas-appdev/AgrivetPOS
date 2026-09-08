@@ -173,8 +173,48 @@ function changeGivenCentavos(shiftId) {
   `).get(shiftId).n;
 }
 
+// ── Closings (POS-509–POS-511) ──────────────────────────────────────────────
+
+const CLOSING_COLUMNS = `
+  id, shift_id, expected_cash_centavos, actual_cash_centavos, variance_centavos,
+  variance_reason, closed_at, closed_by
+`;
+
+function insertClosing(row) {
+  db.get().prepare(`
+    INSERT INTO cashier_closings (${CLOSING_COLUMNS})
+    VALUES (@id, @shift_id, @expected_cash_centavos, @actual_cash_centavos, @variance_centavos,
+            @variance_reason, @closed_at, @closed_by)
+  `).run(row);
+  return row;
+}
+
+function insertClosingLine(row) {
+  db.get().prepare(`
+    INSERT INTO closing_method_lines
+      (id, closing_id, method, expected_centavos, actual_centavos, variance_centavos)
+    VALUES (@id, @closing_id, @method, @expected_centavos, @actual_centavos, @variance_centavos)
+  `).run(row);
+  return row;
+}
+
+function findClosingByShift(shiftId) {
+  if (!tableExists('cashier_closings')) return null;
+  return db.get()
+    .prepare(`SELECT ${CLOSING_COLUMNS} FROM cashier_closings WHERE shift_id = ?`)
+    .get(shiftId) || null;
+}
+
+function closingLinesFor(closingId) {
+  return db.get().prepare(`
+    SELECT id, closing_id, method, expected_centavos, actual_centavos, variance_centavos
+      FROM closing_method_lines WHERE closing_id = ? ORDER BY method
+  `).all(closingId);
+}
+
 module.exports = {
   tableExists, findOpenForUser, findById, insert, close, openShifts, listForUser,
+  insertClosing, insertClosingLine, findClosingByShift, closingLinesFor,
   insertTillMovement, tillMovementsFor, tillTotals,
   collectionTotalsByMethod, tenderTotalsByMethod, refundTotalCentavos, changeGivenCentavos,
 };
