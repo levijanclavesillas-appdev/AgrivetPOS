@@ -36,7 +36,20 @@ const LINES_PER_SALE = 4;              // 100,000 sale lines — NFR_2.1's repor
 // reported that a year cost the same as a day — which was true, and meaningless.
 const DAYS = 90;
 const BUDGET_MS = 3000;                // NFR_1.5 — reported, not asserted
-const CEILING_MS = 3000;               // a full scan per tile, not the budget
+// The ceiling is a multiple of the budget, deliberately.
+//
+// §6 says a figure from anything but the reference machine is not a result, and this
+// file is written not to assert one — but an earlier version set the ceiling *equal* to
+// the budget, which made the assertion exactly as machine-dependent as the figure it
+// refuses to assert. It failed twice on a build machine running four perf files in
+// parallel, each seeding tens of thousands of rows, and both times the cause was load
+// rather than the code.
+//
+// What the ceiling is for is a structural regression — a full scan, a query per row, an
+// index quietly dropped — and those cost ten to a hundred times, not two. Four times the
+// budget catches them with room for a loaded machine, which is the only machine this
+// will ever run on before UAT.
+const CEILING_MS = BUDGET_MS * 4;      // a full scan per tile, not the budget
 
 const PASSWORD = 'correct-horse-battery';
 

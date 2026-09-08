@@ -32,7 +32,20 @@ const temp = require('../helpers/tempdb');
 const PRODUCTS = 5000;                 // NFR_2.1
 const SALES = 300;                     // enough to measure a median and to stress the ledger
 const BUDGET_MS = 2000;                // NFR_1.1 — reported, not asserted
-const CEILING_MS = 2000;               // a full scan inside the transaction, not the budget
+// The ceiling is a multiple of the budget, deliberately.
+//
+// §6 says a figure from anything but the reference machine is not a result, and this
+// file is written not to assert one — but an earlier version set the ceiling *equal* to
+// the budget, which made the assertion exactly as machine-dependent as the figure it
+// refuses to assert. It failed twice on a build machine running four perf files in
+// parallel, each seeding tens of thousands of rows, and both times the cause was load
+// rather than the code.
+//
+// What the ceiling is for is a structural regression — a full scan, a query per row, an
+// index quietly dropped — and those cost ten to a hundred times, not two. Four times the
+// budget catches them with room for a loaded machine, which is the only machine this
+// will ever run on before UAT.
+const CEILING_MS = BUDGET_MS * 4;      // a full scan inside the transaction, not the budget
 
 const PASSWORD = 'correct-horse-battery';
 
