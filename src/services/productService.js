@@ -160,6 +160,16 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
     statutory_discount_eligible: Boolean(row.statutory_discount_eligible),
     min_stock_milli: row.min_stock_milli,
     min_stock_display: quantity.format(row.min_stock_milli, row.base_unit_code),
+    // INV-101: read from the materialised figure the ledger maintains, never computed
+    // here. SCR-201's list column, and what INV-109 is measured against.
+    qty_on_hand_milli: row.qty_on_hand_milli ?? 0,
+    qty_on_hand_display: quantity.format(row.qty_on_hand_milli ?? 0, row.base_unit_code),
+    has_moved: Boolean(row.has_moved),
+    // UOM-003: the base unit is immutable once anything has moved. Surfaced so the
+    // editor can lock the field and say why, rather than discovering it at save.
+    base_unit_locked: Boolean(row.has_moved),
+    is_low_stock: Boolean(row.is_active) && row.min_stock_milli > 0
+      && (row.qty_on_hand_milli ?? 0) <= row.min_stock_milli,
     is_batch_tracked: Boolean(row.is_batch_tracked),
     is_active: Boolean(row.is_active),
     created_at: row.created_at,

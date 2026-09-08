@@ -15,6 +15,9 @@ import { createDashboard } from '../reports/dashboard.js';
 import { createReport } from '../reports/report.js';
 import { createBackup } from '../admin/backup.js';
 import { createHealth } from '../admin/health.js';
+import { createProductList } from '../catalogue/list.js';
+import { createProductEditor } from '../catalogue/editor.js';
+import { createAdjustment } from '../catalogue/adjustment.js';
 
 /** §2's role → landing screen. */
 // §2's role → landing screen. MANAGER and OWNER land on SCR-601, which lives under
@@ -165,11 +168,15 @@ export function createApp({ root }) {
   async function show(id) {
     if (current?.unmount) current.unmount();
     clear(main);
-    renderRail(id);
+    // Low stock is a filter of the products list, not a section of its own, so the
+    // rail keeps Products highlighted rather than highlighting nothing.
+    renderRail(id === 'low-stock' ? 'products' : id);
 
     if (id === 'pos') return showPos();
     if (id === 'reports') return showDashboard();
     if (id === 'admin') return showAdmin();
+    if (id === 'products') return showProducts();
+    if (id === 'low-stock') return showProducts({ mode: 'low-stock' });
 
     // The admin and catalog screens are their own tasks. Saying so beats a dead
     // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
@@ -182,7 +189,51 @@ export function createApp({ root }) {
     current = createDashboard({
       root: main,
       session,
-      onOpenReport: (report) => showReport(report),
+      // A tile opens either a report or a screen; the low-stock one opens SCR-204.
+      onOpenReport: (target, isScreen) => (isScreen ? show(target) : showReport(target)),
+    });
+    current.mount();
+    return current;
+  }
+
+  // ── SCR-201 – SCR-204 ─────────────────────────────────────────────────────
+
+  /** The catalogue list, and the low-stock filter of it (TASK-036). */
+  function showProducts({ mode = 'all' } = {}) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createProductList({
+      root: main,
+      mode,
+      onOpen: (id) => showProductEditor(id),
+      onAdjust: (id) => showAdjustment(id),
+      onValuation: () => showReport('valuation'),
+    });
+    current.mount();
+    return current;
+  }
+
+  function showProductEditor(productId) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createProductEditor({
+      root: main,
+      productId,
+      // A newly created product reopens in the editor rather than dropping back to the
+      // list: its packs, prices and barcodes are the next four things anybody does.
+      onClose: (createdId) => (createdId ? showProductEditor(createdId) : showProducts()),
+    });
+    current.mount();
+    return current;
+  }
+
+  function showAdjustment(productId) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createAdjustment({
+      root: main,
+      productId,
+      onClose: () => showProducts(),
     });
     current.mount();
     return current;

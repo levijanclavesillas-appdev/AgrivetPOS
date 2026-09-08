@@ -577,3 +577,88 @@ test('NFR_4.3: the admin controls are touchable', () => {
     assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
   }
 });
+
+// ── SCR-201 – SCR-204 (TASK-036) ────────────────────────────────────────────
+
+test('TC-UI-02: cost is absent from the catalogue, not disabled', () => {
+  // TX-412 makes cost owner-only. The server omits it from the payload entirely, so
+  // the editor is built from what arrived rather than from a role check here — the
+  // version that stays right when the matrix changes. A greyed-out cost field would
+  // still tell a cashier the margin exists and roughly where.
+  const editor = codeOf('js/catalogue/editor.js');
+  assert.match(editor, /'avg_cost_centavos' in product/, 'the tab is built from the payload');
+  assert.equal(/disabled:.*cost/i.test(editor), false, 'and never merely disabled');
+  // Stronger than checking the role test is absent: the view has no session in scope
+  // at all, so there is nothing for a future change to start branching on.
+  assert.equal(/\bsession\b/.test(editor), false, 'the editor holds no session to branch on');
+
+  // The list shows retail, never cost.
+  const list = codeOf('js/catalogue/list.js');
+  assert.equal(/avg_cost|cost_centavos/.test(list), false, 'the list carries no cost at all');
+  assert.match(list, /retail_price_centavos/);
+});
+
+test('TC-UI-03: the base unit is locked once stock has moved, and says why', () => {
+  const source = proseOf('js/catalogue/editor.js');
+
+  assert.match(source, /product\.base_unit_locked/, 'the lock comes from the server');
+  // UOM-003's whole point: a locked field with no explanation is a support call, and
+  // the correction path is a new product rather than an edit.
+  assert.match(source, /every one of those movements is recorded in this unit/);
+  assert.match(source, /create a new product/);
+  assert.match(source, /UOM-003/);
+});
+
+test('INV-108: an adjustment reason is chosen from a list, never typed', () => {
+  const source = codeOf('js/catalogue/adjustment.js');
+
+  // An adjustment justified by whatever somebody typed is the audit hole the rule
+  // closes: every such row reads differently and none of them can be counted.
+  assert.match(source, /reasons\.map\(\(r\) => h\('option'/, 'the reasons are a select');
+  assert.equal(
+    /h\('input',[^)]*aria-label: 'Reason'/.test(source), false,
+    'the reason is never a free-text input'
+  );
+  assert.match(source, /notes/, 'notes are separate, and optional');
+});
+
+test('AUD-603: the adjustment screen uses the shared authorisation panel', () => {
+  const source = codeOf('js/catalogue/adjustment.js');
+
+  // The same panel the POS screen uses. A second one would drift, and the day they
+  // disagreed the counter and the stockroom would each be sure they were right.
+  assert.match(source, /ui\.authorisationPanel\(/);
+  assert.equal(/authorisation-actions|approverPassword/.test(source), false, 'not a second panel');
+
+  // The approver authenticates as themselves, so the row records two distinct actors.
+  assert.match(source, /api\.post\('\/auth\/login'/);
+  // And submit stays disabled until they have.
+  assert.match(source, /disabled: Boolean\(refusal\) && !approver/);
+});
+
+test('INV-101: no catalogue screen lets anyone type an on-hand figure', () => {
+  // On hand is derived from the ledger. A screen with an editable on-hand box is a
+  // screen that would need a code path writing it directly, which FR_2.4 forbids.
+  for (const file of ['js/catalogue/editor.js', 'js/catalogue/list.js', 'js/catalogue/adjustment.js']) {
+    const source = codeOf(file);
+    assert.equal(
+      /h\('input'[^;]*qty_on_hand/.test(source), false,
+      `${file} offers an editable on-hand field`
+    );
+  }
+  assert.match(proseOf('js/catalogue/editor.js'), /On hand comes from the stock ledger and cannot be typed/);
+});
+
+test('NFR_4.3: the catalogue controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'catalogue.css'), 'utf8');
+  for (const selector of ['.catalogue-search', '.row-action', '.pager button',
+    '.editor-actions button', '.catalogue-controls select']) {
+    const rule = cssRule(css, selector);
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
+  }
+
+  // 04_UX_SPEC §3's two row treatments.
+  assert.match(cssRule(css, '.catalogue-list tr.is-low'), /border-left-color/);
+  assert.match(cssRule(css, '.catalogue-list tr.is-inactive'), /color/);
+});

@@ -11,18 +11,22 @@ network connection at the store.
 >
 > **v1.0 cannot yet be deployed to a store**, and the reason is not the installer.
 >
-> Thirteen of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — the catalogue,
-> customers, shift close, users, settings and the audit viewer (`06_TASKS/README.md`,
+> Nine of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
+> collections, shift close, users, settings and the audit viewer (`06_TASKS/README.md`,
 > *the screen gap*). Every service and API behind them is built and tested; there is simply
 > no screen to reach them from.
 >
-> That makes sections **4 (hardware), 5 (users) and 6 (cutover)** below impossible to perform
-> as written today: the settings, product, customer and user screens they tell you to open are
-> not there, and a shift can be opened but **not closed**.
+> `TASK-036` has landed, so **section 6's catalogue half now works**: products, barcodes,
+> packs, prices, opening stock and adjustments are all reachable from `SCR-201`–`SCR-204`, and
+> `TC-E2E-10` walks that path from an empty install to a completed sale.
 >
-> Those sections are written against the intended screens and are correct for the release that
-> has them. Until `TASK-036`–`TASK-041` land, the only route to those operations is the HTTP
-> API, which is not a thing to do on a store counter.
+> What is still impossible as written: **section 4 (hardware)** and **section 5 (users)**,
+> which need the settings and user screens, and the opening **credit balances** in section 6,
+> which need the customer screens. A shift can be opened but **not closed**, which is the
+> sharpest of the remaining gaps — a till that cannot be counted.
+>
+> Until `TASK-037`–`TASK-041` land, the only route to those operations is the HTTP API, which
+> is not a thing to do on a store counter.
 >
 > **Do not schedule the cutover on the strength of a green test suite.** The suite is green
 > because it tests the API.
@@ -210,28 +214,40 @@ on the rail (UAT check 9).
 Do this on the day the store starts, not a week before. Anything entered early is wrong by
 the time they start.
 
-*The catalogue and customer screens (`SCR-201`–`204`, `SCR-401`–`403`) are not built yet. This
-section describes the cutover as it will be performed once they are; the rules it states about
-base units, opening cost and opening balances are already enforced by the services underneath
-and do not change.*
+*The catalogue screens (`SCR-201`–`SCR-204`) are built and this half is performable today. The
+customer screens (`SCR-401`–`SCR-403`) are not, so opening **credit balances** still cannot be
+entered — that part waits for `TASK-037`.*
 
 ### Products
 
-**Admin → Products**, or the catalogue screen. For each: SKU, name, category, base unit, and
-the retail price.
+**Products** on the rail (`SCR-201`) → **New product**. For each: SKU, name, category, base
+unit, and the retail price — the price is asked for at creation because a product without one
+cannot be sold (`PR-102`).
+
+The category and the unit are creatable from inside the editor, so an empty catalogue does not
+send you looking for another screen before the first product.
 
 The **base unit** is the one decision that is hard to undo — it is immutable once any stock
 movement exists (`UOM-003`), and the correction is a new product. For feed sold both ways,
 the base unit is **KG**, and a sack is a *pack* on top of it with factor 50,000 (`UOM-002`).
 Not the other way round.
 
-Add barcodes as you go by scanning them into the field rather than typing them.
+Add barcodes on the **Barcodes** tab by scanning them into the field rather than typing them —
+the box keeps focus, so a run of products goes at scanner speed. A barcode belongs to one
+product only (`VR-205`) and the screen refuses a clash rather than moving the code.
+
+Packs go on the **Units** tab, and the screen states each one in words — `1 SACK = 50 KG` — so
+a factor typed as 5,000 instead of 50,000 is visible rather than arithmetic nobody checks.
 
 ### Opening stock (`OPS-106`)
 
 Post each product's counted quantity as a **`RECEIPT`** movement carrying the **opening unit
 cost**. Not an adjustment: an adjustment with no cost leaves the average cost at zero, and
 every gross-profit figure the store ever sees will be wrong by the whole cost of goods.
+
+Check it afterwards on the editor's **Pricing** tab: the average cost should be what you paid.
+If it reads ₱0.00, the receipt went in without a cost and the stock must be reversed and
+reposted before the store trades.
 
 Count it physically. The count you post is the number check 4 of the UAT will be measured
 against.
@@ -327,7 +343,8 @@ Open **Admin → Health** first. The version and the last verified backup answer
 | Dates on new records are wrong | The PC's clock. Selling is unaffected — receipt numbers do not come from the clock (`VR-103`) — but fix it |
 | The owner password is lost | The recovery code from wizard step 4. If that is lost too, the data cannot be reached |
 | A cashier sees cost prices | They are signed in on the wrong account. Cost is absent for every role but `OWNER` |
-| A rail item says "not built yet" | It is one of the thirteen screens in the gap. The API exists; the screen does not |
+| A rail item says "not built yet" | It is one of the nine screens still in the gap. The API exists; the screen does not |
+| The base unit cannot be changed | Deliberate (`UOM-003`): stock has moved and every movement is recorded in that unit. Make a new product and move the stock across |
 | The application will not start | The message says why. A database ahead of the binary, or a failed pre-migration backup, are the two that stop it deliberately |
 
 The audit trail answers "who changed this" — `GET /audit` today, `SCR-703` once it is built. Every price change, cost

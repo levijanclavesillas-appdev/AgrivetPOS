@@ -242,10 +242,98 @@ app.whenReady().then(async () => {
 
   await run(`document.querySelector('.report-back').click()`);
   await settle(900);
+  // The low-stock tile opens SCR-204 now, so the valuation report is reached from the
+  // catalogue's own header — which is where somebody asking "what is this stock worth"
+  // actually is.
   await run(`document.querySelector('.tile-low-stock').click()`);
-  await settle(1000);
-  log(await run(`!!document.querySelector('.report-valuation') || !!document.querySelector('.valuation-total')`),
-    'SCR-604 renders the valuation');
+  await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-204' });
+  log(await run(`/Low stock/.test(document.querySelector('h1').textContent)`),
+    'INV-109: the low-stock tile opens the low-stock list');
+
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Valuation/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.valuation-total')`, { label: 'SCR-604' });
+  log(await run(`!!document.querySelector('.valuation-total')`), 'SCR-604 renders the valuation');
+
+  console.log('\n— SCR-201: the catalogue —');
+  await run(OPEN_RAIL('Products'));
+  await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-201' });
+  log(await run(`!!document.querySelector('.catalogue-list')`), 'the product list renders');
+  log(await run(`document.querySelectorAll('.catalogue-list tbody tr').length >= 1`),
+    'and it lists the seeded product');
+  log(await run(`/\\d+(\\.\\d+)? KG/.test(document.querySelector('.catalogue-list').textContent)`),
+    'INV-101: on hand is in the list',
+    (await run(`document.querySelector('.catalogue-list tbody tr').textContent`)).replace(/\s+/g, ' ').slice(0, 70));
+
+  // TX-412: the owner is signed in here, and even so the *list* carries no cost.
+  log(await run(`!/cost/i.test(document.querySelector('.catalogue-list').textContent)`),
+    'and no cost column anywhere in it');
+
+  await run(`(() => {
+    const el = document.querySelector('.catalogue-search');
+    el.value = 'zzzz-nothing';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await waitFor(`/Nothing matches/.test(document.body.textContent)`, { label: 'the empty state' });
+  log(true, 'a search with no match shows the empty state, not a blank table');
+
+  await run(`(() => {
+    const el = document.querySelector('.catalogue-search');
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await waitFor(`document.querySelectorAll('.catalogue-list tbody tr').length >= 1`);
+
+  console.log('\n— SCR-202: the editor —');
+  await run(`document.querySelector('.catalogue-list tbody tr').click()`);
+  await waitFor(`!!document.querySelector('.editor')`, { label: 'SCR-202' });
+  const tabs = await run(`[...document.querySelectorAll('.admin-tab')].map(t => t.textContent)`);
+  log(tabs.length === 5, 'five tabs', tabs.join(', '));
+
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => t.textContent === 'Units').click()`);
+  await settle(500);
+  const units = await run(`document.querySelector('.editor-panel').textContent`);
+  log(/1 SACK = 50 KG/.test(units), 'UOM-002: the pack states its conversion in words',
+    units.replace(/\s+/g, ' ').slice(0, 100));
+
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => t.textContent === 'Identity').click()`);
+  await settle(500);
+  const identity = await run(`document.querySelector('.editor-panel').textContent`);
+  log(/UOM-003/.test(identity), 'UOM-003: the base unit is locked once stock has moved');
+  log(/create a new product/.test(identity), 'and the lock names the correction path');
+  log(await run(`!document.querySelector('.editor-field.locked select')`),
+    'the locked field is prose, not a disabled dropdown');
+
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => t.textContent === 'Pricing').click()`);
+  await settle(500);
+  const pricing = await run(`document.querySelector('.editor-panel').textContent`);
+  log(/Average cost/.test(pricing), 'TX-412: the owner sees average cost');
+
+  console.log('\n— SCR-203: an adjustment —');
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => t.textContent === 'Stock').click()`);
+  await settle(400);
+  log(/cannot be typed/.test(await run(`document.querySelector('.editor-panel').textContent`)),
+    'INV-101: on hand is not editable, and the screen says why');
+
+  await run(`document.querySelector('.report-back').click()`);
+  const backOk = await waitFor(`!!document.querySelector('.catalogue-list')`, { label: 'the list again' });
+  log(backOk, 'the editor returns to the list');
+  if (backOk) await run(`document.querySelector('.catalogue-list .row-action').click()`);
+  await waitFor(`!!document.querySelector('.adjustment')`, { label: 'SCR-203' });
+
+  const reasonCount = await run(`document.querySelectorAll('.adjustment select option').length`);
+  log(reasonCount > 1, 'INV-108: the reasons are a list, not a text box', `${reasonCount - 1} reasons`);
+  log(await run(`!document.querySelector('.adjustment input[type=text][aria-label*=Reason]')`),
+    'and there is no free-text reason field');
+
+  await run(`(() => {
+    const el = document.querySelector('.adjustment input[inputmode=decimal]');
+    el.value = '440';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(400);
+  const variance = await run(`(document.querySelector('.variance') || {}).textContent || ''`);
+  log(/less on the shelf/.test(variance), 'the variance is computed for the reader',
+    variance.replace(/\s+/g, ' ').slice(0, 70));
 
   console.log('\n— SCR-704: backups —');
   await run(OPEN_RAIL('Admin'));

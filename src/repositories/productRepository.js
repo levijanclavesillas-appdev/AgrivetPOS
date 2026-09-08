@@ -20,7 +20,13 @@ const JOINED = `
   b.name AS brand_name,
   u.code AS base_unit_code,
   u.name AS base_unit_name,
-  u.allows_fraction AS base_unit_allows_fraction
+  u.allows_fraction AS base_unit_allows_fraction,
+  -- SCR-201 shows on-hand in its list. Joined here rather than fetched per row,
+  -- because fifty products on a page is fifty round trips otherwise, and the figure is
+  -- one the list is read for. COALESCE because a product that has never moved has no
+  -- inventory row at all — which is 0 on hand, not a missing product (INV-101).
+  COALESCE(i.qty_on_hand_milli, 0) AS qty_on_hand_milli,
+  (i.product_id IS NOT NULL) AS has_moved
 `;
 
 const FROM = `
@@ -28,6 +34,7 @@ const FROM = `
   JOIN categories c ON c.id = p.category_id
   LEFT JOIN brands b ON b.id = p.brand_id
   JOIN units u ON u.id = p.base_unit_id
+  LEFT JOIN inventory i ON i.product_id = p.id
 `;
 
 function findById(id) {

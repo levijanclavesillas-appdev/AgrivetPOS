@@ -47,6 +47,14 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
     body: { sku: 'FEED-HG-50', name: 'Hog Grower Pellets', categoryId: cat.id, baseUnitId: kg.id, retailPriceCentavos: 6250 },
   })).json.product;
   await api(`/products/${product.id}/barcodes`, { method: 'POST', token, body: { barcode: '4800012345678' } });
+
+  // A pack, so SCR-202's Units tab has something to state in words (UOM-002).
+  const sack = (await api('/units', {
+    method: 'POST', token, body: { name: 'Sack', code: 'SACK', allowsFraction: false },
+  })).json.unit;
+  await api(`/products/${product.id}/packs`, {
+    method: 'POST', token, body: { unitId: sack.id, factorMilli: 50000 },
+  });
   await api('/inventory/adjustments', {
     method: 'POST', token,
     body: { productId: product.id, type: 'RECEIPT', qtyMilli: 500000, unitCostCentavos: 4000, reason: 'Received but not recorded' },

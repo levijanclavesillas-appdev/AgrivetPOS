@@ -41,9 +41,21 @@ const DRIVER_PATTERNS = [
   new RegExp(`from\\s+['"\`]better-${'sqlite'}3['"\`]`),
 ];
 
+/**
+ * Literals that are an HTML tag name, not SQL.
+ *
+ * `h('select', …)` builds a dropdown, and a case-insensitive `\bSELECT\b` cannot tell
+ * it from a query. Excluding the exact tag name is narrower than loosening the SQL
+ * pattern — a real single-line `SELECT … FROM` is still caught, and so is
+ * `'select * from users'`, because neither is exactly the word.
+ */
+const HTML_TAGS = new Set(['select', 'option', 'table', 'form', 'label', 'input']);
+
+const isHtmlTag = (literal) => HTML_TAGS.has(literal.slice(1, -1).trim().toLowerCase());
+
 /** Every string literal on a line: single, double and backtick quoted. */
 function stringLiterals(line) {
-  return (line.match(/'[^']*'|"[^"]*"|`[^`]*`/g) || []);
+  return (line.match(/'[^']*'|"[^"]*"|`[^`]*`/g) || []).filter((l) => !isHtmlTag(l));
 }
 
 function walk(target, out = []) {
@@ -91,6 +103,23 @@ test('TC-UT-99: no SQL outside repositories/ and config/', () => {
     });
   }
   assert.deepEqual(offenders, [], `SQL outside the permitted layers:\n${offenders.join('\n')}`);
+});
+
+test('TC-UT-99: the tag-name exclusion does not blunt the SQL patterns', () => {
+  // The exclusion is exact, and this is the assertion that keeps it exact. A guard
+  // loosened to stop a false positive, with nothing checking how far it was loosened,
+  // is a guard that stops catching the thing it was written for.
+  const caught = (line) => stringLiterals(line)
+    .some((literal) => SQL_PATTERNS.some((p) => p.test(literal)));
+
+  assert.equal(caught(`h('select', {}, [])`), false, 'an HTML dropdown is not a query');
+  assert.equal(caught(`h('option', { value: '' })`), false);
+
+  assert.equal(caught(`db.prepare('SELECT id FROM users').get()`), true);
+  assert.equal(caught(`const sql = "select * from products";`), true);
+  assert.equal(caught('run(`DELETE FROM carts WHERE id = ?`)'), true);
+  assert.equal(caught(`exec('CREATE TABLE t (a)')`), true);
+  assert.equal(caught(`pragma('PRAGMA journal_mode')`), true);
 });
 
 test('TC-UT-99: no better-sqlite3 import outside repositories/ and config/', () => {

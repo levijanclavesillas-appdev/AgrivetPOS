@@ -126,6 +126,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-E2E-07` | Adjustment for damage → valuation falls → movement ledger and audit both show it |
 | `TC-E2E-08` | A full trading day with `dns`, `net`, `tls`, `http`, `https` and `fetch` removed, and nothing in the renderer loaded from off the machine. The machine-level version is UAT check F | 
 | `TC-E2E-09` | `kill -9` mid-sale loop → restart → ledger consistent, no partial sale, no lost committed sale. Proves the process-death half of `OPS-008`; §8 item 7 is the power-loss half |
+| `TC-E2E-10` | A cutover from nothing: wizard → category → unit → product → barcode → pack → price → opening stock → scan → sell. The case that proves a store can be set up |
 
 ## 6. Non-functional cases
 
@@ -150,6 +151,8 @@ defect at the severity of whatever it blocks (§9).
 | Case | Asserts | NFR |
 | :--- | :--- | :--- |
 | `TC-UI-01` | Touch targets ≥ 44 px on POS and payment, measured as rendered at 1366×768 | `NFR_4.3` |
+| `TC-UI-02` | Cost is absent — not disabled — from the catalogue for every role but `OWNER` | `TX-412` |
+| `TC-UI-03` | The base unit is locked once movements exist, and the screen renders the reason | `UOM-003` |
 | `TC-INST-01` | An upgrade over a prior install preserves the database, writes and verifies a pre-migration backup, and migrates on first launch | `NFR_5.1` |
 | `TC-INST-02` | A database ahead of the binary refuses to start **through the installed application**, with a message an owner can act on | `NFR_5.1` |
 
@@ -207,8 +210,8 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ **every service, API and rule is built and tested; 13 of the 26 screens in `04_UX_SPEC.md` are not.** `FR_1.5` (audit readable), `FR_2.*` (catalogue), `FR_4.3` (collections) and `FR_5.3` (shift close) have no screen a user can reach — `06_TASKS/README.md`, the screen gap |
-| 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 6 |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ **every service, API and rule is built and tested; 9 of the 26 screens in `04_UX_SPEC.md` are not.** `TASK-036` closed the catalogue gap, so `FR_2.*` is now reachable and a cutover is possible (`TC-E2E-10`). `FR_1.5` (audit readable), `FR_4.3` (collections) and `FR_5.3` (shift close) still have no screen — `06_TASKS/README.md`, the screen gap |
+| 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 7 |
 | 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; it found `UOM-004` and `POS-103` untested on its first run and both now have cases |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
 | 5 | Zero open S1 or S2 defects | ◐ **none known, and nothing has run in the store.** Settled at UAT sign-off (`docs/UAT_RECORD.md`) |
@@ -235,14 +238,18 @@ Measured on a build machine, reported for regression purposes and for nothing el
 > passes, the layering holds, every covered rule is cited by a test, and the offline and
 > durability cases that were unwritten a day ago now exist.
 >
-> **Thirteen of the twenty-six screens in `04_UX_SPEC.md` do not exist.** The backlog assigned
+> **Nine of the twenty-six screens in `04_UX_SPEC.md` do not exist.** The backlog assigned
 > screens to `TASK-015`, `016` and `017` and never assigned the catalogue, customers, shift
 > close, users, settings or the audit viewer. Nothing here caught it, because every one of
-> those screens has a working, tested API underneath and this suite tests the API. A store
-> could sell on this build and could not be set up, stocked, or administered on it — and a
-> shift that opens but cannot be closed is a till that cannot be counted. This is criterion 1,
-> and unlike the four below it is code rather than a visit. `06_TASKS/README.md` carries the
-> six tasks.
+> those screens has a working, tested API underneath and this suite tests the API.
+>
+> `TASK-036` has closed the catalogue half: `SCR-201`–`SCR-204` exist, and `TC-E2E-10` walks a
+> store from an empty install to a sale — category, unit, product, barcode, pack, price,
+> opening stock, scan, sell — which is the cutover the deployment manual describes. What
+> remains is customers and collections, the shift screens, users, settings and the audit
+> viewer (`TASK-037`–`TASK-041`). **A shift that opens but cannot be closed is still a till
+> that cannot be counted**, and that is the sharpest of the five. This is criterion 1, and
+> unlike the four below it is code rather than a visit.
 >
 > **Four further criteria need the store.** They are not paperwork:
 >

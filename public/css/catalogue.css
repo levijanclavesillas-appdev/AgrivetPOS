@@ -1,0 +1,70 @@
+/* SCR-201 – SCR-204. Tokens come from app.css; nothing here redefines a colour. */
+
+.catalogue { padding: 1rem 1.25rem 3rem; max-width: 76rem; }
+
+.catalogue-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+.catalogue-search { flex: 1 1 22rem; min-height: var(--touch); padding: 0 .6rem; }
+.catalogue-controls select { min-height: var(--touch); }
+.catalogue-controls .check { display: flex; align-items: center; gap: .4rem; margin: 0; }
+
+.catalogue-list { width: 100%; border-collapse: collapse; background: #fff; margin: .5rem 0 1rem; }
+.catalogue-list th, .catalogue-list td { text-align: left; padding: .5rem .75rem;
+  border-bottom: 1px solid var(--rule); }
+.catalogue-list thead th { font-size: .8125rem; color: var(--muted); }
+.catalogue-list tbody tr { cursor: pointer; border-left: 4px solid transparent; }
+.catalogue-list tbody tr:hover, .catalogue-list tbody tr:focus-visible { background: #f4f7f5; }
+.catalogue-list .sku { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
+.catalogue-list .qty, .catalogue-list .money { font-variant-numeric: tabular-nums; }
+.catalogue-list .money { text-align: right; }
+
+/* 04_UX_SPEC §3: low-stock rows carry an amber left border; inactive rows are muted. */
+.catalogue-list tr.is-low { border-left-color: var(--warn-ink); }
+.catalogue-list tr.is-inactive { color: var(--muted); }
+
+.tag { display: inline-block; margin-left: .4rem; padding: 0 .35rem; border-radius: 3px;
+  font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--rule); color: var(--muted); }
+.tag.warn { background: var(--warn-bg); color: var(--warn-ink); }
+
+.row-action { min-height: var(--touch); padding: 0 .75rem; background: #fff; font: inherit;
+  border: 1px solid var(--rule); border-radius: 4px; cursor: pointer; color: inherit; }
+
+.pager { display: flex; align-items: center; gap: .75rem; }
+.pager button { min-height: var(--touch); padding: 0 1rem; }
+
+/* ── SCR-202 the editor ──────────────────────────────────────────────────── */
+
+.editor-panel { padding-top: 1rem; }
+.editor-form { max-width: 34rem; }
+.editor-form.inline { max-width: none; }
+.editor-field { margin: 0 0 1rem; }
+.editor-field label { display: block; margin-bottom: .3rem; font-size: .875rem; }
+.editor-field input, .editor-field select { min-height: var(--touch); width: 100%;
+  padding: 0 .6rem; border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.field-row { display: flex; gap: .5rem; align-items: center; }
+.field-row select, .field-row input { flex: 1; }
+.editor-actions { display: flex; gap: .5rem; margin-top: 1.25rem; }
+.editor-actions button { min-height: var(--touch); padding: 0 1.25rem; }
+
+/* UOM-003: a locked field that explains itself. A disabled input with no reason is a
+   support call, so the lock is rendered as prose rather than as a greyed box. */
+.editor-field.locked { background: var(--warn-bg); border-left: 4px solid var(--warn-ink);
+  padding: .75rem 1rem; border-radius: 4px; }
+.locked-value { margin: 0 0 .5rem; font-weight: 600; }
+.locked-why { margin: 0 0 .4rem; font-size: .875rem; line-height: 1.5; }
+
+.cost-block { margin-bottom: 1.5rem; }
+.cost-block h2 { font-size: 1rem; margin: 0 0 .25rem; }
+
+/* ── SCR-203 the adjustment ──────────────────────────────────────────────── */
+
+.adjustment .variance-block { margin: 0 0 1rem; min-height: 1.5rem; }
+.variance { margin: 0; font-size: 1.0625rem; }
+.variance.zero { color: var(--muted); }
+.variance.down strong { color: var(--error); }
+.variance.up strong { color: var(--accent); }
+
+@media (max-width: 1023px) {
+  .catalogue-controls { flex-direction: column; align-items: stretch; }
+  .editor-form { max-width: none; }
+}

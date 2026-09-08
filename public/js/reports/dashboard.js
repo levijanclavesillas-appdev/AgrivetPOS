@@ -19,6 +19,9 @@ const OPENS = {
   credit: null,
 };
 
+/** Tiles that open a screen rather than a report. INV-109's count opens the list. */
+const OPENS_SCREEN = { LOW_STOCK: 'low-stock' };
+
 export function createDashboard({ root, session, onOpenReport }) {
   let dismissed = new Set();
 
@@ -50,13 +53,14 @@ export function createDashboard({ root, session, onOpenReport }) {
   }
 
   function tile(data) {
-    const target = OPENS[data.report];
+    const screen = OPENS_SCREEN[data.key];
+    const target = screen || OPENS[data.report];
     return h('button', {
       class: `tile tile-${data.key.toLowerCase().replace(/_/g, '-')}`,
       // Not a dead button: a tile whose report is not built says so on the tile.
       disabled: !target,
       title: target ? `Open the ${data.report} report` : 'This report arrives in v1.1',
-      onclick: target ? () => onOpenReport(target) : null,
+      onclick: target ? () => onOpenReport(target, Boolean(screen)) : null,
     }, [
       h('span', { class: 'tile-label', text: data.label }),
       h('span', { class: 'tile-value', text: data.display }),

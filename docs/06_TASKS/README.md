@@ -51,20 +51,21 @@ Every task below is implemented, tested and committed. The commit is the one tha
 | [TASK-016](TASK-016-dashboard-and-reports.md) | Dashboard and the v1.0 reports | `4f969b6` | `SCR-601`–`604`; gross profit pulled into v1.0 |
 | [TASK-017](TASK-017-backup-restore-health-alerts.md) | Automatic backup, verification, restore, health, alerts | `812a82b` | `SCR-704`, `705`; verified `.zip` backups, restore, `TC-E2E-09` |
 | [TASK-018](TASK-018-installer-and-uat.md) | Windows installer, first-run migration, UAT on store hardware | `c08f3af` | NSIS config, `TC-UT-98`, `TC-E2E-08`, handover and UAT sheets |
+| [TASK-036](TASK-036-catalogue-screens.md) | Catalogue screens `SCR-201`–`SCR-204` | *this commit* | `TC-E2E-10`, the cutover; on-hand joined into the product search |
 
 ## Open — v1.0 "Till", the screen gap
 
-**These are new, and they are release-blocking.** The v1.0 backlog assigned screens to three
-tasks — `TASK-015` (`SCR-301`–`304`), `TASK-016` (`SCR-601`–`604`) and `TASK-017` (`SCR-704`,
-`705`). Nobody was given the rest. `04_UX_SPEC.md` specifies **26 screens and 13 exist**; every
-service and API behind the missing thirteen is built and tested, but there is no screen to
-reach them from.
+**These are release-blocking.** The v1.0 backlog assigned screens to three tasks — `TASK-015`
+(`SCR-301`–`304`), `TASK-016` (`SCR-601`–`604`) and `TASK-017` (`SCR-704`, `705`). Nobody was
+given the rest. `04_UX_SPEC.md` specifies **26 screens; 17 now exist**; every service and API
+behind the missing nine is built and tested, but there is no screen to reach them from.
 
-The store can sell. It cannot be set up, stocked, or administered from the application.
+`TASK-036` closed the catalogue half — a store can now be stocked, and `TC-E2E-10` proves a
+cutover end to end. The store can sell and can be set up. It still cannot take a payment on
+account, close a shift, add a user, change a setting or read its own audit trail.
 
 | ID | Task | Screens | Why it blocks release |
 | :--- | :--- | :--- | :--- |
-| `TASK-036` | Catalogue screens | `SCR-201`–`SCR-204` | No way to add a product, a barcode, a pack or a price. The cutover in `DEPLOYMENT.md` §6 cannot be performed |
 | `TASK-037` | Customer and credit screens | `SCR-401`–`SCR-403` | No way to add a customer, set a limit, or take a payment on account (`FR_4.3`) |
 | `TASK-038` | Shift screens | `SCR-501`–`SCR-503` | Shift open exists inside the POS screen; **there is no close screen**, so `FR_5.3` cannot be performed by a cashier |
 | `TASK-039` | Settings screen | `SCR-702` | No way to set the printer, the receipt width, the backup folder or any `OPS-005` figure |
@@ -95,7 +96,7 @@ happen.
 > pulled into v1.0 and the backlog is re-ordered — that is the one planned exception.
 >
 > **`Q-4` is answered:** the list is small enough to key in by hand, so `TASK-026` stays in v1.1
-> and the exception is not taken. Hand entry needs `TASK-036` above.
+> and the exception is not taken. Hand entry is possible now that `TASK-036` has landed.
 
 ## Open — v1.2 "Trace"
 
@@ -127,15 +128,16 @@ Every v1.0 service, repository, API route and business rule is implemented and t
 `TC-UT-98` asserts the coverage obligation mechanically: **62 covered v1.0 rules, all cited by
 a test**, and 51 of 51 rules outside the obligation as well.
 
-**What is not built, and it is not small.** Thirteen of the twenty-six screens in
-`04_UX_SPEC.md` do not exist — see [the screen gap](#open--v10-till-the-screen-gap) above.
-The backlog assigned screens to `TASK-015`, `016` and `017` and never assigned the rest, and
-nothing caught it because every one of those screens has a working, tested API underneath. The
-suite is green because the suite tests the API.
+**What is not built.** Nine of the twenty-six screens in `04_UX_SPEC.md` do not exist — see
+[the screen gap](#open--v10-till-the-screen-gap) above. The backlog assigned screens to
+`TASK-015`, `016` and `017` and never assigned the rest, and nothing caught it because every
+one of those screens has a working, tested API underneath. The suite was green because the
+suite tests the API.
 
-In practical terms: a cashier can sell, take a split tender, park a cart, print a receipt and
-read the day's reports. Nobody can add a product, add a customer, close a shift, create a user,
-change a setting, or read the audit trail from the application.
+`TASK-036` closed the catalogue half. In practical terms now: a store can be set up and
+stocked, and a cashier can sell, take a split tender, park a cart, print a receipt and read the
+day's reports. Nobody can take a payment on account, close a shift, create a user, change a
+setting, or read the audit trail from the application.
 
 **Where the release gate stands.** `07_TEST_PLAN.md` §10 carries the per-criterion outcome.
 Seven of eleven criteria are green. Four need the store and cannot be settled from a build
@@ -145,7 +147,7 @@ unlike the other four it is code, not a visit.
 
 **The two open business questions are answered.** `Q-1`: the store is **not BIR-registered**,
 so `tax_mode` is `NONE` at install. `Q-4`: the product list is small enough to key in by hand,
-so `TASK-026` stays in v1.1 — though hand entry needs `TASK-036`.
+so `TASK-026` stays in v1.1. `TASK-036` built the screens that hand entry needs.
 
 `Q-2` (cold-chain veterinary stock) and `Q-3` (delivery charges) remain open and affect only
 v1.2 scope.
