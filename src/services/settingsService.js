@@ -59,6 +59,21 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 10000, group: 'SALES', ruleId: 'POS-510', ownerOnly: false,
     what: 'Cash variance at shift close that requires a reason', min: 0, max: 1000000,
   },
+  // POS-504: till cash in/out requires "a reason from the configured list". Same
+  // reasoning as INV-108's adjustment reasons — a list in code is what OPS-005 exists
+  // to stop, and an owner withdrawal is the entry every store words differently.
+  till_reasons: {
+    type: 'JSON', group: 'SALES', ruleId: 'POS-504', ownerOnly: false,
+    what: 'Reasons till cash may be moved in or out',
+    value: Object.freeze([
+      'Owner withdrawal',
+      'Petty cash',
+      'Change fund top-up',
+      'Bank deposit',
+      'Supplier paid in cash',
+      'Correction of a miscount',
+    ]),
+  },
   shift_max_open_hours: {
     type: 'INT', value: 24, group: 'SALES', ruleId: 'POS-508', ownerOnly: false,
     what: 'Hours a shift may stay open before it raises an alert', min: 1, max: 168,

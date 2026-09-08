@@ -596,15 +596,19 @@ test('the credit reconciliation endpoint is owner-only and reports clean', async
 
 // ── The soft references (05_TECH_SPEC.md §3.4 deviation) ────────────────────
 
-test('TC-INT-47: a credit transaction is writable before sales and cashier_shifts exist', () => {
+test('TC-INT-47: a credit transaction is writable before the tables it references exist', () => {
   // The same trap 001 documented for audit_logs.shift_id. SQLite resolves a foreign
   // key's parent table at INSERT time, so declaring REFERENCES sales(id) here would
   // make every insert fail until migration 006 — a NULL sale_id included. An OPENING
   // balance from the notebook (TASK-026) carries neither a sale nor a shift and must
   // be writable the day this table exists.
+  //
+  // cashier_shifts has since arrived in 005, which is itself the argument: had the
+  // foreign key been declared, every credit transaction would have been unwritable for
+  // the whole window between migration 004 and 005 — a window that exists in the real
+  // upgrade path, not only in a test.
   const schemaRepository = require('../../repositories/schemaRepository');
   assert.equal(schemaRepository.listTables().includes('sales'), false, 'sales arrive in 006');
-  assert.equal(schemaRepository.listTables().includes('cashier_shifts'), false, 'shifts arrive in 005');
 
   const { account } = makeCreditCustomer();
   assert.doesNotThrow(() => creditService.postStandalone({
@@ -616,7 +620,7 @@ test('TC-INT-47: a credit transaction is writable before sales and cashier_shift
     accountId: account.id, type: 'CREDIT_SALE', amountCentavos: 1000,
     actor: sessions.CASHIER, documentNo: 'S-I',
     saleId: 'a-sale-whose-table-does-not-exist-yet',
-    shiftId: 'a-shift-whose-table-does-not-exist-yet',
+    shiftId: 'a-shift-that-was-never-opened',
   }), 'and with both ids set');
 
   assert.deepEqual(schemaRepository.foreignKeyCheck(), [], 'no foreign key violations introduced');

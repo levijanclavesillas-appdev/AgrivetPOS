@@ -96,6 +96,13 @@ const ACTIONS = Object.freeze({
 
   // ── AUD-602: the till ─────────────────────────────────────────────────────
   SHIFT_CLOSED_WITH_VARIANCE: { what: 'Shift closed with a variance beyond tolerance', rule: 'AUD-602' },
+  // Not on AUD-601's list, and recorded anyway: POS-509 measures the close against the
+  // opening float, and every peso moved in or out of the drawer between the two is part
+  // of that arithmetic. A variance nobody can explain is a variance nobody can explain
+  // *because* the movements behind it were not recorded with a name on them.
+  SHIFT_OPENED: { what: 'Shift opened', rule: 'POS-503' },
+  SHIFT_CLOSED: { what: 'Shift closed', rule: 'POS-510' },
+  TILL_CASH_MOVED: { what: 'Till cash moved in or out', rule: 'POS-504' },
 
   // ── AUD-603: the six overrides, each two-actor ────────────────────────────
   OVERRIDE_DISCOUNT_ABOVE_CEILING: { what: 'Discount above ceiling authorised', rule: 'AUD-603', override: true },

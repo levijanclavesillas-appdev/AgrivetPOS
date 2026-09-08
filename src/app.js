@@ -20,6 +20,7 @@ const referenceRoutes = require('./routes/reference');
 const inventoryRoutes = require('./routes/inventory');
 const customerRoutes = require('./routes/customers');
 const pricingRoutes = require('./routes/pricing');
+const shiftRoutes = require('./routes/shifts');
 const setupService = require('./services/setupService');
 const { requireSetup } = require('./middleware/setup');
 
@@ -47,6 +48,7 @@ function createApp() {
   app.use(API_BASE, inventoryRoutes);
   app.use(API_BASE, customerRoutes);
   app.use(API_BASE, pricingRoutes);
+  app.use(API_BASE, shiftRoutes);
 
   // The renderer. Vanilla ES modules, no build step (05_TECH_SPEC.md §2).
   //

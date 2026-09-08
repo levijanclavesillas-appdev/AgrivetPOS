@@ -30,8 +30,9 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(result.from, 0);
   assert.equal(result.to, migrate.binaryVersion());
   assert.deepEqual(result.applied, migrate.available().map((m) => m.file));
-  assert.deepEqual(result.applied.slice(0, 4), [
+  assert.deepEqual(result.applied.slice(0, 5), [
     '001_foundation.sql', '002_catalog.sql', '003_inventory.sql', '004_customers_credit.sql',
+    '005_shifts.sql',
   ]);
 
   const rows = migrate.applied();
@@ -41,6 +42,7 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(rows[1].name, 'catalog');
   assert.equal(rows[2].name, 'inventory');
   assert.equal(rows[3].name, 'customers_credit');
+  assert.equal(rows[4].name, 'shifts');
   for (const row of rows) assert.match(row.applied_at, /Z$/, 'applied_at is stored UTC (VR-102)');
 });
 
@@ -119,13 +121,16 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'inventory', 'inventory_movements',
     // 004_customers_credit
     'credit_allocations', 'customer_credit_accounts', 'customer_credit_transactions', 'customers',
+    // 005_shifts
+    'cashier_closings', 'cashier_shifts', 'closing_method_lines', 'till_movements',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
     'idx_products_name', 'idx_products_category', 'idx_products_active',
     'idx_move_product', 'idx_move_ref', 'idx_move_corrects',
     'idx_customers_name', 'idx_credit_account', 'idx_credit_due',
-    'idx_alloc_collection', 'idx_alloc_sale']) {
+    'idx_alloc_collection', 'idx_alloc_sale',
+    'idx_shift_open', 'idx_till_shift', 'idx_closing_lines']) {
     assert.ok(repo.listIndexes().includes(index), `missing index ${index}`);
   }
   assert.ok(repo.integrityCheck().ok, 'a freshly migrated database passes integrity_check');
@@ -139,7 +144,7 @@ test('TC-INT-05: an audit row is writable before cashier_shifts exists', () => {
   // would fail from first-run setup (AUD-604) onwards.
   temp.openMigrated('audit-writable');
   const repo = require('../../repositories/schemaRepository');
-  assert.ok(!repo.listTables().includes('cashier_shifts'), 'shifts arrive in 005');
+  assert.ok(repo.listTables().includes('cashier_shifts'), 'shifts arrived in 005');
 
   const insert = db.get().prepare(
     'INSERT INTO audit_logs (id, occurred_at, actor_username, action, entity_type, shift_id) ' +
