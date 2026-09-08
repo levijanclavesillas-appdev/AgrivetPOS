@@ -343,6 +343,30 @@ test('TC-INT-38: a duplicate same-day reference warns and requires explicit acce
 
 // ── Step 7 — credit (CR-102, CR-104) ────────────────────────────────────────
 
+test('POS-103: a customer is optional, and a walk-in sells at retail', () => {
+  // The commonest sale in the store: somebody walks in, buys a sack, pays cash, and
+  // nobody asks their name. A POS that needs a customer record before it will take
+  // money is a POS the counter works around.
+  const product = stocked({ retail: 10000 });
+
+  const result = saleService.complete({
+    lines: [{ productId: product.id, qtyMilli: 1000 }],
+    tenders: [{ method: 'CASH', amountCentavos: 10000 }],
+  }, sessions.CASHIER);
+
+  assert.equal(result.sale.status, 'COMPLETED');
+  assert.equal(result.sale.customer_id, null, 'no customer, and none invented');
+  assert.equal(result.sale.price_level, 'RETAIL', 'POS-103: a walk-in is at retail price');
+
+  // And nothing invents one on the way back out, either.
+  const view = saleService.get(result.sale.id);
+  assert.equal(view.sale.customer_id, null);
+  assert.equal(view.items[0].price_level_applied, 'RETAIL');
+
+  // The other half of POS-103, which TC-UT-40 below proves in the other direction:
+  // a walk-in has no account to charge, so credit is not available to them (CR-102).
+});
+
 test('TC-UT-40: a walk-in may not pay on credit', () => {
   const product = stocked({ retail: 10000 });
 
@@ -459,6 +483,38 @@ test('POS-102: a line entered in packs is stored in the base unit', () => {
   assert.equal(sale.items[0].qty_milli, 100000);
   assert.equal(sale.sale.total_centavos, 6250 * 100);
   assert.equal(inventoryRepository.qtyOnHand(product.id), 1000000 - 100000);
+});
+
+test('UOM-004: selling a sack from a KG product posts no break-bulk event', () => {
+  // The rule's second clause, and the normal case for feed: where the base unit is
+  // already the loose unit, opening a sack is not an inventory event. Selling by the
+  // sack simply deducts kilos.
+  //
+  // The assertion is the *absence* of a movement, which is worth stating explicitly:
+  // a BREAK_BULK pair posted here would be two rows per sack sold, summing to zero,
+  // cluttering every product ledger a store ever reads for no information at all.
+  const product = stocked({ retail: 6250, qtyMilli: 1000000 });
+  productService.addPack(product.id, { unitId: ref.sack.id, factorMilli: 50000 }, sessions.OWNER);
+
+  const before = inventoryService.ledger(product.id).movements.length;
+  saleService.complete({
+    lines: [{ productId: product.id, qtyMilli: 1000, packUnitId: ref.sack.id }],
+    tenders: [{ method: 'CASH', amountCentavos: 9999999 }],
+  }, sessions.CASHIER);
+
+  const movements = inventoryService.ledger(product.id).movements;
+  assert.equal(movements.length, before + 1, 'one sale, one movement');
+  assert.equal(movements.some((m) => m.type === 'BREAK_BULK'), false, 'UOM-004: no event needed');
+  assert.equal(inventoryRepository.qtyOnHand(product.id), 1000000 - 50000, 'and it deducted kilos');
+});
+
+test('UOM-004: break-bulk is a transfer, so its movement type moves no stock', () => {
+  // Where a product *is* stocked as sealed packs and sold loose, the rule calls for a
+  // movement pair — and a pair only balances if the type itself is signless. A
+  // BREAK_BULK with sign -1 would be shrinkage every time somebody opened a sack.
+  assert.equal(inventoryService.TYPES.BREAK_BULK.sign, 0);
+  assert.equal(inventoryService.TYPES.BREAK_BULK.costed, false, 'opening a pack changes no cost');
+  assert.ok(inventoryService.TYPE_NAMES.includes('BREAK_BULK'));
 });
 
 test('the pack factor is resolved server-side, never taken from the client', () => {

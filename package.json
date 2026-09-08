@@ -1,8 +1,8 @@
 {
   "name": "chachi-agrivet-pos",
   "productName": "Chachi Agrivet POS",
-  "version": "0.1.0",
-  "description": "Agrivet store POS and inventory management — local-first, offline-capable, one Windows PC.",
+  "version": "1.0.0",
+  "description": "Local-first point of sale and inventory for a Philippine agrivet store",
   "author": "Chachi's Software Development Service",
   "license": "UNLICENSED",
   "private": true,
@@ -36,22 +36,42 @@
       "main.js",
       "src/**/*",
       "public/**/*",
-      "package.json"
+      "package.json",
+      "!src/tests/**/*",
+      "!**/*.md"
     ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
     },
     "win": {
-      "target": "nsis",
-      "requestedExecutionLevel": "asInvoker"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker",
+      "icon": "build/icon.ico",
+      "publish": null
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "deleteAppDataOnUninstall": false
+      "shortcutName": "Chachi Agrivet POS",
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "uninstallDisplayName": "Chachi Agrivet POS",
+      "runAfterFinish": true
+    },
+    "extraMetadata": {
+      "version": "1.0.0"
     }
   }
 }

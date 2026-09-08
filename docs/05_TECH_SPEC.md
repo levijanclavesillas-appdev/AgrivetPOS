@@ -699,8 +699,21 @@ position and the Official Receipt boundary: `03_BUSINESS_RULES.md` `TAX-006`.
 ```bash
 npm ci
 npm run test:all                 # gate: 07_TEST_PLAN.md §Release
+./tools/installer/check.sh       # the NSIS macros compile and say what §7 requires
 npm run build:exe                # -> dist/ChachiAgrivetPOS-Setup-<version>.exe
+npm rebuild better-sqlite3       # see below — do this before running the tests again
 ```
+
+**Build the installer on Windows.** `electron-builder` needs `wine` to stamp the binary and
+to assemble NSIS anywhere else; on a Linux build machine it packages the application
+successfully and then stops at that step. `tools/installer/check.sh` compiles the
+hand-written macros natively, so the half of the installer script that can be wrong is
+verifiable without Windows.
+
+**`build:exe` rebuilds `better-sqlite3` for the target platform**, which replaces the local
+native module and leaves the test suite failing with `invalid ELF header` until
+`npm rebuild better-sqlite3` puts it back. Run the gate before the build, not after — or
+rebuild in between.
 
 electron-builder NSIS, `oneClick: false`, install directory selectable, desktop and start-menu
 shortcuts, `requestedExecutionLevel: asInvoker` — the app never needs administrator rights.

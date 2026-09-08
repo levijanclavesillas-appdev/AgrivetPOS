@@ -53,6 +53,11 @@ const may = (role, tx) => (GRANTS[tx] || []).includes(role);
 export function createApp({ root }) {
   let session = null;
   let current = null;
+  // 04_UX_SPEC.md §3: SCR-101 shows the store name and the version. Both are read
+  // before anyone signs in — the store name from /setup and the version from /health,
+  // which are the two endpoints that answer unauthenticated — because the version is
+  // the first thing a support call needs and the last thing anyone can find.
+  let installation = { store_name: null, app_version: null };
   const main = h('main', { class: 'screen' });
   const railHost = h('nav', { class: 'rail', 'aria-label': 'Sections' });
 
@@ -64,7 +69,10 @@ export function createApp({ root }) {
     const problem = h('p', { class: 'error', role: 'alert', hidden: true });
 
     clear(root).append(h('div', { class: 'signin' }, [
-      h('h1', { text: 'Chachi Agrivet POS' }),
+      h('h1', { text: installation.store_name || 'Chachi Agrivet POS' }),
+      installation.store_name
+        ? h('p', { class: 'signin-store', text: 'Chachi Agrivet POS' })
+        : null,
       note ? h('p', { class: 'signin-note', text: note }) : null,
       h('form', {
         onsubmit: async (event) => {
@@ -92,6 +100,10 @@ export function createApp({ root }) {
         problem,
         h('button', { type: 'submit', class: 'primary', text: 'Sign in' }),
       ]),
+      h('p', {
+        class: 'signin-version',
+        text: installation.app_version ? `Version ${installation.app_version}` : '',
+      }),
     ]));
     queueMicrotask(() => (prefillUsername ? password : username).focus());
   }
@@ -340,6 +352,15 @@ export function createApp({ root }) {
     async mount() {
       const status = await api.get('/setup').catch(() => null);
       if (status?.required) { window.location.href = '/'; return; }
+
+      // Neither call is allowed to stop the counter opening: a sign-in screen without
+      // a version on it is a minor inconvenience, and one that never renders is a shop
+      // that cannot trade.
+      const health = await api.get('/health').catch(() => null);
+      installation = {
+        store_name: status?.store_name || null,
+        app_version: health?.app_version || null,
+      };
       signIn();
     },
     get session() { return session; },

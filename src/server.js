@@ -20,8 +20,18 @@ function port() {
 
 async function start({ listenPort = port(), log = () => {} } = {}) {
   db.open();
-  const result = migrate.migrate({ log });
-  log(`schema version ${result.to}`);
+
+  // 05_TECH_SPEC.md §7: pending migrations run on first launch after an upgrade, and a
+  // verified backup is taken first. Migrations are forward-only (§8.9), so that backup
+  // is the only way back — and if it cannot be taken, the upgrade does not run.
+  const upgrade = require('./services/upgradeService').onLaunch({ log });
+  if (upgrade.error) {
+    db.close();
+    const err = new Error(upgrade.error);
+    err.ruleId = upgrade.rule_id || null;
+    err.upgrade = upgrade;
+    throw err;
+  }
 
   // INT-1 / INT-2: the printer and drawer drivers are installed once the database is
   // open, because the transport is read from settings. documentService and

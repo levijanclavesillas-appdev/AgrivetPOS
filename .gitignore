@@ -5,3 +5,4 @@ dist/
 *.db-shm
 logs/
 .env
+tools/installer/chachi-nsh-check.exe

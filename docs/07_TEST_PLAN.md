@@ -15,7 +15,8 @@ and current gate status**.
 | API | project runner | Every endpoint, including authorisation refusals | `npm run test` |
 | E2E | project runner | A scripted trading day end to end | `npm run test:e2e` |
 | Performance | project runner | `NFR_1.*` budgets against a seeded 5,000-product database | `npm run test:perf` |
-| Browser smoke | scripted, out of gate | The real renderer in Chromium: sign in, open the shift, scan, park, resume, pay, receipt | `./tools/browser-smoke/run.sh` |
+| Browser smoke | scripted, out of gate | The real renderer in Chromium: sign in, open the shift, scan, park, resume, pay, receipt, reports, backups, health | `./tools/browser-smoke/run.sh` |
+| Installer macros | scripted, out of gate | `build/installer.nsh` compiles, and the uninstaller never removes the database or the backup folder | `./tools/installer/check.sh` |
 | Installer | manual, scripted | The signed `.exe` on the reference machine: clean install, upgrade, uninstall | — |
 | UAT | manual | `07_TEST_PLAN.md` §8, on the store's own hardware | — |
 
@@ -123,7 +124,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-E2E-05` | Split tender: cash + GCash + credit in one sale |
 | `TC-E2E-06` | Full trading day → close shift → variance → reason → backup written and verified |
 | `TC-E2E-07` | Adjustment for damage → valuation falls → movement ledger and audit both show it |
-| `TC-E2E-08` | The whole of `TC-E2E-06` **with networking disabled** | 
+| `TC-E2E-08` | A full trading day with `dns`, `net`, `tls`, `http`, `https` and `fetch` removed, and nothing in the renderer loaded from off the machine. The machine-level version is UAT check F | 
 | `TC-E2E-09` | `kill -9` mid-sale loop → restart → ledger consistent, no partial sale, no lost committed sale. Proves the process-death half of `OPS-008`; §8 item 7 is the power-loss half |
 
 ## 6. Non-functional cases
@@ -152,6 +153,12 @@ defect at the severity of whatever it blocks (§9).
 | `TC-INST-01` | An upgrade over a prior install preserves the database, writes and verifies a pre-migration backup, and migrates on first launch | `NFR_5.1` |
 | `TC-INST-02` | A database ahead of the binary refuses to start **through the installed application**, with a message an owner can act on | `NFR_5.1` |
 
+`TC-INST-01` and `TC-INST-02` are automated against the working tree in
+`src/tests/integration/upgrade.test.js`, with the prior install built by running the previous
+release's own migrations rather than by hand-writing an old schema. Both are re-run against the
+**installed** `.exe` at UAT (checks D and E), because an installer can lose a database in ways a
+service call cannot.
+
 ## 7. Regression guards
 
 Permanent, never deleted, run on every build:
@@ -178,6 +185,10 @@ Permanent, never deleted, run on every build:
 | 9 | Cashier cannot see cost or reach settings | Confirmed on their own login |
 | 10 | Receipt carries "This is not an official receipt" | Printed and read | 
 
+These ten, plus the eight installer and recovery checks `TASK-018` adds, are recorded on
+`docs/UAT_RECORD.md` — filled in by hand on the day, on the store's own hardware. A
+pre-ticked UAT record is not evidence of anything.
+
 ## 9. Defect severity
 
 | Severity | Definition | Ship? |
@@ -196,46 +207,59 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ `FR_1`–`FR_7` built |
-| 2 | `npm run test:all` green | ☑ green — unit 14 files, integration 20, E2E 5 |
-| 3 | `TC-UT-98` passes — every covered rule has a test | ☐ Not written — `TASK-018` |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ built and green in the suite. `FR_1.2` (offline) is asserted by `TC-E2E-08`; item 7 below is the same claim on the store's own machine |
+| 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 6 |
+| 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; it found `UOM-004` and `POS-103` untested on its first run and both now have cases |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
-| 5 | Zero open S1 or S2 defects | ◐ None known; nothing has run on the store's hardware |
-| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ `TC-PERF-01`–`03` and `05` measure and report; `04` not written. **No figure here was taken on the reference machine** (§6) |
-| 7 | `TC-E2E-08` passes with networking disabled | ☐ Not written — `TASK-018` |
-| 8 | `TC-E2E-09` passes — power-loss durability | ◐ Written and green against `SIGKILL`, which proves the process-death half. The OS-level half needs the plug pulled on the reference machine — §8 item 7 |
-| 9 | UAT §8 complete on the store's hardware, owner signed | ☐ Not started |
-| 10 | Backup verified restorable onto a second machine | ◐ Restore is built and `TC-INT-74` proves it in place. Onto a *second machine* is UAT — `TASK-018` |
-| 11 | `TAX-006` confirmed on the printed document | ◐ Asserted in the encoder's output; never seen on paper |
+| 5 | Zero open S1 or S2 defects | ◐ **none known, and nothing has run in the store.** Settled at UAT sign-off (`docs/UAT_RECORD.md`) |
+| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ all five written and measuring. **Every figure below is from a build machine, not the reference spec, and therefore establishes nothing about the budget** (§6) |
+| 7 | `TC-E2E-08` passes with networking disabled | ◐ written and green with `dns`, `net`, `tls`, `http`, `https` and `fetch` replaced by throwing stubs — the application reaches for nothing. **The machine-level version, cable out at the wall, is UAT check F** |
+| 8 | `TC-E2E-09` passes — power-loss durability | ◐ written and green against `SIGKILL`, which proves the process-death half and would pass with `synchronous = OFF`. **The plug-pull is UAT check 7** |
+| 9 | UAT §8 complete on the store's hardware, owner signed | ☐ **not started.** `docs/UAT_RECORD.md` is the sheet it is recorded on |
+| 10 | Backup verified restorable onto a second machine | ☐ **not done.** `TC-INT-74` restores in place; the second machine is UAT check G |
+| 11 | `TAX-006` confirmed on the printed document | ☐ **not done.** Asserted in the encoder's output and in `TC-E2E-08`; never read on paper. UAT check 10 |
 
-> ### Gate status, 2026-09-08 — **NOT SHIPPABLE**
+Measured on a build machine, reported for regression purposes and for nothing else:
+
+| Case | Budget | Measured here | On the reference machine |
+| :--- | :--- | :--- | :--- |
+| `TC-PERF-01` — sale, confirm to receipt | `NFR_1.1` ≤ 2 s | median 12 ms | not measured |
+| `TC-PERF-02` — scan to cart line | `NFR_1.2` ≤ 300 ms | median 0.6 ms | not measured |
+| `TC-PERF-03` — product search | `NFR_1.3` ≤ 500 ms | median 20 ms | not measured |
+| `TC-PERF-04` — cold start to login | `NFR_1.4` ≤ 8 s | median 713 ms, server only | not measured; excludes Electron and Chromium starting |
+| `TC-PERF-05` — dashboard at 100,000 lines | `NFR_1.5` ≤ 3 s | median 125 ms | not measured |
+
+> ### Gate status, 2026-09-08 — **NOT SHIPPABLE, and one step from being assessable**
 >
-> `TASK-001` through `TASK-017` are built. Every functional requirement `FR_1`–`FR_7` has code
-> behind it: the counter takes a sale end to end, the owner reads the day off a screen, and the
-> store's data is backed up, verified, retained and restorable.
+> `TASK-001` through `TASK-018` are built. Every automatable criterion is green: the suite
+> passes, the layering holds, every covered rule is cited by a test, and the offline and
+> durability cases that were unwritten a day ago now exist.
 >
-> `TC-E2E-09` now exists and is green: a till ringing sales is killed with `SIGKILL` mid-loop,
-> the database is reopened, and every committed sale is present with no partial one. That closes
-> the gap this section named as the most serious.
+> **Four criteria remain, and all four need the store.** They are not paperwork:
 >
-> It is not shippable, and the reasons are specific rather than a matter of polish:
+> - **Nothing has run on the store's hardware** (5, 6, 9). No receipt has been printed on
+>   paper, no drawer has opened, no scanner has been used, and every performance figure
+>   above came from a machine that is not the one the store will use. §6 says plainly that
+>   a budget measured anywhere else is not a budget.
+> - **A backup has never been restored onto a second machine** (10). This is the scenario
+>   `05_TECH_SPEC.md` §7's disaster-recovery table actually describes, and until it has
+>   been done once the store's backups are untested where it counts.
+> - **`TAX-006` has never been read on paper** (11). It is a legal requirement about a
+>   physical document handed to a customer, and it has only ever been asserted against a
+>   byte stream.
+> - **The two hardest guarantees are half-proved** (7, 8). `TC-E2E-08` proves the
+>   application reaches for no network; it does not prove the machine has none.
+>   `TC-E2E-09` proves a killed process loses nothing; `SIGKILL` does not empty the
+>   operating system's write cache, and a power cut does.
 >
-> - **Nothing has run on the store's hardware.** Every performance figure above was measured on a
->   developer machine, and §6 says plainly that a budget measured anywhere else is not a budget.
->   No receipt has been printed on paper, no drawer has opened, no scanner has been used.
-> - **A backup has never been restored onto a second machine.** `TC-INT-74` restores in place
->   and proves the control, but the scenario the disaster-recovery table in `05_TECH_SPEC.md` §7
->   actually describes — new hardware, the backup folder from a USB stick — has not been
->   performed. A system whose backup has never been restored elsewhere is a system whose backup
->   is untested where it counts.
-> - **`TC-E2E-09` proves the process-death half of `OPS-008`, not the power-loss half.** `SIGKILL`
->   does not empty the operating system's page cache, so the case would pass even with
->   `synchronous = OFF`. Pulling the plug on the reference machine is §8 item 7 and it is the
->   only thing that settles it.
-> - **Two gate cases are unwritten**: `TC-UT-98` (rule coverage) and `TC-E2E-08` (offline).
-> - **UAT has not begun** (`TASK-018`).
+> **The installer is built but not produced.** `npm run build:exe` packages the application
+> correctly and then stops: assembling and signing a Windows installer needs Windows or
+> `wine`, and signing needs a certificate the business holds. The NSIS macros are compiled
+> and checked by `tools/installer/check.sh`, so the hand-written half is verified — but no
+> `.exe` has been produced, installed, upgraded over or uninstalled.
 >
-> The path to the next assessable gate is `06_TASKS/README.md`, `TASK-017` and `TASK-018`.
+> The path to a shippable gate is one visit: build and sign the installer on a Windows
+> machine, then work down `docs/UAT_RECORD.md` on the store's own counter.
 
 ---
 
