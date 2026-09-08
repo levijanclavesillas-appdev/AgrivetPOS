@@ -135,6 +135,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-E2E-11` | A cashier's day from the shift screens: open → resume → sell → cash out → count short → refused → reason → close → summary → backup. The case that proves a till can be counted |
 | `TC-E2E-12` | The owner creates a cashier who then trades under their own name: create → sign in → refused what a cashier may not do → open → sell → PIN unlock → lock out → reset → deactivate. The case that proves the store need not trade on the owner login |
 | `TC-E2E-13` | An installer configures a store from `SCR-702`: printer, width, test page, backup folder, a bounded figure refused, an owner-only one refused to a manager, the tax mode changed and audited |
+| `TC-E2E-14` | A credit customer's life: create → limit → buy on credit → part payment settling the oldest → overpayment refused then acknowledged → deactivation refused while owing, then allowed |
 
 ## 6. Non-functional cases
 
@@ -165,6 +166,7 @@ defect at the severity of whatever it blocks (§9).
 | `TC-UI-05` | `CREDIT` is rendered as unreconcilable, with its reason, and takes no counted input | `POS-510` |
 | `TC-UI-06` | No password or PIN value is ever rendered back into the DOM | `SEC-1` |
 | `TC-UI-07` | The settings screen holds no copy of the registry — every field is built from the server's declaration | `OPS-005` |
+| `TC-UI-08` | No customer screen computes a balance; the collection preview is labelled an estimate and the result is the server's | `CR-103` |
 | `TC-INST-01` | An upgrade over a prior install preserves the database, writes and verifies a pre-migration backup, and migrates on first launch | `NFR_5.1` |
 | `TC-INST-02` | A database ahead of the binary refuses to start **through the installed application**, with a message an owner can act on | `NFR_5.1` |
 
@@ -222,8 +224,8 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ **every service, API and rule is built and tested; 4 of the 26 screens in `04_UX_SPEC.md` are not.** `TASK-036` made `FR_2.*` reachable, `TASK-038` `FR_5.*`, `TASK-040` `FR_1.2`–`FR_1.4`, `TASK-039` `FR_1.1`. `FR_1.5` (audit readable) and `FR_4.3` (collections) still have no screen — `06_TASKS/README.md`, the screen gap |
-| 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 10 |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ **every service, API and rule is built and tested; 1 of the 26 screens in `04_UX_SPEC.md` is not.** `FR_1.1`–`FR_1.4`, `FR_2.*`, `FR_3.*`, `FR_4.*`, `FR_5.*`, `FR_6.*` and `FR_7.*` are all reachable. Only `FR_1.5` — reading the audit trail — has no screen (`TASK-041`) |
+| 2 | `npm run test:all` green | ☑ green — unit 15 files, integration 21, E2E 11 |
 | 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; it found `UOM-004` and `POS-103` untested on its first run and both now have cases |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
 | 5 | Zero open S1 or S2 defects | ◐ **none known, and nothing has run in the store.** Settled at UAT sign-off (`docs/UAT_RECORD.md`) |
@@ -255,15 +257,16 @@ Measured on a build machine, reported for regression purposes and for nothing el
 > close, users, settings or the audit viewer. Nothing here caught it, because every one of
 > those screens has a working, tested API underneath and this suite tests the API.
 >
-> Four of the six are closed. `TASK-036` built the catalogue and `TC-E2E-10` walks a store from
-> an empty install to a sale. `TASK-038` built the shift screens and `TC-E2E-11` walks a
-> cashier's day to a counted, reconciled, backed-up close. `TASK-040` built user administration
-> and `TC-E2E-12` has the owner create a cashier who then trades **under her own name**.
-> `TASK-039` built `SCR-702` and `TC-E2E-13` configures a store from it — printer, width, test
-> page, backup folder, tax mode — which is what `DEPLOYMENT.md` §4 asks the installer to do and
-> could only be done through the API until now. What remains is customers and collections, and
-> the audit viewer (`TASK-037`, `TASK-041`). This is criterion 1, and unlike the four below it
-> is code rather than a visit.
+> Five of the six are closed. `TASK-036` built the catalogue, `TASK-038` the shift screens,
+> `TASK-039` the settings, `TASK-040` user administration, and `TASK-037` the customer and
+> credit screens — `TC-E2E-10` to `TC-E2E-14` walk all five paths end to end. A store can now
+> be installed, configured, stocked, staffed and traded from the application, its till counted
+> and its credit customers paid off.
+>
+> **One screen remains**: the audit viewer (`TASK-041`). The trail is written and queryable and
+> nothing can be reached without leaving a row on it — but the owner it exists for cannot read
+> it, which is `FR_1.5`. This is criterion 1, and unlike the four below it is code rather than a
+> visit.
 >
 > **Four further criteria need the store.** They are not paperwork:
 >

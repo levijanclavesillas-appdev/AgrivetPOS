@@ -20,6 +20,9 @@ import { createSettings } from '../admin/settings.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
+import { createCustomerList } from '../customers/list.js';
+import { createCustomerProfile } from '../customers/profile.js';
+import { createCollection } from '../customers/collection.js';
 import { createShift } from '../shift/view.js';
 import { createShiftSummary } from '../shift/summary.js';
 
@@ -182,6 +185,7 @@ export function createApp({ root }) {
     if (id === 'products') return showProducts();
     if (id === 'low-stock') return showProducts({ mode: 'low-stock' });
     if (id === 'shift') return showShift();
+    if (id === 'customers') return showCustomers();
 
     // The admin and catalog screens are their own tasks. Saying so beats a dead
     // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
@@ -227,6 +231,48 @@ export function createApp({ root }) {
       // A newly created product reopens in the editor rather than dropping back to the
       // list: its packs, prices and barcodes are the next four things anybody does.
       onClose: (createdId) => (createdId ? showProductEditor(createdId) : showProducts()),
+    });
+    current.mount();
+    return current;
+  }
+
+  // ── SCR-401 – SCR-403 ─────────────────────────────────────────────────────
+
+  function showCustomers() {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    renderRail('customers');
+    current = createCustomerList({
+      root: main,
+      onOpen: (id) => showCustomer(id),
+      onCollect: (id) => showCollection(id),
+    });
+    current.mount();
+    return current;
+  }
+
+  function showCustomer(customerId) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createCustomerProfile({
+      root: main,
+      customerId,
+      onBack: () => showCustomers(),
+      onCollect: (id) => showCollection(id),
+    });
+    current.mount();
+    return current;
+  }
+
+  function showCollection(customerId) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createCollection({
+      root: main,
+      customerId,
+      onBack: () => showCustomer(customerId),
+      // Back to the profile, where the new balance and the settled invoices are.
+      onDone: (id) => showCustomer(id),
     });
     current.mount();
     return current;

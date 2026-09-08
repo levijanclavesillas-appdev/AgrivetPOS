@@ -6,6 +6,8 @@ const { app, BrowserWindow } = require('electron');
 
 const PORT = Number(process.env.UI_PORT || 47897);
 const TOKEN = process.env.UI_TOKEN;
+const PRODUCT_ID = process.env.UI_PRODUCT;
+const CUSTOMER_ID = process.env.UI_CUSTOMER;
 const API = `http://127.0.0.1:${PORT}/api/v1`;
 
 const fails = [];
@@ -266,6 +268,96 @@ app.whenReady().then(async () => {
 
   await run(`[...document.querySelectorAll('.summary button')].find(b => /Done/.test(b.textContent)).click()`);
   await settle(900);
+
+  console.log('\n— SCR-401 to SCR-403: customers and credit —');
+  await run(OPEN_RAIL('Customers'));
+  await waitFor(`!!document.querySelector('.customers')`, { label: 'SCR-401' });
+  log(await run(`document.querySelectorAll('.customer-list tbody tr').length >= 1`),
+    'the customer list renders');
+  log(await run(`/Santos Farm/.test(document.querySelector('.customer-list').textContent)`),
+    'and the credit customer is on it');
+
+  await run(`document.querySelector('.customer-list tbody tr').click()`);
+  await waitFor(`!!document.querySelector('.credit-summary')`, { label: 'SCR-402' });
+
+  const creditBlock = await run(`document.querySelector('.credit-summary').textContent`);
+  for (const [label, pattern] of [
+    ['Owes', /Owes/], ['Limit', /Limit/], ['Can still buy', /Can still buy/], ['Terms', /Terms/],
+  ]) log(pattern.test(creditBlock), `CR-104: the first block shows ${label}`);
+  log(/₱50,000\.00/.test(creditBlock), 'with the figures the server sent',
+    creditBlock.replace(/\s+/g, ' ').slice(0, 80));
+
+  // A credit sale, so there is something to pay off.
+  const shiftOpen = await api('/shifts/current');
+  if (!shiftOpen.json.open) {
+    await api('/shifts/open', { method: 'POST', body: { openingFloatCentavos: 200000, confirmed: true } });
+  }
+  await api('/sales', {
+    method: 'POST',
+    body: {
+      lines: [{ productId: PRODUCT_ID, qtyMilli: 5000 }],
+      customerId: CUSTOMER_ID,
+      tenders: [{ method: 'CREDIT', amountCentavos: 31250 }],
+    },
+  });
+
+  console.log('\n— SCR-403: taking a payment —');
+  await run(OPEN_RAIL('Customers'));
+  await waitFor(`!!document.querySelector('.customer-list')`);
+  await run(`document.querySelector('.customer-list .row-action').click()`);
+  await waitFor(`!!document.querySelector('.collection')`, { label: 'SCR-403' });
+
+  log(await run(`document.querySelector('.collection-amount').value === ''`),
+    'the amount starts empty');
+
+  await run(`[...document.querySelectorAll('.collection .row-action')].find(b => /Pay in full/.test(b.textContent)).click()`);
+  await settle(500);
+  const full = await run(`document.querySelector('.collection-amount').value`);
+  log(full === '312.50', 'Pay in full fills the outstanding balance', `₱${full}`);
+
+  const previewText = await run(`document.querySelector('.preview').textContent`);
+  log(/nothing owing/i.test(previewText), 'and the preview says the account clears',
+    previewText.replace(/\s+/g, ' ').slice(0, 70));
+
+  // CR-204: overpay, and watch the screen refuse until it is acknowledged.
+  await run(`(() => {
+    const el = document.querySelector('.collection-amount');
+    el.value = '400.00';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(500);
+  const over = await run(`document.querySelector('.preview').textContent`);
+  log(/more than they owe/.test(over), 'CR-204: an overpayment is named',
+    (over.match(/That is [^.]+\./) || [''])[0]);
+  log(await run(`document.querySelector('.overpayment input[type=checkbox]').checked === false`),
+    'the tick starts off — a tick that defaults to on is not explicit');
+  log(await run(`document.querySelector('.editor-actions .primary').disabled === true`),
+    'and the payment cannot be recorded until it is ticked');
+
+  await run(`(() => {
+    const t = document.querySelector('.overpayment input[type=checkbox]');
+    t.checked = true;
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await settle(400);
+  log(await run(`document.querySelector('.editor-actions .primary').disabled === false`),
+    'ticked, it is allowed');
+
+  // Take the sensible payment instead.
+  await run(`(() => {
+    const el = document.querySelector('.collection-amount');
+    el.value = '312.50';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(400);
+  await run(`document.querySelector('.editor-actions .primary').click()`);
+  await waitFor(`!!document.querySelector('.collection-done')`, { label: 'the receipt', timeoutMs: 15000 });
+
+  const done = await run(`document.querySelector('.collection-done').textContent`);
+  log(/They owe nothing now/.test(done), 'the server’s figure is what is shown afterwards',
+    done.replace(/\s+/g, ' ').slice(0, 80));
+  log(/What it settled/.test(done), 'CR-203: and which invoices it settled');
+  log(/acknowledgement/i.test(done), 'CR-206: with the acknowledgement’s outcome');
 
   console.log('\n— SCR-601: the dashboard —');
   await run(OPEN_RAIL('Reports'));

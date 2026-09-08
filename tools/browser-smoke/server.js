@@ -60,6 +60,15 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
     body: { productId: product.id, type: 'RECEIPT', qtyMilli: 500000, unitCostCentavos: 4000, reason: 'Received but not recorded' },
   });
 
+  // A credit customer, so SCR-401 to SCR-403 have something to show.
+  const farm = (await api('/customers', {
+    method: 'POST', token,
+    body: {
+      name: 'Santos Farm', code: 'SANTOS', customerType: 'FARM', priceLevel: 'RETAIL',
+      isCreditEligible: true, creditLimitCentavos: 5000000, termsDays: 30,
+    },
+  })).json.customer;
+
   // Everything the browser side needs to drive and to check against.
-  console.log(`READY ${JSON.stringify({ port: PORT, token, productId: product.id })}`);
+  console.log(`READY ${JSON.stringify({ port: PORT, token, productId: product.id, customerId: farm.id })}`);
 })().catch((err) => { console.error('SERVER CRASH', err); process.exit(2); });

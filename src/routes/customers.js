@@ -42,15 +42,27 @@ router.get('/customers/credit-reconciliation', [authenticate, requirePermission(
   }
 });
 
+/**
+ * The list, and the two enumerations a screen would otherwise have to keep itself.
+ *
+ * `customer_types` and `price_levels` are served for the same reason `/settings` serves
+ * its groups and `/sales/pricing-policy` serves its ceilings: a screen with its own
+ * copy of a list the server validates against is a screen that is wrong the day the
+ * list changes, and it fails by offering a choice the server then refuses.
+ */
 router.get('/customers', readCustomers, (req, res, next) => {
   try {
-    res.json(customerService.search({
-      q: req.query.q,
-      includeInactive: req.query.includeInactive === 'true',
-      creditOnly: req.query.creditOnly === 'true',
-      limit: req.query.limit,
-      offset: req.query.offset,
-    }));
+    res.json({
+      customer_types: customerService.TYPES,
+      price_levels: customerService.PRICE_LEVELS,
+      ...customerService.search({
+        q: req.query.q,
+        includeInactive: req.query.includeInactive === 'true',
+        creditOnly: req.query.creditOnly === 'true',
+        limit: req.query.limit,
+        offset: req.query.offset,
+      }),
+    });
   } catch (err) {
     next(err);
   }

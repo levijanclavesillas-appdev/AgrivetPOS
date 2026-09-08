@@ -871,3 +871,79 @@ test('NFR_4.3: the settings controls are touchable', () => {
   assert.ok(rule, 'the text inputs have a rule');
   assert.match(rule, /min-height:\s*var\(--touch\)/);
 });
+
+// ── SCR-401 – SCR-403 (TASK-037) ────────────────────────────────────────────
+
+test('TC-UI-08: no customer screen computes a balance of its own', () => {
+  // CR-103 derives the balance from the transactions. A screen that added up its own
+  // would eventually disagree with the ledger, and that is the one disagreement a
+  // credit system cannot survive.
+  const profile = codeOf('js/customers/profile.js');
+  const list = codeOf('js/customers/list.js');
+
+  for (const [name, source] of [['profile', profile], ['list', list]]) {
+    assert.equal(
+      /balance_centavos\s*[-+]\s*|reduce\(/.test(source), false,
+      `the ${name} does arithmetic on a balance`
+    );
+  }
+  assert.match(profile, /money\(credit\.balance_centavos\)/, 'it renders the server’s figure');
+  assert.match(profile, /money\(row\.balance_after_centavos\)/, 'and the ledger’s running balance');
+});
+
+test('TC-UI-08: the collection preview is labelled an estimate, and the result is not', () => {
+  const source = codeOf('js/customers/collection.js');
+
+  // The preview subtracts, because a cashier needs to see the consequence before
+  // committing. What matters is that it says so, and that the figure quoted afterwards
+  // is the server's.
+  assert.match(source, /credit\.balance_centavos - paid/, 'the preview is arithmetic');
+  assert.match(commentsOf('js/customers/collection.js'), /an estimate, and labelled as one/);
+  assert.match(source, /result\.balance_centavos/, 'and the result renders the server’s figure');
+  assert.equal(
+    /result\.balance_centavos\s*[-+]/.test(source), false,
+    'which is never adjusted here'
+  );
+});
+
+test('CR-204: an overpayment tick starts off and names the excess first', () => {
+  const source = codeOf('js/customers/collection.js');
+
+  // A tick that defaults to on is not explicit, and the rule asks for explicit.
+  assert.match(source, /let acceptOverpayment = false;/);
+  assert.match(source, /checked: acceptOverpayment/);
+  // Submit is refused while the excess is unacknowledged.
+  assert.match(source, /excess > 0 && !acceptOverpayment/);
+  // And the amount is named in the label, not merely "there is an overpayment".
+  assert.match(proseOf('js/customers/collection.js'), /more than they owe/);
+  assert.match(source, /keep the extra \$\{money\(excess\)\}/);
+});
+
+test('CR-205: the screen warns that a cash collection opens the drawer', () => {
+  // A cashier who does not expect the drawer will not have it ready.
+  assert.match(proseOf('js/customers/collection.js'), /the drawer opens/);
+  assert.match(codeOf('js/customers/collection.js'), /CR-205/);
+});
+
+test('CR-106: the credit limit is its own action, not a field on the customer form', () => {
+  // Folding it into the customer form would let a TX-413 holder raise a limit as a
+  // side effect of correcting a phone number, which is why the API separates them.
+  const list = codeOf('js/customers/list.js');
+  const profile = codeOf('js/customers/profile.js');
+
+  assert.equal(/credit-limit/.test(list), false, 'the create form does not set a limit endpoint');
+  assert.match(profile, /api\.put\(`\/customers\/\$\{customerId\}\/credit-limit`/);
+  assert.match(profile, /TX-414/);
+});
+
+test('NFR_4.3: the customer and collection controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'customers.css'), 'utf8');
+  for (const selector of ['.customer-form input, .customer-form select',
+    '.collection input, .collection select', '.limit-form input']) {
+    const rule = cssRule(css, selector) ?? cssRule(css, selector.split(',')[0].trim());
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)/);
+  }
+  // CR-107's overdue treatment.
+  assert.match(cssRule(css, '.tag.overdue'), /color/);
+});

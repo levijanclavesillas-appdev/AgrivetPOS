@@ -11,20 +11,18 @@ network connection at the store.
 >
 > **v1.0 cannot yet be deployed to a store**, and the reason is not the installer.
 >
-> Four of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
-> collections, and the audit viewer (`06_TASKS/README.md`, *the screen gap*).
+> One of the twenty-six screens in `04_UX_SPEC.md` does not exist yet — the audit viewer
+> (`06_TASKS/README.md`, *the screen gap*).
 > Every service and API behind them is built and tested; there is simply no screen to reach
 > them from.
 >
-> `TASK-036`, `TASK-038`, `TASK-039` and `TASK-040` have landed, so **sections 4, 5 and 6's
-> catalogue half are all performable today**: the printer, the receipt width and the backup
-> folder from `SCR-702`, the cashiers from `SCR-701`, the products and opening stock from
-> `SCR-201`–`SCR-204`, and a counted close from `SCR-501`–`SCR-503`. `TC-E2E-10` to `TC-E2E-13`
-> walk all four paths end to end.
+> **Every section of this manual is now performable from the application.** `TASK-036` to
+> `TASK-040` built the catalogue, the shift screens, the settings, user administration and the
+> customer and credit screens; `TC-E2E-10` to `TC-E2E-14` walk all five paths end to end.
 >
-> What is still impossible as written: the opening **credit balances** in section 6, which need
-> the customer screens (`TASK-037`), and reading the audit trail (`TASK-041`). Until those land
-> the only route is the HTTP API, which is not a thing to do on a store counter.
+> What is still missing is the **audit viewer** (`TASK-041`). Nothing in this manual depends on
+> it — the trail is written on every mutation regardless — but an owner cannot read it, which
+> is `FR_1.5`.
 >
 > **Do not schedule the cutover on the strength of a green test suite.** The suite is green
 > because it tests the API.
@@ -213,13 +211,10 @@ on the rail (UAT check 9).
 Do this on the day the store starts, not a week before. Anything entered early is wrong by
 the time they start.
 
-*The catalogue screens (`SCR-201`–`SCR-204`) are built and this half is performable today. The
-customer screens (`SCR-401`–`SCR-403`) are not, so opening **credit balances** still cannot be
-entered — that part waits for `TASK-037`.*
-
-*The shift screens (`SCR-501`–`SCR-503`) are built too, so UAT check 6 — a full day's takings
-reconciling at close — can now be performed by the cashier rather than by a technician with an
-HTTP client.*
+*All of the screens this section needs are built: the catalogue (`SCR-201`–`SCR-204`), the
+customers and their credit (`SCR-401`–`SCR-403`), and the shift screens (`SCR-501`–`SCR-503`),
+so UAT checks 5 and 6 can be performed by the store's own people rather than by a technician
+with an HTTP client.*
 
 ### Products
 
@@ -257,8 +252,9 @@ against.
 
 ### Opening credit balances (`OPS-107`)
 
-For each customer who owes money: create the customer, make them credit-eligible with their
-limit and terms, then post their balance as a credit transaction **dated at cutover**.
+For each customer who owes money: create them on **Customers → New customer** with *Buys on
+credit* ticked and their limit and terms, then post their opening balance as a credit
+transaction **dated at cutover**.
 
 Reconcile against the store's notebook, customer by customer, and have the owner agree each
 figure before you post it (UAT check 5). A credit ledger that starts wrong stays wrong: the
@@ -347,7 +343,7 @@ Open **Admin → Health** first. The version and the last verified backup answer
 | The owner password is lost | The recovery code from wizard step 4. If that is lost too, the data cannot be reached |
 | A cashier is locked out | Five wrong passwords locks an account for 15 minutes (`SEC-3`). The owner resetting the password in **Admin → Users** clears the lock immediately |
 | A cashier sees cost prices | They are signed in on the wrong account. Cost is absent for every role but `OWNER` |
-| A rail item says "not built yet" | It is one of the nine screens still in the gap. The API exists; the screen does not |
+| A rail item says "not built yet" | Only the audit viewer is still in the gap. The API exists; the screen does not |
 | The base unit cannot be changed | Deliberate (`UOM-003`): stock has moved and every movement is recorded in that unit. Make a new product and move the stock across |
 | The application will not start | The message says why. A database ahead of the binary, or a failed pre-migration backup, are the two that stop it deliberately |
 

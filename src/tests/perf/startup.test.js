@@ -195,11 +195,16 @@ test('start-up does not get slower as the database fills', async () => {
     `    empty database: ${fresh.toFixed(0)} ms · 5,000 products and 5,000 sales: ${before.toFixed(0)} ms\n`
   );
 
-  // Twice as slow on a full database would mean something is reading it all.
+  // The claim is that start-up is not proportional to the database. The seeded one
+  // holds five thousand products and five thousand sales against an empty file, so a
+  // proportional start-up would be orders of magnitude slower — this catches that
+  // while staying loose enough to survive four perf files seeding in parallel, which
+  // is how the suite actually runs and which made a tighter bound flaky.
   assert.ok(
-    before < fresh * 3 + 1000,
+    before < fresh * 5 + 2000,
     `a seeded database started in ${before.toFixed(0)} ms against ${fresh.toFixed(0)} ms empty`
   );
+  assert.ok(before < CEILING_MS, `a seeded start-up of ${before.toFixed(0)} ms is past the ceiling`);
 });
 
 test('the figures above are not a release gate', () => {

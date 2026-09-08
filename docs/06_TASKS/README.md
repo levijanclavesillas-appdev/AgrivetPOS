@@ -54,28 +54,29 @@ Every task below is implemented, tested and committed. The commit is the one tha
 | [TASK-036](TASK-036-catalogue-screens.md) | Catalogue screens `SCR-201`–`SCR-204` | `cce3c8f` | `TC-E2E-10`, the cutover; on-hand joined into the product search |
 | [TASK-038](TASK-038-shift-screens.md) | Shift screens `SCR-501`–`SCR-503` | `c4e0e9d` | `TC-E2E-11`, a counted close; one open path instead of two |
 | [TASK-040](TASK-040-user-administration.md) | User administration `SCR-701` | `c9f97cf` | `TC-E2E-12`; an admin password reset now clears a `SEC-3` lockout |
-| [TASK-039](TASK-039-settings-screen.md) | Settings screen `SCR-702` | *this commit* | `TC-E2E-13`; `OPS-001` is now enforced wherever the backup folder is set, not only in the wizard |
+| [TASK-039](TASK-039-settings-screen.md) | Settings screen `SCR-702` | `aa82cc4` | `TC-E2E-13`; `OPS-001` is now enforced wherever the backup folder is set, not only in the wizard |
+| [TASK-037](TASK-037-customer-and-credit-screens.md) | Customer and credit screens `SCR-401`–`SCR-403` | *this commit* | `TC-E2E-14`; `GET /customers` now serves the enumerations a screen would otherwise copy |
 
 ## Open — v1.0 "Till", the screen gap
 
 **These are release-blocking.** The v1.0 backlog assigned screens to three tasks — `TASK-015`
 (`SCR-301`–`304`), `TASK-016` (`SCR-601`–`604`) and `TASK-017` (`SCR-704`, `705`). Nobody was
-given the rest. `04_UX_SPEC.md` specifies **26 screens; 22 now exist**; every service and API
-behind the missing four is built and tested, but there is no screen to reach them from.
+given the rest. `04_UX_SPEC.md` specifies **26 screens; 25 now exist**. Five of the six tasks are closed: the
+store can be stocked (`TC-E2E-10`), its till counted (`TC-E2E-11`), its staff given their own
+logins (`TC-E2E-12`), the machine configured (`TC-E2E-13`) and its credit customers paid off
+(`TC-E2E-14`).
 
-`TASK-036`, `TASK-038`, `TASK-039` and `TASK-040` closed the four that stopped a store being
-run properly: it can be stocked (`TC-E2E-10`), its till can be counted (`TC-E2E-11`), its staff
-have their own logins (`TC-E2E-12`), and it can be configured (`TC-E2E-13`). What is left is
-taking a payment on account and reading the audit trail.
+**One screen remains**: the audit viewer. The trail is written on every mutation and queryable
+through `GET /audit`, and the owner it exists for cannot read it.
 
 | ID | Task | Screens | Why it blocks release |
 | :--- | :--- | :--- | :--- |
-| `TASK-037` | Customer and credit screens | `SCR-401`–`SCR-403` | No way to add a customer, set a limit, or take a payment on account (`FR_4.3`) |
 | [TASK-040](TASK-040-user-administration.md) | User administration | `SCR-701` | No way to create the cashiers. The store would trade on the owner login, which defeats `TX-412` and every audit row |
 | `TASK-041` | Audit trail viewer | `SCR-703` | The trail is written and queryable but cannot be read by the owner (`FR_1.5`) |
 
-`TASK-037` is the sharper of the two left: `FR_4.3` is a payment on account, and a store that
-sells on credit and cannot record a payment against it has a ledger that only grows.
+`TASK-041` is the last of them. `AUD-601` writes a row for every price change, cost change,
+credit limit, adjustment, void, reprint, user change, settings change, export and restore — and
+`FR_1.5` is the owner being able to read it. A trail nobody can read deters nobody.
 
 ## Open — v1.1 "Supply" (no task files yet; write them at v1.0 close)
 
@@ -135,11 +136,12 @@ a test**, and 51 of 51 rules outside the obligation as well.
 one of those screens has a working, tested API underneath. The suite was green because the
 suite tests the API.
 
-`TASK-036`, `TASK-038`, `TASK-039` and `TASK-040` closed the catalogue, the till, the settings
-and the staff. In practical terms now: a store can be installed, configured, stocked and
-staffed from the application, and a cashier can open a drawer, sell, take a split tender, park
-a cart, print a receipt, move cash in and out, count the drawer and close it against a verified
-backup. Nobody can take a payment on account or read the audit trail from the application.
+Five of the six screen tasks are closed. In practical terms now: a store can be installed,
+configured, stocked and staffed from the application; a cashier can open a drawer, sell, take a
+split tender, park a cart, print a receipt, move cash in and out, count the drawer and close it
+against a verified backup; and a credit customer can be created, given a limit, sold to on
+account and paid off with the oldest invoice settled first. Nobody can read the audit trail
+from the application.
 
 **Where the release gate stands.** `07_TEST_PLAN.md` §10 carries the per-criterion outcome.
 Seven of eleven criteria are green. Four need the store and cannot be settled from a build

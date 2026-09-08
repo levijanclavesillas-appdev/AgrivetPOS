@@ -1,0 +1,52 @@
+/* SCR-401 – SCR-403. Tokens come from app.css; nothing here redefines a colour. */
+
+.customers { padding: 1rem 1.25rem 3rem; max-width: 72rem; }
+.customers h2 { font-size: 1rem; margin: 1.75rem 0 .5rem; }
+.customer-form { max-width: 30rem; padding: 1rem 0; }
+.customer-form input, .customer-form select { min-height: var(--touch); width: 100%;
+  padding: 0 .6rem; border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.customers .check { display: flex; align-items: center; gap: .4rem; margin: 0 0 1rem; }
+
+/* CR-107: an overdue account must not look like every other row. */
+.tag.overdue { background: var(--refuse-bg); color: var(--error); font-weight: 600; }
+.customer-list tr.is-overdue-row td, .is-overdue-row td { color: var(--error); }
+
+/* SCR-402's first block — the question anybody opening the screen is asking. */
+.credit-summary { margin: 1rem 0 1.5rem; padding: 1rem 1.25rem; background: #fff;
+  border: 1px solid var(--rule); border-radius: 6px; border-left: 4px solid var(--accent); }
+.credit-summary.is-overdue { border-left-color: var(--error); background: var(--refuse-bg); }
+.credit-summary.none { border-left-color: var(--rule); }
+.credit-figures { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.credit-figure { display: flex; flex-direction: column; }
+.figure-label { font-size: .8125rem; color: var(--muted); }
+.figure-value { font-size: 1.375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.credit-figure.available .figure-value { color: var(--accent); }
+.credit-summary.is-overdue .credit-figure.balance .figure-value { color: var(--error); }
+.overdue-note { margin: 0 0 .75rem; font-weight: 600; color: var(--error); }
+.limit-form { margin-top: .75rem; }
+.limit-form input { min-height: var(--touch); padding: 0 .6rem; border: 1px solid var(--rule);
+  border-radius: 4px; font: inherit; background: #fff; }
+
+.statement td { font-variant-numeric: tabular-nums; }
+
+/* SCR-403 */
+.collection .collection-amount { font-size: 1.25rem; text-align: right; }
+.collection input, .collection select { min-height: var(--touch); width: 100%; padding: 0 .6rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.preview { margin: 1.25rem 0; padding: .9rem 1rem; background: #fff; border: 1px solid var(--rule);
+  border-radius: 6px; min-height: 3rem; }
+.preview-line { margin: 0; font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+/* CR-204: the excess is named before the tick, and the tick starts off. */
+.overpayment { margin-top: .75rem; padding: .75rem; border-radius: 4px;
+  background: var(--warn-bg); border-left: 4px solid var(--warn-ink); }
+.overpayment p { margin: 0 0 .5rem; font-weight: 600; }
+.overpayment .check { margin: 0; align-items: flex-start; }
+.overpayment input[type="checkbox"] { min-width: 1.15rem; min-height: 1.15rem; width: auto; }
+
+@media (max-width: 1023px) {
+  .credit-figures { gap: 1rem; }
+  .customer-form { max-width: none; }
+}
+
+/* A payment on the statement is a subtraction — the column is read down the balance. */
+.statement .money.credit { color: var(--accent); }
