@@ -14,23 +14,38 @@
 // has not run is different in kind: dismissing it does not make the day any safer, and
 // the person who dismisses it is rarely the person who loses the data.
 //
-// ## Sources, and the two that are not built yet
+// ## Sources
 //
-// Each alert is produced by a source function. TASK-017 owns the backup log and the
-// OPS-009 clock check, so `BACKUP_OVERDUE`, `BACKUP_UNVERIFIED` and `CLOCK_ANOMALY`
-// read through seams that return nothing until it lands. That is the same shape
-// drawerService and documentService used before TASK-014 filled them: the dashboard
-// gets its alerts the day the source exists, with no edit to this file or to the
-// screen. A source that throws is caught and reported as its own alert rather than
-// taking the dashboard down with it — a store whose dashboard is blank because one
-// count failed has lost more than the count.
+// Each alert is produced by a source function, and the list is one service so SCR-601
+// and the shell's top bar cannot disagree (TASK-017 requirement 11). A source that
+// throws is caught and reported as its own alert rather than taking the dashboard down
+// with it — a store whose dashboard is blank because one count failed has lost more
+// than the count.
+//
+// TASK-016 left `BACKUP_OVERDUE`, `BACKUP_UNVERIFIED` and `CLOCK_ANOMALY` behind a
+// seam, because the backup log and the OPS-009 check did not exist yet. TASK-017 fills
+// them in below, and the seam stays: `install()` still overrides the source, which is
+// what the tests use to drive a clock anomaly without setting the machine's clock.
+//
+// ## Dismissal
+//
+// Alerts are **derived** — recomputed on every read, never stored — so a dismissal is
+// the only part that persists. It is keyed on the alert's identity (kind plus what
+// makes this instance different from the next), so dismissing "this shift has been
+// open too long" does not dismiss tomorrow's, and it lapses after a window so that a
+// dismissed alert comes back if the condition does not go away.
 
 const clock = require('../config/clock');
+const ids = require('../config/ids');
+const errors = require('./errors');
 const settingsService = require('./settingsService');
 const inventoryService = require('./inventoryService');
 const creditService = require('./creditService');
 const shiftService = require('./shiftService');
+const backupService = require('./backupService');
+const systemService = require('./systemService');
 const shiftRepository = require('../repositories/shiftRepository');
+const alertRepository = require('../repositories/alertRepository');
 
 /** Alerts that no one may dismiss, and why (OPS-007). */
 const UNDISMISSIBLE = Object.freeze(['BACKUP_OVERDUE', 'BACKUP_UNVERIFIED', 'CLOCK_ANOMALY']);
@@ -145,11 +160,68 @@ function varianceAlerts({ now }) {
   ));
 }
 
-/** OPS-002, OPS-009 — through TASK-017's seam, silent until it exists. */
+/**
+ * OPS-002, OPS-003, OPS-009 — backup freshness and the clock.
+ *
+ * `install()` overrides this entirely, which is how a test drives a clock anomaly
+ * without touching the machine's clock. With nothing installed the real checks run.
+ */
 function healthAlerts({ now }) {
-  if (!provider) return [];
-  const rows = provider.alerts ? provider.alerts({ now }) : [];
-  return rows.map((row) => alert(row.kind, row.severity, row.rule_id, row.message, row.extra || {}));
+  if (provider) {
+    const rows = provider.alerts ? provider.alerts({ now }) : [];
+    return rows.map((row) => alert(row.kind, row.severity, row.rule_id, row.message, row.extra || {}));
+  }
+
+  const out = [];
+
+  // FR_7.3 / OPS-007: no verified backup inside the configured period. Never
+  // dismissible — dismissing it does not make the day any safer, and the person who
+  // dismisses it is rarely the person who loses the data.
+  const backup = backupService.overdue({ now });
+  if (backup.overdue) {
+    out.push(alert('BACKUP_OVERDUE', 'CRITICAL', 'OPS-007', backup.message, {
+      last_verified_at: backup.last_verified_at,
+      hours_since: backup.hours_since,
+    }));
+  }
+
+  // OPS-002: a backup was written and did not verify. Distinct from overdue — there
+  // may well be an older good one — and distinct in what it means: the folder, the
+  // disk or the stick is failing, and the next backup will probably fail too.
+  const failed = lastFailedBackup();
+  if (failed) {
+    out.push(alert('BACKUP_UNVERIFIED', 'CRITICAL', 'OPS-002',
+      `The backup attempted ${clock.toManila(failed.taken_at)} did not succeed: `
+      + `${failed.error || 'no reason was recorded'} Nothing has been backed up since. `
+      + 'Check the backup folder and the drive it is on.',
+      { file_name: failed.file_name, taken_at: failed.taken_at }));
+  }
+
+  // OPS-009. Selling continues — the sale sequence does not depend on the clock
+  // (VR-103) — so this is an alert and never a block.
+  const clockState = systemService.checkClock({ now });
+  if (clockState.anomaly) {
+    out.push(alert('CLOCK_ANOMALY', 'CRITICAL', 'OPS-009',
+      `This machine's clock reads ${clockState.now_manila}, which is `
+      + `${clockState.behind_by_hours} hours earlier than the last recorded transaction `
+      + `(${clockState.latest_recorded_at_manila}). Selling is unaffected — receipt numbers do `
+      + 'not come from the clock — but dates on new records will be wrong until it is fixed.',
+      { behind_by_hours: clockState.behind_by_hours }));
+  }
+
+  return out;
+}
+
+/**
+ * The most recent failed backup, if it is the most recent backup.
+ *
+ * Only if it is the newest: a failure a fortnight ago followed by ten good backups is
+ * history, not a live condition, and an alert that keeps mentioning it is one people
+ * learn to scroll past.
+ */
+function lastFailedBackup() {
+  const recent = backupService.list({ limit: 1 }).backups[0];
+  return recent && recent.verification_result === 'FAILED' ? recent : null;
 }
 
 const SOURCES = Object.freeze([
@@ -166,31 +238,93 @@ const SOURCES = Object.freeze([
  * A source that throws becomes an alert about itself. The alternative is a dashboard
  * that renders blank or, worse, renders a short list that looks complete.
  */
-function list({ now = clock.nowUtc() } = {}) {
-  const alerts = [];
+function list({ now = clock.nowUtc(), includeDismissed = false } = {}) {
+  const raised = [];
 
   for (const [name, source] of SOURCES) {
     try {
-      alerts.push(...source({ now }));
+      raised.push(...source({ now }));
     } catch (err) {
-      alerts.push(alert(
+      raised.push(alert(
         'ALERT_SOURCE_FAILED', 'CRITICAL', 'OPS-007',
         `The ${name} check could not run: ${err.message} Treat this screen as incomplete.`
       ));
     }
   }
 
+  const dismissed = dismissedKeys({ now });
+  const withKeys = raised.map((a) => ({ ...a, key: keyFor(a) }));
+  const showing = includeDismissed
+    ? withKeys.map((a) => ({ ...a, dismissed: dismissed.has(a.key) }))
+    : withKeys.filter((a) => !dismissed.has(a.key));
+
   return {
     as_of: now,
     as_of_manila: clock.toManila(now),
-    alerts: alerts.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]),
+    alerts: showing.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]),
+    dismissed_count: withKeys.length - showing.filter((a) => !a.dismissed).length,
     health_source_installed: installed(),
   };
 }
 
+/**
+ * What makes one instance of an alert different from the next.
+ *
+ * Deliberately not the message: wording changes with the figures in it, and a key
+ * built from the message would un-dismiss itself the moment a customer's balance
+ * moved by a peso.
+ */
+function keyFor(a) {
+  return [a.kind, a.shift_id || a.file_name || ''].filter(Boolean).join(':');
+}
+
+function dismissedKeys({ now }) {
+  if (!alertRepository.tableExists()) return new Set();
+  const windowDays = settingsService.get('alert_dismissal_window_days');
+  const since = new Date(Date.parse(now) - windowDays * 86400000).toISOString();
+  return alertRepository.dismissedKeys({ sinceAt: since });
+}
+
+/**
+ * Dismiss one alert, for this store, until the window lapses.
+ *
+ * The undismissible three are refused by a CHECK on the table, so this validation is
+ * the message rather than the control — the constraint would refuse the insert even if
+ * this check were deleted.
+ */
+function dismiss(alertKey, actor, { now = clock.nowUtc() } = {}) {
+  const kind = String(alertKey || '').split(':')[0];
+
+  if (UNDISMISSIBLE.includes(kind)) {
+    throw errors.forbidden(
+      'This alert cannot be dismissed. It is about whether the store\u2019s data is safe, and '
+      + 'hiding it would not make it any safer.',
+      { ruleId: 'OPS-007' }
+    );
+  }
+  if (!kind) throw errors.badRequest('Which alert?', { ruleId: 'OPS-007' });
+
+  const existing = alertRepository.findByKey(alertKey);
+  if (existing) return { dismissed: true, already: true, alert_key: alertKey };
+
+  alertRepository.insert({
+    id: ids.uuidv7(),
+    alert_key: alertKey,
+    kind,
+    dismissed_at: now,
+    dismissed_by: actor.id,
+  });
+
+  return { dismissed: true, already: false, alert_key: alertKey };
+}
+
+function undismiss(alertKey) {
+  return { restored: alertRepository.remove(alertKey) > 0, alert_key: alertKey };
+}
+
 module.exports = {
   UNDISMISSIBLE, SEVERITIES,
-  install, installed, list,
+  install, installed, list, dismiss, undismiss, keyFor,
   // Named so the tests can drive one source at a time.
-  lowStockAlerts, creditAlerts, shiftAlerts, varianceAlerts, healthAlerts,
+  lowStockAlerts, creditAlerts, shiftAlerts, varianceAlerts, healthAlerts, lastFailedBackup,
 };

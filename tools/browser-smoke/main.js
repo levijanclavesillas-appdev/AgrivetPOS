@@ -58,6 +58,26 @@ app.whenReady().then(async () => {
 
   const run = (code) => win.webContents.executeJavaScript(code, true);
   const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * Wait for the page to reach a state, rather than for a length of time.
+   *
+   * Fixed sleeps made this harness flaky: sign-in does a real bcrypt compare at the
+   * production work factor, which takes a few hundred milliseconds and more when the
+   * machine is busy. A poll on the condition removes the whole class of flake instead
+   * of moving the threshold and hoping.
+   */
+  const waitFor = async (expression, { timeoutMs = 10000, label = expression } = {}) => {
+    const until = Date.now() + timeoutMs;
+    for (;;) {
+      if (await run(expression)) return true;
+      if (Date.now() > until) {
+        console.log(`        timed out waiting for ${label}`);
+        return false;
+      }
+      await settle(80);
+    }
+  };
   const press = (key) => run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`);
 
   await win.loadURL(`http://127.0.0.1:${PORT}/`);
@@ -68,14 +88,14 @@ app.whenReady().then(async () => {
   log(!(await run(`document.body.textContent.includes('Starting…')`)), 'the "Starting…" placeholder is replaced');
 
   await run(SIGN_IN);
-  await settle(900);
+  await waitFor(`!!document.querySelector('.rail')`, { label: 'the rail' });
   log(await run(`!!document.querySelector('.rail')`), 'the rail appears after sign-in');
   log(await run(`[...document.querySelectorAll('.rail button, .rail a')].some(b => /POS/i.test(b.textContent))`),
     'the POS item is on the rail');
 
   console.log('\n— the counter needs a shift (POS-501) —');
   await run(OPEN_POS);
-  await settle(800);
+  await waitFor(`!!document.querySelector('.screen').textContent.trim()`, { label: 'the POS screen' });
   const beforeShift = await run(`document.querySelector('.screen').textContent`);
   log(/shift|float/i.test(beforeShift), 'the POS screen asks for a shift before a cart',
     beforeShift.replace(/\s+/g, ' ').slice(0, 80));
@@ -84,12 +104,12 @@ app.whenReady().then(async () => {
   log(opened.status === 201 || opened.status === 200, 'a shift is opened', String(opened.status));
 
   await run(`location.reload()`);
-  await settle(1000);
+  await waitFor(`!!document.querySelector('.signin form')`, { label: 'the sign-in form' });
   log(await run(`!!document.querySelector('.signin form')`), 'SEC-7: a reload loses the token and asks again');
   await run(SIGN_IN);
-  await settle(1000);
+  await waitFor(`!!document.querySelector('.rail')`, { label: 'the rail' });
   await run(OPEN_POS);
-  await settle(900);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
   log(await run(`!!document.querySelector('.pos')`), 'SCR-301 renders with a shift open');
   log(await run(`!!document.querySelector('.pos-search')`), 'the search field is there');
   log(await run(`document.activeElement === document.querySelector('.pos-search')`),
@@ -127,11 +147,11 @@ app.whenReady().then(async () => {
 
   console.log('\n— POS-105: the restart —');
   await run(`location.reload()`);
-  await settle(1000);
+  await waitFor(`!!document.querySelector('.signin form')`, { label: 'the sign-in form' });
   await run(SIGN_IN);
-  await settle(1100);
+  await waitFor(`!!document.querySelector('.rail')`, { label: 'the rail' });
   await run(OPEN_POS);
-  await settle(1000);
+  await waitFor(`${LINE_COUNT} >= 1`, { label: 'the restored cart' });
   log(await run(LINE_COUNT) >= 1, 'POS-105: the cart is restored after a restart', `${await run(LINE_COUNT)} line(s)`);
 
   console.log('\n— SCR-303: payment —');
@@ -174,7 +194,7 @@ app.whenReady().then(async () => {
 
   console.log('\n— SCR-601: the dashboard —');
   await run(OPEN_RAIL('Reports'));
-  await settle(1200);
+  await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
   log(await run(`!!document.querySelector('.dashboard')`), 'SCR-601 renders');
   const tiles = await run(`[...document.querySelectorAll('.tile')].map(t => t.className)`);
   log(tiles.length === 7, 'seven tiles', `${tiles.length}`);
@@ -226,6 +246,77 @@ app.whenReady().then(async () => {
   await settle(1000);
   log(await run(`!!document.querySelector('.report-valuation') || !!document.querySelector('.valuation-total')`),
     'SCR-604 renders the valuation');
+
+  console.log('\n— SCR-704: backups —');
+  await run(OPEN_RAIL('Admin'));
+  await waitFor(`!!document.querySelector('.backups')`, { label: 'SCR-704' });
+  log(await run(`!!document.querySelector('.backups')`), 'SCR-704 renders');
+
+  const warning = await run(`(document.querySelector('.backup-warning') || {}).textContent || ''`);
+  log(/readable by anyone/i.test(warning), 'SEC-9: the shared-drive warning is in plain words',
+    warning.replace(/\s+/g, ' ').slice(0, 80));
+  log(/USB stick/i.test(warning) && /Nothing in this application does that for you/i.test(warning),
+    '§7: the off-machine copy is stated as the operator\u2019s job');
+
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Back up now/.test(b.textContent)).click()`);
+  await waitFor(`document.querySelectorAll('.backup-list tbody tr').length >= 1`,
+    { label: 'the backup to appear', timeoutMs: 20000 });
+  const rows = await run(`document.querySelectorAll('.backup-list tbody tr').length`);
+  log(rows >= 1, 'a manual backup appears in the list', `${rows} row(s)`);
+  log(await run(`/Verified/.test((document.querySelector('.backup-list') || {}).textContent || '')`),
+    'OPS-002: and it says it was verified');
+
+  const backups = await api('/backups');
+  log(backups.json.backups.length >= 1 && backups.json.backups[0].verified,
+    'the server agrees it verified', backups.json.backups[0] && backups.json.backups[0].file_name);
+
+  console.log('\n— OPS-004: the restore confirmation —');
+  await run(`(document.querySelector('.backup-list .restore') || { click(){} }).click()`);
+  await settle(900);
+  log(await run(`!!document.querySelector('.restore-dialog')`), 'the dialog opens');
+  log(await run(`document.querySelector('.restore-dialog .danger').disabled === true`),
+    'and Restore is disabled until the filename is typed');
+
+  const name = backups.json.backups[0].file_name;
+  await run(`(() => {
+    const el = document.querySelector('.confirm-filename');
+    el.value = ${JSON.stringify(name.slice(0, -1))};
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+  log(await run(`document.querySelector('.restore-dialog .danger').disabled === true`),
+    'a filename one character short is still refused');
+
+  await run(`(() => {
+    const el = document.querySelector('.confirm-filename');
+    el.value = ${JSON.stringify(name)};
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+  log(await run(`document.querySelector('.restore-dialog .danger').disabled === false`),
+    'and enabled only when it matches exactly');
+
+  // Not clicked: the point was the control, and restoring would replace the database
+  // this smoke test is still using.
+  await run(`[...document.querySelectorAll('.dialog-actions button')].find(b => /Cancel/.test(b.textContent)).click()`);
+  await settle(400);
+
+  console.log('\n— SCR-705: health —');
+  await run(`[...document.querySelectorAll('.admin-tab')].find(b => /Health/.test(b.textContent)).click()`);
+  await settle(1200);
+  const health = await run(`(document.querySelector('.health-figures') || {}).textContent || ''`);
+  for (const [label, figure] of [
+    ['Schema version', /Schema version/],
+    ['Database size', /Database size/],
+    ['Last verified backup', /Last verified backup/],
+    ['Last export', /Last export/],
+    ['Last integrity check', /Last integrity check/],
+  ]) log(figure.test(health), `OPS-006: ${label}`);
+  log(await run(`document.querySelectorAll('.row-counts tr').length > 20`), 'OPS-006: row counts');
+
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Check the database/.test(b.textContent)).click()`);
+  await settle(1800);
+  log(/sound/i.test(await run(`document.body.textContent`)), 'the on-demand integrity check reports back');
 
   console.log('\n— console —');
   log(errors.length === 0, 'the renderer logged no errors', errors.slice(0, 4).join(' | '));

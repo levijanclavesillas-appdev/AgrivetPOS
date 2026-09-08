@@ -589,12 +589,27 @@ test('OPS-007: backup overdue and clock anomaly can never be dismissed', () => {
   alertService.install(null);
 });
 
-test('the two alerts TASK-017 owns are silent until it installs a source', () => {
+test('the seam TASK-016 left is filled, and still overridable', () => {
+  // TASK-016 built BACKUP_OVERDUE, BACKUP_UNVERIFIED and CLOCK_ANOMALY behind a seam
+  // because the backup log and the OPS-009 check did not exist yet. TASK-017 filled
+  // them in — and kept the seam, which is what lets a test drive a clock anomaly
+  // without setting the machine's clock.
   alertService.install(null);
-  const quiet = alertService.list();
-  assert.equal(quiet.health_source_installed, false);
-  assert.equal(quiet.alerts.some((a) => a.kind.startsWith('BACKUP')), false);
-  assert.equal(quiet.alerts.some((a) => a.kind === 'CLOCK_ANOMALY'), false);
+  const real = alertService.list();
+  assert.equal(real.health_source_installed, false, 'the real checks are running');
+
+  // This store has never taken a verified backup, so the real check says so.
+  const overdue = real.alerts.find((a) => a.kind === 'BACKUP_OVERDUE');
+  assert.ok(overdue, 'a store with no verified backup is told');
+  assert.equal(overdue.dismissible, false);
+
+  alertService.install({
+    alerts: () => [{ kind: 'CLOCK_ANOMALY', severity: 'CRITICAL', rule_id: 'OPS-009', message: 'x' }],
+  });
+  assert.equal(alertService.list().health_source_installed, true);
+  assert.equal(alertService.list().alerts.some((a) => a.kind === 'BACKUP_OVERDUE'), false,
+    'and the override replaces them rather than adding to them');
+  alertService.install(null);
 });
 
 test('a source that throws becomes an alert rather than a blank dashboard', () => {

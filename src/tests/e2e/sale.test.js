@@ -277,10 +277,15 @@ test('TC-E2E-01: the day is consistent end to end', async () => {
   assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [] });
   assert.deepEqual(await json(await call('/customers/credit-reconciliation')), { ok: true, breaks: [] });
 
-  // And the health panel counts what was actually written.
-  const health = await json(await call('/health'));
+  // And the health panel counts what was actually written. TASK-017 moved OPS-006's
+  // figures behind TX-428, so this asks as the owner rather than anonymously.
+  const health = await json(await call('/health/panel'));
   assert.equal(health.database.row_counts.sales, 2);
   assert.equal(health.database.row_counts.sale_items, 4);
   assert.equal(health.database.row_counts.sale_tenders, 4);
   assert.ok(health.database.row_counts.inventory_movements >= 5);
+
+  // Six figures, and the backup among them: the day has been closed, so there is one.
+  assert.ok(health.schema.version > 0);
+  assert.ok(health.database.size_bytes > 0);
 });

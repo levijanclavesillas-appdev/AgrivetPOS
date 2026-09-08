@@ -506,17 +506,67 @@ CREATE INDEX idx_carts_shift      ON carts (shift_id, status);
 -- rule constrains it, and the moment it becomes real it is a sale with its own rows
 -- (POS-107). A cart_items table would invite the reporting that must read sale_items.
 
-CREATE TABLE backup_log (                -- OPS-002, OPS-006
+CREATE TABLE backups (                   -- OPS-002, OPS-003, OPS-006
   id TEXT PRIMARY KEY,
-  file_path   TEXT NOT NULL,
-  size_bytes  INTEGER NOT NULL,
-  trigger     TEXT NOT NULL CHECK (trigger IN ('SCHEDULED','SHIFT_CLOSE','MANUAL','PRE_RESTORE','PRE_IMPORT')),
-  verified    INTEGER NOT NULL DEFAULT 0,
-  verify_error TEXT,
-  created_at  TEXT NOT NULL,
-  created_by  TEXT REFERENCES users(id)
+  -- Nullable: a backup that failed before it had a name — no folder configured — is
+  -- still an attempt, and it is the worst one to lose. A store with no backup folder
+  -- is the most exposed state this product has.
+  filename    TEXT,
+  path        TEXT,
+  size_bytes  INTEGER,
+  taken_at    TEXT NOT NULL,
+  trigger     TEXT NOT NULL CHECK (trigger IN
+                ('SCHEDULED','SHIFT_CLOSE','MANUAL','PRE_RESTORE','PRE_IMPORT','PRE_MIGRATION')),
+  -- OPS-002: written and verified are two different events, and the gap between them
+  -- is where a bad backup hides. PENDING means the check never completed, so a crash
+  -- mid-verify reads as unverified rather than as success.
+  verified_at TEXT,
+  verification_result TEXT NOT NULL DEFAULT 'PENDING'
+                CHECK (verification_result IN ('PENDING','OK','FAILED')),
+  error       TEXT,
+  schema_version INTEGER,
+  row_counts  TEXT,                      -- JSON, for the health panel
+  created_by  TEXT REFERENCES users(id), -- NULL for a scheduled backup
+  pruned_at   TEXT                       -- OPS-003: the row outlives the file
+);
+
+CREATE TABLE alert_dismissals (          -- OPS-007
+  id TEXT PRIMARY KEY,
+  alert_key    TEXT NOT NULL,
+  kind         TEXT NOT NULL,
+  dismissed_at TEXT NOT NULL,
+  dismissed_by TEXT NOT NULL REFERENCES users(id),
+  CHECK (kind NOT IN ('BACKUP_OVERDUE','BACKUP_UNVERIFIED','CLOCK_ANOMALY')),
+  UNIQUE (alert_key)
+);
+
+CREATE TABLE system_events (             -- OPS-006, OPS-009
+  id TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL CHECK (kind IN
+                ('CLOCK_ANOMALY','INTEGRITY_CHECK','EXPORT','RESTORE','LAUNCH')),
+  occurred_at TEXT NOT NULL,
+  ok          INTEGER NOT NULL DEFAULT 1 CHECK (ok IN (0, 1)),
+  detail      TEXT,                      -- JSON
+  actor_id    TEXT REFERENCES users(id)
 );
 ```
+
+**There is no `alerts` table, and that is deliberate.** `TASK-017` specified one
+(`id, type, severity, raised_at, dismissible, dismissed_at, payload`) and it was not built,
+because alerts in this product are **derived**: low stock is a query over inventory, overdue
+credit a query over the ledger, cash variance a query over the closings, backup overdue a query
+over `backups`. Storing them would need a writer deciding when to raise and when to clear, and
+would produce rows that go stale — a `LOW_STOCK` row still saying low six hours after the
+delivery arrived. `OPS-007` is recomputed on every read instead, which is also what makes
+`TASK-017` requirement 11 hold: one derivation cannot disagree with itself, whereas one table
+with two writers can.
+
+What is stored is the single fact no query can derive — **that a person dismissed one, and
+when** — keyed on the alert's identity so that dismissing "this shift has been open too long"
+does not dismiss tomorrow's, and lapsing after a configured window so an alert whose condition
+has not gone away comes back. The three that `OPS-007` says may never be dismissed are refused
+by a `CHECK` on the table rather than by a guard in a service: a service check is a promise the
+next caller can break.
 
 ### 3.5 Migrations
 
@@ -567,9 +617,20 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/reports/inventory/valuation` | `TX-422` | `RPT-103` |
 | `GET` | `/reports/:report/export.csv` | `TX-426` + the report's own grant | `AUD-601` |
 | `GET` | `/audit?actor=&entity=&from=&to=` | `TX-429` | |
+| `GET` | `/backups` | `TX-428` | `SCR-704` — the log, the folder, and `SEC-9`'s warning |
 | `POST` | `/backups` | `TX-428` | `OPS-001`, `OPS-002` |
-| `POST` | `/backups/:id/restore` | `TX-427` | `OPS-004` |
-| `GET` | `/health` | — | `OPS-006` |
+| `GET` | `/backups/restore/preflight` | `TX-427` | what must be true before a restore |
+| `POST` | `/backups/:id/restore` | `TX-427` | `OPS-004` — owner only, typed filename |
+| `GET` | `/alerts` | signed in | `OPS-007` |
+| `POST` | `/alerts/dismiss` | signed in | `OPS-007` — never the undismissible three |
+| `POST` | `/health/integrity-check` | `TX-428` | `OPS-006` |
+| `GET` | `/health` | — | liveness only: a status and a version |
+| `GET` | `/health/panel` | `TX-428` | `OPS-006` — `SCR-705`'s six figures |
+
+`GET /health` is unauthenticated because `main.js` polls it before the window opens, so it is
+deliberately thin: a status and a version, and nothing about the store. `OPS-006`'s figures are
+on `/health/panel` behind `TX-428`. `SEC-8` opens the bind address to the LAN in v1.3, and an
+unauthenticated endpoint reporting row counts and the database path would go with it.
 
 `TX-421` is the one grant in this table the middleware does not fully decide. It is `OWN_SHIFT`
 for a `CASHIER`, so `requirePermission` admits them and `reportService` decides which shift they

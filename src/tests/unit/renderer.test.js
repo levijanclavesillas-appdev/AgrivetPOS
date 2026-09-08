@@ -37,6 +37,17 @@ const codeOf = (relative) => fs.readFileSync(path.join(root, 'public', relative)
  * Comments are stripped first, or the comment above a rule ends up inside its selector
  * capture and no rule is ever found by name.
  */
+/**
+ * Source with its string concatenations joined up.
+ *
+ * The renderer's prose is written across several lines with `+`, so a sentence a guard
+ * looks for is rarely contiguous in the file. Joining first means a guard checks what
+ * the user reads rather than how the line happened to wrap.
+ */
+const proseOf = (relative) => fs.readFileSync(path.join(root, 'public', relative), 'utf8')
+  .replace(/'\s*\n\s*\+\s*'/g, '')
+  .replace(/"\s*\n\s*\+\s*"/g, '');
+
 /** Every file under public/, so a guard cannot be dodged by adding a new module. */
 function walkFiles(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -454,7 +465,7 @@ test('POS-206: no report screen can say a payment was verified', () => {
 });
 
 test('RPT-101: a report that does not reconcile says so in those words', () => {
-  const source = fs.readFileSync(path.join(root, 'public', 'js', 'reports', 'report.js'), 'utf8');
+  const source = proseOf('js/reports/report.js');
 
   // A red tick is not enough. The rule calls a failed reconciliation a defect, and the
   // screen has to say that, because the alternative reading — "rounding" — is exactly
@@ -490,6 +501,78 @@ test('NFR_4.3: the dashboard and report controls are touchable', () => {
   const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
   for (const selector of ['.dash-refresh', '.alert-dismiss', '.report-back, .report-export']) {
     const rule = cssRule(css, selector) ?? cssRule(css, selector.split(',')[0].trim());
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
+  }
+});
+
+// ── SCR-704, SCR-705 (TASK-017) ─────────────────────────────────────────────
+
+test('SEC-9: SCR-704 says who can read a backup, and promises no encryption', () => {
+  const source = proseOf('js/admin/backup.js');
+
+  assert.match(source, /shared_drive_warning/, 'the server’s wording, not a second copy');
+  // 05_TECH_SPEC.md §7: the off-machine copy is a process control. The screen says so
+  // rather than implying the application handles it.
+  assert.match(source, /Nothing in this application does that for you/);
+  assert.match(source, /USB stick/);
+
+  const code = codeOf('js/admin/backup.js');
+  assert.equal(/encrypt/i.test(code), false, 'it does not promise encryption it does not do');
+  // NFR_3.1 and TASK-017 requirement 13: no cloud target anywhere in the renderer.
+  // The pattern is anchored on word boundaries — an earlier version matched `sync`
+  // inside `async function` and failed on the word "async", which is the same trap
+  // TC-UT-99 and the offline guard both had to solve.
+  assert.equal(
+    /\b(cloud|dropbox|onedrive|gdrive)\b|drive\.google|amazonaws/i.test(code), false,
+    'the renderer offers no off-machine target'
+  );
+});
+
+test('OPS-004: the restore needs the filename typed, checked in the view too', () => {
+  const source = codeOf('js/admin/backup.js');
+
+  // The server refuses a wrong filename regardless (SEC-6); this is the courtesy on
+  // top of it, and 04_UX_SPEC.md §6 puts validation at the point of action.
+  assert.match(source, /typed\.value\.trim\(\) !== backup\.file_name/);
+  assert.match(source, /go\.disabled = true/, 'and it starts disabled');
+  // Not a checkbox: a checkbox is ticked without reading, and the date on the file is
+  // the thing that has to be read.
+  assert.equal(/type: 'checkbox'/.test(source), false);
+  assert.match(source, /class: 'danger'/, 'the most destructive button looks like one');
+});
+
+test('OPS-007: the undismissible alerts get no dismiss control on any screen', () => {
+  for (const file of ['js/reports/dashboard.js', 'js/admin/backup.js', 'js/admin/health.js']) {
+    const source = codeOf(file);
+    // Every screen renders the dismiss control conditionally on the server's flag, or
+    // renders none at all. None of them decides for itself which alerts are dismissible.
+    const hardCoded = /BACKUP_OVERDUE|CLOCK_ANOMALY|BACKUP_UNVERIFIED/.test(source);
+    assert.equal(hardCoded, false, `${file} decides dismissibility for itself`);
+  }
+  assert.match(codeOf('js/reports/dashboard.js'), /a\.dismissible\s*\n?\s*\?/);
+});
+
+test('OPS-006: SCR-705 renders all six figures', () => {
+  const source = codeOf('js/admin/health.js');
+  for (const [figure, pattern] of [
+    ['schema version', /schema\.version/],
+    ['database size', /size_display/],
+    ['row counts', /row_counts/],
+    ['last successful backup', /last_successful_at/],
+    ['last export', /last_export_at/],
+    ['last integrity check', /last_integrity_check_at/],
+  ]) assert.match(source, pattern, `SCR-705 shows the ${figure}`);
+
+  // And it reads the panel, which is the endpoint that carries them.
+  assert.match(source, /api\.get\('\/health\/panel'\)/);
+});
+
+test('NFR_4.3: the admin controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  for (const selector of ['.admin-tab', '.admin-head button', '.confirm-filename',
+    '.dialog-actions button', '.backup-list .restore']) {
+    const rule = cssRule(css, selector);
     assert.ok(rule, `${selector} has a rule`);
     assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
   }

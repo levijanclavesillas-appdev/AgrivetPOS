@@ -30,9 +30,10 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(result.from, 0);
   assert.equal(result.to, migrate.binaryVersion());
   assert.deepEqual(result.applied, migrate.available().map((m) => m.file));
-  assert.deepEqual(result.applied.slice(0, 8), [
+  assert.deepEqual(result.applied.slice(0, 9), [
     '001_foundation.sql', '002_catalog.sql', '003_inventory.sql', '004_customers_credit.sql',
     '005_shifts.sql', '006_sales.sql', '007_carts.sql', '008_report_indexes.sql',
+    '009_backups_alerts.sql',
   ]);
 
   const rows = migrate.applied();
@@ -46,6 +47,7 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(rows[5].name, 'sales');
   assert.equal(rows[6].name, 'carts');
   assert.equal(rows[7].name, 'report_indexes');
+  assert.equal(rows[8].name, 'backups_alerts');
   for (const row of rows) assert.match(row.applied_at, /Z$/, 'applied_at is stored UTC (VR-102)');
 });
 
@@ -131,6 +133,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     // 007_carts
     'carts',
     // 008_report_indexes adds no table — it is indexes only.
+    // 009_backups_alerts
+    'backups', 'alert_dismissals', 'system_events',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
@@ -142,7 +146,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'idx_sales_date', 'idx_sales_shift', 'idx_sales_cust', 'idx_sales_no',
     'idx_saleitems_product', 'idx_tender_sale', 'idx_tender_ref', 'idx_discounts_sale',
     'idx_carts_user_shift', 'idx_carts_shift',
-    'idx_saleitems_report', 'idx_tender_report']) {
+    'idx_saleitems_report', 'idx_tender_report',
+    'idx_backups_verified', 'idx_backups_taken', 'idx_dismissals_kind', 'idx_sysevents_kind']) {
     assert.ok(repo.listIndexes().includes(index), `missing index ${index}`);
   }
   assert.ok(repo.integrityCheck().ok, 'a freshly migrated database passes integrity_check');

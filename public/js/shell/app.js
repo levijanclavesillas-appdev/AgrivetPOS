@@ -13,6 +13,8 @@ import { createPayment } from '../payment/view.js';
 import { createReceipt } from '../receipt/view.js';
 import { createDashboard } from '../reports/dashboard.js';
 import { createReport } from '../reports/report.js';
+import { createBackup } from '../admin/backup.js';
+import { createHealth } from '../admin/health.js';
 
 /** §2's role → landing screen. */
 // §2's role → landing screen. MANAGER and OWNER land on SCR-601, which lives under
@@ -155,6 +157,7 @@ export function createApp({ root }) {
 
     if (id === 'pos') return showPos();
     if (id === 'reports') return showDashboard();
+    if (id === 'admin') return showAdmin();
 
     // The admin and catalog screens are their own tasks. Saying so beats a dead
     // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
@@ -169,6 +172,40 @@ export function createApp({ root }) {
       session,
       onOpenReport: (report) => showReport(report),
     });
+    current.mount();
+    return current;
+  }
+
+  /**
+   * SCR-704 and SCR-705, under Admin.
+   *
+   * Users, settings and the audit trail are their own tasks; the two TASK-017 owns are
+   * here, and the rest of the section says so rather than offering a dead button.
+   */
+  const ADMIN_PANELS = [
+    { id: 'backup', label: 'Backups', screen: 'SCR-704', create: createBackup },
+    { id: 'health', label: 'Health', screen: 'SCR-705', create: createHealth },
+  ];
+  let adminPanel = 'backup';
+
+  function showAdmin() {
+    const host = h('div', { class: 'admin-screen' });
+    const panelHost = h('div', { class: 'admin-panel' });
+
+    const tabs = h('nav', { class: 'admin-tabs', 'aria-label': 'Admin sections' },
+      ADMIN_PANELS.map((panel) => h('button', {
+        class: `admin-tab${panel.id === adminPanel ? ' is-active' : ''}`,
+        'aria-current': panel.id === adminPanel ? 'page' : null,
+        text: panel.label,
+        onclick: () => { adminPanel = panel.id; showAdmin(); },
+      })));
+
+    clear(main).append(host);
+    host.append(tabs, panelHost);
+
+    const chosen = ADMIN_PANELS.find((panel) => panel.id === adminPanel);
+    if (current?.unmount) current.unmount();
+    current = chosen.create({ root: panelHost, session });
     current.mount();
     return current;
   }

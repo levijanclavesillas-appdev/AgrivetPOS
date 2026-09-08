@@ -124,7 +124,7 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-E2E-06` | Full trading day → close shift → variance → reason → backup written and verified |
 | `TC-E2E-07` | Adjustment for damage → valuation falls → movement ledger and audit both show it |
 | `TC-E2E-08` | The whole of `TC-E2E-06` **with networking disabled** | 
-| `TC-E2E-09` | `kill -9` mid-sale loop → restart → ledger consistent, no partial sale, no lost committed sale |
+| `TC-E2E-09` | `kill -9` mid-sale loop → restart → ledger consistent, no partial sale, no lost committed sale. Proves the process-death half of `OPS-008`; §8 item 7 is the power-loss half |
 
 ## 6. Non-functional cases
 
@@ -196,37 +196,43 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ `FR_1`–`FR_6` built; `FR_7` (backup, restore, health) is `TASK-017` |
-| 2 | `npm run test:all` green | ☑ green — unit 14 files, integration 19, E2E 4 |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ `FR_1`–`FR_7` built |
+| 2 | `npm run test:all` green | ☑ green — unit 14 files, integration 20, E2E 5 |
 | 3 | `TC-UT-98` passes — every covered rule has a test | ☐ Not written — `TASK-018` |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
 | 5 | Zero open S1 or S2 defects | ◐ None known; nothing has run on the store's hardware |
 | 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ `TC-PERF-01`–`03` and `05` measure and report; `04` not written. **No figure here was taken on the reference machine** (§6) |
-| 7 | `TC-E2E-08` passes with networking disabled | ☐ Not written |
-| 8 | `TC-E2E-09` passes — power-loss durability | ☐ Not written |
+| 7 | `TC-E2E-08` passes with networking disabled | ☐ Not written — `TASK-018` |
+| 8 | `TC-E2E-09` passes — power-loss durability | ◐ Written and green against `SIGKILL`, which proves the process-death half. The OS-level half needs the plug pulled on the reference machine — §8 item 7 |
 | 9 | UAT §8 complete on the store's hardware, owner signed | ☐ Not started |
-| 10 | Backup verified restorable onto a second machine | ☐ Not started — `TASK-017` |
+| 10 | Backup verified restorable onto a second machine | ◐ Restore is built and `TC-INT-74` proves it in place. Onto a *second machine* is UAT — `TASK-018` |
 | 11 | `TAX-006` confirmed on the printed document | ◐ Asserted in the encoder's output; never seen on paper |
 
 > ### Gate status, 2026-09-08 — **NOT SHIPPABLE**
 >
-> `TASK-001` through `TASK-016` are built: schema, auth, catalog, inventory, customers and
-> credit, pricing and tax, shifts and till, the sale, collections, shift close, ESC/POS printing,
-> the POS, payment and receipt screens, and the dashboard with the three reports. The release
-> gate is green, the counter can take a sale end to end, and the owner can read the day off a
-> screen.
+> `TASK-001` through `TASK-017` are built. Every functional requirement `FR_1`–`FR_7` has code
+> behind it: the counter takes a sale end to end, the owner reads the day off a screen, and the
+> store's data is backed up, verified, retained and restorable.
+>
+> `TC-E2E-09` now exists and is green: a till ringing sales is killed with `SIGKILL` mid-loop,
+> the database is reopened, and every committed sale is present with no partial one. That closes
+> the gap this section named as the most serious.
 >
 > It is not shippable, and the reasons are specific rather than a matter of polish:
 >
 > - **Nothing has run on the store's hardware.** Every performance figure above was measured on a
 >   developer machine, and §6 says plainly that a budget measured anywhere else is not a budget.
 >   No receipt has been printed on paper, no drawer has opened, no scanner has been used.
-> - **`FR_7` does not exist yet** — backup, restore and health (`TASK-017`). A store cannot be
->   handed a system whose backup has never been restored.
-> - **Three gate cases are unwritten**: `TC-UT-98` (rule coverage), `TC-E2E-08` (offline) and
->   `TC-E2E-09` (power loss). The last of those is the one that decides whether a power cut in
->   Sultan Kudarat costs a day's takings, and asserting durability without testing it is exactly
->   the false comfort §1 exists to prevent.
+> - **A backup has never been restored onto a second machine.** `TC-INT-74` restores in place
+>   and proves the control, but the scenario the disaster-recovery table in `05_TECH_SPEC.md` §7
+>   actually describes — new hardware, the backup folder from a USB stick — has not been
+>   performed. A system whose backup has never been restored elsewhere is a system whose backup
+>   is untested where it counts.
+> - **`TC-E2E-09` proves the process-death half of `OPS-008`, not the power-loss half.** `SIGKILL`
+>   does not empty the operating system's page cache, so the case would pass even with
+>   `synchronous = OFF`. Pulling the plug on the reference machine is §8 item 7 and it is the
+>   only thing that settles it.
+> - **Two gate cases are unwritten**: `TC-UT-98` (rule coverage) and `TC-E2E-08` (offline).
 > - **UAT has not begun** (`TASK-018`).
 >
 > The path to the next assessable gate is `06_TASKS/README.md`, `TASK-017` and `TASK-018`.

@@ -207,7 +207,14 @@ test('TC-E2E-06: with a reason it closes, audits the variance and backs the day 
   assert.equal(closing.backup.verified, true);
   assert.equal(closing.backup.trigger, 'SHIFT_CLOSE');
   assert.ok(fs.existsSync(closing.backup.file_path));
-  assert.deepEqual(closing.alerts, []);
+  // TASK-017: the close returns OPS-007's whole list, so SCR-503 and SCR-601 cannot
+  // disagree about the state of the store (requirement 11). The backup succeeded, so
+  // nothing about backups is raised — but the ₱200 shortage that was just signed off
+  // is, which is the alert list doing its job.
+  assert.equal(closing.alerts.some((a) => a.kind.startsWith('BACKUP')), false);
+  const variance = closing.alerts.find((a) => a.kind === 'CASH_VARIANCE');
+  assert.ok(variance, 'POS-511: the shortage is raised');
+  assert.equal(variance.variance_centavos, -20000);
 
   // The summary the store keeps with the drawer count.
   assert.match(closing.summary.text, /CASH VARIANCE\s+200\.00 short/);
@@ -263,11 +270,19 @@ test('TC-E2E-06: the backup is a database with the day in it', async () => {
   assert.equal(summary.closing.lines.length, 4);
 
   // Opened independently: OPS-002's point is that somebody has looked inside it.
-  const backups = fs.readdirSync(backupFolder).filter((f) => f.endsWith('.db'));
+  //
+  // TASK-017 made the artefact a .zip (05_TECH_SPEC.md §7), so the database is
+  // extracted first — and that extraction is part of the check, because an archive
+  // that cannot be read back is not a backup either.
+  const backups = fs.readdirSync(backupFolder).filter((f) => f.endsWith('.zip'));
   assert.equal(backups.length, 1, 'one close, one backup');
 
   const Database = require('better-sqlite3');
-  const copy = new Database(path.join(backupFolder, backups[0]), { readonly: true, fileMustExist: true });
+  const os = require('os');
+  const extracted = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-e2e-')), 'copy.db');
+  require('../../repositories/backupRepository')
+    .extract(path.join(backupFolder, backups[0]), extracted);
+  const copy = new Database(extracted, { readonly: true, fileMustExist: true });
   try {
     assert.equal(copy.pragma('integrity_check')[0].integrity_check, 'ok');
     assert.equal(copy.prepare('SELECT COUNT(*) AS n FROM sales').get().n, 3, "the day's three sales");

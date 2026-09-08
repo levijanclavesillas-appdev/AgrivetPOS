@@ -97,6 +97,12 @@ const ACTIONS = Object.freeze({
   DATA_IMPORTED: { what: 'Data imported', rule: 'AUD-605' },
   DATA_EXPORTED: { what: 'Data exported', rule: 'AUD-601' },
   BACKUP_RESTORED: { what: 'Backup restored', rule: 'AUD-601' },
+  // OPS-002: a backup that did not happen is a fact worth keeping, and the one an
+  // owner asks about after the fact. Failure is recorded; success is the log table's
+  // job, because a row per successful backup would drown the trail people read.
+  BACKUP_FAILED: { what: 'Backup failed or failed verification', rule: 'OPS-002' },
+  // OPS-009: the clock moved backwards past the last recorded transaction.
+  CLOCK_ANOMALY: { what: 'System clock earlier than the last recorded transaction', rule: 'OPS-009' },
   AUDIT_EXPORTED: { what: 'Audit trail exported', rule: 'AUD-601' },
 
   // ── AUD-602: the till ─────────────────────────────────────────────────────
@@ -411,7 +417,11 @@ function exportCsv(filters = {}) {
   return { csv: `${lines.join('\r\n')}\r\n`, rowCount: rows.length, total: page.total, capped: page.total > EXPORT_CAP };
 }
 
+/** The actor for something the application did on its own — a scheduled backup. */
+const SYSTEM_ACTOR = Object.freeze({ id: null, username: 'system' });
+
 module.exports = {
+  SYSTEM_ACTOR,
   ACTIONS, ACTION_NAMES, OVERRIDE_ACTIONS, CSV_COLUMNS, MAX_PAGE, DEFAULT_PAGE, EXPORT_CAP, REDACTED,
   isKnownAction, assertKnownAction, describe, redact,
   write, recordOverride, browse, present, exportCsv,

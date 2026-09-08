@@ -90,6 +90,13 @@ const REGISTRY = Object.freeze({
     // expires at midnight is an alert nobody sees.
     what: 'Days a cash-variance alert keeps showing on the dashboard', min: 1, max: 90,
   },
+  // OPS-007: a dismissal lapses, so an alert whose condition has not gone away comes
+  // back rather than staying hidden for good. A day is long enough to stop it nagging
+  // through one shift and short enough that nothing is buried.
+  alert_dismissal_window_days: {
+    type: 'INT', value: 1, group: 'REPORTING', ruleId: 'OPS-007', ownerOnly: false,
+    what: 'Days a dismissed alert stays hidden before it is raised again', min: 1, max: 30,
+  },
   report_max_range_days: {
     type: 'INT', value: 366, group: 'REPORTING', ruleId: 'RPT-106', ownerOnly: false,
     // NFR_2.2 keeps five years online, so the ceiling admits an accountant asking for
@@ -219,6 +226,13 @@ const REGISTRY = Object.freeze({
   backup_hour: {
     type: 'INT', value: 21, group: 'BACKUP', ruleId: 'OPS-001', ownerOnly: true,
     what: 'Hour of the day (Manila, 0–23) the daily backup runs', min: 0, max: 23,
+  },
+  // FR_7.3 / OPS-007: how long the store may go without a *verified* backup before the
+  // launch warning appears. A day of slack past the daily schedule, so the warning
+  // means "yesterday did not get backed up" rather than "the hour has not come round".
+  backup_period_hours: {
+    type: 'INT', value: 36, group: 'BACKUP', ruleId: 'OPS-007', ownerOnly: false,
+    what: 'Hours without a verified backup before the launch warning appears', min: 1, max: 720,
   },
   backup_retention_count: {
     type: 'INT', value: 30, group: 'BACKUP', ruleId: 'OPS-003', ownerOnly: true,

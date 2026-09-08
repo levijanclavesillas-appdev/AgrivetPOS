@@ -501,9 +501,7 @@ function close({
   //
   // The backup is the last thing, and its failure is reported rather than thrown. The
   // shift is closed; a full disk does not un-count a drawer.
-  const backupService = require('./backupService');
-  const backup = backupService.run({ trigger: 'SHIFT_CLOSE', actor });
-  const backupAlert = backupService.alertFor(backup);
+  const backup = require('./backupService').run({ trigger: 'SHIFT_CLOSE', actor });
 
   const summary = buildClosingSummary({
     shift: result.closed, expected, lines: result.lines, variance,
@@ -523,7 +521,10 @@ function close({
     backup,
     summary,
     printed,
-    alerts: backupAlert ? [backupAlert] : [],
+    // OPS-007's list, recomputed after the close so it carries the backup that just
+    // ran (or did not). One service produces it, so SCR-503 and SCR-601 cannot
+    // disagree about whether the store is backed up (TASK-017 requirement 11).
+    alerts: require('./alertService').list().alerts,
   };
 }
 

@@ -8,12 +8,29 @@
 
 const express = require('express');
 const healthService = require('../services/healthService');
+const { authenticate, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
+/**
+ * Liveness, unauthenticated, deliberately thin.
+ *
+ * A status, a version and nothing about the store. OPS-006's six figures are on
+ * /health/panel behind TX-428 — an unauthenticated caller on the loopback has no
+ * business learning how many sales the store has taken.
+ */
 router.get('/health', (req, res, next) => {
   try {
-    res.json(healthService.health());
+    res.json(healthService.liveness());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** SCR-705 — OPS-006's six figures. */
+router.get('/health/panel', [authenticate, requirePermission('TX-428')], (req, res, next) => {
+  try {
+    res.json(healthService.panel());
   } catch (err) {
     next(err);
   }

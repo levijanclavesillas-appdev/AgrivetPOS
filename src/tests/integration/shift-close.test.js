@@ -402,7 +402,11 @@ test('TC-INT-70: a successful close writes a backup and verifies it', () => {
   // The copy is a real database with this store's rows in it, not an empty file that
   // happens to pass an integrity check.
   assert.ok(result.backup.row_counts.sales >= 0);
-  assert.deepEqual(result.alerts, [], 'nothing to raise');
+
+  // TASK-017: the close now returns OPS-007's whole list rather than only a backup
+  // alert, so that SCR-503 and SCR-601 cannot disagree about whether the store is
+  // backed up (requirement 11). A clean close raises nothing about the backup.
+  assert.equal(result.alerts.some((a) => a.kind.startsWith('BACKUP')), false, 'nothing to raise');
 });
 
 test('TC-INT-70: the backup is a consistent snapshot, not a byte copy', () => {
@@ -419,8 +423,14 @@ test('TC-INT-70: the backup is a consistent snapshot, not a byte copy', () => {
 
   // Opened independently and checked: a filesystem copy of a WAL database mid-write is
   // the backup that restores into a half-written page (TC-INT-75's concern).
+  //
+  // TASK-017 made the artefact a .zip (05_TECH_SPEC.md §7), so the database is
+  // extracted first — and the extraction is itself part of the check, because an
+  // archive that cannot be read back is not a backup either.
   const Database = require('better-sqlite3');
-  const copy = new Database(result.backup.file_path, { readonly: true, fileMustExist: true });
+  const extracted = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-check-')), 'copy.db');
+  require('../../repositories/backupRepository').extract(result.backup.file_path, extracted);
+  const copy = new Database(extracted, { readonly: true, fileMustExist: true });
   try {
     assert.equal(copy.pragma('integrity_check')[0].integrity_check, 'ok');
     assert.deepEqual(copy.pragma('foreign_key_check'), []);
@@ -450,10 +460,12 @@ test('TC-INT-70: a backup failure raises an alert and does not reopen the shift'
     assert.equal(result.shift.status, 'CLOSED', 'the shift stayed closed');
     assert.equal(shiftRepository.findById(shift.id).status, 'CLOSED');
 
-    assert.equal(result.alerts.length, 1);
-    assert.equal(result.alerts[0].kind, 'BACKUP_FAILED');
-    assert.equal(result.alerts[0].severity, 'CRITICAL');
-    assert.match(result.alerts[0].message, /not backed up/);
+    // OPS-007's list, recomputed after the close. BACKUP_OVERDUE is what a store with
+    // no configured folder is: nothing has ever verified, and nothing can.
+    const backupAlert = result.alerts.find((a) => a.kind.startsWith('BACKUP'));
+    assert.ok(backupAlert, 'the failure reaches the alert list');
+    assert.equal(backupAlert.severity, 'CRITICAL');
+    assert.equal(backupAlert.dismissible, false, 'OPS-007: never dismissible');
   } finally {
     db.transaction(() => settingsService.set('backup_folder', good, sessions.OWNER));
   }

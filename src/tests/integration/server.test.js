@@ -26,29 +26,54 @@ test.after(async () => {
   temp.cleanup();
 });
 
-test('GET /api/v1/health reports schema version, size and row counts (OPS-006)', async () => {
+test('GET /api/v1/health is thin, and says nothing about the store', async () => {
+  // main.js polls this before the window opens, so it answers before anyone has
+  // authenticated (05_TECH_SPEC.md §4). TASK-017 moved OPS-006's six figures behind
+  // TX-428 for exactly that reason: an unauthenticated caller on the loopback has no
+  // business learning how many sales the store has taken.
   const res = await fetch(`${BASE}/api/v1/health`);
   assert.equal(res.status, 200);
   const body = await res.json();
 
   assert.equal(body.status, 'ok');
+  assert.match(body.checked_at, /Z$/, 'UTC (VR-102)');
+  assert.ok(body.app_version);
+
+  for (const leaked of ['database', 'row_counts', 'schema', 'backup']) {
+    assert.equal(leaked in body, false, `${leaked} is not served unauthenticated`);
+  }
+});
+
+test('GET /api/v1/health/panel reports OPS-006’s six figures, behind TX-428', async () => {
+  const anonymous = await fetch(`${BASE}/api/v1/health/panel`);
+  assert.equal(anonymous.status, 401, 'and not to anyone who has not signed in');
+
+  const token = require('../../services/authService')
+    .login({ username: 'installowner', password: 'correct-horse-battery' }).token;
+  const res = await fetch(`${BASE}/api/v1/health/panel`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+
   assert.equal(body.schema.version, body.schema.binary_version, 'a started server is fully migrated');
   assert.equal(body.schema.binary_version, require('../../config/migrate').binaryVersion());
+  assert.equal(body.schema.up_to_date, true);
   assert.ok(body.database.size_bytes > 0, 'a migrated database has a size');
   assert.deepEqual(Object.keys(body.database.row_counts).sort(), [
-    'audit_logs', 'brands', 'carts', 'cashier_closings', 'cashier_shifts', 'categories',
-    'closing_method_lines', 'credit_allocations', 'customer_credit_accounts',
-    'customer_credit_transactions', 'customers', 'inventory', 'inventory_movements',
+    'alert_dismissals', 'audit_logs', 'backups', 'brands', 'carts', 'cashier_closings',
+    'cashier_shifts', 'categories', 'closing_method_lines', 'credit_allocations',
+    'customer_credit_accounts', 'customer_credit_transactions', 'customers',
+    'inventory', 'inventory_movements',
     'product_barcodes', 'product_packs', 'product_prices', 'products',
     'sale_discounts', 'sale_items', 'sale_tenders', 'sales',
-    'schema_migrations', 'store_profile', 'system_settings', 'till_movements',
-    'units', 'users',
+    'schema_migrations', 'store_profile', 'system_events', 'system_settings',
+    'till_movements', 'units', 'users',
   ]);
   assert.equal(body.database.row_counts.schema_migrations, body.schema.binary_version);
-  assert.match(body.checked_at, /Z$/, 'UTC (VR-102)');
 
-  // TASK-017 fills these; the keys exist now so the payload shape does not change.
-  assert.equal(body.last_successful_backup_at, null);
+  // OPS-006's six, all present and honest about being empty on a fresh install.
+  assert.equal(body.backup.last_successful_at, null, 'nothing has been backed up yet');
   assert.equal(body.last_export_at, null);
   assert.equal(body.last_integrity_check_at, null);
 });

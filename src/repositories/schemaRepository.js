@@ -50,4 +50,27 @@ function foreignKeyCheck() {
   return db.get().pragma('foreign_key_check');
 }
 
-module.exports = { listTables, listIndexes, rowCounts, integrityCheck, foreignKeyCheck };
+/**
+ * The row count of one table, or null when the table is not there.
+ *
+ * A restore swaps the database underneath the application, so "how many sales were
+ * there before and after" has to survive the possibility that the restored file is
+ * from a schema version that predates the table being counted.
+ */
+function countOf(table) {
+  if (!/^[a-z_]+$/.test(table)) throw new RangeError(`not a table name: ${table}`);
+  try {
+    return db.get().prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get().n;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a user id still exists — asked after a restore, about the person doing it. */
+function userExists(userId) {
+  return Boolean(db.get().prepare('SELECT id FROM users WHERE id = ?').get(userId));
+}
+
+module.exports = {
+  listTables, listIndexes, rowCounts, integrityCheck, foreignKeyCheck, countOf, userExists,
+};

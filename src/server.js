@@ -29,6 +29,20 @@ async function start({ listenPort = port(), log = () => {} } = {}) {
   // that already prints or pulses starts working here, with no edit to any of them.
   require('./services/printService').install();
 
+  // OPS-009 and OPS-007's launch checks, and the daily backup schedule (OPS-001).
+  // Here rather than in main.js because the server runs inside the Electron main
+  // process already, and a check that lives here also runs under `npm start` and in
+  // the test suite. Neither may stop the server coming up: a store must be able to
+  // open its till on a machine whose clock is wrong and whose last backup failed.
+  try {
+    const launch = require('./services/systemService').onLaunch();
+    if (launch.clock.anomaly) log('clock anomaly: the system clock is behind the ledger (OPS-009)');
+    if (launch.backup.overdue) log(`backup overdue: ${launch.backup.message}`);
+  } catch (err) {
+    log(`launch checks did not complete: ${err.message}`);
+  }
+  require('./services/scheduleService').start();
+
   const app = createApp();
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(listenPort, HOST, () => resolve(s));
@@ -78,6 +92,7 @@ async function waitForHealth({ listenPort = port(), attempts = 50, intervalMs = 
 }
 
 function stop(server) {
+  require('./services/scheduleService').stop();
   return new Promise((resolve) => {
     if (!server) return resolve();
     server.close(() => {

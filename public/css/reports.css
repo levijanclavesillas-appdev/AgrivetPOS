@@ -92,3 +92,49 @@
 }
 
 .methods-note { margin: .25rem 0 0; font-size: .8125rem; color: var(--muted); }
+
+/* ── SCR-704, SCR-705 (TASK-017) ─────────────────────────────────────────── */
+
+.admin-screen { padding: 1rem 1.25rem 3rem; max-width: 72rem; }
+.admin-tabs { display: flex; gap: .5rem; border-bottom: 1px solid var(--rule); }
+.admin-tab { min-height: var(--touch); padding: 0 1rem; background: none; border: 0;
+  border-bottom: 2px solid transparent; font: inherit; color: var(--muted); cursor: pointer; }
+.admin-tab.is-active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+.admin { padding: 1rem 0 2rem; }
+.admin-head { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.admin-head h1 { margin: 0; }
+.admin-head button { min-height: var(--touch); padding: 0 1rem; margin-left: auto; }
+.admin-meta { display: grid; gap: .25rem 1.5rem; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  margin: 1rem 0; padding: .75rem 1rem; background: #fff; border: 1px solid var(--rule); border-radius: 6px; }
+.admin-meta .warn dd { color: var(--warn-ink); }
+.backup-fresh { color: var(--muted); margin: .5rem 0 0; }
+
+/* SEC-9 and §7's process control. Deliberately prominent: it is the only place the
+   product tells the operator that the off-machine copy is theirs to make. */
+.backup-warning { margin: 1.25rem 0; padding: .9rem 1rem; border-radius: 6px;
+  background: var(--warn-bg); border-left: 4px solid var(--warn-ink); }
+.backup-warning h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.backup-warning p { margin: 0 0 .5rem; line-height: 1.5; }
+
+.admin table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
+.admin th, .admin td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--rule); }
+.admin thead th { font-size: .8125rem; color: var(--muted); }
+.backup-list .file { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
+.backup-list .failed { color: var(--muted); }
+.backup-list .failed .verified { color: var(--error); }
+.backup-list .restore { min-height: var(--touch); padding: 0 .75rem; }
+.row-counts td { font-variant-numeric: tabular-nums; }
+
+.restore-dialog { background: var(--bg); padding: 1.5rem; border-radius: 8px; max-width: 34rem; }
+.restore-dialog h1 { font-size: 1.25rem; }
+.restore-dialog p { line-height: 1.5; margin: 0 0 .75rem; }
+.restore-loss { font-weight: 600; }
+.restore-dialog .file { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  font-size: .8125rem; word-break: break-all; }
+.confirm-filename { min-height: var(--touch); width: 100%; }
+.dialog-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+.dialog-actions button { min-height: var(--touch); padding: 0 1.25rem; }
+/* A restore is the most destructive thing in the product. Its button looks like it. */
+.danger { background: var(--error); color: #fff; border: 0; border-radius: 4px; }
+.danger:disabled { background: var(--rule); color: var(--muted); }

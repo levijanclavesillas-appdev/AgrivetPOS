@@ -16,6 +16,10 @@ const os = require('os');
 
 const server = require('../../server');
 const temp = require('../helpers/tempdb');
+const schemaRepository = require('../../repositories/schemaRepository');
+
+/** Row counts read straight from the database — /health no longer reports them. */
+const counts = () => schemaRepository.rowCounts();
 
 const PORT = 47895;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -72,9 +76,16 @@ test('TC-E2E-00: every route but the wizard and health is refused (FR_1.1)', asy
   }
 
   // main.js polls health before the window opens, so it answers on an empty database.
+  // TASK-017 made that answer deliberately thin — a status and a version, nothing
+  // about the store — because SEC-8 opens the bind address to the LAN in v1.3 and an
+  // unauthenticated endpoint reporting row counts would go with it. The counts come
+  // from the database directly here, which is what this case actually wants.
   const health = await call('/health');
   assert.equal(health.status, 200);
-  assert.equal((await health.json()).database.row_counts.users, 0);
+  const liveness = await health.json();
+  assert.equal(liveness.status, 'ok');
+  assert.equal('database' in liveness, false, 'and it says nothing about the store');
+  assert.equal(counts().users, 0);
 });
 
 test('TC-E2E-00: the wizard reports what it needs, in five steps', async () => {
@@ -105,11 +116,10 @@ test('TC-E2E-00: a refused completion writes nothing and the wizard starts again
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error.rule_id, 'SEC-5');
 
-  const health = await call('/health');
-  const counts = (await health.json()).database.row_counts;
-  assert.equal(counts.users, 0, 'no owner');
-  assert.equal(counts.store_profile, 0, 'no profile');
-  assert.equal(counts.system_settings, 0, 'no settings');
+  const written = counts();
+  assert.equal(written.users, 0, 'no owner');
+  assert.equal(written.store_profile, 0, 'no profile');
+  assert.equal(written.system_settings, 0, 'no settings');
   assert.equal((await (await call('/setup')).json()).required, true, 'back at step 1');
 });
 
@@ -165,7 +175,7 @@ test('TC-E2E-00: the wizard cannot be run twice', async () => {
 
   assert.equal(res.status, 409);
   assert.equal((await call('/health')).status, 200);
-  assert.equal((await (await call('/health')).json()).database.row_counts.users, 1, 'still one user');
+  assert.equal(counts().users, 1, 'still one user');
 });
 
 // ── 4. First login ─────────────────────────────────────────────────────────
