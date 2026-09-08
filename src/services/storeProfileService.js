@@ -46,13 +46,13 @@ const MODES = Object.freeze(Object.keys(TAX_MODES));
  * TAX-002: `NONE` and `NON_VAT` compute no tax at all — the selling price is the final
  * price and every sale line records `tax_amount_centavos = 0`.
  *
- * TASK-009 owns the VAT decomposition itself. This is the mode-level fact the rest of
- * the system branches on, and TC-UT-17 asserts it here so that the branch is decided
- * once rather than re-read from the mode string at each call site.
+ * Delegated to taxService, which owns the engine (TASK-009). Kept here because the
+ * setup wizard and the store profile screen both ask the question of a *mode* rather
+ * than of a basket, and because one answer is better than two that agree today.
  */
 function computesTax(mode) {
   assertMode(mode);
-  return TAX_MODES[mode].computesTax;
+  return require('./taxService').computesTax(mode);
 }
 
 function assertMode(mode) {

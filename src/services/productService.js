@@ -205,44 +205,20 @@ function detail(row, session, { at = clock.nowUtc() } = {}) {
 // ── Price resolution (PR-101 levels 3–4, PR-102) ────────────────────────────
 
 /**
- * The price a level actually charges.
+ * The price a level actually charges — PR-101's precedence and PR-102's fall-through.
  *
- * PR-102: retail is required to be sellable; wholesale and dealer are optional and
- * **fall through to retail, never to zero**. That sentence is the whole rule — a
- * missing wholesale price resolving to 0 gives the product away, and it is the sort of
- * defect that only shows up in the day's takings.
- *
- * Levels 1 and 2 of PR-101 — a customer-specific price and a quantity break — are
- * v1.1 and belong to TASK-009's engine. This resolves levels 3 and 4 only, and says
- * which level it resolved so the sale line can record it.
+ * Delegated to pricingService, which owns the four-level chain (TASK-009). This
+ * signature stays because the catalog screens call it with a level rather than a
+ * customer, but there is exactly one resolver in the product: two would drift, and the
+ * day they disagreed the counter and the report would each be sure they were right.
  */
 function resolvePrice(productId, level = 'RETAIL', { at = clock.nowUtc() } = {}) {
+  const pricingService = require('./pricingService');
   const wanted = text(level, { max: 20 }).toUpperCase() || 'RETAIL';
-  if (!PRICE_LEVELS.includes(wanted)) {
-    throw errors.badRequest(`Price level must be one of ${PRICE_LEVELS.join(', ')}`, { ruleId: 'PR-101' });
-  }
-
-  const own = productRepository.priceAt(productId, wanted, at);
-  if (own) {
-    return { level: wanted, resolved_level: wanted, price_centavos: own.price_centavos, effective_from: own.effective_from, fell_through: false };
-  }
-
-  const retail = productRepository.priceAt(productId, 'RETAIL', at);
-  if (!retail) {
-    // PR-102: not sellable. Refused rather than priced at zero.
-    throw errors.conflict(
-      'This product has no retail price yet, so it cannot be sold. Set one first.',
-      { ruleId: 'PR-102' }
-    );
-  }
-
-  return {
-    level: wanted,
-    resolved_level: 'RETAIL',
-    price_centavos: retail.price_centavos,
-    effective_from: retail.effective_from,
-    fell_through: wanted !== 'RETAIL',
-  };
+  const resolved = pricingService.resolvePrice({
+    productId, customer: { price_level: wanted }, at,
+  });
+  return { ...resolved, level: resolved.requested_level };
 }
 
 function isSellable(productId, { at = clock.nowUtc() } = {}) {
