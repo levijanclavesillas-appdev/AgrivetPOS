@@ -210,8 +210,8 @@ test('TC-E2E-06: with a reason it closes, audits the variance and backs the day 
   assert.deepEqual(closing.alerts, []);
 
   // The summary the store keeps with the drawer count.
-  assert.match(closing.summary.text, /Cash variance: ₱200\.00 short/);
-  assert.match(closing.summary.text, /Reason: Two ₱100 notes missing/);
+  assert.match(closing.summary.text, /CASH VARIANCE\s+200\.00 short/);
+  assert.match(closing.summary.text, /Two PHP 100 notes missing|Two ₱100 notes missing/);
   assert.match(closing.summary.text, /This is not an official receipt/);
 });
 

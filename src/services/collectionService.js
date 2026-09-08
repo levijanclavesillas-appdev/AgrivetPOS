@@ -263,42 +263,24 @@ function buildAcknowledgement({
   balanceAfterCentavos, allocations, actor, at,
 }) {
   const profile = storeProfileService.profile();
-  const owed = balanceAfterCentavos > 0;
 
-  const lines = [
-    profile.store_name,
-    profile.address || null,
-    '',
-    'COLLECTION ACKNOWLEDGEMENT',
+  // TASK-014 owns every layout. The content is decided here — CR-206 lists what an
+  // acknowledgement carries — and rendered there at the store's configured paper
+  // width, so the paper and the stored row cannot disagree and there is one template
+  // rather than two that drift.
+  const printService = require('./printService');
+  const rendered = printService.renderAcknowledgement({
+    profile,
     documentNo,
-    clock.toManila(at),
-    '',
-    `Customer: ${customer.name}${customer.code ? ` (${customer.code})` : ''}`,
-    `Amount:   ${money.toDisplay(amountCentavos)}`,
-    `Method:   ${method}${referenceNo ? ` — ${referenceNo}` : ''}`,
-    '',
-  ];
-
-  if (allocations.length > 0) {
-    lines.push('Applied to:');
-    for (const allocation of allocations) {
-      lines.push(
-        `  ${allocation.sale_document_no}  ${money.toDisplay(allocation.amount_centavos)}`
-        + (allocation.settled_in_full ? '  (settled)' : '  (part)')
-      );
-    }
-    lines.push('');
-  }
-
-  lines.push(
-    owed
-      ? `Balance now: ${money.toDisplay(balanceAfterCentavos)}`
-      : `Store credit: ${money.toDisplay(-balanceAfterCentavos)}`,
-    `Received by: ${actor.username}`,
-    '',
-    // TAX-006, verbatim and unconditional. Not a setting, and not omitted in any mode.
-    documentService.REQUIRED_NOTICE,
-  );
+    customer,
+    amountCentavos,
+    method,
+    referenceNo,
+    balanceAfterCentavos,
+    allocations,
+    receivedBy: actor.username,
+    at,
+  });
 
   return {
     kind: 'COLLECTION_ACKNOWLEDGEMENT',
@@ -316,7 +298,8 @@ function buildAcknowledgement({
       amount_centavos: a.amount_centavos,
       settled_in_full: a.settled_in_full,
     })),
-    text: lines.filter((line) => line !== null).join('\n'),
+    text: rendered.text,
+    columns: rendered.columns,
   };
 }
 

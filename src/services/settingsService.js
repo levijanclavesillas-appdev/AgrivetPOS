@@ -160,6 +160,36 @@ const REGISTRY = Object.freeze({
     what: 'Receipt cost variance needing authorisation, in basis points', min: 0, max: 10000,
   },
 
+  // ── Printing (INT-1, INT-2) ───────────────────────────────────────────────
+  //
+  // The paper width is fixed by the hardware the store bought, and the transport by
+  // how it is plugged in. Both are operator-owned in exactly OPS-005's sense: they
+  // differ per installation and a build must not assume either.
+  receipt_width_columns: {
+    type: 'INT', value: 32, group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
+    what: 'Receipt width: 32 columns for 58 mm paper, 48 for 80 mm',
+    // Not a range: a 40-column thermal head does not exist, and min/max would admit
+    // one. The two values are the two paper sizes INT-1 names.
+    oneOf: [32, 48],
+  },
+  printer_transport: {
+    type: 'STRING', value: 'NONE', group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
+    what: 'How the receipt printer is connected: NONE, USB or LAN',
+    oneOf: ['NONE', 'USB', 'LAN'],
+  },
+  printer_device: {
+    type: 'STRING', value: '', group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
+    what: 'USB printer device or share the bridge writes to',
+  },
+  printer_host: {
+    type: 'STRING', value: '', group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
+    what: 'LAN printer address',
+  },
+  printer_port: {
+    type: 'INT', value: 9100, group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
+    what: 'LAN printer port; 9100 is the ESC/POS raw port', min: 1, max: 65535,
+  },
+
   // ── Backup (OPS-*) ────────────────────────────────────────────────────────
   // Set by the wizard (OPS-001), which is why the default is empty: there is no
   // sensible folder to guess before the operator has chosen a drive, and a default
@@ -203,6 +233,21 @@ function encode(value, type) {
   return String(value);
 }
 
+/**
+ * A setting whose values are an enumeration rather than a range.
+ *
+ * Bounds are the wrong shape for a figure with a fixed set of legal values: 32 to 48
+ * columns admits 40, and no thermal printer has a 40-column head. `oneOf` says what
+ * the values actually are, and the refusal lists them.
+ */
+function assertOneOf(key, value, declared) {
+  if (!declared.oneOf || declared.oneOf.includes(value)) return value;
+  throw errors.badRequest(
+    `${key} must be one of ${declared.oneOf.join(', ')}`,
+    { ruleId: declared.ruleId }
+  );
+}
+
 function declaration(key) {
   const declared = REGISTRY[key];
   if (!declared) {
@@ -233,6 +278,7 @@ function coerce(key, raw) {
     if (!Number.isInteger(n)) {
       throw errors.badRequest(`${key} must be a whole number`, { ruleId: declared.ruleId });
     }
+    assertOneOf(key, n, declared);
     if (declared.min !== undefined && n < declared.min) {
       throw errors.badRequest(`${key} may not be below ${declared.min}`, { ruleId: declared.ruleId });
     }
@@ -265,6 +311,11 @@ function coerce(key, raw) {
   const text = String(raw === null || raw === undefined ? '' : raw).trim();
   if (declared.required && text === '') {
     throw errors.badRequest(`${key} is required`, { ruleId: declared.ruleId });
+  }
+  if (declared.oneOf) {
+    const upper = text.toUpperCase();
+    assertOneOf(key, upper, declared);
+    return upper;
   }
   return text;
 }
@@ -309,6 +360,7 @@ function describe({ includeOwnerOnly = true } = {}) {
         default_value: declared.value,
         min: declared.min ?? null,
         max: declared.max ?? null,
+        one_of: declared.oneOf ?? null,
         owner_only: Boolean(declared.ownerOnly),
         immutable: Boolean(declared.immutable),
         is_default: !row,

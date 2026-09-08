@@ -23,6 +23,12 @@ async function start({ listenPort = port(), log = () => {} } = {}) {
   const result = migrate.migrate({ log });
   log(`schema version ${result.to}`);
 
+  // INT-1 / INT-2: the printer and drawer drivers are installed once the database is
+  // open, because the transport is read from settings. documentService and
+  // drawerService were written with a driver seam for exactly this — every call site
+  // that already prints or pulses starts working here, with no edit to any of them.
+  require('./services/printService').install();
+
   const app = createApp();
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(listenPort, HOST, () => resolve(s));

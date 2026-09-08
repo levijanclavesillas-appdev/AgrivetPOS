@@ -635,6 +635,67 @@ function assertFractionAllowed(qtyMilli, allowsFraction, unitCode) {
   );
 }
 
+// ── POS-208 — the reprint ───────────────────────────────────────────────────
+
+/**
+ * Reprint a receipt, stamped and audited.
+ *
+ * POS-208's reasoning is worth stating: an **unmarked** reprint is a shrinkage tool. A
+ * cashier can hand a customer a receipt for a sale they pocketed the cash from and
+ * produce another for the drawer, and nothing distinguishes the two pieces of paper.
+ * So every reprint says REPRINT on it, and every reprint is on the trail with who asked
+ * for it and when.
+ *
+ * Outside any transaction (INT-1). A reprint that will not print is still a reprint
+ * that was requested, so the audit row is written either way.
+ */
+function reprint(saleId, actor) {
+  const printService = require('./printService');
+  const storeProfileService = require('./storeProfileService');
+  const documentService = require('./documentService');
+
+  const view = get(saleId);
+  const document = printService.renderSaleReceipt({
+    sale: { ...view.sale, id: saleId },
+    items: view.items,
+    tenders: view.tenders,
+    profile: storeProfileService.profile(),
+    reprint: true,
+  });
+
+  db.transaction(() => {
+    auditService.write({
+      actor,
+      action: 'RECEIPT_REPRINTED',
+      entityType: 'sales',
+      entityId: saleId,
+      after: { sale_no: view.sale.sale_no, total_centavos: view.sale.total_centavos },
+      reason: `Receipt ${view.sale.sale_no} reprinted`,
+      shiftId: actor.shiftId || null,
+    });
+  });
+
+  const printed = documentService.print(document);
+  return { ...view, document, printed };
+}
+
+/** The first print, called by the route after POST /sales returns (INT-1). */
+function printReceipt(saleId) {
+  const printService = require('./printService');
+  const storeProfileService = require('./storeProfileService');
+  const documentService = require('./documentService');
+
+  const view = get(saleId);
+  const document = printService.renderSaleReceipt({
+    sale: { ...view.sale, id: saleId },
+    items: view.items,
+    tenders: view.tenders,
+    profile: storeProfileService.profile(),
+  });
+
+  return { document, printed: documentService.print(document) };
+}
+
 // ── Reading ─────────────────────────────────────────────────────────────────
 
 function get(saleId) {
@@ -713,6 +774,6 @@ function forShift(shiftId) {
 
 module.exports = {
   TENDERS, TENDER_METHODS,
-  complete, get, getByNo, present, forShift,
+  complete, get, getByNo, present, forShift, reprint, printReceipt,
   assertClientTotalMatches, settleTenders, resolveLineQuantity,
 };

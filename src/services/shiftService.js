@@ -531,40 +531,15 @@ function close({
  */
 function buildClosingSummary({ shift, expected, lines, variance, beyondTolerance, tolerance, reason, actor, at }) {
   const storeProfileService = require('./storeProfileService');
+  const printService = require('./printService');
   const profile = storeProfileService.profile();
 
-  const rows = lines.map((line) => {
-    const sign = line.variance_centavos === 0 ? '' : (line.variance_centavos < 0 ? ' short' : ' over');
-    return `  ${line.method.padEnd(7)} expected ${money.toDisplay(line.expected_centavos).padStart(12)}`
-      + `  counted ${money.toDisplay(line.actual_centavos).padStart(12)}`
-      + `  ${money.toDisplay(Math.abs(line.variance_centavos))}${sign}`;
+  // TASK-014 owns the layout; this decides what goes on it. One renderer for all three
+  // documents, at the store's configured paper width.
+  const rendered = printService.renderClosingSummary({
+    profile, shift, expected, lines, variance, beyondTolerance, tolerance,
+    reason, closedBy: actor.username, at,
   });
-
-  const text = [
-    profile.store_name,
-    profile.address || null,
-    '',
-    'SHIFT CLOSING SUMMARY',
-    `Shift opened ${clock.toManila(shift.opened_at)}`,
-    `Shift closed ${clock.toManila(at)}`,
-    `Closed by:   ${actor.username}`,
-    '',
-    `Opening float:    ${money.toDisplay(expected.opening_float_centavos)}`,
-    `Cash sales:       ${money.toDisplay(expected.cash_sales_centavos)}`,
-    `Cash collections: ${money.toDisplay(expected.cash_collections_centavos)}`,
-    `Cash in:          ${money.toDisplay(expected.cash_in_centavos)}`,
-    `Cash out:        -${money.toDisplay(expected.cash_out_centavos)}`,
-    `Change given:    -${money.toDisplay(expected.change_given_centavos)}`,
-    '',
-    ...rows,
-    '',
-    `Cash variance: ${money.toDisplay(Math.abs(variance))}`
-      + `${variance === 0 ? ' — balanced' : (variance < 0 ? ' short' : ' over')}`,
-    beyondTolerance ? `Beyond the ${money.toDisplay(tolerance)} tolerance.` : null,
-    reason ? `Reason: ${reason}` : null,
-    '',
-    documentService.REQUIRED_NOTICE,
-  ].filter((line) => line !== null).join('\n');
 
   return {
     kind: 'SHIFT_CLOSING',
@@ -577,7 +552,8 @@ function buildClosingSummary({ shift, expected, lines, variance, beyondTolerance
     beyond_tolerance: beyondTolerance,
     variance_reason: reason,
     lines,
-    text,
+    text: rendered.text,
+    columns: rendered.columns,
   };
 }
 

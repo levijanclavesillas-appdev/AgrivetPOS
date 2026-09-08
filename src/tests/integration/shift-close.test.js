@@ -494,11 +494,12 @@ test('the closing summary prints, and is subject to TAX-006', () => {
   const text = result.summary.text;
   assert.match(text, /SHIFT CLOSING SUMMARY/);
   assert.match(text, /Test Agrivet Supply/);
-  assert.match(text, /Opening float: *₱2,000\.00/);
-  assert.match(text, /Cash sales: *₱200\.00/);
-  assert.match(text, /CASH *expected/);
-  assert.match(text, /Cash variance: ₱200\.00 short/);
-  assert.match(text, /Reason: Counted twice/);
+  assert.match(text, /Opening float\s+2,000\.00/);
+  assert.match(text, /Cash sales\s+200\.00/);
+  assert.match(text, /CASH\n {2}expected/);
+  assert.match(text, /CASH VARIANCE\s+200\.00 short/);
+  assert.match(text, /Reason:/);
+  assert.match(text, /Counted twice/);
 
   // TAX-006 — it is an internal record, and documentService refused to print it
   // otherwise.

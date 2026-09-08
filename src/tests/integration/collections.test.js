@@ -210,7 +210,7 @@ test('TC-INT-45: confirmed, the excess becomes store credit as a negative balanc
   assert.equal(creditService.reconcile().ok, true);
 
   // And the acknowledgement says store credit rather than a negative balance.
-  assert.match(result.acknowledgement.text, /Store credit: ₱500\.00/);
+  assert.match(result.acknowledgement.text, /Store credit\s+500\.00/);
   assert.equal(creditRepository.findAccount(account.id).balance_centavos, -50000);
 });
 
@@ -387,15 +387,19 @@ test('TC-INT-43: the acknowledgement carries everything CR-206 lists, with a COL
   // And the printed text says each of them in words the customer can read.
   assert.match(ack.text, /COLLECTION ACKNOWLEDGEMENT/);
   assert.match(ack.text, new RegExp(ack.document_no));
-  assert.match(ack.text, /Amount: *₱1,500\.00/);
-  assert.match(ack.text, /Method: *GCASH — GC-4004/);
-  assert.match(ack.text, /Balance now: ₱1,500\.00/);
-  assert.match(ack.text, /Received by: cashier/);
+  // Rendered by printService at the store's paper width (TASK-014). Figures are
+  // right-aligned without the peso sign, which a CP437 thermal head cannot print.
+  assert.match(ack.text, /Amount\s+1,500\.00/);
+  assert.match(ack.text, /Method\s+GCASH/);
+  assert.match(ack.text, /Ref GC-4004/);
+  assert.match(ack.text, /Balance now\s+1,500\.00/);
+  assert.match(ack.text, /Received by\s+cashier/);
+  assert.equal(ack.columns, 32, '58 mm by default');
 
   // CR-203: it shows which invoices the payment settled.
   assert.match(ack.text, /Applied to:/);
-  assert.match(ack.text, /\(settled\)/);
-  assert.match(ack.text, /\(part\)/);
+  assert.match(ack.text, /settled/);
+  assert.match(ack.text, /part payment/);
 });
 
 test('TC-INT-43: the acknowledgement is subject to TAX-006', () => {
