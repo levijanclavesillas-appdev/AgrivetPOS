@@ -7,25 +7,16 @@ This covers building the installer, putting it on the store's PC, configuring th
 loading the opening data, and upgrading later. Work down it in order. Nothing here needs a
 network connection at the store.
 
-> ## ⚠ Read this before booking the visit
+> ## Before booking the visit
 >
-> **v1.0 cannot yet be deployed to a store**, and the reason is not the installer.
+> **Every section of this manual is performable from the application.** The screen gap that
+> stood here — thirteen of the twenty-six screens in `04_UX_SPEC.md` missing — is closed, and
+> `TC-UI-10` asserts it stays closed. `TC-E2E-10` to `TC-E2E-15` walk the catalogue, the shift,
+> the settings, user administration, credit and the audit trail end to end.
 >
-> One of the twenty-six screens in `04_UX_SPEC.md` does not exist yet — the audit viewer
-> (`06_TASKS/README.md`, *the screen gap*).
-> Every service and API behind them is built and tested; there is simply no screen to reach
-> them from.
->
-> **Every section of this manual is now performable from the application.** `TASK-036` to
-> `TASK-040` built the catalogue, the shift screens, the settings, user administration and the
-> customer and credit screens; `TC-E2E-10` to `TC-E2E-14` walk all five paths end to end.
->
-> What is still missing is the **audit viewer** (`TASK-041`). Nothing in this manual depends on
-> it — the trail is written on every mutation regardless — but an owner cannot read it, which
-> is `FR_1.5`.
->
-> **Do not schedule the cutover on the strength of a green test suite.** The suite is green
-> because it tests the API.
+> What still cannot be done from a build machine is everything in §7 of this manual: the signed
+> `.exe`, and the checks that need the store's own scanner, printer, drawer, mains power and
+> owner. `07_TEST_PLAN.md` §10 lists them by criterion.
 
 ---
 

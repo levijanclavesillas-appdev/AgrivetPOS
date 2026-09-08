@@ -351,6 +351,13 @@ export function createPos({ root, session, onPay }) {
     cancelField: () => { results.hidden = true; attachBar.hidden = true; if (modalOpen) { modalOpen = false; clear(panelHost); } search.focus(); },
   };
 
+  /**
+   * `SCR-302` — park and resume (`POS-106`).
+   *
+   * Not a screen of its own: it is the POS screen with the cart set down, which is why
+   * it lives here rather than in a file of its own. Labelled because the spec names it,
+   * and an implemented screen nobody can find in the source reads as a missing one.
+   */
   async function park({ andNew }) {
     if (cart.isEmpty) return ui.toast('There is nothing to park.', { kind: 'error' });
     try {

@@ -17,6 +17,7 @@ import { createBackup } from '../admin/backup.js';
 import { createHealth } from '../admin/health.js';
 import { createUsers } from '../admin/users.js';
 import { createSettings } from '../admin/settings.js';
+import { createAudit } from '../admin/audit.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
@@ -328,6 +329,7 @@ export function createApp({ root }) {
   const ADMIN_PANELS = [
     { id: 'users', label: 'Users', screen: 'SCR-701', create: createUsers },
     { id: 'settings', label: 'Settings', screen: 'SCR-702', create: createSettings },
+    { id: 'audit', label: 'Audit', screen: 'SCR-703', create: createAudit },
     { id: 'backup', label: 'Backups', screen: 'SCR-704', create: createBackup },
     { id: 'health', label: 'Health', screen: 'SCR-705', create: createHealth },
   ];

@@ -696,6 +696,51 @@ app.whenReady().then(async () => {
   await settle(1800);
   log(/sound/i.test(await run(`document.body.textContent`)), 'the on-demand integrity check reports back');
 
+  console.log('\n— SCR-703: the audit trail —');
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => /Audit/.test(t.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.audit')`, { label: 'SCR-703' });
+  await waitFor(`document.querySelectorAll('.audit-list tbody tr').length >= 1`,
+    { label: 'the trail to load' });
+
+  const trailRows = await run(`document.querySelectorAll('.audit-list tbody tr').length`);
+  log(trailRows >= 1, 'the trail renders', `${trailRows} rows`);
+
+  const served = (await api('/audit')).json;
+  const actionOptions = await run(`document.querySelectorAll('.audit-filters select')[1].options.length - 1`);
+  log(actionOptions === served.actions.length,
+    'the action filter is built from the server’s registry',
+    `${actionOptions} of ${served.actions.length}`);
+  const actorOptions = await run(`document.querySelectorAll('.audit-filters select')[0].options.length - 1`);
+  log(actorOptions === served.actors.length, 'and so is the actor filter', `${actorOptions} actors`);
+
+  // AUD-606: a row opens to before and after.
+  await run(`document.querySelector('.audit-list tbody tr').click()`);
+  await waitFor(`!!document.querySelector('.audit-detail')`, { label: 'the expanded row' });
+  const detail = await run(`document.querySelector('.audit-detail').textContent`);
+  log(/Before/.test(detail) && /After/.test(detail),
+    'AUD-606: a row opens to before and after', detail.replace(/\s+/g, ' ').slice(0, 70));
+
+  // Filter by an action that exists, and watch the list narrow.
+  await run(`(() => {
+    const sel = document.querySelectorAll('.audit-filters select')[1];
+    const opt = [...sel.options].find(o => o.value === 'SETTING_CHANGED');
+    sel.value = opt.value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await settle(900);
+  const filtered = await run(`document.querySelector('.audit-list').textContent`);
+  log(/setting/i.test(filtered), 'filtering by action narrows the trail',
+    filtered.replace(/\s+/g, ' ').slice(0, 70));
+
+  await run(`[...document.querySelectorAll('.audit-filters button')].find(b => /Clear/.test(b.textContent)).click()`);
+  await settle(900);
+
+  // AUD-605, said where somebody would look for an edit button.
+  log(/Nothing here can be changed or removed/.test(await run(`document.body.textContent`)),
+    'AUD-605: and the screen says the trail cannot be edited');
+  log(await run(`!document.querySelector('.audit input[type=text][aria-label*=reason]')`),
+    'there is no field that would write to it');
+
   console.log('\n— console —');
   log(errors.length === 0, 'the renderer logged no errors', errors.slice(0, 4).join(' | '));
 

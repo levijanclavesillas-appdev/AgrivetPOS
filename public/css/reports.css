@@ -173,3 +173,33 @@
   padding: .6rem .75rem; border-radius: 4px; margin: 0 0 .75rem; line-height: 1.5; }
 .tax-mode select, .tax-mode input { min-height: var(--touch); }
 .print-test { margin: 1rem 0; padding-top: 1rem; border-top: 1px solid var(--rule); }
+
+/* SCR-703 — the audit trail (TASK-041). */
+.audit-filters { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; margin: 1rem 0; }
+.audit-filter { display: flex; flex-direction: column; gap: .2rem; margin: 0; font-size: .8125rem; }
+.audit-filter select, .audit-filter input { min-height: var(--touch); padding: 0 .5rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.audit-filters button { min-height: var(--touch); padding: 0 1rem; }
+
+.audit-list tbody tr { cursor: pointer; }
+.audit-list tbody tr:hover, .audit-list tbody tr:focus-visible { background: #f4f7f5; }
+.audit-list tr.is-open { background: #f4f7f5; }
+.audit-list .reason { color: var(--muted); font-size: .875rem; }
+.audit-list .expand-hint { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* AUD-603: the second actor is what makes an override an authorisation. */
+.tag.approver { background: var(--warn-bg); color: var(--warn-ink); }
+
+.audit-detail td { background: #fff; }
+.detail-grid { display: grid; gap: 1.5rem; grid-template-columns: 1fr 1fr; }
+.detail-grid h3 { font-size: .8125rem; color: var(--muted); margin: 0 0 .3rem;
+  letter-spacing: .04em; text-transform: uppercase; }
+.detail-grid pre { margin: 0; padding: .6rem .75rem; background: var(--bg); border-radius: 4px;
+  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem;
+  line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.detail-meta { margin: .6rem 0 0; font-size: .75rem; color: var(--muted);
+  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; }
+.trail-note { margin-top: 1.5rem; }
+
+@media (max-width: 1023px) {
+  .detail-grid { grid-template-columns: 1fr; }
+}

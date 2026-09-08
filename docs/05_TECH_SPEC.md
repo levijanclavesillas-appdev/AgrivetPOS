@@ -616,7 +616,8 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/reports/payments?from=&to=&shiftId=` | `TX-421` | `RPT-102` |
 | `GET` | `/reports/inventory/valuation` | `TX-422` | `RPT-103` |
 | `GET` | `/reports/:report/export.csv` | `TX-426` + the report's own grant | `AUD-601` |
-| `GET` | `/audit?actor=&entity=&from=&to=` | `TX-429` | |
+| `GET` | `/audit?actor=&action=&entity=&from=&to=` | `TX-429` | `SCR-703`; serves the action and actor lists its filters are built from |
+| `GET` | `/audit/export` | `TX-429` | The same query as CSV. Not `TX-426`: exporting the trail is reading it, and the export is itself audited (`AUD-601`) |
 | `GET` | `/backups` | `TX-428` | `SCR-704` — the log, the folder, and `SEC-9`'s warning |
 | `POST` | `/backups` | `TX-428` | `OPS-001`, `OPS-002` |
 | `GET` | `/backups/restore/preflight` | `TX-427` | what must be true before a restore |

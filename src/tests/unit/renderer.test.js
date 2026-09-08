@@ -947,3 +947,77 @@ test('NFR_4.3: the customer and collection controls are touchable', () => {
   // CR-107's overdue treatment.
   assert.match(cssRule(css, '.tag.overdue'), /color/);
 });
+
+// ── SCR-703 (TASK-041) ──────────────────────────────────────────────────────
+
+test('TC-UI-09: the audit viewer holds no action list, and writes nothing', () => {
+  const source = codeOf('js/admin/audit.js');
+  const auditService = require(path.join(root, 'src', 'services', 'auditService.js'));
+
+  // The filter is built from what the endpoint returns, so an action added to the
+  // ACTIONS registry appears with no edit — and one removed cannot linger as a choice
+  // the server would refuse.
+  const named = auditService.ACTION_NAMES.filter((action) => source.includes(action));
+  assert.deepEqual(named, [], 'the viewer names an audit action, which means it knows the registry');
+  assert.match(source, /body\.actions/, 'the actions come from the server');
+  assert.match(source, /body\.actors/, 'and so do the actors');
+
+  // AUD-605: the trail has no update or delete path anywhere in the product, so this
+  // screen has no control that implies one.
+  assert.equal(/api\.(post|put|del)\(/.test(source), false, 'nothing on the screen writes');
+  assert.match(proseOf('js/admin/audit.js'), /Nothing here can be changed or removed/);
+});
+
+test('AUD-603: an override row shows both actors', () => {
+  const source = codeOf('js/admin/audit.js');
+  // An override that names one person is an override nobody authorised.
+  assert.match(source, /row\.approver/);
+  assert.match(source, /approved by \$\{row\.approver\.username\}/);
+});
+
+test('AUD-606: a row opens to before and after, side by side', () => {
+  const source = codeOf('js/admin/audit.js');
+
+  // "Price changed" answers nothing. The rule is that the change is legible
+  // afterwards, which needs both figures where a reader can compare them.
+  assert.match(source, /text: 'Before'/);
+  assert.match(source, /text: 'After'/);
+  assert.match(source, /row\.before === null \? '—' : format\(row\.before\)/);
+
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  assert.match(cssRule(css, '.detail-grid'), /grid-template-columns:\s*1fr 1fr/);
+});
+
+test('TX-429: the export is read-permission, and the screen says it is recorded', () => {
+  const source = proseOf('js/admin/audit.js');
+
+  // Exporting the trail is reading the trail, so it is not TX-426. And a copy of
+  // who-did-what leaving the machine is exactly the event somebody would want to find.
+  assert.match(source, /The export is on the trail itself/);
+  assert.match(codeOf('js/admin/audit.js'), /api\.download\(`\/audit\/export/);
+});
+
+test('NFR_4.3: the audit filters are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  for (const selector of ['.audit-filter select, .audit-filter input', '.audit-filters button']) {
+    const rule = cssRule(css, selector) ?? cssRule(css, selector.split(',')[0].trim());
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)/);
+  }
+});
+
+test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
+  // The screen gap, asserted rather than tracked in prose. It was thirteen missing
+  // when TASK-036 started; this is the case that says when it is closed.
+  const spec = fs.readFileSync(path.join(root, 'docs', '04_UX_SPEC.md'), 'utf8');
+  const specified = [...new Set(spec.match(/SCR-\d{3}/g) || [])].sort();
+
+  const sources = walkFiles(path.join(root, 'public'))
+    .filter((f) => /\.(js|css|html)$/.test(f))
+    .map((f) => fs.readFileSync(f, 'utf8'))
+    .join('\n');
+
+  const missing = specified.filter((screen) => !sources.includes(screen));
+  assert.deepEqual(missing, [], `${missing.length} specified screen(s) have no view`);
+  assert.ok(specified.length >= 26, `only ${specified.length} screens parsed from the spec`);
+});
