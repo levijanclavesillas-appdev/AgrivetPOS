@@ -196,12 +196,12 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ `FR_1`–`FR_5` built; `FR_6` (reports) and `FR_7` (backup/health) are `TASK-016`/`TASK-017` |
-| 2 | `npm run test:all` green | ☑ green — unit 14 files, integration 18, E2E 4 |
-| 3 | `TC-UT-98` passes — every covered rule has a test | ☐ Not written. `TASK-016` onward |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ `FR_1`–`FR_6` built; `FR_7` (backup, restore, health) is `TASK-017` |
+| 2 | `npm run test:all` green | ☑ green — unit 14 files, integration 19, E2E 4 |
+| 3 | `TC-UT-98` passes — every covered rule has a test | ☐ Not written — `TASK-018` |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
 | 5 | Zero open S1 or S2 defects | ◐ None known; nothing has run on the store's hardware |
-| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ `TC-PERF-01`–`03` measure and report; `04`, `05` not written. **No figure here was taken on the reference machine** (§6) |
+| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ `TC-PERF-01`–`03` and `05` measure and report; `04` not written. **No figure here was taken on the reference machine** (§6) |
 | 7 | `TC-E2E-08` passes with networking disabled | ☐ Not written |
 | 8 | `TC-E2E-09` passes — power-loss durability | ☐ Not written |
 | 9 | UAT §8 complete on the store's hardware, owner signed | ☐ Not started |
@@ -210,25 +210,26 @@ of how small it looks.
 
 > ### Gate status, 2026-09-08 — **NOT SHIPPABLE**
 >
-> `TASK-001` through `TASK-015` are built: schema, auth, catalog, inventory, customers and
+> `TASK-001` through `TASK-016` are built: schema, auth, catalog, inventory, customers and
 > credit, pricing and tax, shifts and till, the sale, collections, shift close, ESC/POS printing,
-> and the POS, payment and receipt screens. The release gate is green and the counter can take a
-> sale end to end.
+> the POS, payment and receipt screens, and the dashboard with the three reports. The release
+> gate is green, the counter can take a sale end to end, and the owner can read the day off a
+> screen.
 >
 > It is not shippable, and the reasons are specific rather than a matter of polish:
 >
 > - **Nothing has run on the store's hardware.** Every performance figure above was measured on a
 >   developer machine, and §6 says plainly that a budget measured anywhere else is not a budget.
 >   No receipt has been printed on paper, no drawer has opened, no scanner has been used.
-> - **`FR_6` and `FR_7` do not exist yet** — reports (`TASK-016`) and backup, restore and health
->   (`TASK-017`). A store cannot be handed a system whose backup has never been restored.
+> - **`FR_7` does not exist yet** — backup, restore and health (`TASK-017`). A store cannot be
+>   handed a system whose backup has never been restored.
 > - **Three gate cases are unwritten**: `TC-UT-98` (rule coverage), `TC-E2E-08` (offline) and
 >   `TC-E2E-09` (power loss). The last of those is the one that decides whether a power cut in
 >   Sultan Kudarat costs a day's takings, and asserting durability without testing it is exactly
 >   the false comfort §1 exists to prevent.
 > - **UAT has not begun** (`TASK-018`).
 >
-> The path to the next assessable gate is `06_TASKS/README.md`, `TASK-016` through `TASK-018`.
+> The path to the next assessable gate is `06_TASKS/README.md`, `TASK-017` and `TASK-018`.
 
 ---
 

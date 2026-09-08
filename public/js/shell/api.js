@@ -99,3 +99,44 @@ export const get = (path, opts) => request('GET', path, null, opts);
 export const post = (path, body, opts) => request('POST', path, body ?? {}, opts);
 export const put = (path, body, opts) => request('PUT', path, body ?? {}, opts);
 export const del = (path, opts) => request('DELETE', path, null, opts);
+
+/**
+ * A file the server generates, fetched with the session header (TX-426).
+ *
+ * A plain <a href> cannot do this: SEC-7 keeps the token in memory only, so a link the
+ * browser follows on its own arrives unauthenticated and the user gets a 401 page
+ * instead of a spreadsheet. The response is fetched here and handed to the browser as
+ * a blob, and a refusal comes back as an ApiError like any other.
+ */
+export async function download(path) {
+  const response = await fetch(`${BASE}${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  }).catch(() => null);
+
+  if (!response) {
+    throw new ApiError({
+      status: 0, code: 'UNREACHABLE',
+      message: 'The application stopped responding. Close it and start it again.',
+    });
+  }
+
+  const refreshed = response.headers.get(SESSION_HEADER);
+  if (refreshed) setToken(refreshed);
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const error = new ApiError({
+      status: response.status,
+      code: payload?.error?.code || 'ERROR',
+      message: payload?.error?.message || 'The export could not be produced.',
+      ruleId: payload?.error?.rule_id || null,
+      requiresRole: payload?.error?.requires_role || null,
+    });
+    for (const listener of listeners.error) listener(error);
+    throw error;
+  }
+
+  const disposition = response.headers.get('content-disposition') || '';
+  const named = disposition.match(/filename="([^"]+)"/);
+  return { text: await response.text(), filename: named ? named[1] : 'export.csv' };
+}

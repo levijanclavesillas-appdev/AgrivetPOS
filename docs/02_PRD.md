@@ -232,8 +232,15 @@ Each requirement is testable and carries acceptance criteria. `TC-*` cases are i
 ### FR_6 — Reporting
 
 - **`FR_6.1`** The dashboard shall show today's gross sales, transaction count, payment mix, total
-  credit outstanding, overdue count, and low-stock count, refreshed on navigation.
+  credit outstanding, overdue count, low-stock count, and **gross profit**, refreshed on navigation.
   *AC*: figures equal the underlying report queries for the same day. `TC-INT-60`.
+  > The seventh tile resolves a contradiction between three documents. `01_PRODUCT_BRIEF.md` §6
+  > metric 5 makes "the owner can state yesterday's gross profit" a **week-1 v1.0** success
+  > criterion, while this requirement listed six tiles and `RPT-104` was scheduled for 1.1.
+  > Resolved in favour of the metric in `TASK-016`: the cost snapshot has been written on every
+  > sale line since `TASK-011` (`MON-005`), so the figure costs a join, and a release that cannot
+  > answer "did we make money yesterday" fails its own success criteria on the day it ships.
+  > `RPT-104` moved to 1.0 and `TC-INT-35` is a v1.0 gate test.
 - **`FR_6.2`** The daily sales report shall reconcile: `gross − discounts − returns = net`, and net
   shall equal the sum of tenders less change (`RPT-101`). *AC*: asserted after the E2E day.
   `TC-INT-61`.

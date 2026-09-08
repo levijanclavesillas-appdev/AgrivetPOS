@@ -24,6 +24,7 @@ const GROUPS = Object.freeze({
   INVENTORY: 'Inventory',
   CREDIT: 'Credit',
   PURCHASING: 'Purchasing',
+  REPORTING: 'Reports and alerts',
   BACKUP: 'Backup',
 });
 
@@ -77,6 +78,23 @@ const REGISTRY = Object.freeze({
   shift_max_open_hours: {
     type: 'INT', value: 24, group: 'SALES', ruleId: 'POS-508', ownerOnly: false,
     what: 'Hours a shift may stay open before it raises an alert', min: 1, max: 168,
+  },
+
+  // ── Reports and alerts (RPT-*, OPS-007) ───────────────────────────────────
+  // Both of these were constants in reportService and alertService until TC-UT-06
+  // caught them, which is the guard doing exactly its job: how long an alert nags and
+  // how far back a report may reach are store policy, not arithmetic.
+  variance_alert_window_days: {
+    type: 'INT', value: 7, group: 'REPORTING', ruleId: 'POS-511', ownerOnly: false,
+    // A shortage is noticed the morning after at the earliest, so an alert that
+    // expires at midnight is an alert nobody sees.
+    what: 'Days a cash-variance alert keeps showing on the dashboard', min: 1, max: 90,
+  },
+  report_max_range_days: {
+    type: 'INT', value: 366, group: 'REPORTING', ruleId: 'RPT-106', ownerOnly: false,
+    // NFR_2.2 keeps five years online, so the ceiling admits an accountant asking for
+    // the lot; the default is a year because that is what anyone asks for in practice.
+    what: 'Longest range a single report may cover', min: 1, max: 1826,
   },
   return_window_days: {
     type: 'INT', value: 7, group: 'SALES', ruleId: 'POS-307', ownerOnly: true,

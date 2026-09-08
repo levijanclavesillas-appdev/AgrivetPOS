@@ -34,6 +34,12 @@ const SIGN_IN = `(() => {
   return true;
 })()`;
 
+const OPEN_RAIL = (label) => `(() => {
+  const b = [...document.querySelectorAll('.rail button, .rail a')].find(x => /${label}/i.test(x.textContent));
+  if (b) { b.click(); return true; }
+  return false;
+})()`;
+
 const OPEN_POS = `(() => {
   const b = [...document.querySelectorAll('.rail button, .rail a')].find(x => /POS/i.test(x.textContent));
   if (b) { b.click(); return true; }
@@ -165,6 +171,61 @@ app.whenReady().then(async () => {
 
   const after = (await api('/carts/active')).json;
   log(after.cart === null, 'the counter is cleared after the sale');
+
+  console.log('\n— SCR-601: the dashboard —');
+  await run(OPEN_RAIL('Reports'));
+  await settle(1200);
+  log(await run(`!!document.querySelector('.dashboard')`), 'SCR-601 renders');
+  const tiles = await run(`[...document.querySelectorAll('.tile')].map(t => t.className)`);
+  log(tiles.length === 7, 'seven tiles', `${tiles.length}`);
+  log(await run(`!!document.querySelector('.tile-gross-profit')`), 'the seventh is gross profit');
+
+  const profit = await run(`(document.querySelector('.tile-gross-profit') || {}).textContent || ''`);
+  log(/₱/.test(profit), 'and it carries a figure', profit.replace(/\s+/g, ' ').slice(0, 60));
+
+  const sales = await api(`/reports/daily?from=${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}`);
+  const shown = await run(`(document.querySelector('.tile-gross-sales .tile-value') || {}).textContent || ''`);
+  const expected = `₱${(sales.json.totals.gross_centavos / 100).toFixed(2)}`;
+  log(shown === expected, 'TC-INT-60: the tile equals the report behind it', `${shown} vs ${expected}`);
+
+  console.log('\n— SCR-602: the daily sales report —');
+  await run(`document.querySelector('.tile-gross-sales').click()`);
+  await settle(1200);
+  log(await run(`!!document.querySelector('.report-daily')`), 'the tile opens the report behind it');
+
+  const recon = await run(`(document.querySelector('.reconciliation') || {}).textContent || ''`);
+  log(/gross/.test(recon) && /net/.test(recon), 'FR_6.2: the reconciliation is printed as arithmetic',
+    recon.replace(/\s+/g, ' ').slice(0, 90));
+  log(await run(`document.querySelector('.reconciliation').classList.contains('balances')`),
+    'and it balances');
+
+  const meta = await run(`(document.querySelector('.report-meta') || {}).textContent || ''`);
+  log(/Voided/.test(meta) && /Excluded/.test(meta), 'RPT-106: the header states void inclusion',
+    meta.replace(/\s+/g, ' ').slice(0, 90));
+
+  console.log('\n— SCR-603 and SCR-604 —');
+  await run(`document.querySelector('.report-back').click()`);
+  await settle(900);
+  await run(`document.querySelector('.tile-payment-mix').click()`);
+  await settle(1000);
+  const methods = await run(`(document.querySelector('.methods') || {}).textContent || ''`);
+  log(/CASH/.test(methods), 'SCR-603 lists the methods', methods.replace(/\s+/g, ' ').slice(0, 90));
+
+  // The mix must agree with net sales, not with the notes that crossed the counter.
+  const paidApi = await api(`/reports/payments?from=${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}`);
+  log(paidApi.json.total_centavos === sales.json.totals.net_centavos,
+    'RPT-102: the mix reconciles to net sales',
+    `₱${(paidApi.json.total_centavos / 100).toFixed(2)} vs ₱${(sales.json.totals.net_centavos / 100).toFixed(2)}`);
+  log(/RECORDED/.test(methods) === /GCASH|QRPH|CREDIT/.test(methods),
+    'POS-206: non-cash rows read RECORDED');
+  log(/VERIFIED|CONFIRMED/.test(methods) === false, 'and nothing reads verified');
+
+  await run(`document.querySelector('.report-back').click()`);
+  await settle(900);
+  await run(`document.querySelector('.tile-low-stock').click()`);
+  await settle(1000);
+  log(await run(`!!document.querySelector('.report-valuation') || !!document.querySelector('.valuation-total')`),
+    'SCR-604 renders the valuation');
 
   console.log('\n— console —');
   log(errors.length === 0, 'the renderer logged no errors', errors.slice(0, 4).join(' | '));

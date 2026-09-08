@@ -560,13 +560,21 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/sales/price-check` | `TX-401` | resolves `PR-101` for a cart without committing |
 | `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5` |
 | `POST` | `/sales/:id/reprint` | `TX-430` | `POS-208` |
-| `GET` | `/reports/daily?date=` | `TX-421` | `RPT-101` |
-| `GET` | `/reports/payments?from=&to=` | `TX-421` | `RPT-102` |
+| `GET` | `/reports/dashboard?date=` | `TX-421` | `FR_6.1` — every tile from the query behind it |
+| `GET` | `/reports/alerts` | `TX-421` | `OPS-007` |
+| `GET` | `/reports/daily?from=&to=&shiftId=` | `TX-421` | `RPT-101`, `RPT-104` |
+| `GET` | `/reports/payments?from=&to=&shiftId=` | `TX-421` | `RPT-102` |
 | `GET` | `/reports/inventory/valuation` | `TX-422` | `RPT-103` |
+| `GET` | `/reports/:report/export.csv` | `TX-426` + the report's own grant | `AUD-601` |
 | `GET` | `/audit?actor=&entity=&from=&to=` | `TX-429` | |
 | `POST` | `/backups` | `TX-428` | `OPS-001`, `OPS-002` |
 | `POST` | `/backups/:id/restore` | `TX-427` | `OPS-004` |
 | `GET` | `/health` | — | `OPS-006` |
+
+`TX-421` is the one grant in this table the middleware does not fully decide. It is `OWN_SHIFT`
+for a `CASHIER`, so `requirePermission` admits them and `reportService` decides which shift they
+may read — refusing with `403` and writing an audit row, never narrowing the answer silently. A
+cashier handed their own till's figures under a store-wide heading has been told something false.
 
 ### 4.1 `POST /sales` — the one contract that matters
 

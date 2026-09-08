@@ -1,0 +1,94 @@
+/* SCR-601 – SCR-604. No framework and no build step (05_TECH_SPEC.md §2).
+   The tokens come from app.css; nothing here redefines a colour. */
+
+/* ── SCR-601 dashboard ───────────────────────────────────────────────────── */
+
+.dashboard { padding: 1rem 1.25rem 2rem; max-width: 72rem; }
+.dash-head { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+.dash-head h1 { margin: 0; }
+.dash-when { color: var(--muted); margin: 0; font-size: .875rem; }
+.dash-scope { margin: 0; font-size: .8125rem; font-weight: 600; color: var(--warn-ink);
+  background: var(--warn-bg); padding: .15rem .5rem; border-radius: 999px; }
+.dash-refresh { margin-left: auto; min-height: var(--touch); padding: 0 1rem; }
+
+/* OPS-007's list, above the tiles. */
+.alerts { list-style: none; margin: 1rem 0 1.5rem; padding: 0; display: grid; gap: .5rem; }
+.alert { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem;
+  border-radius: 6px; border-left: 4px solid var(--muted); background: #fff; }
+.alert-warning { border-left-color: var(--warn-ink); background: var(--warn-bg); }
+.alert-critical { border-left-color: var(--error); background: var(--refuse-bg); }
+.alert-message { flex: 1; }
+.alert-rule { font-size: .75rem; letter-spacing: .06em; color: var(--muted); }
+/* No dismiss control at all on the two that carry dismissible:false — an absent
+   button says "you cannot" more clearly than a disabled one. */
+.alert-dismiss { min-width: var(--touch); min-height: var(--touch); background: none;
+  border: 0; font-size: 1.25rem; cursor: pointer; color: inherit; }
+
+.tiles { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.tile { display: grid; gap: .2rem; text-align: left; padding: .9rem 1rem; min-height: 6rem;
+  background: #fff; border: 1px solid var(--rule); border-radius: 8px; cursor: pointer;
+  font: inherit; color: inherit; }
+.tile:hover:not(:disabled) { border-color: var(--accent); }
+.tile:disabled { cursor: default; opacity: .7; }
+.tile-label { color: var(--muted); font-size: .8125rem; }
+.tile-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile-note { font-size: .8125rem; color: var(--muted); }
+.tile-rule { font-size: .6875rem; letter-spacing: .06em; color: var(--muted); }
+
+/* ── SCR-602 – SCR-604 ───────────────────────────────────────────────────── */
+
+.report { padding: 1rem 1.25rem 3rem; max-width: 72rem; }
+.report-head { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.report-head h1 { margin: 0; }
+.report-back, .report-export { min-height: var(--touch); padding: 0 1rem; display: inline-flex;
+  align-items: center; border: 1px solid var(--rule); border-radius: 4px; background: #fff;
+  font: inherit; color: inherit; cursor: pointer; text-decoration: none; }
+.report-export { margin-left: auto; }
+.report-range { display: flex; gap: .5rem; align-items: flex-end; }
+.report-range label { margin: 0; font-size: .8125rem; }
+.report-range input { min-height: var(--touch); }
+.report-range button { min-height: var(--touch); padding: 0 1rem; }
+
+/* RPT-106's header, on every report. */
+.report-meta { display: grid; gap: .25rem 1.5rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  margin: 1rem 0 1.5rem; padding: .75rem 1rem; background: #fff; border: 1px solid var(--rule);
+  border-radius: 6px; border-top: 1px solid var(--rule); }
+.meta-field { display: flex; gap: .5rem; font-size: .875rem; }
+.meta-field dt { flex: 0 0 8rem; }
+
+.report table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
+.report th, .report td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--rule); }
+.report .money, .report td { font-variant-numeric: tabular-nums; }
+.report .money { text-align: right; }
+.report thead th { font-size: .8125rem; color: var(--muted); }
+.report tfoot th, .report .total-row th, .report .total-row td { font-weight: 700; border-top: 2px solid var(--ink); }
+.report .inactive { color: var(--muted); }
+.report .recorded { font-size: .75rem; letter-spacing: .08em; color: var(--muted); }
+
+/* FR_6.2 — the reconciliation, printed as arithmetic rather than as a tick. */
+.reconciliation { margin: 1.5rem 0; padding: .9rem 1rem; border-radius: 6px;
+  border: 1px solid var(--rule); background: #fff; }
+.reconciliation h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.recon-line { margin: .2rem 0; font-variant-numeric: tabular-nums; }
+.recon-verdict { margin: .6rem 0 0; font-weight: 600; }
+.recon-rule { font-size: .6875rem; letter-spacing: .06em; color: var(--muted); margin: .4rem 0 0; }
+/* RPT-101: a report that does not reconcile is a defect. It is coloured like one. */
+.does-not-balance { border-color: var(--error); background: var(--refuse-bg); }
+.does-not-balance .recon-verdict { color: var(--error); }
+
+.profit { margin: 1.5rem 0; }
+.profit h2 { font-size: 1rem; margin: 0 0 .25rem; }
+.profit-figure { font-size: 1.75rem; font-weight: 600; margin: 0; font-variant-numeric: tabular-nums; }
+.profit-margin { margin: 0; color: var(--muted); }
+.profit-basis { margin: .35rem 0 0; font-size: .8125rem; color: var(--muted); }
+
+.valuation-total { font-size: 1.5rem; font-weight: 600; margin: 0; }
+.voids h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+.voids ul { margin: 0; padding-left: 1.1rem; color: var(--muted); }
+
+@media (max-width: 1023px) {
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+  .report-meta { grid-template-columns: 1fr; }
+}
+
+.methods-note { margin: .25rem 0 0; font-size: .8125rem; color: var(--muted); }

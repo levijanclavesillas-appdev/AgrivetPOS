@@ -282,7 +282,7 @@ request**; hiding a button is not a permission (`SEC-6`).
 | `RPT-101` | Daily sales must reconcile: `gross − discounts − returns = net`, and `net = SUM(tenders) − change`. A report that does not reconcile is a defect, not a rounding artefact. | 1.0 |
 | `RPT-102` | The payment report groups tenders by method and states, per method, recorded total and count. Non-cash rows are labelled `RECORDED` (`POS-206`). | 1.0 |
 | `RPT-103` | Inventory valuation is `SUM(qty_on_hand_milli × avg_cost_centavos)` in the base unit, computed at read time, stated with its as-of timestamp. | 1.0 |
-| `RPT-104` | Gross profit reads the **sale-line cost snapshot** (`MON-005`), never the current average cost. | 1.1 |
+| `RPT-104` | Gross profit reads the **sale-line cost snapshot** (`MON-005`), never the current average cost. Revenue is taken net of VAT, because output VAT is not the store's money. | 1.0 |
 | `RPT-105` | Reconciliation compares recorded per-method totals against operator-entered actual settlement, and reports variance. It never adjusts the recorded figure. | 1.2 |
 | `RPT-106` | Every report states its date range, the tax mode in force, and whether voided sales are included. Voided sales are excluded from net sales in all reports. | 1.0 |
 

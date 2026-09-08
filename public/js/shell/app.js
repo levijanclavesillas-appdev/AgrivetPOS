@@ -11,9 +11,14 @@ import { h, clear } from './ui.js';
 import { createPos } from '../pos/view.js';
 import { createPayment } from '../payment/view.js';
 import { createReceipt } from '../receipt/view.js';
+import { createDashboard } from '../reports/dashboard.js';
+import { createReport } from '../reports/report.js';
 
 /** §2's role → landing screen. */
-const LANDING = { CASHIER: 'pos', INVENTORY: 'products', MANAGER: 'dashboard', OWNER: 'dashboard' };
+// §2's role → landing screen. MANAGER and OWNER land on SCR-601, which lives under
+// the rail's Reports section — so the id is the rail's, or the rail would highlight
+// nothing on the screen the user is looking at.
+const LANDING = { CASHIER: 'pos', INVENTORY: 'products', MANAGER: 'reports', OWNER: 'reports' };
 
 /** The rail, with the TX-* each item needs. Hidden without it; refused regardless. */
 const RAIL = [
@@ -149,11 +154,37 @@ export function createApp({ root }) {
     renderRail(id);
 
     if (id === 'pos') return showPos();
+    if (id === 'reports') return showDashboard();
 
-    // The rest of the rail is TASK-016's and the admin screens'. Saying so beats a
-    // dead button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
+    // The admin and catalog screens are their own tasks. Saying so beats a dead
+    // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
     ui.empty(main, { title: `${RAIL.find((item) => item.id === id)?.label} is not built yet.` });
     return null;
+  }
+
+  /** SCR-601. MANAGER and OWNER land here (04_UX_SPEC.md §2). */
+  function showDashboard() {
+    current = createDashboard({
+      root: main,
+      session,
+      onOpenReport: (report) => showReport(report),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-602 – SCR-604, reached from the tile that carries their figure. */
+  function showReport(report) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createReport({
+      root: main,
+      session,
+      report,
+      onBack: () => { clear(main); showDashboard(); },
+    });
+    current.mount();
+    return current;
   }
 
   async function showPos() {

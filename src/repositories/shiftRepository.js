@@ -212,9 +212,29 @@ function closingLinesFor(closingId) {
   `).all(closingId);
 }
 
+/**
+ * Closings whose variance is beyond tolerance, newest first — OPS-007's cash-variance
+ * alert.
+ *
+ * The tolerance is passed in rather than read here: a repository that reads a setting
+ * is a repository that has an opinion, and §8.2 keeps opinions in services.
+ */
+function closingsOverTolerance({ toleranceCentavos, sinceAt, limit = 20 }) {
+  return db.get().prepare(`
+    SELECT c.id, c.shift_id, c.variance_centavos, c.variance_reason, c.closed_at,
+           u.username AS closed_by_username, u.full_name AS closed_by_name
+    FROM cashier_closings c
+    JOIN users u ON u.id = c.closed_by
+    WHERE ABS(c.variance_centavos) > @toleranceCentavos
+      AND c.closed_at >= @sinceAt
+    ORDER BY c.closed_at DESC
+    LIMIT @limit
+  `).all({ toleranceCentavos, sinceAt, limit });
+}
+
 module.exports = {
   tableExists, findOpenForUser, findById, insert, close, openShifts, listForUser,
-  insertClosing, insertClosingLine, findClosingByShift, closingLinesFor,
+  insertClosing, insertClosingLine, findClosingByShift, closingLinesFor, closingsOverTolerance,
   insertTillMovement, tillMovementsFor, tillTotals,
   collectionTotalsByMethod, tenderTotalsByMethod, refundTotalCentavos, changeGivenCentavos,
 };

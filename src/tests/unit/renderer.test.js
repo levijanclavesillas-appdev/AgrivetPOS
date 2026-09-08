@@ -412,3 +412,85 @@ test('no inline script and no inline style survive in the shell', () => {
   assert.equal(/<script(?![^>]*\bsrc=)/.test(html), false, 'no inline <script>');
   assert.equal(/<style[\s>]/.test(html), false, 'no inline <style>');
 });
+
+// ── SCR-601 – SCR-604 (TASK-016) ────────────────────────────────────────────
+
+test('TC-INT-60: the dashboard view does no arithmetic of its own', () => {
+  // Requirement 2 of TASK-016: every tile figure comes from the report behind it. The
+  // way that goes wrong is a renderer that "just adds up" the methods to fill a tile,
+  // and then disagrees with the report by one centavo of rounding for a week before
+  // anyone notices. So the view is asserted to contain no money arithmetic at all.
+  const source = codeOf('js/reports/dashboard.js');
+
+  assert.equal(/centavos\s*[-+*/]/.test(source), false, 'no arithmetic on a centavo figure');
+  assert.equal(/reduce\(/.test(source), false, 'no summing in the view');
+  assert.equal(/\.value_centavos\s*[-+*/]/.test(source), false);
+  // It renders `display`, which the server formatted from the same figure the report
+  // used.
+  assert.match(source, /data\.display|tile-value/);
+});
+
+test('OPS-007: the alert list gives the undismissible ones no dismiss control', () => {
+  const source = codeOf('js/reports/dashboard.js');
+
+  // Not a disabled button — no button. An absent control says "you cannot" more
+  // clearly than a greyed one, and there is nothing to explain.
+  assert.match(source, /a\.dismissible\s*\n?\s*\?/, 'the control is conditional on the flag');
+  assert.equal(/disabled:\s*!a\.dismissible/.test(source), false, 'not merely disabled');
+
+  // And dismissal never leaves the browser: "I have read this" is not a fact about the
+  // store, so nothing is written to the server.
+  assert.equal(/api\.(post|put|del)\(/.test(source), false, 'dismissal writes nothing');
+});
+
+test('POS-206: no report screen can say a payment was verified', () => {
+  for (const file of walkFiles(path.join(root, 'public', 'js', 'reports'))) {
+    const source = codeOf(path.relative(path.join(root, 'public'), file));
+    assert.equal(
+      /VERIFIED|CONFIRMED|SETTLED/.test(source), false,
+      `${path.relative(root, file)} implies a payment was confirmed`
+    );
+  }
+});
+
+test('RPT-101: a report that does not reconcile says so in those words', () => {
+  const source = fs.readFileSync(path.join(root, 'public', 'js', 'reports', 'report.js'), 'utf8');
+
+  // A red tick is not enough. The rule calls a failed reconciliation a defect, and the
+  // screen has to say that, because the alternative reading — "rounding" — is exactly
+  // the one a person reaches for when the numbers are close.
+  assert.match(source, /does not reconcile/);
+  assert.match(source, /defect, not a rounding artefact/);
+  assert.match(source, /RPT-101/);
+
+  // And the arithmetic is printed, not just checked (FR_6.2).
+  assert.match(source, /r\.statement/);
+  assert.match(source, /r\.tender_statement/);
+});
+
+test('every report screen renders RPT-106’s header', () => {
+  const source = codeOf('js/reports/report.js');
+  for (const field of ['from_date', 'tax_mode', 'includes_voided', 'generated_at_manila']) {
+    assert.ok(source.includes(field), `the header shows ${field}`);
+  }
+  // headerBlock is called for all three reports, not only the daily one.
+  assert.match(source, /headerBlock\(data\.header\)/);
+});
+
+test('TX-426: the export is fetched with the session, never followed as a link', () => {
+  // SEC-7 keeps the token in memory only, so a plain <a href> the browser follows
+  // arrives unauthenticated and the user gets a 401 page instead of a spreadsheet.
+  const source = codeOf('js/reports/report.js');
+  assert.match(source, /event\.preventDefault\(\);\s*exportCsv\(\)/);
+  assert.match(source, /api\.download\(/);
+  assert.match(codeOf('js/shell/api.js'), /export async function download/);
+});
+
+test('NFR_4.3: the dashboard and report controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  for (const selector of ['.dash-refresh', '.alert-dismiss', '.report-back, .report-export']) {
+    const rule = cssRule(css, selector) ?? cssRule(css, selector.split(',')[0].trim());
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
+  }
+});

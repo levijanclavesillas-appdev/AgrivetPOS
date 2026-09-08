@@ -159,8 +159,8 @@ exceeds tolerance (`POS-510`), then a summary the cashier can print. Closing tri
 
 ### `SCR-601` — Dashboard · `FT-601`
 
-Six tiles: today's sales, transactions, payment mix, credit outstanding, overdue accounts, low
-stock. Each tile is a link to the report behind it. Alerts (`OPS-007`) sit above the tiles as a
+Seven tiles: today's sales, transactions, payment mix, credit outstanding, overdue accounts, low
+stock, and gross profit (`RPT-104`, see `FR_6.1`). Each tile is a link to the report behind it. Alerts (`OPS-007`) sit above the tiles as a
 dismissible-per-session list; **backup overdue and clock anomaly are not dismissible**.
 
 ### `SCR-602`/`603`/`604` — Reports
