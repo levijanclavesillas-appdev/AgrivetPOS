@@ -106,51 +106,22 @@ function suggestBackupFolder() {
   return path.join(os.homedir(), 'Documents', 'ChachiAgrivetPOS Backups');
 }
 
-function isInsideDataDir(folder) {
-  const dataDir = path.resolve(paths.dataDir());
-  const target = path.resolve(folder);
-  const relative = path.relative(dataDir, target);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
 /**
- * Validate the folder and prove it writable, before anything is written to the
- * database.
+ * OPS-001's placement rule, and a proof that the folder is writable.
  *
- * Proving it means writing a file and deleting it. A permission bit says what the
- * filesystem believes; a full disk, a disconnected USB drive and a synced folder that
- * has gone read-only all pass that check and fail the first real backup — which the
- * operator would then discover on the day they needed one.
- *
- * This runs *outside* the completion transaction on purpose: a filesystem probe is not
- * rolled back by a SQLite rollback, so it happens first and its failure means nothing
- * has been attempted at all.
+ * The placement half lives in settingsService's registry, so the wizard and
+ * `PUT /settings` cannot disagree about where a backup may go — they did, and a store
+ * could move its backups inside the folder being backed up the day after install. The
+ * write probe stays here: the wizard is the one caller that must fail before anything
+ * has been created, and a folder that cannot be written to is not a folder anybody
+ * should finish an installation on.
  */
 function validateBackupFolder(folder) {
   const text = typeof folder === 'string' ? folder.trim() : '';
   if (!text) {
     throw errors.badRequest('Choose a folder for automatic backups.', { ruleId: 'OPS-001' });
   }
-  if (!path.isAbsolute(text)) {
-    throw errors.badRequest('The backup folder must be a full path.', { ruleId: 'OPS-001' });
-  }
-  if (isInsideDataDir(text)) {
-    throw errors.badRequest(
-      'The backup folder must be outside the application data folder, so that a backup '
-      + 'survives losing the folder the database is in. Choose another drive or your '
-      + 'Documents folder.',
-      { ruleId: 'OPS-001' }
-    );
-  }
-
-  try {
-    fs.mkdirSync(text, { recursive: true });
-  } catch (err) {
-    throw errors.badRequest(
-      `That folder could not be created (${err.code || err.message}). Choose one you can write to.`,
-      { ruleId: 'OPS-001' }
-    );
-  }
+  settingsService.validateBackupFolder(text);
 
   const probe = path.join(text, `.agrivet-write-test-${Date.now()}`);
   try {
@@ -263,5 +234,5 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
 module.exports = {
   SETUP_ACTOR, STEPS,
   isComplete, status, assertComplete, assertNotComplete,
-  suggestBackupFolder, isInsideDataDir, validateBackupFolder, complete,
+  suggestBackupFolder, isInsideDataDir: paths.isInsideDataDir, validateBackupFolder, complete,
 };

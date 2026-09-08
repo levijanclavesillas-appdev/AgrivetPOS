@@ -222,6 +222,8 @@ const REGISTRY = Object.freeze({
   backup_folder: {
     type: 'STRING', value: '', group: 'BACKUP', ruleId: 'OPS-001', ownerOnly: true,
     what: 'Folder automatic backups are written to',
+    // OPS-001, enforced wherever the value is set — the wizard and this screen alike.
+    validate: (text) => validateBackupFolder(text),
   },
   backup_hour: {
     type: 'INT', value: 21, group: 'BACKUP', ruleId: 'OPS-001', ownerOnly: true,
@@ -348,6 +350,49 @@ function coerce(key, raw) {
     const upper = text.toUpperCase();
     assertOneOf(key, upper, declared);
     return upper;
+  }
+  // A setting whose rule needs more than a type, a bound or an enumeration says so in
+  // its own declaration. The alternative is a check in whichever caller happens to
+  // remember it — which is how the setup wizard came to enforce OPS-001 on the backup
+  // folder while `PUT /settings` did not, so a store could move its backups inside the
+  // folder being backed up the day after it was installed.
+  return declared.validate ? declared.validate(text) : text;
+}
+
+/**
+ * OPS-001 — where a backup folder may be.
+ *
+ * A backup inside the application data directory survives exactly the failures that do
+ * not matter: it does not survive the disk, the ransomware or the uninstaller, which
+ * are the three it exists for. Blank is allowed and means "not configured yet", which
+ * the alert centre already reports as the most exposed state a store can be in.
+ */
+function validateBackupFolder(text) {
+  if (text === '') return text;
+
+  const path_ = require('path');
+  const paths = require('../config/paths');
+
+  if (!path_.isAbsolute(text)) {
+    throw errors.badRequest('The backup folder must be a full path.', { ruleId: 'OPS-001' });
+  }
+
+  if (paths.isInsideDataDir(text)) {
+    throw errors.badRequest(
+      'The backup folder must be outside the application data folder, so that a backup '
+      + 'survives losing the folder the database is in. Choose another drive or your '
+      + 'Documents folder.',
+      { ruleId: 'OPS-001' }
+    );
+  }
+
+  try {
+    require('fs').mkdirSync(path_.resolve(text), { recursive: true });
+  } catch (err) {
+    throw errors.badRequest(
+      `That folder could not be created (${err.code || err.message}). Choose one you can write to.`,
+      { ruleId: 'OPS-001' }
+    );
   }
   return text;
 }
@@ -513,7 +558,7 @@ function assertMayChange(session, key) {
 }
 
 module.exports = {
-  GROUPS, REGISTRY, KEYS,
+  GROUPS, REGISTRY, KEYS, validateBackupFolder,
   decode, encode, coerce, declaration,
   get, describe, put, seedDefaults, set, setMany, assertMayChange,
 };

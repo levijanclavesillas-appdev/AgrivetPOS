@@ -457,6 +457,71 @@ app.whenReady().then(async () => {
   const pinColumn = await run(`(document.querySelector('.users-list') || {}).textContent || ''`);
   log(/set/.test(pinColumn), 'the list says who has a PIN — what an owner checks here');
 
+  console.log('\n— SCR-702: settings —');
+  const tabNames = await run(`[...document.querySelectorAll('.admin-tab')].map(t => t.textContent)`);
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => /Settings/.test(t.textContent)).click()`);
+  if (!(await waitFor(`!!document.querySelector('.settings')`, { label: 'SCR-702', timeoutMs: 6000 }))) {
+    console.log('        tabs:', tabNames.join(', '));
+    console.log('        panel:', String(await run(
+      `(document.querySelector('.admin-panel') || document.querySelector('.screen')).textContent`
+    )).replace(/\s+/g, ' ').slice(0, 200));
+  }
+
+  const declared = (await api('/settings')).json;
+  const rendered = await run(`document.querySelectorAll('.setting').length`);
+  log(rendered === declared.settings.length,
+    'OPS-005: every registered setting is on the screen',
+    `${rendered} of ${declared.settings.length}`);
+
+  const sections = await run(`document.querySelectorAll('.settings-group h2').length`);
+  log(sections >= Object.keys(declared.groups).length,
+    'one section per group', `${sections} sections`);
+
+  const ruleIds = await run(`[...document.querySelectorAll('.setting-rule')].map(e => e.textContent)`);
+  log(ruleIds.length === rendered && ruleIds.every((r) => /^[A-Z]{2,4}-\d+$/.test(r)),
+    'and every field carries its rule id, visibly', ruleIds.slice(0, 4).join(', '));
+
+  log(await run(`!!document.querySelector('.setting select')`),
+    'an enumerated setting renders as a select');
+  log(await run(`!!document.querySelector('.setting textarea')`),
+    'a JSON list renders as editable lines');
+  log(await run(`[...document.querySelectorAll('.setting .tag')].some(t => /owner only/.test(t.textContent))`),
+    'and owner-only settings are marked');
+
+  // Change one and save the section it lives in.
+  await run(`(() => {
+    const label = [...document.querySelectorAll('.setting')]
+      .find(s => s.querySelector('.setting-key').textContent === 'shift_max_open_hours');
+    const el = label.querySelector('input');
+    el.value = '14';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    const group = label.closest('.settings-group');
+    group.querySelector('.editor-actions button').click();
+  })()`);
+  await settle(1200);
+  const savedValue = (await api('/settings')).json.settings
+    .find((x) => x.key === 'shift_max_open_hours');
+  log(savedValue.value === 14, 'a change saves', `now ${savedValue.value}`);
+  log(savedValue.is_default === false, 'and the screen knows it is no longer the default');
+
+  // OPS-001, surfaced rather than pre-empted.
+  await waitFor(`!!document.querySelector('.setting')`);
+  const dataDir = (await api('/health/panel')).json.database.path.replace(/[^/\\]+$/, '');
+  await run(`(() => {
+    const s = [...document.querySelectorAll('.setting')]
+      .find(x => x.querySelector('.setting-key').textContent === 'backup_folder');
+    const el = s.querySelector('input');
+    el.value = ${JSON.stringify(dataDir)};
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    s.closest('.settings-group').querySelector('.editor-actions button').click();
+  })()`);
+  await settle(1200);
+  log(/outside the application data folder/i.test(await run(`document.body.textContent`)),
+    'OPS-001: a backup folder inside app data is refused, in the rule\u2019s own words');
+
+  const printTest = await run(`!!document.querySelector('.print-test button')`);
+  log(printTest, 'INT-1: there is a print-test button where the printer is configured');
+
   console.log('\n— SCR-704: backups —');
   // Admin opens on Users now, so the tab is selected rather than assumed.
   await run(`[...document.querySelectorAll('.admin-tab')].find(t => /Backups/.test(t.textContent)).click()`);

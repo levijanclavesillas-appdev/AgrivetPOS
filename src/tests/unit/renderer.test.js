@@ -808,3 +808,66 @@ test('NFR_4.3: the user form is touchable', () => {
   assert.ok(rule, '.user-form input has a rule');
   assert.match(rule, /min-height:\s*var\(--touch\)/);
 });
+
+// ── SCR-702 (TASK-039) ──────────────────────────────────────────────────────
+
+test('TC-UI-07: the settings screen holds no copy of the registry', () => {
+  // OPS-005 says an operator-owned figure lives in the registry and nowhere else. A
+  // screen that knew the keys, the bounds or the labels independently would be the
+  // second place the rule exists to prevent — and the day the two disagreed, the
+  // screen would validate against figures the server had stopped using.
+  const source = codeOf('js/admin/settings.js');
+
+  // Not one registered key is named in the view, bar the single branch that decides
+  // where the print-test button belongs.
+  const settingsService = require(path.join(root, 'src', 'services', 'settingsService.js'));
+  const named = settingsService.KEYS.filter((key) => source.includes(`'${key}'`));
+  assert.deepEqual(named, ['printer_transport'],
+    'the view names a setting key, which means it knows the registry');
+
+  // No group labels either: they come from the server's GROUPS.
+  for (const label of Object.values(settingsService.GROUPS)) {
+    assert.equal(source.includes(label), false, `the view hard-codes the group label "${label}"`);
+  }
+
+  // And no bounds. Every limit is the server's, and the refusal is what surfaces.
+  assert.match(source, /setting\.min/, 'bounds are read from the declaration');
+  assert.match(source, /setting\.one_of/, 'and so is the enumeration');
+  assert.match(source, /groups\[group\]/, 'and the group label');
+});
+
+test('OPS-005: every field carries its rule id, visibly', () => {
+  const source = codeOf('js/admin/settings.js');
+  assert.match(source, /class: 'setting-rule', text: setting\.rule_id/);
+
+  // Visible, not a tooltip. The whole value of the id is somebody reading it aloud.
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  const rule = cssRule(css, '.setting-rule');
+  assert.ok(rule, '.setting-rule has a rule');
+  assert.equal(/display:\s*none/.test(rule), false, 'and it is not hidden');
+});
+
+test('TAX-001: the consequence is stated before the control, not after the click', () => {
+  const source = proseOf('js/admin/settings.js');
+
+  // Past sales keep the mode they were made under, and reports spanning the change
+  // report both. That is not undoable, so it is said where somebody reads it first.
+  assert.match(source, /report that spans the change reports two modes at once/);
+  assert.match(source, /it cannot be undone/);
+  assert.match(codeOf('js/admin/settings.js'), /TX-425/);
+});
+
+test('INT-1: the print test tells the reader to look at the paper', () => {
+  // A width set wrong does not error on a thermal head — it wraps a peso figure onto
+  // two lines. The screen cannot show that; only the paper can.
+  const source = proseOf('js/admin/settings.js');
+  assert.match(source, /Read the paper, not the screen/);
+  assert.match(codeOf('js/admin/settings.js'), /api\.post\('\/print\/test'/);
+});
+
+test('NFR_4.3: the settings controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  const rule = cssRule(css, '.setting input[type="text"]');
+  assert.ok(rule, 'the text inputs have a rule');
+  assert.match(rule, /min-height:\s*var\(--touch\)/);
+});

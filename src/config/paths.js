@@ -24,6 +24,20 @@ function dataDir() {
   return path.join(base, APP_DIR_NAME);
 }
 
+/**
+ * Is this folder inside the application's own data directory?
+ *
+ * OPS-001's placement test, and it lives here because two services ask it — the setup
+ * wizard and the settings registry — and for a while only one of them did, so a store
+ * could move its backups inside the folder being backed up the day after install.
+ */
+function isInsideDataDir(folder) {
+  const base = path.resolve(dataDir());
+  const target = path.resolve(folder);
+  const relative = path.relative(base, target);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 function ensureDataDir() {
   const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
@@ -34,4 +48,5 @@ const databasePath = () => path.join(dataDir(), 'agrivet.db');
 const logsDir = () => path.join(dataDir(), 'logs');
 const migrationsDir = () => path.join(__dirname, '..', 'migrations');
 
-module.exports = { APP_DIR_NAME, dataDir, ensureDataDir, databasePath, logsDir, migrationsDir };
+module.exports = {
+  isInsideDataDir, APP_DIR_NAME, dataDir, ensureDataDir, databasePath, logsDir, migrationsDir };

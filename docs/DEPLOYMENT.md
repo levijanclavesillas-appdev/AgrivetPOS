@@ -11,22 +11,20 @@ network connection at the store.
 >
 > **v1.0 cannot yet be deployed to a store**, and the reason is not the installer.
 >
-> Five of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
-> collections, settings and the audit viewer (`06_TASKS/README.md`, *the screen gap*).
+> Four of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
+> collections, and the audit viewer (`06_TASKS/README.md`, *the screen gap*).
 > Every service and API behind them is built and tested; there is simply no screen to reach
 > them from.
 >
-> `TASK-036`, `TASK-038` and `TASK-040` have landed, so a store can now be **stocked**, its
-> till can be **counted**, and its staff have **their own logins**. Sections 5 and 6's
-> catalogue half are performable today; `TC-E2E-10`, `TC-E2E-11` and `TC-E2E-12` walk all
-> three paths end to end.
+> `TASK-036`, `TASK-038`, `TASK-039` and `TASK-040` have landed, so **sections 4, 5 and 6's
+> catalogue half are all performable today**: the printer, the receipt width and the backup
+> folder from `SCR-702`, the cashiers from `SCR-701`, the products and opening stock from
+> `SCR-201`–`SCR-204`, and a counted close from `SCR-501`–`SCR-503`. `TC-E2E-10` to `TC-E2E-13`
+> walk all four paths end to end.
 >
-> What is still impossible as written: **section 4 (hardware)**, which needs the settings
-> screen, and the opening **credit balances** in section 6, which need the customer screens.
->
-> Until `TASK-037`, `TASK-039` and `TASK-041` land, the only route to those is the HTTP API,
-> which is not a thing to do on a store counter. **Section 4 is the one to watch**: the
-> printer, the receipt width and the backup folder are all settings.
+> What is still impossible as written: the opening **credit balances** in section 6, which need
+> the customer screens (`TASK-037`), and reading the audit trail (`TASK-041`). Until those land
+> the only route is the HTTP API, which is not a thing to do on a store counter.
 >
 > **Do not schedule the cutover on the strength of a green test suite.** The suite is green
 > because it tests the API.
@@ -151,8 +149,8 @@ If the store has a second physical drive, use it.
 
 ## 4. Hardware
 
-All three are configured in **Admin → Settings** (`SCR-702`, *not built yet — see the notice
-above*). Test each one before you leave.
+All three are configured in **Admin → Settings** (`SCR-702`). Every field there carries the
+rule it comes from, so a support call is one sentence. Test each one before you leave.
 
 ### Receipt printer (`INT-1`)
 
@@ -167,9 +165,9 @@ Get the width right by printing, not by measuring. A line one character too long
 error on a thermal head — it wraps mid-figure, and ₱1,234.56 becomes ₱1,234 on one line and
 `.56` on the next. **Print on both widths if the store has both rolls** (UAT check 2).
 
-Prove it with a test page. The endpoint is `POST /print/test`; the button for it belongs on
-`SCR-702`, which is not built yet. The test page carries the `TAX-006` line like every other
-document, deliberately.
+Prove it with the **Print a test page** button on `SCR-702`, and then read the paper rather
+than the screen — a width set wrong does not error, it wraps a peso figure onto two lines. The
+test page carries the `TAX-006` line like every other document, deliberately.
 
 ### Cash drawer (`INT-2`)
 

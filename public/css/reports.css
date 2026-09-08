@@ -146,3 +146,30 @@
 .user-form input, .user-form select { min-height: var(--touch); width: 100%; padding: 0 .6rem;
   border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
 .role-note { margin: .35rem 0 0; font-size: .8125rem; }
+
+/* SCR-702 — settings (TASK-039). */
+.settings-group { margin: 0 0 2rem; padding: 1rem 1.25rem; background: #fff;
+  border: 1px solid var(--rule); border-radius: 6px; }
+.settings-group h2 { font-size: 1.0625rem; margin: 0 0 1rem; }
+.settings-group h3 { font-size: .9375rem; margin: 1.5rem 0 .5rem; }
+
+.setting { margin: 0 0 1.25rem; max-width: 40rem; }
+.setting-label { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
+  margin-bottom: .3rem; font-size: .9375rem; }
+/* OPS-005's own id, visible: reading it down the phone is the fastest support call. */
+.setting-rule { font-size: .6875rem; letter-spacing: .06em; color: var(--muted); }
+.setting input[type="text"], .setting select, .setting textarea {
+  min-height: var(--touch); width: 100%; padding: .4rem .6rem; border: 1px solid var(--rule);
+  border-radius: 4px; font: inherit; background: #fff; }
+.setting textarea { min-height: 5rem; line-height: 1.5; resize: vertical; }
+.setting input[type="checkbox"] { min-width: 1.15rem; min-height: 1.15rem; }
+.setting-meta { margin: .3rem 0 0; font-size: .75rem; color: var(--muted); }
+.setting-key { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; }
+.setting.has-problem input, .setting.has-problem select, .setting.has-problem textarea {
+  border-color: var(--error); }
+
+.tax-mode { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+.warn-note { background: var(--warn-bg); border-left: 4px solid var(--warn-ink);
+  padding: .6rem .75rem; border-radius: 4px; margin: 0 0 .75rem; line-height: 1.5; }
+.tax-mode select, .tax-mode input { min-height: var(--touch); }
+.print-test { margin: 1rem 0; padding-top: 1rem; border-top: 1px solid var(--rule); }
