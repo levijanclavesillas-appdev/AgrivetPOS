@@ -15,6 +15,7 @@ import { createDashboard } from '../reports/dashboard.js';
 import { createReport } from '../reports/report.js';
 import { createBackup } from '../admin/backup.js';
 import { createHealth } from '../admin/health.js';
+import { createUsers } from '../admin/users.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
@@ -278,10 +279,13 @@ export function createApp({ root }) {
    * here, and the rest of the section says so rather than offering a dead button.
    */
   const ADMIN_PANELS = [
+    { id: 'users', label: 'Users', screen: 'SCR-701', create: createUsers },
     { id: 'backup', label: 'Backups', screen: 'SCR-704', create: createBackup },
     { id: 'health', label: 'Health', screen: 'SCR-705', create: createHealth },
   ];
-  let adminPanel = 'backup';
+  // Users first: on the day a store is installed it is the first thing anybody needs,
+  // and leaving it further in is how a store ends up trading on the owner login.
+  let adminPanel = 'users';
 
   function showAdmin() {
     const host = h('div', { class: 'admin-screen' });

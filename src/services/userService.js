@@ -139,6 +139,22 @@ function update(id, changes, actor) {
     fields.password_hash = auth.hashSecretValue(changes.password);
     // The hash itself never enters the trail (SEC-1); that it changed does.
     after.password_changed = true;
+
+    // SEC-3's lockout is cleared by the reset (TASK-040).
+    //
+    // The rule locks an account for fifteen minutes after five failed attempts, to stop
+    // somebody guessing at the login screen. An owner authenticated under TX-423
+    // deliberately setting a new password is not that, and the lock has nothing left to
+    // guard: the password it was protecting no longer exists.
+    //
+    // Without this, the sequence a store actually hits — cashier forgets password,
+    // tries five times, owner resets it, cashier still cannot log in — leaves the owner
+    // having apparently fixed nothing, with a queue at the counter. A reset that
+    // appears not to work is one people stop using, which costs more security than the
+    // lock buys.
+    fields.failed_attempts = 0;
+    fields.locked_until_at = null;
+    if (user.locked_until_at) after.lockout_cleared = true;
   }
   if (changes.pin !== undefined) {
     if (changes.pin === null) {

@@ -410,8 +410,56 @@ app.whenReady().then(async () => {
   log(/less on the shelf/.test(variance), 'the variance is computed for the reader',
     variance.replace(/\s+/g, ' ').slice(0, 70));
 
-  console.log('\n— SCR-704: backups —');
+  console.log('\n— SCR-701: users —');
   await run(OPEN_RAIL('Admin'));
+  await waitFor(`!!document.querySelector('.users')`, { label: 'SCR-701' });
+  log(await run(`document.querySelectorAll('.admin-tab')[0].textContent === 'Users'`),
+    'Users is the first admin tab — it is the first thing a new store needs');
+  log(await run(`document.querySelectorAll('.users-list tbody tr').length >= 1`),
+    'the owner is listed');
+
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /New user/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.user-form')`, { label: 'the new-user form' });
+
+  // SEC-1: the secret fields are write-only and never carry a value.
+  const secretValues = await run(`[...document.querySelectorAll('.user-form input[type=password]')].map(i => i.value)`);
+  log(secretValues.length === 2 && secretValues.every((v) => v === ''),
+    'SEC-1: the password and PIN fields start empty', `${secretValues.length} fields`);
+
+  const roleNote = await run(`(document.querySelector('.role-note') || {}).textContent || ''`);
+  log(roleNote.length > 0, 'the role explains what it grants', roleNote.slice(0, 60));
+
+  await run(`(() => {
+    const f = document.querySelector('.user-form');
+    const [username, fullName] = f.querySelectorAll('input[type=text]');
+    const [password, pin] = f.querySelectorAll('input[type=password]');
+    username.value = 'aling.nena';
+    fullName.value = 'Nena Reyes';
+    password.value = 'first-day-at-the-till';
+    pin.value = '441703';
+    f.querySelector('select').value = 'CASHIER';
+    f.requestSubmit();
+  })()`);
+  await waitFor(`/aling\\.nena/.test(document.body.textContent)`, { label: 'the new cashier', timeoutMs: 20000 });
+  log(true, 'the cashier is created and appears in the list');
+
+  const created = (await api('/users')).json.users.find((u) => u.username === 'aling.nena');
+  log(Boolean(created && created.has_pin && created.role === 'CASHIER'),
+    'with the PIN and role the form sent', created && `${created.role}, pin ${created.has_pin}`);
+
+  // SEC-1 again, after the round trip: nothing secret came back into the page.
+  const pageText = await run(`document.body.textContent`);
+  log(!/first-day-at-the-till|441703/.test(pageText),
+    'and no password or PIN is anywhere in the rendered page');
+  log(await run(`[...document.querySelectorAll('input[type=password]')].every(i => i.value === '')`),
+    'the fields were cleared rather than re-rendered');
+
+  const pinColumn = await run(`(document.querySelector('.users-list') || {}).textContent || ''`);
+  log(/set/.test(pinColumn), 'the list says who has a PIN — what an owner checks here');
+
+  console.log('\n— SCR-704: backups —');
+  // Admin opens on Users now, so the tab is selected rather than assumed.
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => /Backups/.test(t.textContent)).click()`);
   await waitFor(`!!document.querySelector('.backups')`, { label: 'SCR-704' });
   log(await run(`!!document.querySelector('.backups')`), 'SCR-704 renders');
 

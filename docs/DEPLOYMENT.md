@@ -11,23 +11,22 @@ network connection at the store.
 >
 > **v1.0 cannot yet be deployed to a store**, and the reason is not the installer.
 >
-> Six of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
-> collections, users, settings and the audit viewer (`06_TASKS/README.md`, *the screen gap*).
+> Five of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
+> collections, settings and the audit viewer (`06_TASKS/README.md`, *the screen gap*).
 > Every service and API behind them is built and tested; there is simply no screen to reach
 > them from.
 >
-> `TASK-036` and `TASK-038` have landed, so a store can now be **stocked** and its till can be
-> **counted**: products, barcodes, packs, prices, opening stock and adjustments from
-> `SCR-201`–`SCR-204`, and open, cash in and out, and a counted close from `SCR-501`–`SCR-503`.
-> `TC-E2E-10` and `TC-E2E-11` walk both paths end to end.
+> `TASK-036`, `TASK-038` and `TASK-040` have landed, so a store can now be **stocked**, its
+> till can be **counted**, and its staff have **their own logins**. Sections 5 and 6's
+> catalogue half are performable today; `TC-E2E-10`, `TC-E2E-11` and `TC-E2E-12` walk all
+> three paths end to end.
 >
-> What is still impossible as written: **section 4 (hardware)** and **section 5 (users)**,
-> which need the settings and user screens, and the opening **credit balances** in section 6,
-> which need the customer screens.
+> What is still impossible as written: **section 4 (hardware)**, which needs the settings
+> screen, and the opening **credit balances** in section 6, which need the customer screens.
 >
-> Until `TASK-037` and `TASK-039`–`TASK-041` land, the only route to those operations is the
-> HTTP API, which is not a thing to do on a store counter. **Section 5 is the one to watch**:
-> without it the store trades on the owner login, and every audit row carries the wrong name.
+> Until `TASK-037`, `TASK-039` and `TASK-041` land, the only route to those is the HTTP API,
+> which is not a thing to do on a store counter. **Section 4 is the one to watch**: the
+> printer, the receipt width and the backup folder are all settings.
 >
 > **Do not schedule the cutover on the strength of a green test suite.** The suite is green
 > because it tests the API.
@@ -193,7 +192,8 @@ Scan twenty times in a row at counter speed before you accept it (UAT check 1).
 
 ## 5. Users
 
-Create the real cashiers in **Admin → Users** (`SCR-701`, *not built yet*) before you leave. Do not let the store trade on
+Create the real cashiers in **Admin → Users** (`SCR-701`) before you leave. It is the first tab
+under Admin, deliberately — it is the first thing a new installation needs. Do not let the store trade on
 the owner login — a cashier signed in as the owner can see cost prices and reach Settings, and
 every audit row will name the wrong person.
 
@@ -347,6 +347,7 @@ Open **Admin → Health** first. The version and the last verified backup answer
 | "No verified backup for N hours" | The folder is missing or the drive is unplugged. This warning cannot be dismissed, deliberately |
 | Dates on new records are wrong | The PC's clock. Selling is unaffected — receipt numbers do not come from the clock (`VR-103`) — but fix it |
 | The owner password is lost | The recovery code from wizard step 4. If that is lost too, the data cannot be reached |
+| A cashier is locked out | Five wrong passwords locks an account for 15 minutes (`SEC-3`). The owner resetting the password in **Admin → Users** clears the lock immediately |
 | A cashier sees cost prices | They are signed in on the wrong account. Cost is absent for every role but `OWNER` |
 | A rail item says "not built yet" | It is one of the nine screens still in the gap. The API exists; the screen does not |
 | The base unit cannot be changed | Deliberate (`UOM-003`): stock has moved and every movement is recorded in that unit. Make a new product and move the stock across |

@@ -138,3 +138,11 @@
 /* A restore is the most destructive thing in the product. Its button looks like it. */
 .danger { background: var(--error); color: #fff; border: 0; border-radius: 4px; }
 .danger:disabled { background: var(--rule); color: var(--muted); }
+
+/* SCR-701 — users (TASK-040). */
+.users .check { display: flex; align-items: center; gap: .4rem; margin: 0; }
+.users-list .is-inactive { color: var(--muted); }
+.user-form { max-width: 30rem; padding: 1rem 0; }
+.user-form input, .user-form select { min-height: var(--touch); width: 100%; padding: 0 .6rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.role-note { margin: .35rem 0 0; font-size: .8125rem; }

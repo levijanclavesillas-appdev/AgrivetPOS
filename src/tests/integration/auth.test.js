@@ -116,6 +116,44 @@ test('TC-INT-02: the lockout is audited, and a successful sign-in clears the cou
   assert.equal(userRepository.findByUsername('cashier1').failed_attempts, 0);
 });
 
+test('TC-INT-02: an owner resetting the password clears the lock (TASK-040)', () => {
+  temp.openMigrated('lockout-reset');
+  temp.seedStore({ withOwner: false });
+  temp.seedUser({ username: 'boss', role: 'OWNER', password: PASSWORD });
+  temp.seedUser({ username: 'cashier1', password: PASSWORD });
+
+  const owner = authService.verifyToken(
+    authService.login({ username: 'boss', password: PASSWORD }).token
+  );
+
+  for (let i = 0; i < 5; i += 1) attemptLogin('cashier1', 'wrong');
+  const locked = userRepository.findByUsername('cashier1');
+  assert.ok(locked.locked_until_at, 'SEC-3: locked');
+  assert.equal(attemptLogin('cashier1', PASSWORD).ok, false, 'even with the right password');
+
+  // The sequence a store actually hits. SEC-3 stops somebody guessing at the login
+  // screen; an owner deliberately setting a new password is not that, and the lock has
+  // nothing left to guard — the password it protected no longer exists.
+  const userService = require('../../services/userService');
+  userService.update(locked.id, { password: 'a-brand-new-password' }, owner);
+
+  const after = userRepository.findByUsername('cashier1');
+  assert.equal(after.locked_until_at, null, 'the lock is cleared');
+  assert.equal(after.failed_attempts, 0, 'and so is the counter');
+  assert.ok(
+    authService.login({ username: 'cashier1', password: 'a-brand-new-password' }).token,
+    'so the cashier can serve the queue that is standing there'
+  );
+
+  // SEC-1: what changed is on the trail; what it changed to is not.
+  const audited = auditService.list({ action: 'PASSWORD_RESET' });
+  assert.equal(audited.length, 1);
+  const recorded = JSON.parse(audited[0].after_value);
+  assert.equal(recorded.password_changed, true);
+  assert.equal(recorded.lockout_cleared, true);
+  assert.equal(/a-brand-new-password|\$2[aby]\$/.test(audited[0].after_value), false, 'no secret on the trail');
+});
+
 test('TC-INT-02: the lock is per account, not global', () => {
   temp.openMigrated('lockout-scope');
   temp.seedUser({ username: 'cashier1', password: PASSWORD });

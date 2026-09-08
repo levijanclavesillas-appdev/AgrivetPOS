@@ -759,3 +759,52 @@ test('NFR_4.3: the shift controls are touchable', () => {
   assert.match(cssRule(css, '.shift-close .variance.down'), /color/);
   assert.match(cssRule(css, '.shift-close .variance.up'), /color/);
 });
+
+// ── SCR-701 (TASK-040) ──────────────────────────────────────────────────────
+
+test('TC-UI-06: no password or PIN is ever rendered back into the DOM', () => {
+  // SEC-1 keeps hashes on the server; this is the renderer's half. The fields are
+  // write-only: never given a `value`, cleared after use, and never read back into a
+  // re-render — a password that survives a re-render is a password sitting in the DOM
+  // of a machine on a shop counter.
+  const source = codeOf('js/admin/users.js');
+
+  assert.match(source, /const password = h\('input', \{ type: 'password', autocomplete: 'new-password' \}\)/);
+  assert.equal(/value: (password|pin)\.value/.test(source), false, 'neither is echoed back');
+  assert.equal(/password\.value = user|pin\.value = user/.test(source), false, 'nor seeded from a user');
+  assert.match(source, /password\.value = '';/, 'and both are cleared after use');
+  assert.match(source, /pin\.value = '';/);
+
+  // The list renders no secret-shaped field at all.
+  assert.equal(/password_hash|pin_hash/.test(source), false);
+});
+
+test('VR-503: the last-owner guard is explained, not greyed out', () => {
+  const source = commentsOf('js/admin/users.js');
+
+  // A disabled control teaches nobody why the store must keep an owner. The screen
+  // offers the action and renders the server's refusal, which names the rule.
+  assert.match(source, /greyed-out button teaches nobody/);
+  assert.match(codeOf('js/admin/users.js'), /err\.ruleId/, 'the refusal names its rule');
+});
+
+test('AUD-606: the screen deactivates rather than deletes, and says why', () => {
+  const source = proseOf('js/admin/users.js');
+
+  assert.match(source, /deactivated, never deleted/);
+  assert.match(source, /AUD-606/);
+  assert.equal(/api\.del\(/.test(codeOf('js/admin/users.js')), false, 'there is no delete call');
+});
+
+test('SEC-2: the PIN is described as a screen unlock, not a way to sign in', () => {
+  // The distinction matters: a PIN that reads as a login is a four-digit password on a
+  // machine anyone in the shop can reach.
+  assert.match(proseOf('js/admin/users.js'), /It is not a way to sign in \(SEC-2\)/);
+});
+
+test('NFR_4.3: the user form is touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  const rule = cssRule(css, '.user-form input');
+  assert.ok(rule, '.user-form input has a rule');
+  assert.match(rule, /min-height:\s*var\(--touch\)/);
+});
