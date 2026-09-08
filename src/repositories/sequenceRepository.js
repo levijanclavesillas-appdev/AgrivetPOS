@@ -12,6 +12,8 @@ const db = require('../config/database');
 const ALLOWED = Object.freeze({
   sales: ['sale_no'],
   customer_credit_transactions: ['document_no'],
+  purchase_orders: ['po_no'],
+  goods_receipts: ['gr_no'],
 });
 
 function assertTarget(table, column) {

@@ -39,13 +39,14 @@ field() { node -e "console.log(JSON.parse(process.argv[1])[process.argv[2]])" "$
 TOKEN=$(field token)
 PRODUCT=$(field productId)
 CUSTOMER=$(field customerId)
+SUPPLIER=$(field supplierId)
 
 # A display if there is none. --no-sandbox is for a container running as root; it is a
 # test harness on a throwaway database and never how the product is launched.
 LAUNCH=("$ELECTRON" --no-sandbox "$HERE/main.js")
 command -v xvfb-run >/dev/null && [ -z "${DISPLAY:-}" ] && LAUNCH=(xvfb-run -a "${LAUNCH[@]}")
 
-UI_TOKEN="$TOKEN" UI_PRODUCT="$PRODUCT" UI_CUSTOMER="$CUSTOMER" "${LAUNCH[@]}" 2>&1 \
+UI_TOKEN="$TOKEN" UI_PRODUCT="$PRODUCT" UI_CUSTOMER="$CUSTOMER" UI_SUPPLIER="$SUPPLIER" "${LAUNCH[@]}" 2>&1 \
   | grep -vE "GPU|Fontconfig|dbus|libva|Vulkan|gbm|DevTools|MESA|glx|sandbox|Passthrough|EGL"
 STATUS=${PIPESTATUS[0]}
 exit "$STATUS"

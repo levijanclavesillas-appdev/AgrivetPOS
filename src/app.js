@@ -27,6 +27,7 @@ const printRoutes = require('./routes/print');
 const cartRoutes = require('./routes/carts');
 const reportRoutes = require('./routes/reports');
 const backupRoutes = require('./routes/backups');
+const purchasingRoutes = require('./routes/purchasing');
 const setupService = require('./services/setupService');
 const { requireSetup } = require('./middleware/setup');
 
@@ -61,6 +62,7 @@ function createApp() {
   app.use(API_BASE, cartRoutes);
   app.use(API_BASE, reportRoutes);
   app.use(API_BASE, backupRoutes);
+  app.use(API_BASE, purchasingRoutes);
 
   // The renderer. Vanilla ES modules, no build step (05_TECH_SPEC.md §2).
   //

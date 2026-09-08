@@ -26,6 +26,10 @@ import { createCustomerProfile } from '../customers/profile.js';
 import { createCollection } from '../customers/collection.js';
 import { createShift } from '../shift/view.js';
 import { createShiftSummary } from '../shift/summary.js';
+import { createPurchaseOrders } from '../purchasing/orders.js';
+import { createPurchaseOrder } from '../purchasing/order.js';
+import { createGoodsReceipt } from '../purchasing/receive.js';
+import { createSuppliers } from '../purchasing/suppliers.js';
 
 /** §2's role → landing screen. */
 // §2's role → landing screen. MANAGER and OWNER land on SCR-601, which lives under
@@ -39,6 +43,9 @@ const RAIL = [
   { id: 'customers', label: 'Customers', tx: 'TX-413', screen: 'SCR-401' },
   { id: 'products', label: 'Products', tx: 'TX-422', screen: 'SCR-201' },
   { id: 'shift', label: 'Shift', tx: 'TX-418', screen: 'SCR-501' },
+  // TX-409 is §10's "receive goods", and purchasing sits behind it whole: owner,
+  // manager and the inventory clerk, and never a cashier.
+  { id: 'buying', label: 'Buying', tx: 'TX-409', screen: 'SCR-801' },
   { id: 'reports', label: 'Reports', tx: 'TX-421', screen: 'SCR-601' },
   { id: 'admin', label: 'Admin', tx: 'TX-423', screen: 'SCR-701' },
 ];
@@ -52,6 +59,7 @@ const RAIL = [
  */
 const GRANTS = {
   'TX-401': ['OWNER', 'MANAGER', 'CASHIER'],
+  'TX-409': ['OWNER', 'MANAGER', 'INVENTORY'],
   'TX-413': ['OWNER', 'MANAGER', 'CASHIER', 'INVENTORY'],
   'TX-418': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-421': ['OWNER', 'MANAGER', 'CASHIER'],
@@ -173,6 +181,23 @@ export function createApp({ root }) {
 
   // ── Screens ───────────────────────────────────────────────────────────────
 
+  /**
+   * A fresh host element per screen, instead of every view sharing `main`.
+   *
+   * A view fetches and then renders into its root. Switching screens while a fetch was
+   * in flight left the **new** screen blank: the old view's reply landed after the
+   * switch and cleared `main` from under whatever had replaced it. Each view's own
+   * sequence guard cannot see that — it only knows about its own later requests — so
+   * the fix belongs here. A late render now writes into a node that is no longer in
+   * the document, and nobody sees it.
+   */
+  function host() {
+    clear(main);
+    const el = h('div', { class: 'screen-host' });
+    main.append(el);
+    return el;
+  }
+
   async function show(id) {
     if (current?.unmount) current.unmount();
     clear(main);
@@ -187,6 +212,7 @@ export function createApp({ root }) {
     if (id === 'low-stock') return showProducts({ mode: 'low-stock' });
     if (id === 'shift') return showShift();
     if (id === 'customers') return showCustomers();
+    if (id === 'buying') return showPurchaseOrders();
 
     // The admin and catalog screens are their own tasks. Saying so beats a dead
     // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
@@ -197,7 +223,7 @@ export function createApp({ root }) {
   /** SCR-601. MANAGER and OWNER land here (04_UX_SPEC.md §2). */
   function showDashboard() {
     current = createDashboard({
-      root: main,
+      root: host(),
       session,
       // A tile opens either a report or a screen; the low-stock one opens SCR-204.
       onOpenReport: (target, isScreen) => (isScreen ? show(target) : showReport(target)),
@@ -211,9 +237,8 @@ export function createApp({ root }) {
   /** The catalogue list, and the low-stock filter of it (TASK-036). */
   function showProducts({ mode = 'all' } = {}) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createProductList({
-      root: main,
+      root: host(),
       mode,
       onOpen: (id) => showProductEditor(id),
       onAdjust: (id) => showAdjustment(id),
@@ -225,9 +250,8 @@ export function createApp({ root }) {
 
   function showProductEditor(productId) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createProductEditor({
-      root: main,
+      root: host(),
       productId,
       // A newly created product reopens in the editor rather than dropping back to the
       // list: its packs, prices and barcodes are the next four things anybody does.
@@ -241,10 +265,9 @@ export function createApp({ root }) {
 
   function showCustomers() {
     if (current?.unmount) current.unmount();
-    clear(main);
     renderRail('customers');
     current = createCustomerList({
-      root: main,
+      root: host(),
       onOpen: (id) => showCustomer(id),
       onCollect: (id) => showCollection(id),
     });
@@ -254,9 +277,8 @@ export function createApp({ root }) {
 
   function showCustomer(customerId) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createCustomerProfile({
-      root: main,
+      root: host(),
       customerId,
       onBack: () => showCustomers(),
       onCollect: (id) => showCollection(id),
@@ -267,9 +289,8 @@ export function createApp({ root }) {
 
   function showCollection(customerId) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createCollection({
-      root: main,
+      root: host(),
       customerId,
       onBack: () => showCustomer(customerId),
       // Back to the profile, where the new balance and the settled invoices are.
@@ -282,10 +303,9 @@ export function createApp({ root }) {
   /** SCR-501 – SCR-503. `shiftId` opens another user's drawer, from the POS-508 alert. */
   function showShift(shiftId = null) {
     if (current?.unmount) current.unmount();
-    clear(main);
     renderRail('shift');
     current = createShift({
-      root: main,
+      root: host(),
       session,
       shiftId,
       onClosed: (result) => showShiftSummary(result),
@@ -296,9 +316,8 @@ export function createApp({ root }) {
 
   function showShiftSummary(result) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createShiftSummary({
-      root: main,
+      root: host(),
       result,
       // POS-511: a closed shift is immutable, so there is nowhere to go back to. The
       // cashier lands where the day starts again.
@@ -308,11 +327,69 @@ export function createApp({ root }) {
     return current;
   }
 
+  // ── SCR-801 – SCR-804 ─────────────────────────────────────────────────────
+
+  /** SCR-801. The rail lands here; everything else in Buying is reached from it. */
+  function showPurchaseOrders() {
+    if (current?.unmount) current.unmount();
+    renderRail('buying');
+    current = createPurchaseOrders({
+      root: host(),
+      onOpen: (id) => showPurchaseOrder(id),
+      onNew: () => showPurchaseOrder(null),
+      onReceive: (id) => showGoodsReceipt(id),
+      onSuppliers: () => showSuppliers(),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-802. `poId` null raises a new one. */
+  function showPurchaseOrder(poId) {
+    if (current?.unmount) current.unmount();
+    renderRail('buying');
+    current = createPurchaseOrder({
+      root: host(),
+      poId,
+      onBack: () => showPurchaseOrders(),
+      onReceive: (id) => showGoodsReceipt(id),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-803. `poId` null is FT-504's counter purchase (PO-207). */
+  function showGoodsReceipt(poId) {
+    if (current?.unmount) current.unmount();
+    renderRail('buying');
+    current = createGoodsReceipt({
+      root: host(),
+      poId,
+      onBack: () => (poId ? showPurchaseOrder(poId) : showPurchaseOrders()),
+      // PO-206: a posted delivery is immutable, so there is nothing to go back to.
+      // Landing on the order shows the new status and what is still outstanding.
+      onPosted: (gr) => (gr.po_id ? showPurchaseOrder(gr.po_id) : showPurchaseOrders()),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-804. */
+  function showSuppliers() {
+    if (current?.unmount) current.unmount();
+    renderRail('buying');
+    current = createSuppliers({
+      root: host(),
+      onBack: () => showPurchaseOrders(),
+    });
+    current.mount();
+    return current;
+  }
+
   function showAdjustment(productId) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createAdjustment({
-      root: main,
+      root: host(),
       productId,
       onClose: () => showProducts(),
     });
@@ -338,7 +415,7 @@ export function createApp({ root }) {
   let adminPanel = 'users';
 
   function showAdmin() {
-    const host = h('div', { class: 'admin-screen' });
+    const screen = h('div', { class: 'admin-screen' });
     const panelHost = h('div', { class: 'admin-panel' });
 
     const tabs = h('nav', { class: 'admin-tabs', 'aria-label': 'Admin sections' },
@@ -349,8 +426,8 @@ export function createApp({ root }) {
         onclick: () => { adminPanel = panel.id; showAdmin(); },
       })));
 
-    clear(main).append(host);
-    host.append(tabs, panelHost);
+    clear(main).append(screen);
+    screen.append(tabs, panelHost);
 
     const chosen = ADMIN_PANELS.find((panel) => panel.id === adminPanel);
     if (current?.unmount) current.unmount();
@@ -362,9 +439,8 @@ export function createApp({ root }) {
   /** SCR-602 – SCR-604, reached from the tile that carries their figure. */
   function showReport(report) {
     if (current?.unmount) current.unmount();
-    clear(main);
     current = createReport({
-      root: main,
+      root: host(),
       session,
       report,
       onBack: () => { clear(main); showDashboard(); },
@@ -396,7 +472,7 @@ export function createApp({ root }) {
     }
 
     current = createPos({
-      root: main,
+      root: host(),
       session,
       onPay: ({ cart, priced, approver }) => showPayment({ cart, priced, approver }),
     });
@@ -407,7 +483,7 @@ export function createApp({ root }) {
   function showPayment({ cart, priced, approver }) {
     if (current?.unmount) current.unmount();
     current = createPayment({
-      root: main,
+      root: host(),
       cart,
       priced,
       approver,
@@ -420,7 +496,7 @@ export function createApp({ root }) {
   function showReceipt(sale) {
     if (current?.unmount) current.unmount();
     current = createReceipt({
-      root: main,
+      root: host(),
       sale,
       printed: sale.printed ?? null,
       onNewSale: () => showPos(),

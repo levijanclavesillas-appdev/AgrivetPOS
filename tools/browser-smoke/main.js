@@ -8,6 +8,7 @@ const PORT = Number(process.env.UI_PORT || 47897);
 const TOKEN = process.env.UI_TOKEN;
 const PRODUCT_ID = process.env.UI_PRODUCT;
 const CUSTOMER_ID = process.env.UI_CUSTOMER;
+const SUPPLIER_ID = process.env.UI_SUPPLIER;
 const API = `http://127.0.0.1:${PORT}/api/v1`;
 
 const fails = [];
@@ -80,6 +81,21 @@ app.whenReady().then(async () => {
       await settle(80);
     }
   };
+  /**
+   * Null-safe expression builders.
+   *
+   * `document.querySelector(x).textContent` throws while a screen is mid-reload — the
+   * root has been cleared and the node is not there yet — and a throw inside
+   * `executeJavaScript` surfaces as a crash of the whole harness rather than as one
+   * failed assertion. These build the guarded form once. They are Node-side string
+   * builders rather than helpers installed on `window`, because the page's globals do
+   * not survive everything this walk does to it.
+   */
+  const TEXT = (sel) => `(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`;
+  const text = (sel) => run(TEXT(sel));
+  const FIND = (sel, re) => `[...document.querySelectorAll(${JSON.stringify(sel)})].find(b => ${re}.test(b.textContent))`;
+  const clickOn = (sel, re) => run(`(() => { const el = ${FIND(sel, re)}; if (el) { el.click(); return true; } return false; })()`);
+
   const press = (key) => run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`);
 
   await win.loadURL(`http://127.0.0.1:${PORT}/`);
@@ -501,6 +517,214 @@ app.whenReady().then(async () => {
   const variance = await run(`(document.querySelector('.variance') || {}).textContent || ''`);
   log(/less on the shelf/.test(variance), 'the variance is computed for the reader',
     variance.replace(/\s+/g, ' ').slice(0, 70));
+
+  // ── SCR-801 – SCR-804: buying (TASK-019) ─────────────────────────────────
+  //
+  // The owner drives the order; the bodega clerk takes the delivery, because PO-204
+  // and PO-205 self-authorise for a manager and the authorisation panel — the half of
+  // SCR-803 most worth driving — would never open.
+
+  /**
+   * Switch user.
+   *
+   * The rail's user button is not a sign-out: SCR-102 puts the PIN lock over the
+   * preserved cart for anyone who has a PIN (POS-105), and "Different user" is the way
+   * past it. A harness that only knew the second door would hang on the owner.
+   */
+  const signInAs = async (username, password) => {
+    await run(`document.querySelector('.rail-user').click()`);
+    await settle(300);
+    await clickOn('.lock-different', '/Different user/');
+    const at = await waitFor(`!!document.querySelector('.signin form')`, { label: 'the sign-in form' });
+    if (!at) return false;
+    await run(`(() => {
+      const f = document.querySelector('.signin form');
+      f.querySelector('input[type=text]').value = ${JSON.stringify(username)};
+      f.querySelector('input[type=password]').value = ${JSON.stringify(password)};
+      f.requestSubmit();
+      return true;
+    })()`);
+    return waitFor(`!!document.querySelector('.rail')`, { label: 'the rail', timeoutMs: 20000 });
+  };
+
+  /**
+   * Open a rail section and wait for its screen.
+   *
+   * Clicking the rail immediately after a sign-in raced the rail being built, which
+   * looked like a permission failure rather than a harness one — a click into empty
+   * space returns false and the assertion that follows blames the screen.
+   */
+  const openRail = async (label) => {
+    if (!await waitFor(FIND('.rail button', `/${label}/i`), { label: `the ${label} rail item` })) return false;
+    await clickOn('.rail button', `/${label}/i`);
+    return waitFor(`!!document.querySelector('.purchasing')`, { label: `${label}'s screen` });
+  };
+
+  const POST_BUTTON = FIND('.goods-receipt .editor-actions button', '/Post delivery/');
+
+  console.log('\n— SCR-801: purchase orders —');
+  log(await openRail('Buying'), 'SCR-801 renders from the rail');
+
+  log(await run(`(document.querySelector('.check input') || {}).checked === true`),
+    'the list defaults to what is still awaited, not to everything ever ordered');
+
+  const stockBeforeOrder = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+
+  console.log('\n— SCR-802: raising an order —');
+  await clickOn('.admin-head button', '/New order/');
+  await waitFor(`!!document.querySelector('.purchase-order')`, { label: 'SCR-802' });
+
+  // PO-103, said on the screen rather than only in the schema.
+  log(/moves no stock/i.test(await text('.purchase-order')),
+    'PO-103: the screen says a purchase order moves no stock');
+
+  const supplierOptions = await run(`document.querySelectorAll('.purchase-order select option').length - 1`);
+  log(supplierOptions >= 1, 'the supplier list is served, not hard-coded', `${supplierOptions} suppliers`);
+
+  await run(`(() => {
+    const sel = document.querySelector('.purchase-order select');
+    sel.value = sel.options[1].value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+
+  // Type enough of the product for the line to resolve against /products.
+  await run(`(() => {
+    const el = document.querySelector('.line-product');
+    el.value = 'Hog Grower';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(700);
+  // The field keeps what was typed — rebuilding it would move the cursor — so the
+  // confirmation is the resolved label beneath it, which is also the only thing that
+  // tells the buyer the line is bound to a product at all.
+  const resolved = await waitFor(`/FEED-HG-50/.test(${TEXT('.catalogue-list .resolved')})`,
+    { label: 'the product to resolve', timeoutMs: 6000 });
+  log(resolved, 'a typed product resolves, and the row says what to',
+    await text('.catalogue-list .resolved'));
+
+  await run(`(() => {
+    const [qty, cost] = document.querySelectorAll('.catalogue-list input[inputmode=decimal]');
+    qty.value = '2500'; qty.dispatchEvent(new Event('input', { bubbles: true }));
+    cost.value = '39.00'; cost.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+  const runningTotal = await run(`(document.querySelector('.po-total') || {}).textContent || ''`);
+  log(/97,500\.00/.test(runningTotal), 'the running total is computed for the reader', runningTotal.trim());
+
+  await run(`document.querySelector('.purchase-order form').requestSubmit()`);
+  // `\\d` rather than `\d`: a template literal swallows the backslash, and the regex
+  // that reaches the page silently matches nothing.
+  const savedOk = await waitFor(`/PO-\\d{8}-\\d{6}/.test(${TEXT('.admin-head h1')})`,
+    { label: 'the saved order', timeoutMs: 8000 });
+  log(savedOk, 'the order saves and reopens on its number', await text('.admin-head h1'));
+
+  log(await run(`[...document.querySelectorAll('.admin-head button')].some(b => /Send to supplier/.test(b.textContent))`),
+    'PO-102: a draft offers "send", and the delivery button is not there yet');
+  log(await run(`![...document.querySelectorAll('.admin-head button')].some(b => /Receive delivery/.test(b.textContent))`),
+    'nothing is delivered against an order nobody has sent');
+
+  await clickOn('.admin-head button', '/Send to supplier/');
+  await waitFor(`/Sent to supplier/.test(${TEXT('.admin-head')})`, { label: 'PENDING', timeoutMs: 8000 });
+  log(true, 'PO-102: DRAFT → PENDING');
+
+  // PO-104 — the screen says which of the two it is about to do, before the button.
+  log(/revision 2/.test(await text('.purchase-order')),
+    'PO-104: a sent order says saving raises a revision, not that it overwrites');
+
+  // Stock has not moved, and this is the assertion the whole rule exists for. Measured
+  // against what was on the shelf before the order rather than against a constant:
+  // the cashier's sale earlier in this walk already took some of it.
+  const afterOrderStock = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(afterOrderStock === stockBeforeOrder,
+    'PO-103: raising and sending the order moved no stock',
+    `${afterOrderStock} milli, unchanged`);
+
+  console.log('\n— SCR-803: the delivery, taken by the clerk —');
+  // Somebody who may receive and may not authorise, so PO-205's panel actually opens.
+  log(await signInAs('bodega', 'sack-of-feed-2026'), 'the bodega clerk signs in');
+
+  log(await openRail('Buying'), 'the clerk reaches SCR-801 — TX-409 is theirs too');
+  const receiveBtn = await waitFor(
+    `[...document.querySelectorAll('.catalogue-list .row-action')].some(b => /Receive/.test(b.textContent))`,
+    { label: 'the receive shortcut', timeoutMs: 8000 }
+  );
+  log(receiveBtn, 'the open order offers the delivery from the list');
+
+  await run(`[...document.querySelectorAll('.catalogue-list .row-action')].find(b => /Receive/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.goods-receipt')`, { label: 'SCR-803' });
+
+  log(/only the sound quantity/i.test(await text('.goods-receipt')),
+    'PO-202: the screen says what becomes stock and what does not');
+
+  const prefilled = await run(`(document.querySelectorAll('.receive-table input[inputmode=decimal]')[0] || {}).value`);
+  log(prefilled === '2500', 'the outstanding quantity is pre-filled, and meant to be corrected', prefilled);
+
+  // Fifty sacks arrived, three split, at ₱46.80 rather than the ₱39.00 agreed.
+  await run(`(() => {
+    const [arrived, damaged, cost] = document.querySelectorAll('.receive-table input[inputmode=decimal]');
+    damaged.value = '150'; damaged.dispatchEvent(new Event('input', { bubbles: true }));
+    cost.value = '46.80'; cost.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+
+  const sound = await run(`(document.querySelector('.qty.sound') || {}).textContent || ''`);
+  log(/2,350/.test(sound), 'PO-202: the sound quantity is computed at the tailgate', sound.trim());
+
+  await run(`document.querySelector('.goods-receipt form').requestSubmit()`);
+  const panelOk = await waitFor(`!!document.querySelector('.authorisation')`,
+    { label: 'the authorisation panel', timeoutMs: 8000 });
+  log(panelOk, 'PO-205: an out-of-tolerance cost opens the authorisation panel');
+
+  if (panelOk) {
+    const panel = await run(`document.querySelector('.authorisation').textContent`);
+    log(/PO-205/.test(panel), 'the panel names the rule', panel.replace(/\s+/g, ' ').slice(0, 80));
+    log(/above the ordered cost/.test(panel), 'and says by how much it was exceeded');
+    log(/owner/i.test(panel), 'and who may approve it');
+    log(await run(`(${POST_BUTTON} || {}).disabled === true`),
+      'and nothing posts until somebody has authenticated in it');
+
+    await run(`(() => {
+      const f = document.querySelector('.authorisation');
+      f.querySelector('input[name=approver]').value = 'chachi';
+      f.querySelector('input[name=approverPassword]').value = 'sack-of-feed-2026';
+      f.requestSubmit();
+      return true;
+    })()`);
+    await waitFor(`!!${POST_BUTTON} && !${POST_BUTTON}.disabled`,
+      { label: 'the authorised state', timeoutMs: 15000 });
+    log(true, 'AUD-603: the approver authenticates as themselves and the button unlocks');
+
+    await run(`document.querySelector('.goods-receipt form').requestSubmit()`);
+    await waitFor(`/Received/.test(${TEXT('.admin-head')})`, { label: 'the closed order', timeoutMs: 15000 });
+    log(true, 'the delivery posts and lands back on the order, now received');
+  }
+
+  // The three assertions the whole task is for, read off the API the screen just drove.
+  const afterStock = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(afterStock === stockBeforeOrder + 2350000,
+    'PO-202: only the sound quantity became stock — forty-seven sacks, not fifty',
+    `${stockBeforeOrder} + 2,350,000 = ${afterStock} milli`);
+  const afterCost = (await api(`/products/${PRODUCT_ID}`)).json.product.avg_cost_centavos;
+  log(afterCost > 4000 && afterCost < 4680, 'PO-203: the average moved at the ₱46.80 charged',
+    `₱${(afterCost / 100).toFixed(2)}`);
+  const flagged = (await api('/goods-receipts?flaggedOnly=true')).json.goods_receipts;
+  log(flagged.length === 1 && flagged[0].has_cost_variance,
+    'PO-205: the exception is flagged on the receipt, findable afterwards');
+
+  console.log('\n— SCR-804: suppliers —');
+  await run(OPEN_RAIL('Buying'));
+  await waitFor(`!!document.querySelector('.purchasing')`, { label: 'SCR-801' });
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Suppliers/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.suppliers')`, { label: 'SCR-804' });
+  log(await run(`document.querySelectorAll('.catalogue-list tbody tr').length >= 1`),
+    'the supplier list renders');
+  log(/B-MEG Feeds/.test(await text('.suppliers')),
+    'and shows the mill the delivery came from');
+  log(await run(`![...document.querySelectorAll('.suppliers button')].some(b => /^Delete/.test(b.textContent))`),
+    'VR-401: there is no delete button, only deactivate');
+
+  // Back to the owner for the admin section, which is TX-423 and not the clerk's.
+  log(await signInAs('chachi', 'sack-of-feed-2026'), 'the owner signs back in');
 
   console.log('\n— SCR-701: users —');
   await run(OPEN_RAIL('Admin'));

@@ -69,6 +69,20 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
     },
   })).json.customer;
 
+  // A supplier, so SCR-801 to SCR-804 have somebody to buy from (VR-401).
+  const mill = (await api('/suppliers', {
+    method: 'POST', token,
+    body: { name: 'B-MEG Feeds', code: 'BMEG', contactNo: '09171234567', termsDays: 30 },
+  })).json.supplier;
+
+  // A second user who may receive goods and may not authorise an exception. Without
+  // one, PO-204 and PO-205 self-authorise for the owner and the panel never opens —
+  // which would leave the half of SCR-803 most worth driving untested.
+  await api('/users', {
+    method: 'POST', token,
+    body: { username: 'bodega', fullName: 'Bodega Clerk', password: 'sack-of-feed-2026', role: 'INVENTORY' },
+  });
+
   // Everything the browser side needs to drive and to check against.
-  console.log(`READY ${JSON.stringify({ port: PORT, token, productId: product.id, customerId: farm.id })}`);
+  console.log(`READY ${JSON.stringify({ port: PORT, token, productId: product.id, customerId: farm.id, supplierId: mill.id })}`);
 })().catch((err) => { console.error('SERVER CRASH', err); process.exit(2); });

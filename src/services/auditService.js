@@ -73,6 +73,23 @@ const ACTIONS = Object.freeze({
   COLLECTION_RECORDED: { what: 'Collection recorded', rule: 'CR-201' },
   CREDIT_ADJUSTED: { what: 'Credit balance adjusted', rule: 'CR-103' },
 
+  // ── AUD-601: purchasing (FT-501–FT-504) ───────────────────────────────────
+  //
+  // A goods receipt is a cost change: PO-203 moves the average cost at the actual
+  // received price, and AUD-601 names "cost change" explicitly. The others are not on
+  // the rule's list and are recorded anyway — PO-104 says a PENDING order is amended
+  // by a revision rather than overwritten, and the trail is where the superseded lines
+  // live, so a supplier holding a printed rev 1 can be reconciled against rev 2.
+  SUPPLIER_CREATED: { what: 'Supplier created', rule: 'VR-401' },
+  SUPPLIER_MODIFIED: { what: 'Supplier modified', rule: 'VR-401' },
+  SUPPLIER_DEACTIVATED: { what: 'Supplier deactivated', rule: 'VR-401' },
+  PURCHASE_ORDER_CREATED: { what: 'Purchase order raised', rule: 'PO-101' },
+  PURCHASE_ORDER_MODIFIED: { what: 'Purchase order edited in draft', rule: 'PO-104' },
+  PURCHASE_ORDER_AMENDED: { what: 'Purchase order amended to a new revision', rule: 'PO-104' },
+  PURCHASE_ORDER_SUBMITTED: { what: 'Purchase order sent to the supplier', rule: 'PO-102' },
+  PURCHASE_ORDER_CANCELLED: { what: 'Purchase order cancelled', rule: 'PO-102' },
+  GOODS_RECEIVED: { what: 'Goods received', rule: 'AUD-601' },
+
   // ── AUD-601: users and access ─────────────────────────────────────────────
   USER_CREATED: { what: 'User created', rule: 'AUD-601' },
   USER_MODIFIED: { what: 'User modified', rule: 'AUD-601' },

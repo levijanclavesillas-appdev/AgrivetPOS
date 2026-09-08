@@ -187,7 +187,7 @@ every audit row will name the wrong person.
 | Role | Sees | Typical |
 | :--- | :--- | :--- |
 | `CASHIER` | The counter, their own shift's figures. **No cost prices, no settings** | Everyone on the till |
-| `INVENTORY` | Products and stock, no sales | A stock clerk, if there is one |
+| `INVENTORY` | Products, stock and buying, no sales | A stock clerk, if there is one |
 | `MANAGER` | Everything except user administration and settings | A supervisor |
 | `OWNER` | Everything, including restore | One person |
 
@@ -240,6 +240,12 @@ reposted before the store trades.
 
 Count it physically. The count you post is the number check 4 of the UAT will be measured
 against.
+
+*From v1.1 there is a second way in, and for stock that is arriving rather than already on the
+shelf it is the better one: **Buying → Receive without an order** (`SCR-803`) records a delivery
+against a supplier, and posts the same `RECEIPT` movement at the cost you were actually charged
+(`PO-203`, `PO-207`). Use it for the first delivery after cutover. Use the movement above for
+what is already in the stockroom on day one, which came from nobody the system knows about.*
 
 ### Opening credit balances (`OPS-107`)
 
@@ -334,13 +340,13 @@ Open **Admin → Health** first. The version and the last verified backup answer
 | The owner password is lost | The recovery code from wizard step 4. If that is lost too, the data cannot be reached |
 | A cashier is locked out | Five wrong passwords locks an account for 15 minutes (`SEC-3`). The owner resetting the password in **Admin → Users** clears the lock immediately |
 | A cashier sees cost prices | They are signed in on the wrong account. Cost is absent for every role but `OWNER` |
-| A rail item says "not built yet" | Only the audit viewer is still in the gap. The API exists; the screen does not |
+| A rail item says "not built yet" | Nothing does any more — every screen in `04_UX_SPEC.md` §3 exists, and `TC-UI-10` keeps it that way |
 | The base unit cannot be changed | Deliberate (`UOM-003`): stock has moved and every movement is recorded in that unit. Make a new product and move the stock across |
 | The application will not start | The message says why. A database ahead of the binary, or a failed pre-migration backup, are the two that stop it deliberately |
 
-The audit trail answers "who changed this" — `GET /audit` today, `SCR-703` once it is built. Every price change, cost
-change, credit limit change, adjustment, void, reprint, user change, settings change, export
-and restore is on it, with both actors where an override was involved.
+The audit trail answers "who changed this" — **Admin → Audit** (`SCR-703`). Every price change,
+cost change, credit limit change, adjustment, void, reprint, user change, settings change,
+export and restore is on it, with both actors where an override was involved.
 
 ---
 

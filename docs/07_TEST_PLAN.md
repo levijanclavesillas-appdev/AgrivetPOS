@@ -36,9 +36,16 @@ while the eyes-on checks in §8 stay manual.
 ## 2. Rule coverage obligation
 
 `NFR_5.2`: **every rule in `03_BUSINESS_RULES.md` §1 (money), §2 (units), §5 (inventory),
-§6 (sales/till) and §7 (credit) must be cited by at least one `TC-*` case.** A rule with no test
-is treated as unimplemented, whatever the code says. The mapping is the table in §3–§5 below;
-coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both documents.
+§6 (sales/till), §7 (credit) and §9 (purchasing) must be cited by at least one `TC-*` case.** A
+rule with no test is treated as unimplemented, whatever the code says. The mapping is the table
+in §3–§5 below; coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
+documents.
+
+§9 joined the list with `TASK-019`, which built the whole of `PO-101`–`PO-207`. The obligation
+follows the implementation rather than leading it: a coverage requirement over rules nobody has
+built yet forces a fake citation, which makes the figure stop meaning anything (`TC-UT-98`'s
+own comment says so). The obligation applies per release — a `PO-*` rule marked 1.1 is covered,
+one marked 1.2 is reported and not asserted, exactly as the other sections work.
 
 ## 3. Unit cases
 
@@ -114,6 +121,11 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-INT-73` | Clock set earlier than the last transaction raises the anomaly alert | `OPS-009`, `VR-103` |
 | `TC-INT-74` | Restore is owner-only, takes a pre-restore backup, needs typed confirmation, and is audited | `OPS-004`, `AUD-601` |
 | `TC-INT-75` | A backup taken while a sale is mid-flight restores to a consistent database | `OPS-002`, `OPS-008` |
+| `TC-INT-76` | `PO-103`: raising, sending, amending and cancelling an order writes no inventory movement, and moves no average cost | `PO-103`, `INV-101` |
+| `TC-INT-77` | `PO-202`: fifty sacks with three split posts forty-seven; the damaged quantity is recorded and posts nothing, and a wholly damaged line posts no movement at all | `PO-202`, `INV-103` |
+| `TC-INT-78` | `PO-203`: the average moves at the actual received cost, and the figure the ordered cost would have produced is asserted as the wrong answer | `PO-203`, `INV-106`, `MON-004` |
+| `TC-INT-79` | `PO-102`, `PO-104`, `PO-105`: the status machine and the transitions it refuses; a revision rather than an overwrite; a cancellation refused once anything arrived | `PO-102`, `PO-104`, `PO-105` |
+| `TC-INT-80` | `PO-204`, `PO-205`: over-receipt and an out-of-tolerance cost each refuse, name the rule and the role, flag the receipt, and record two distinct actors | `PO-204`, `PO-205`, `AUD-603` |
 | `TC-API-01` | Every route refuses an actor lacking its `TX-*`, with 403, and audits it | `SEC-6` |
 | `TC-API-02` | No endpoint returns `password_hash`, `pin_hash` or `recovery_code_hash` | `SEC-1` |
 
@@ -137,6 +149,8 @@ coverage is asserted mechanically by `TC-UT-98`, which parses rule IDs from both
 | `TC-E2E-13` | An installer configures a store from `SCR-702`: printer, width, test page, backup folder, a bounded figure refused, an owner-only one refused to a manager, the tax mode changed and audited |
 | `TC-E2E-14` | A credit customer's life: create → limit → buy on credit → part payment settling the oldest → overpayment refused then acknowledged → deactivation refused while owing, then allowed |
 | `TC-E2E-15` | A day's work is legible afterwards: a price change with its old figure, an adjustment naming both actors, a settings change, a reprint — findable by actor, action, entity and date, exportable, with no secret anywhere and no write path |
+
+| `TC-E2E-16` | A delivery: register the mill → order fifty sacks → nothing on the shelf moves → the clerk keys in forty-seven sound, three split, at 20% above the agreed price → refused, naming the rule and the role → the owner authorises → stock, average cost, ledger, order status and the damaged figure are all right afterwards, and the receipt cannot be edited |
 
 ## 6. Non-functional cases
 
@@ -188,7 +202,7 @@ two `TC-INT-84`s that assert different things.
 
 | Range | Task | Subject |
 | :--- | :--- | :--- |
-| `TC-INT-76` – `TC-INT-80` | `TASK-019` | Purchasing: no stock on a PO, damaged quantity, actual cost, the status machine, over-receipt |
+| ~~`TC-INT-76` – `TC-INT-80`~~ | `TASK-019` | **Written** — see §4. Purchasing: no stock on a PO, damaged quantity, actual cost, the status machine, over-receipt |
 | `TC-INT-81` – `TC-INT-84` | `TASK-020` | Returns: the quantity ceiling, write-off defaults, refund precedence, both movements |
 | `TC-INT-85` – `TC-INT-87` | `TASK-021` | Voids: full reversal, the shift window, the authorisation |
 | `TC-INT-88` – `TC-INT-91` | `TASK-022` | Stock counts: the freeze, no movement when matched, self-approval, staleness |
@@ -196,7 +210,7 @@ two `TC-INT-84`s that assert different things.
 | `TC-INT-94` – `TC-INT-100` | `TASK-025`, `TASK-026` | Import validation before writing, determinism, collisions, the opening load |
 | `TC-INT-101` – `TC-INT-102`, `TC-UT-50` – `TC-UT-51` | `TASK-027` | Statutory discount: off by default, no compounding, VAT exemption |
 | `TC-INT-103` – `TC-INT-106` | `TASK-028` | Store credit: both sources, spending it, reconciliation, never aged overdue |
-| `TC-E2E-16` – `TC-E2E-22` | one per task | The journey each task exists for |
+| ~~`TC-E2E-16`~~, `TC-E2E-17` – `TC-E2E-22` | one per task | The journey each task exists for. `TC-E2E-16` is written — see §5 |
 
 **Two existing cases are re-pointed rather than replaced**, and both are named in their tasks:
 `TC-INT-62` currently forces a `VOIDED` status by hand because no void path exists, and
@@ -253,8 +267,8 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ **built, tested and reachable.** All 26 screens in `04_UX_SPEC.md` §3 exist, asserted by `TC-UI-10`. The criteria are *confirmed* on the store's hardware at UAT (item 9) |
-| 2 | `npm run test:all` green | ☑ green — **750 cases**: 195 unit, 437 integration and API, 118 E2E, across 48 files |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☑ **built, tested and reachable.** Every screen in `04_UX_SPEC.md` §3 exists — 26 at v1.0, 30 since `TASK-019` — asserted by `TC-UI-10`. The criteria are *confirmed* on the store's hardware at UAT (item 9) |
+| 2 | `npm run test:all` green | ☑ green — **779 cases**: 196 unit, 459 integration and API, 124 E2E, across 50 files. (v1.0 closed at 750 across 48; the difference is `TASK-019`.) |
 | 3 | `TC-UT-98` passes — every covered rule has a test | ☑ green. 62 covered v1.0 rules, all cited; 51 of 51 outside §2's obligation as well |
 | 4 | `TC-UT-99` passes — layering intact | ☑ green |
 | 5 | Zero open S1 or S2 defects | ◐ **none known, and nothing has run in the store.** Settled at UAT sign-off (`docs/UAT_RECORD.md`) |
@@ -264,6 +278,18 @@ of how small it looks.
 | 9 | UAT §8 complete on the store's hardware, owner signed | ☐ **not started.** `docs/UAT_RECORD.md` is the sheet it is recorded on |
 | 10 | Backup verified restorable onto a second machine | ☐ **not done.** `TC-INT-74` restores in place; the second machine is UAT check G |
 | 11 | `TAX-006` confirmed on the printed document | ☐ **not done.** Asserted in the encoder's output and in `TC-E2E-08`; never read on paper. UAT check 10 |
+
+### v1.1 gate
+
+Opened by `TASK-019`. The v1.0 criteria above stay in force — the four still open are still
+open, and none of them is made better or worse by a purchasing module.
+
+| # | Criterion | Status |
+| :-: | :--- | :--- |
+| 1 | `FT-501`–`FT-504` built, tested and reachable | ☑ **done** (`TASK-019`). `SCR-801`–`SCR-804` exist and are driven end to end by the browser smoke |
+| 2 | `TC-INT-76`–`TC-INT-80`, `TC-E2E-16` green | ☑ green |
+| 3 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-020` – `TASK-028` outstanding |
+| 4 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
 
 Measured on a build machine, reported for regression purposes and for nothing else:
 
@@ -284,6 +310,11 @@ assert a ceiling at four times the budget, which catches a structural regression
 a query per row, a dropped index — and nothing finer.
 
 > ### Gate status, 2026-09-08 — **NOT SHIPPABLE. Everything that can be settled here is.**
+>
+> **v1.1 has started.** `TASK-019` adds purchasing, four screens and 27 cases. It does not move
+> any of the four v1.0 items below, and it must not be read as progress towards them: they all
+> reduce to the same thing, and a larger application that has still never run in the store is
+> further from shipping, not nearer.
 >
 > `TASK-001` through `TASK-018`, and `TASK-036` through `TASK-041`, are built. **Four of the
 > eleven criteria are met and cannot be advanced further from a build machine.** The remaining

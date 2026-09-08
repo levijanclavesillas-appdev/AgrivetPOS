@@ -118,9 +118,12 @@ customers ──< customer_credit_accounts ──< customer_credit_transactions
 cashier_shifts ──< till_movements
       └──< cashier_closings ──< closing_method_lines
 
--- v1.1+
+-- v1.1
 suppliers ──< purchase_orders ──< purchase_order_items
-                   └──< goods_receipts ──< goods_receipt_items
+     │             └──────────┐
+     └──────────────────────< goods_receipts ──< goods_receipt_items
+                              (po_id NULL = PO-207's direct receipt)
+-- v1.1+
 sales_returns ──< sales_return_items
 stock_counts ──< stock_count_items
 inventory_adjustments
@@ -568,6 +571,137 @@ has not gone away comes back. The three that `OPS-007` says may never be dismiss
 by a `CHECK` on the table rather than by a guard in a service: a service check is a promise the
 next caller can break.
 
+### 3.4.1 v1.1 schema — purchasing (`TASK-019`)
+
+Five tables, in `010_purchasing.sql`. §3.1's conventions are binding here as they are above,
+and two of them carry most of the weight.
+
+**`PO-103` is an absence.** Nothing on `purchase_orders` or `purchase_order_items` touches
+stock, and no service writes an inventory movement from either. An order is a statement of
+intent to a supplier; only a goods receipt moves stock, because `INV-101` has meant "what is on
+the shelf" since `TASK-007`, and a system where ordering changes on hand is a system whose stock
+figure means "what we expect" instead. `TC-INT-76` asserts it.
+
+**`PO-202` is the split on the receipt line.** `received_qty_milli` is what the van brought;
+`damaged_qty_milli` is the part of it that was unsound, not an arrival of its own; and
+`sound_qty_milli` is the difference, which is the only figure that posts a `RECEIPT` movement. A
+`CHECK` makes "damaged more than arrived" unrepresentable rather than merely unlikely.
+
+```sql
+CREATE TABLE suppliers (
+  id TEXT PRIMARY KEY,
+  code TEXT UNIQUE COLLATE NOCASE,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,        -- VR-401, NOCASE: one account, one history
+  contact_person TEXT, contact_no TEXT, email TEXT, address TEXT,
+  terms_days INTEGER NOT NULL DEFAULT 0 CHECK (terms_days >= 0),   -- 0 = cash on delivery
+  notes TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,            -- VR-401: deactivated, never deleted
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id),
+  updated_at TEXT, updated_by TEXT REFERENCES users(id)
+);
+
+CREATE TABLE purchase_orders (
+  id TEXT PRIMARY KEY,
+  po_no TEXT NOT NULL UNIQUE,                      -- PO-YYYYMMDD-NNNNNN (VR-103)
+  supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+  status TEXT NOT NULL DEFAULT 'DRAFT'             -- PO-102, and nothing outside it
+    CHECK (status IN ('DRAFT','PENDING','PARTIALLY_RECEIVED','RECEIVED','CANCELLED')),
+  -- PO-104: the supplier was told a number, so po_no never changes and the revision
+  -- moves with it. The superseded lines live in audit_logs, which AUD-601 already
+  -- requires to carry both values on every amendment.
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+  ordered_at TEXT, expected_at TEXT, reference_no TEXT, notes TEXT,
+  total_centavos INTEGER NOT NULL DEFAULT 0,
+  submitted_at TEXT, submitted_by TEXT REFERENCES users(id),
+  cancelled_at TEXT, cancelled_by TEXT REFERENCES users(id), cancel_reason TEXT,
+  completed_at TEXT,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id),
+  updated_at TEXT, updated_by TEXT REFERENCES users(id)
+);
+CREATE INDEX idx_po_supplier ON purchase_orders (supplier_id, ordered_at);
+CREATE INDEX idx_po_status   ON purchase_orders (status);
+
+CREATE TABLE purchase_order_items (
+  id TEXT PRIMARY KEY,
+  po_id TEXT NOT NULL REFERENCES purchase_orders(id),
+  line_no INTEGER NOT NULL,
+  product_id TEXT NOT NULL REFERENCES products(id),
+  product_name_snapshot TEXT NOT NULL,             -- MON-005's reasoning
+  qty_milli INTEGER NOT NULL CHECK (qty_milli > 0), -- MON-002, base unit
+  order_unit_id TEXT REFERENCES units(id),         -- UOM-002: "50 SACK", not "2,500 KG"
+  order_pack_factor_milli INTEGER NOT NULL DEFAULT 1000 CHECK (order_pack_factor_milli > 0),
+  unit_cost_centavos INTEGER NOT NULL CHECK (unit_cost_centavos >= 0),  -- per base unit
+  line_total_centavos INTEGER NOT NULL,            -- MON-003, rounded once
+  notes TEXT,
+  UNIQUE (po_id, line_no)
+);
+CREATE INDEX idx_poitems_product ON purchase_order_items (product_id);
+
+CREATE TABLE goods_receipts (
+  id TEXT PRIMARY KEY,
+  gr_no TEXT NOT NULL UNIQUE,                      -- GR-YYYYMMDD-NNNNNN (VR-103)
+  po_id TEXT REFERENCES purchase_orders(id),       -- PO-207: NULL is the counter purchase
+  supplier_id TEXT NOT NULL REFERENCES suppliers(id),   -- required either way
+  supplier_dr_no TEXT, invoice_no TEXT,
+  -- PO-206: one status, so there is no draft to edit and no way to write anything
+  -- else. The correction is an adjustment or a supplier return.
+  status TEXT NOT NULL DEFAULT 'POSTED' CHECK (status IN ('POSTED')),
+  total_centavos INTEGER NOT NULL DEFAULT 0,
+  has_over_receipt INTEGER NOT NULL DEFAULT 0,     -- PO-204, flagged on the receipt
+  has_cost_variance INTEGER NOT NULL DEFAULT 0,    -- PO-205
+  approved_by TEXT REFERENCES users(id),           -- AUD-603's second actor
+  approval_reason TEXT, notes TEXT,
+  received_at TEXT NOT NULL,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id)
+);
+CREATE INDEX idx_gr_supplier ON goods_receipts (supplier_id, received_at);
+CREATE INDEX idx_gr_po       ON goods_receipts (po_id);
+CREATE INDEX idx_gr_date     ON goods_receipts (received_at);
+
+CREATE TABLE goods_receipt_items (
+  id TEXT PRIMARY KEY,
+  gr_id TEXT NOT NULL REFERENCES goods_receipts(id),
+  line_no INTEGER NOT NULL,
+  po_item_id TEXT REFERENCES purchase_order_items(id),  -- NULL on a direct receipt
+  product_id TEXT NOT NULL REFERENCES products(id),
+  product_name_snapshot TEXT NOT NULL,
+  -- PO-201's four figures. ordered_qty_milli is a snapshot taken at receipt, so a
+  -- later revision cannot change what this delivery was measured against.
+  ordered_qty_milli  INTEGER NOT NULL DEFAULT 0,
+  received_qty_milli INTEGER NOT NULL CHECK (received_qty_milli > 0),
+  damaged_qty_milli  INTEGER NOT NULL DEFAULT 0 CHECK (damaged_qty_milli >= 0),
+  sound_qty_milli    INTEGER NOT NULL CHECK (sound_qty_milli >= 0),
+  receive_unit_id TEXT REFERENCES units(id),
+  receive_pack_factor_milli INTEGER NOT NULL DEFAULT 1000 CHECK (receive_pack_factor_milli > 0),
+  -- PO-203: the average moves at this one, the actual. The ordered cost sits beside it
+  -- so PO-205's variance stays answerable from the row for ever.
+  unit_cost_centavos INTEGER NOT NULL CHECK (unit_cost_centavos >= 0),
+  ordered_unit_cost_centavos INTEGER,
+  cost_variance_bp INTEGER,
+  line_total_centavos INTEGER NOT NULL,            -- MON-003, the sound value
+  is_over_receipt  INTEGER NOT NULL DEFAULT 0,
+  is_cost_variance INTEGER NOT NULL DEFAULT 0,
+  batch_no TEXT, expiry_date TEXT,                 -- INV-206, v1.2; nullable now
+  movement_id TEXT REFERENCES inventory_movements(id),  -- NULL when sound is zero
+  damage_note TEXT,
+  UNIQUE (gr_id, line_no),
+  CHECK (damaged_qty_milli <= received_qty_milli),
+  CHECK (sound_qty_milli = received_qty_milli - damaged_qty_milli)
+);
+CREATE INDEX idx_gritems_product ON goods_receipt_items (product_id);
+CREATE INDEX idx_gritems_poitem  ON goods_receipt_items (po_item_id);
+```
+
+**Two figures are derived rather than stored.** How much of a PO line has arrived is summed
+from `goods_receipt_items` at read time, and the order's status is recomputed from that sum
+after each receipt. Both follow `INV-101`'s reasoning applied to a different table: a stored
+"received so far" is a second number that must agree with the receipts, and it drifts on
+exactly the rollback the transaction exists to survive.
+
+**`TASK-019`'s brief named these `purchase_order_lines` and `goods_receipt_lines`.** They are
+`_items` here, matching §3.3's entity overview and `sale_items`, because §3.3 had already
+published the names and the data model is this document's to own.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -581,7 +715,10 @@ migrations/003_inventory.sql        inventory, inventory_movements
 migrations/004_customers_credit.sql customers, accounts, transactions, allocations
 migrations/005_shifts.sql           shifts, till, closings, closing lines
 migrations/006_sales.sql            sales, items, tenders, discounts
-migrations/007_backup_log.sql       backup_log
+migrations/007_carts.sql            carts (POS-105's parked sale)
+migrations/008_report_indexes.sql   indexes only — no table
+migrations/009_backups_alerts.sql   backups, alert_dismissals, system_events
+migrations/010_purchasing.sql       suppliers, purchase orders and items, goods receipts and items
 ```
 
 ## 4. API
@@ -616,6 +753,22 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/reports/payments?from=&to=&shiftId=` | `TX-421` | `RPT-102` |
 | `GET` | `/reports/inventory/valuation` | `TX-422` | `RPT-103` |
 | `GET` | `/reports/:report/export.csv` | `TX-426` + the report's own grant | `AUD-601` |
+| `GET` | `/suppliers?q=&includeInactive=` | `TX-409` | `FT-501` |
+| `GET` | `/suppliers/:id` | `TX-409` | |
+| `POST` `PUT` | `/suppliers` `/suppliers/:id` | `TX-409` | `VR-401` — name required and unique, NOCASE |
+| `POST` | `/suppliers/:id/deactivate` `/reactivate` | `TX-409` | `VR-401` — refused while an order is outstanding |
+| `DELETE` | `/suppliers/:id` | `TX-409` | Always 409. Orders and deliveries reference them (`VR-401`) |
+| `GET` | `/purchase-orders?supplierId=&status=&open=&q=&from=&to=` | `TX-409` | `SCR-801`; serves the status list its filter is built from |
+| `GET` | `/purchase-orders/:id` | `TX-409` | Lines, what has arrived against each, and the deliveries |
+| `POST` | `/purchase-orders` | `TX-409` | `PO-101`. **Writes no inventory movement** (`PO-103`) |
+| `PUT` | `/purchase-orders/:id` | `TX-409` | `PO-104` — a `DRAFT` is edited, a `PENDING` order is amended into a new revision. The server decides which |
+| `POST` | `/purchase-orders/:id/submit` | `TX-409` | `PO-102` — `DRAFT` → `PENDING` |
+| `POST` | `/purchase-orders/:id/cancel` | `TX-409` | `PO-105` — refused once anything has been received |
+| `GET` | `/goods-receipts?supplierId=&poId=&flaggedOnly=&from=&to=` | `TX-409` | `flaggedOnly` finds `PO-204`/`PO-205` exceptions afterwards |
+| `GET` | `/goods-receipts/:id` | `TX-409` | |
+| `POST` | `/goods-receipts` | `TX-409` | `PO-201`–`PO-207`. `poId` absent is the counter purchase and still needs a `supplierId`. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |
+| `PUT` `DELETE` | `/goods-receipts/:id` | `TX-409` | Always 409 — `PO-206`, and the refusal names the adjustment or return that is the correction |
+| `GET` | `/products/:id/purchase-history` | `TX-409` | What this product has cost, from whom, and when |
 | `GET` | `/audit?actor=&action=&entity=&from=&to=` | `TX-429` | `SCR-703`; serves the action and actor lists its filters are built from |
 | `GET` | `/audit/export` | `TX-429` | The same query as CSV. Not `TX-426`: exporting the trail is reading it, and the export is itself audited (`AUD-601`) |
 | `GET` | `/backups` | `TX-428` | `SCR-704` — the log, the folder, and `SEC-9`'s warning |
@@ -637,6 +790,15 @@ unauthenticated endpoint reporting row counts and the database path would go wit
 for a `CASHIER`, so `requirePermission` admits them and `reportService` decides which shift they
 may read — refusing with `403` and writing an audit row, never narrowing the answer silently. A
 cashier handed their own till's figures under a store-wide heading has been told something false.
+
+All of purchasing is behind `TX-409` — §10's "receive goods" — because §10 has no separate
+grant for raising an order and `TX-409`'s roles are exactly the right set: owner, manager and
+the inventory clerk, never a cashier. A new permission would be a change to
+`03_BUSINESS_RULES.md` §10, which `TASK-019` was not scoped to make. A goods receipt moves
+average cost, which is otherwise `TX-412` and owner-only; it is not gated on that, because
+`PO-203` makes the cost move a **consequence** of a delivery rather than an edit of a product —
+a clerk is being asked what the van charged, not being allowed to retype a margin, and
+`PO-205`'s authorisation is what covers the case where that answer is wrong.
 
 ### 4.1 `POST /sales` — the one contract that matters
 

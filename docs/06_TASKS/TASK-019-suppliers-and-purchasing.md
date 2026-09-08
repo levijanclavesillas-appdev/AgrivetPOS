@@ -7,7 +7,10 @@ rules `PO-101`–`PO-207`, `VR-401`, `INV-106`, `MON-004`, `AUD-601`
 
 ---
 
-## Before starting — 1 answer is needed
+## Before starting — 1 answer is needed · **ANSWERED: yes, build the full lifecycle**
+
+The store does raise orders, so `PO-101`–`PO-105` were built alongside the receipt rather than
+deferred behind it. The question, as it was asked:
 
 **Does the store issue purchase orders at all?** `D-4` shipped v1.0 as a "thin till-first MVP"
 on the reasoning that the store *"can buy stock on paper for a few weeks"*. If it still does —
@@ -86,15 +89,15 @@ of stock and a number the store can take to the supplier.
 
 ## Acceptance Criteria
 
-- [ ] A PO can be raised, submitted, partially received, and completed
-- [ ] Raising and amending a PO writes no inventory movement whatsoever
-- [ ] A damaged quantity is recorded and does not increase stock
-- [ ] Average cost after a receipt equals the actual received cost, not the ordered cost
-- [ ] Over-receipt and an out-of-tolerance cost each require authorisation and are flagged
-- [ ] A PO with any receipt against it cannot be cancelled
-- [ ] A posted receipt cannot be edited
-- [ ] A direct receipt with no PO works and obeys the same rules
-- [ ] The inventory ledger reconciles after a week of purchasing
+- [x] A PO can be raised, submitted, partially received, and completed
+- [x] Raising and amending a PO writes no inventory movement whatsoever
+- [x] A damaged quantity is recorded and does not increase stock
+- [x] Average cost after a receipt equals the actual received cost, not the ordered cost
+- [x] Over-receipt and an out-of-tolerance cost each require authorisation and are flagged
+- [x] A PO with any receipt against it cannot be cancelled
+- [x] A posted receipt cannot be edited
+- [x] A direct receipt with no PO works and obeys the same rules
+- [x] The inventory ledger reconciles after a week of purchasing
 
 ## Tests
 
@@ -106,6 +109,44 @@ of stock and a number the store can take to the supplier.
 | `TC-INT-79` | `PO-102`, `PO-105`: the status machine, and the cancellation that is refused |
 | `TC-INT-80` | `PO-204`, `PO-205`: over-receipt and cost variance each need authorisation |
 | `TC-E2E-16` | Order 50 sacks, receive 47 sound and 3 damaged at a higher cost than ordered, authorise it, and find the stock, the cost and the ledger all right |
+
+---
+
+## Closed
+
+Every acceptance criterion above is asserted by a test, not by inspection: `TC-INT-76` to
+`TC-INT-80` and `TC-E2E-16`, plus the purchasing walk in `tools/browser-smoke/`, which drives
+`SCR-801`–`SCR-804` in real Chromium and is where the authorisation panel and the sound-quantity
+arithmetic are proved in front of a person rather than through the API.
+
+**Four decisions worth carrying forward.**
+
+1. **The tables are `purchase_order_items` and `goods_receipt_items`**, not the `_lines` this
+   file asked for. `05_TECH_SPEC.md` §3.3 had already published the `_items` names in its entity
+   overview and `sale_items` sets the house convention; the data model is that document's to own.
+
+2. **`PO-205` applies to a direct receipt too, measured against the prevailing average cost.**
+   The rule's own words are "differs from the PO", and `PO-207` has no PO to differ from — but
+   `PO-207` also says a direct receipt follows every other receipt rule, and the reason `PO-205`
+   gives is that a mis-keyed cost silently destroys every margin figure, which is exactly as true
+   at the counter. Where a product has never been costed there is no baseline and the check does
+   not apply. The refusal names which baseline it used.
+
+3. **A manager or owner doing the receiving is the authorisation `PO-204` and `PO-205` ask for**,
+   recorded as `self_authorised` in the trail. This is the carve-out `INV-108` already makes for
+   a large adjustment, for the same reason: a second distinct person would make an over-receipt
+   impossible in a store where the manager unloads the van. Where the receiver is an inventory
+   clerk, `AUD-603`'s distinct actors apply in full.
+
+4. **The approver is resolved against the `users` table, not taken from the request body.** The
+   v1.0 pattern trusts a client-asserted `{ id, username, role }`; on a route that moves stock
+   and rewrites average cost that is a claim, not an authorisation, and `SEC-6` says
+   authorisation is server-side without exception. `TASK-011`'s override prompt should be brought
+   to the same shape.
+
+**One defect fixed outside the task's scope,** because the browser smoke found it while driving
+these screens: switching screens with a fetch in flight left the new screen blank, the old view's
+reply having cleared the shared root from under it. Each screen now owns its host element.
 
 ---
 

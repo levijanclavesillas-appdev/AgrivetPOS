@@ -35,8 +35,27 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..', '..');
 const RULES_DOC = path.join(root, 'docs', '03_BUSINESS_RULES.md');
 
-/** §2's covered sections, by rule prefix. */
-const COVERED = Object.freeze(['MON', 'UOM', 'INV', 'POS', 'CR']);
+/**
+ * §2's covered sections, by rule prefix.
+ *
+ * `PO` joined with TASK-019, which built the whole of §9. The obligation follows the
+ * implementation rather than leading it — see the note above about what requiring a
+ * citation for an unbuilt rule does to the figure — and it is still applied per
+ * release below, so a `PO-*` rule scheduled for 1.2 is reported, not asserted.
+ */
+const COVERED = Object.freeze(['MON', 'UOM', 'INV', 'POS', 'PO', 'CR']);
+
+/**
+ * Covered prefixes whose **v1.1** rules are built, and are therefore asserted rather
+ * than merely reported.
+ *
+ * This list is what makes §2's obligation follow the implementation instead of leading
+ * it. `PO` is here because TASK-019 built the whole of §9; the v1.1 rules in `POS`,
+ * `INV` and `CR` are TASK-020 to TASK-028's, and requiring a citation for them today
+ * would force exactly the fake that the "never faked" case below exists to prevent.
+ * A task that lands adds its prefix here.
+ */
+const BUILT_AT_1_1 = Object.freeze(['PO']);
 
 /**
  * The rules the document declares, with the release each is scheduled for.
@@ -115,6 +134,33 @@ test('TC-UT-98: every v1.0 rule in a covered section is cited by a test (NFR_5.2
   );
 
   process.stdout.write(`    ${rules.length} covered v1.0 rules, all cited\n`);
+});
+
+test('TC-UT-98: a v1.1 rule in a built section is cited too (NFR_5.2)', () => {
+  // §9 is built whole (TASK-019), so its rules carry the same obligation §1, §2, §5,
+  // §6 and §7 have carried since v1.0 — a rule with no test is treated as
+  // unimplemented, whatever the code says.
+  const rules = declaredRules().filter(
+    (r) => BUILT_AT_1_1.includes(r.prefix) && r.version === '1.1'
+  );
+  const cited = citedRules();
+  const missing = rules.filter((rule) => !cited.has(rule.id));
+
+  assert.ok(rules.length >= 12, `only ${rules.length} v1.1 rules parsed from the built sections`);
+  assert.deepEqual(
+    missing.map((r) => `${r.id} — ${r.section}`), [],
+    `${missing.length} of ${rules.length} built v1.1 rules have no test citing them`
+  );
+
+  // And in a test, not only in the service that implements them.
+  for (const rule of rules) {
+    assert.ok(
+      [...cited.get(rule.id)].some((f) => f.includes('src/tests/')),
+      `${rule.id} is cited only outside the test suite`
+    );
+  }
+
+  process.stdout.write(`    ${rules.length} built v1.1 rules, all cited\n`);
 });
 
 test('TC-UT-98: a citation is in a test, not only in the code it tests', () => {

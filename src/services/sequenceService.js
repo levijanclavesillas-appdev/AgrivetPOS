@@ -26,6 +26,8 @@ const sequenceRepository = require('../repositories/sequenceRepository');
 const SEQUENCES = Object.freeze({
   SALE: { prefix: 'SALE', table: 'sales', column: 'sale_no', rule: 'POS-108' },
   COLLECTION: { prefix: 'COLL', table: 'customer_credit_transactions', column: 'document_no', rule: 'CR-206' },
+  PURCHASE_ORDER: { prefix: 'PO', table: 'purchase_orders', column: 'po_no', rule: 'PO-101' },
+  GOODS_RECEIPT: { prefix: 'GR', table: 'goods_receipts', column: 'gr_no', rule: 'PO-201' },
 });
 
 const WIDTH = 6;

@@ -3,7 +3,7 @@
 Work items, closed and open. Each task is self-contained: an implementer should need this file,
 plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**v1.0 is code-complete.** `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
+**v1.0 is code-complete; v1.1 is under way.** `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
 screens the original backlog never assigned to anybody — see [the screen gap](#the-screen-gap--found-and-closed),
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
 shippable: nothing has run in the store. [Status](#status) has the detail.
@@ -85,6 +85,22 @@ again quietly.
 | [TASK-037](TASK-037-customer-and-credit-screens.md) | Customers and credit | `SCR-401`–`SCR-403` | `c6e4641` |
 | [TASK-041](TASK-041-audit-viewer.md) | Audit trail viewer | `SCR-703` | *this commit* |
 
+## Closed — v1.1 "Supply"
+
+| ID | Task | Commit | What it left behind |
+| :--- | :--- | :--- | :--- |
+| [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | *this commit* | `010_purchasing.sql`; `supplierService`, `purchaseOrderService`, `goodsReceiptService` and their repositories; `SCR-801`–`SCR-804`; `TC-INT-76`–`TC-INT-80`, `TC-E2E-16`. The v1.1 gate in `07_TEST_PLAN.md` §10 |
+
+**The answer to its opening question was "yes, build the full lifecycle."** The store does raise
+orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
+
+**What it also fixed, found by the browser smoke.** Switching screens while the previous one had
+a fetch in flight left the *new* screen blank: the old view's reply landed after the switch and
+cleared the shared `main` element from under it. Each screen now gets its own host element
+(`shell/app.js`), so a late render writes into a node that is no longer in the document. It
+predates this task — the products and customers lists could both do it — and nothing before this
+walk switched screens fast enough to see it.
+
 ## Open — v1.1 "Supply"
 
 Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
@@ -94,7 +110,6 @@ Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-0
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
-| [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | `FT-501`–`FT-504` | — |
 | [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `FT-308` | — |
 | [TASK-020](TASK-020-sales-returns.md) | Sales returns with restock/write-off decision | `FT-307` | — |
 | [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `FT-209` | — |
@@ -105,11 +120,11 @@ Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-0
 | [TASK-027](TASK-027-statutory-discount.md) | Senior citizen / PWD statutory discount | `FT-309` | — |
 | [TASK-028](TASK-028-store-credit.md) | Store credit balances | `FT-408` | `TASK-020` |
 
-Two of them carry a question that must be answered before the work starts, in the same shape
-`TASK-016` and `TASK-018` used: `TASK-019` asks whether the store issues purchase orders at all
-(if not, build the goods receipt first and let the lifecycle follow), and `TASK-027` asks
-whether the store is required to grant the statutory discount — a question for the store's
-accountant, which is why `TAX-004` ships it off by default.
+One of them still carries a question that must be answered before the work starts, in the same
+shape `TASK-016` and `TASK-018` used: `TASK-027` asks whether the store is required to grant the
+statutory discount — a question for the store's accountant, which is why `TAX-004` ships it off
+by default. (`TASK-019`'s was answered: the store does raise purchase orders, so the full
+lifecycle was built.)
 
 Four fill things v1.0 deliberately left stubbed rather than absent: `PR-101`'s top two
 precedence levels (`TASK-024`), `RPT-101`'s `returns` term (`TASK-020`), `sales.voided_at` and

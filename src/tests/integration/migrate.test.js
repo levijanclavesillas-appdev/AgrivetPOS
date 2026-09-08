@@ -135,6 +135,9 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     // 008_report_indexes adds no table — it is indexes only.
     // 009_backups_alerts
     'backups', 'alert_dismissals', 'system_events',
+    // 010_purchasing
+    'suppliers', 'purchase_orders', 'purchase_order_items',
+    'goods_receipts', 'goods_receipt_items',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
@@ -147,7 +150,10 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'idx_saleitems_product', 'idx_tender_sale', 'idx_tender_ref', 'idx_discounts_sale',
     'idx_carts_user_shift', 'idx_carts_shift',
     'idx_saleitems_report', 'idx_tender_report',
-    'idx_backups_verified', 'idx_backups_taken', 'idx_dismissals_kind', 'idx_sysevents_kind']) {
+    'idx_backups_verified', 'idx_backups_taken', 'idx_dismissals_kind', 'idx_sysevents_kind',
+    'idx_po_supplier', 'idx_po_status', 'idx_poitems_product',
+    'idx_gr_supplier', 'idx_gr_po', 'idx_gr_date',
+    'idx_gritems_product', 'idx_gritems_poitem']) {
     assert.ok(repo.listIndexes().includes(index), `missing index ${index}`);
   }
   assert.ok(repo.integrityCheck().ok, 'a freshly migrated database passes integrity_check');

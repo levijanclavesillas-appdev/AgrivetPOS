@@ -64,10 +64,12 @@ test('GET /api/v1/health/panel reports OPS-006’s six figures, behind TX-428', 
     'alert_dismissals', 'audit_logs', 'backups', 'brands', 'carts', 'cashier_closings',
     'cashier_shifts', 'categories', 'closing_method_lines', 'credit_allocations',
     'customer_credit_accounts', 'customer_credit_transactions', 'customers',
+    'goods_receipt_items', 'goods_receipts',
     'inventory', 'inventory_movements',
     'product_barcodes', 'product_packs', 'product_prices', 'products',
+    'purchase_order_items', 'purchase_orders',
     'sale_discounts', 'sale_items', 'sale_tenders', 'sales',
-    'schema_migrations', 'store_profile', 'system_events', 'system_settings',
+    'schema_migrations', 'store_profile', 'suppliers', 'system_events', 'system_settings',
     'till_movements', 'units', 'users',
   ]);
   assert.equal(body.database.row_counts.schema_migrations, body.schema.binary_version);

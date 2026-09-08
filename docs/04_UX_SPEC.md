@@ -41,6 +41,8 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-203 Adjustment     SCR-204 Low stock   │
 │  SHIFT        SCR-501 Open           SCR-502 Till cash   │
 │               SCR-503 Close                              │
+│  BUYING       SCR-801 Orders         SCR-802 Order       │
+│               SCR-803 Receive        SCR-804 Suppliers   │
 │  REPORTS      SCR-601 Dashboard      SCR-602 Daily sales │
 │               SCR-603 Payments       SCR-604 Inventory   │
 │  ADMIN        SCR-701 Users          SCR-702 Settings    │
@@ -169,6 +171,38 @@ Every report header states the date range, the tax mode (`RPT-106`) and whether 
 included. Every report is exportable to CSV. Daily sales shows the reconciliation line
 `gross − discounts − returns = net` explicitly, because a report that quietly fails to reconcile
 is worse than one that shows it (`RPT-101`).
+
+### `SCR-801`–`SCR-804` — Buying · `FT-501`–`FT-504` — v1.1
+
+Behind `TX-409`, so an owner, a manager and the inventory clerk reach it and a cashier does not.
+
+`SCR-801` **Orders** — the list, filtered by supplier and status, defaulting to the two statuses
+that mean "sent and not yet fully here". Each row shows the number, the supplier, what was
+ordered against what has arrived, and the status word from `PO-102`. The status filter is served
+by `GET /purchase-orders`; the screen keeps no copy of it.
+
+`SCR-802` **Order** — one purchase order. Lines of product, quantity and unit cost, with the
+running total. **A `DRAFT` is edited in place; a sent order is amended into a new revision**
+(`PO-104`), and the screen says which of the two it is about to do before the buyer presses
+save — the supplier is holding a printed copy of something, and "rev 2" is the word that tells
+them which. **Nothing on this screen moves stock** (`PO-103`); the only thing that does is
+`SCR-803`, and the order says so where a reader might expect a "receive" shortcut to appear.
+Cancel is offered only while `PO-102` allows it and is refused outright once anything has
+arrived (`PO-105`).
+
+`SCR-803` **Receive** — the delivery. Per line: what was ordered, what arrived, **how much of
+what arrived was damaged**, and the unit cost actually charged. The screen computes the sound
+quantity — arrived less damaged — and states it as the figure that will become stock (`PO-202`),
+because a shopkeeper counting sacks off a van is entitled to see the arithmetic rather than
+discover it in the ledger. Over-receipt (`PO-204`) and a cost outside tolerance (`PO-205`) each
+raise §4's inline authorisation panel, naming the rule and the amount by which it was exceeded;
+the post button stays disabled until a manager or owner has authenticated in it. Reached with no
+order for the counter purchase, which still requires a supplier (`PO-207`). Posted, it is
+immutable (`PO-206`) and the screen offers no edit.
+
+`SCR-804` **Suppliers** — name, code, contact, terms, and the purchase history that answers
+"what did this supplier charge us last time". Deactivated, never deleted (`VR-401`), and refused
+while an order is still outstanding.
 
 ### `SCR-701`–`SCR-705` — Admin
 

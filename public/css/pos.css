@@ -43,6 +43,10 @@
 .rail-user { border-top: 1px solid rgba(255, 255, 255, .15); }
 
 .screen { padding: 1rem 1.25rem; overflow: hidden; }
+/* Each screen gets its own host element so a late fetch from the screen you just left
+   cannot clear the one you just opened (shell/app.js). `display: contents` keeps the
+   wrapper out of the box tree, so no existing layout has to know it is there. */
+.screen-host { display: contents; }
 
 /* Below 1024 px the rail collapses to icons (§8). The label is hidden rather than the
    item, so nothing becomes unreachable on a smaller screen. */

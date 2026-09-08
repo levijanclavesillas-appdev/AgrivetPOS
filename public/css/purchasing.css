@@ -1,0 +1,68 @@
+/* SCR-801 – SCR-804. Tokens come from app.css; nothing here redefines a colour. */
+
+.purchasing { padding: 1rem 1.25rem 3rem; max-width: 82rem; }
+
+/* §4: a wide table scrolls inside its own container, never the page. The receive
+   table is eight columns on a 1366-wide store PC, which is exactly the case the rule
+   is written for. */
+.table-scroll { overflow-x: auto; margin: .5rem 0 1rem; }
+.table-scroll .catalogue-list { margin: 0; min-width: 44rem; }
+.receive-table { min-width: 58rem; }
+
+/* PO-102's five words, coloured by what they mean for the buyer: something is still
+   expected, everything arrived, or nothing will. */
+.status { display: inline-block; padding: .1rem .45rem; border-radius: 3px;
+  font-size: .75rem; letter-spacing: .02em; background: var(--rule); color: var(--ink); }
+.status-draft { background: #eee; color: var(--muted); }
+.status-pending, .status-partially_received { background: var(--warn-bg); color: var(--warn-ink); }
+.status-received { background: #e6f1ea; color: var(--accent); }
+.status-cancelled { background: #f6e7e6; color: var(--error); }
+
+.catalogue-list tr.is-open { border-left-color: var(--warn-ink); }
+.catalogue-list tr.is-complete { color: var(--muted); }
+
+/* A rule stated on the screen it governs: PO-103's "this moves no stock", PO-202's
+   "only the sound quantity", PO-104's "saving raises a revision". Quiet by default,
+   and marked when it is a warning about what the next click will do. */
+.rule-note { margin: .5rem 0 1rem; font-size: .875rem; line-height: 1.5; max-width: 54rem; }
+.rule-note.warn { background: var(--warn-bg); color: var(--warn-ink);
+  padding: .6rem .75rem; border-left: 4px solid var(--warn-ink); border-radius: 3px; }
+
+.editor-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.editor-row .editor-field { flex: 1 1 14rem; }
+.purchasing .editor-form { max-width: none; }
+
+.catalogue-list .qty input, .catalogue-list .money input { width: 6.5rem; min-height: var(--touch);
+  padding: 0 .4rem; text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+.catalogue-list .unit { margin-left: .35rem; font-size: .8125rem; color: var(--muted); }
+.catalogue-list .line-product { width: 100%; min-width: 16rem; min-height: var(--touch);
+  padding: 0 .4rem; font: inherit; }
+.catalogue-list .damage-note { width: 100%; min-width: 10rem; min-height: var(--touch);
+  padding: 0 .4rem; font: inherit; }
+.catalogue-list small { display: block; font-size: .75rem; color: var(--muted); }
+.catalogue-list .resolved:not(:empty) { color: var(--accent); }
+
+/* PO-202's figure, and the one the eye should land on while sacks are being counted
+   off a van. Marked when it is below what arrived, because that is the case worth
+   noticing before the delivery note is signed. */
+.qty.sound { font-weight: 600; }
+.qty.sound.warn { color: var(--warn-ink); background: var(--warn-bg); }
+
+.po-total, .gr-total { margin-left: auto; font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+
+.po-receipts { margin-top: 2rem; }
+.po-receipts h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.plain-list li { padding: .4rem 0; border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums; }
+
+.supplier-editor { background: #fff; border: 1px solid var(--rule); border-radius: 6px;
+  padding: 1rem 1.25rem; margin: 1rem 0; max-width: 46rem; }
+.supplier-editor h2 { font-size: 1rem; margin: 0 0 1rem; }
+
+.row-action.danger { color: var(--error); }
+
+@media (max-width: 900px) {
+  .editor-row { flex-direction: column; }
+  .po-total, .gr-total { margin-left: 0; }
+}
