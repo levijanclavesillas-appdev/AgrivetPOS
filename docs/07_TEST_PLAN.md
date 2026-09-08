@@ -179,6 +179,32 @@ release's own migrations rather than by hand-writing an old schema. Both are re-
 **installed** `.exe` at UAT (checks D and E), because an installer can lose a database in ways a
 service call cannot.
 
+## 6.3 v1.1 cases, reserved
+
+`TC-*` ids are owned by this document, so the v1.1 task files do not invent them privately —
+the ids they cite are reserved here. The cases themselves are written with the tasks; what this
+section prevents is two tasks reaching for the same number, which is how a suite ends up with
+two `TC-INT-84`s that assert different things.
+
+| Range | Task | Subject |
+| :--- | :--- | :--- |
+| `TC-INT-76` – `TC-INT-80` | `TASK-019` | Purchasing: no stock on a PO, damaged quantity, actual cost, the status machine, over-receipt |
+| `TC-INT-81` – `TC-INT-84` | `TASK-020` | Returns: the quantity ceiling, write-off defaults, refund precedence, both movements |
+| `TC-INT-85` – `TC-INT-87` | `TASK-021` | Voids: full reversal, the shift window, the authorisation |
+| `TC-INT-88` – `TC-INT-91` | `TASK-022` | Stock counts: the freeze, no movement when matched, self-approval, staleness |
+| `TC-INT-92` – `TC-INT-93`, `TC-UT-45` – `TC-UT-49` | `TASK-023`, `TASK-024` | Discount tiers, category ceilings, non-compounding, the four precedence levels |
+| `TC-INT-94` – `TC-INT-100` | `TASK-025`, `TASK-026` | Import validation before writing, determinism, collisions, the opening load |
+| `TC-INT-101` – `TC-INT-102`, `TC-UT-50` – `TC-UT-51` | `TASK-027` | Statutory discount: off by default, no compounding, VAT exemption |
+| `TC-INT-103` – `TC-INT-106` | `TASK-028` | Store credit: both sources, spending it, reconciliation, never aged overdue |
+| `TC-E2E-16` – `TC-E2E-22` | one per task | The journey each task exists for |
+
+**Two existing cases are re-pointed rather than replaced**, and both are named in their tasks:
+`TC-INT-62` currently forces a `VOIDED` status by hand because no void path exists, and
+`TASK-021` points it at a real void; `TC-UT-31` currently asserts that two of `PR-101`'s four
+precedence levels are stubbed, and `TASK-024` makes it assert that all four resolve. A case that
+was written against a placeholder is a case that must change when the placeholder does — and
+noticing that at v1.1 close is cheaper than noticing it in review.
+
 ## 7. Regression guards
 
 Permanent, never deleted, run on every build:

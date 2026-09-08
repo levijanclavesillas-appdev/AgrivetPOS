@@ -85,27 +85,36 @@ again quietly.
 | [TASK-037](TASK-037-customer-and-credit-screens.md) | Customers and credit | `SCR-401`–`SCR-403` | `c6e4641` |
 | [TASK-041](TASK-041-audit-viewer.md) | Audit trail viewer | `SCR-703` | *this commit* |
 
-## Open — v1.1 "Supply" (no task files yet; write them at v1.0 close)
+## Open — v1.1 "Supply"
 
-| ID | Task | Feature |
-| :--- | :--- | :--- |
-| `TASK-019` | Suppliers, purchase orders, goods receipt | `FT-501`–`FT-504` |
-| `TASK-020` | Sales returns with restock/write-off decision | `FT-307` |
-| `TASK-021` | Sale voiding with full reversal | `FT-308` |
-| `TASK-022` | Stock counting with frozen expected quantities | `FT-209` |
-| `TASK-023` | Discount rules engine and category ceilings | `FT-306` |
-| `TASK-024` | Customer-specific and quantity-break pricing | `FT-211`, `FT-212` |
-| `TASK-025` | JSON export and validated import | `FT-705`, `FT-706` |
-| `TASK-026` | **Opening-data load from CSV** — products, opening stock, opening credit balances | `FT-707` |
-| `TASK-027` | Senior citizen / PWD statutory discount | `FT-309` |
-| `TASK-028` | Store credit balances | `FT-408` |
+Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
+`TASK-024` because the second slots into the precedence the first defines, `TASK-020` before
+`TASK-028` because a return is the other thing that creates store credit, and `TASK-025` before
+`TASK-026` because the opening load reuses its validation pass rather than growing a second one.
 
-> `TASK-026` is v1.1 by release but is needed **at cutover**, before the store's first real day.
-> If the client's SKU count makes manual entry impractical (`01_PRODUCT_BRIEF.md` `Q-4`), it is
-> pulled into v1.0 and the backlog is re-ordered — that is the one planned exception.
->
-> **`Q-4` is answered:** the list is small enough to key in by hand, so `TASK-026` stays in v1.1
-> and the exception is not taken. Hand entry is possible now that `TASK-036` has landed.
+| ID | Task | Feature | Depends on |
+| :--- | :--- | :--- | :--- |
+| [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | `FT-501`–`FT-504` | — |
+| [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `FT-308` | — |
+| [TASK-020](TASK-020-sales-returns.md) | Sales returns with restock/write-off decision | `FT-307` | — |
+| [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `FT-209` | — |
+| [TASK-023](TASK-023-discount-rules-engine.md) | Discount rules engine and category ceilings | `FT-306` | — |
+| [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `FT-211`, `FT-212` | `TASK-023` |
+| [TASK-025](TASK-025-json-export-and-import.md) | JSON export and validated import | `FT-705`, `FT-706` | — |
+| [TASK-026](TASK-026-opening-data-load.md) | **Opening-data load from CSV** — products, opening stock, opening credit balances | `FT-707` | `TASK-025` |
+| [TASK-027](TASK-027-statutory-discount.md) | Senior citizen / PWD statutory discount | `FT-309` | — |
+| [TASK-028](TASK-028-store-credit.md) | Store credit balances | `FT-408` | `TASK-020` |
+
+Two of them carry a question that must be answered before the work starts, in the same shape
+`TASK-016` and `TASK-018` used: `TASK-019` asks whether the store issues purchase orders at all
+(if not, build the goods receipt first and let the lifecycle follow), and `TASK-027` asks
+whether the store is required to grant the statutory discount — a question for the store's
+accountant, which is why `TAX-004` ships it off by default.
+
+Four fill things v1.0 deliberately left stubbed rather than absent: `PR-101`'s top two
+precedence levels (`TASK-024`), `RPT-101`'s `returns` term (`TASK-020`), `sales.voided_at` and
+its siblings (`TASK-021`), and `sale_tenders`' `STORE_CREDIT` method (`TASK-028`). Each was
+built with the seam in place, and each task's job is to fill it rather than to reshape anything.
 
 ## Open — v1.2 "Trace"
 
