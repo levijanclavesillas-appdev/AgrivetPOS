@@ -17,6 +17,7 @@ const productService = require('../../services/productService');
 const referenceService = require('../../services/referenceService');
 const auditService = require('../../services/auditService');
 const productRepository = require('../../repositories/productRepository');
+const inventoryService = require('../../services/inventoryService');
 const temp = require('../helpers/tempdb');
 
 const PORT = 47893;
@@ -143,44 +144,40 @@ test('TC-UT-10: the base unit is editable before any movement exists', () => {
 test('TC-UT-10: the base unit is refused once a movement exists, and the message says why', () => {
   const product = productService.create(productInput({ sku: 'FEED-003', name: 'Layer Mash' }), sessions.OWNER);
 
-  // inventory_movements arrives with TASK-007's migration 003. A fixture builds the
-  // state the production path cannot reach yet — the sanctioned exception in
-  // TC-UT-99's own comment — so UOM-003 is proved now rather than asserted later.
-  db.get().exec(`
-    CREATE TABLE IF NOT EXISTS inventory_movements (
-      id TEXT PRIMARY KEY, product_id TEXT NOT NULL, movement_type TEXT NOT NULL,
-      qty_milli INTEGER NOT NULL, balance_after_milli INTEGER NOT NULL, occurred_at TEXT NOT NULL
-    )`);
-  db.get()
-    .prepare('INSERT INTO inventory_movements VALUES (?, ?, ?, ?, ?, ?)')
-    .run('m1', product.id, 'RECEIPT', 500000, 500000, new Date().toISOString());
+  // A real movement through the real service (TASK-007). Until migration 003 existed
+  // this case built a stub table as a fixture; it does not need to any more, and a
+  // fixture that outlives the thing it stood in for is how a test starts asserting
+  // its own scaffolding.
+  inventoryService.postStandalone({
+    productId: product.id,
+    type: 'RECEIPT',
+    qtyMilli: 500000,
+    unitCostCentavos: 4800,
+    actor: sessions.OWNER,
+  });
 
+  assert.equal(productRepository.countMovements(product.id), 1);
+
+  let err;
   try {
-    assert.equal(productRepository.countMovements(product.id), 1);
-
-    let err;
-    try {
-      productService.update(product.id, { baseUnitId: ref.sack.id }, sessions.OWNER);
-    } catch (caught) {
-      err = caught;
-    }
-
-    assert.ok(err, 'UOM-003: the base unit is frozen once history exists');
-    assert.equal(err.status, 409);
-    assert.equal(err.ruleId, 'UOM-003');
-    // 04_UX_SPEC.md §3 requires the reason to be shown, and a refusal an operator
-    // cannot act on just gets worked around.
-    assert.match(err.message, /reinterpret/i, 'why it is refused');
-    assert.match(err.message, /create a new product/i, 'and the correction path UOM-003 gives');
-
-    assert.equal(productService.get(product.id, sessions.OWNER).base_unit.code, 'KG', 'unchanged');
-
-    // Everything else about the product is still editable — the freeze is on the unit.
-    const renamed = productService.update(product.id, { name: 'Layer Mash 50' }, sessions.OWNER);
-    assert.equal(renamed.name, 'Layer Mash 50');
-  } finally {
-    db.get().exec('DROP TABLE inventory_movements');
+    productService.update(product.id, { baseUnitId: ref.sack.id }, sessions.OWNER);
+  } catch (caught) {
+    err = caught;
   }
+
+  assert.ok(err, 'UOM-003: the base unit is frozen once history exists');
+  assert.equal(err.status, 409);
+  assert.equal(err.ruleId, 'UOM-003');
+  // 04_UX_SPEC.md §3 requires the reason to be shown, and a refusal an operator
+  // cannot act on just gets worked around.
+  assert.match(err.message, /reinterpret/i, 'why it is refused');
+  assert.match(err.message, /create a new product/i, 'and the correction path UOM-003 gives');
+
+  assert.equal(productService.get(product.id, sessions.OWNER).base_unit.code, 'KG', 'unchanged');
+
+  // Everything else about the product is still editable — the freeze is on the unit.
+  const renamed = productService.update(product.id, { name: 'Layer Mash 50' }, sessions.OWNER);
+  assert.equal(renamed.name, 'Layer Mash 50');
 });
 
 // ── VR-205 — barcodes ───────────────────────────────────────────────────────

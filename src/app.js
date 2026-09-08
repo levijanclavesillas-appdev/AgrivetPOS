@@ -17,6 +17,7 @@ const settingsRoutes = require('./routes/settings');
 const auditRoutes = require('./routes/audit');
 const productRoutes = require('./routes/products');
 const referenceRoutes = require('./routes/reference');
+const inventoryRoutes = require('./routes/inventory');
 const setupService = require('./services/setupService');
 const { requireSetup } = require('./middleware/setup');
 
@@ -41,6 +42,7 @@ function createApp() {
   app.use(API_BASE, auditRoutes);
   app.use(API_BASE, productRoutes);
   app.use(API_BASE, referenceRoutes);
+  app.use(API_BASE, inventoryRoutes);
 
   // The renderer. Vanilla ES modules, no build step (05_TECH_SPEC.md §2).
   //

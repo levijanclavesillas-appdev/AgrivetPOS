@@ -106,6 +106,24 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 500000, group: 'INVENTORY', ruleId: 'INV-108', ownerOnly: true,
     what: 'Adjustment value above which owner authorisation is required', min: 0, max: 100000000,
   },
+  // INV-108: "a reason from the configured list". A free-text-only reason is rejected,
+  // so the list has to exist somewhere an owner can edit — and a list that lives in
+  // code is exactly what OPS-005 is about. JSON rather than a table: it is a short,
+  // ordered list of labels with no identity of its own, and nothing references a
+  // reason by id.
+  adjustment_reasons: {
+    type: 'JSON', group: 'INVENTORY', ruleId: 'INV-108', ownerOnly: false,
+    what: 'Reasons an inventory adjustment may be filed under',
+    value: Object.freeze([
+      'Damaged in storage',
+      'Spoilage',
+      'Physical count correction',
+      'Received but not recorded',
+      'Internal use',
+      'Supplier shortage on delivery',
+      'Data entry correction',
+    ]),
+  },
   stock_count_stale_days: {
     type: 'INT', value: 7, group: 'INVENTORY', ruleId: 'INV-113', ownerOnly: false,
     what: 'Days before an unposted stock count is flagged stale', min: 1, max: 365,
@@ -217,7 +235,17 @@ function coerce(key, raw) {
     throw errors.badRequest(`${key} must be true or false`, { ruleId: declared.ruleId });
   }
 
-  if (declared.type === 'JSON') return raw;
+  if (declared.type === 'JSON') {
+    const list = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(list) || list.length === 0) {
+      throw errors.badRequest(`${key} must be a non-empty list`, { ruleId: declared.ruleId });
+    }
+    const cleaned = list.map((item) => String(item).trim()).filter(Boolean);
+    if (cleaned.length !== list.length) {
+      throw errors.badRequest(`${key} may not contain a blank entry`, { ruleId: declared.ruleId });
+    }
+    return cleaned;
+  }
 
   const text = String(raw === null || raw === undefined ? '' : raw).trim();
   if (declared.required && text === '') {
