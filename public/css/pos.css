@@ -218,9 +218,9 @@
 
 /* ── Sign in and the lock screen ───────────────────────────────────────── */
 
-.signin, .open-shift { max-width: 22rem; margin: 4rem auto; }
-.signin input, .open-shift input[type="text"] { min-height: var(--touch); width: 100%; }
-.signin button, .open-shift button { min-height: var(--touch); width: 100%; margin-top: .5rem; }
+.signin { max-width: 22rem; margin: 4rem auto; }
+.signin input { min-height: var(--touch); width: 100%; }
+.signin button { min-height: var(--touch); width: 100%; margin-top: .5rem; }
 .signin-note { color: var(--muted); }
 
 .lock-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(18, 38, 28, .92); }

@@ -15,8 +15,10 @@ const os = require('os');
 const server = require('../../server');
 const temp = require('../helpers/tempdb');
 
-const PORT = 47887;
-const API = `http://127.0.0.1:${PORT}/api/v1`;
+// Port 0: the OS picks a free one and the real port is read back off the server.
+// A fixed port collides whenever two runs overlap or a socket lingers, which is a
+// flake that looks like a defect in whatever test happens to be running.
+let API = null;
 const PASSWORD = 'correct-horse-battery';
 
 let instance;
@@ -41,7 +43,8 @@ const json = async (res) => {
 
 test.before(async () => {
   temp.openEmpty('e2e-sale');
-  instance = await server.start({ listenPort: PORT });
+  instance = await server.start({ listenPort: 0 });
+  API = `http://127.0.0.1:${instance.address().port}/api/v1`;
   backupFolder = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-e2e-sale-')), 'backups');
 });
 

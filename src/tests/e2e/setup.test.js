@@ -21,9 +21,13 @@ const schemaRepository = require('../../repositories/schemaRepository');
 /** Row counts read straight from the database — /health no longer reports them. */
 const counts = () => schemaRepository.rowCounts();
 
-const PORT = 47895;
-const ORIGIN = `http://127.0.0.1:${PORT}`;
-const API = `${ORIGIN}/api/v1`;
+// Port 0: the OS picks a free one and the real port is read back off the server.
+// A fixed port collides whenever two runs overlap or a socket lingers, which is a
+// flake that looks like a defect in whatever test happens to be running.
+let ORIGIN = null;
+// Read at call time, not at module load: ORIGIN is not known until the server has
+// bound its port.
+const API = () => `${ORIGIN}/api/v1`;
 
 const STORE = 'Chachi Agrivet Supply';
 const OWNER = { fullName: 'Aling Nena', username: 'nena', password: 'correct-horse-battery', pin: '284917' };
@@ -32,7 +36,7 @@ let instance;
 let backupFolder;
 let recoveryCode;
 
-const call = (path_, { token = null, method = 'GET', body = null } = {}) => fetch(`${API}${path_}`, {
+const call = (path_, { token = null, method = 'GET', body = null } = {}) => fetch(`${API()}${path_}`, {
   method,
   headers: {
     ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -43,7 +47,8 @@ const call = (path_, { token = null, method = 'GET', body = null } = {}) => fetc
 
 test.before(async () => {
   temp.openEmpty('e2e-setup');                 // migrate() inside start(); no rows at all
-  instance = await server.start({ listenPort: PORT });
+  instance = await server.start({ listenPort: 0 });
+  ORIGIN = `http://127.0.0.1:${instance.address().port}`;
   backupFolder = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-e2e-')), 'backups');
 });
 

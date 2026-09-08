@@ -51,30 +51,29 @@ Every task below is implemented, tested and committed. The commit is the one tha
 | [TASK-016](TASK-016-dashboard-and-reports.md) | Dashboard and the v1.0 reports | `4f969b6` | `SCR-601`–`604`; gross profit pulled into v1.0 |
 | [TASK-017](TASK-017-backup-restore-health-alerts.md) | Automatic backup, verification, restore, health, alerts | `812a82b` | `SCR-704`, `705`; verified `.zip` backups, restore, `TC-E2E-09` |
 | [TASK-018](TASK-018-installer-and-uat.md) | Windows installer, first-run migration, UAT on store hardware | `c08f3af` | NSIS config, `TC-UT-98`, `TC-E2E-08`, handover and UAT sheets |
-| [TASK-036](TASK-036-catalogue-screens.md) | Catalogue screens `SCR-201`–`SCR-204` | *this commit* | `TC-E2E-10`, the cutover; on-hand joined into the product search |
+| [TASK-036](TASK-036-catalogue-screens.md) | Catalogue screens `SCR-201`–`SCR-204` | `cce3c8f` | `TC-E2E-10`, the cutover; on-hand joined into the product search |
+| [TASK-038](TASK-038-shift-screens.md) | Shift screens `SCR-501`–`SCR-503` | *this commit* | `TC-E2E-11`, a counted close; one open path instead of two |
 
 ## Open — v1.0 "Till", the screen gap
 
 **These are release-blocking.** The v1.0 backlog assigned screens to three tasks — `TASK-015`
 (`SCR-301`–`304`), `TASK-016` (`SCR-601`–`604`) and `TASK-017` (`SCR-704`, `705`). Nobody was
-given the rest. `04_UX_SPEC.md` specifies **26 screens; 17 now exist**; every service and API
-behind the missing nine is built and tested, but there is no screen to reach them from.
+given the rest. `04_UX_SPEC.md` specifies **26 screens; 20 now exist**; every service and API
+behind the missing six is built and tested, but there is no screen to reach them from.
 
-`TASK-036` closed the catalogue half — a store can now be stocked, and `TC-E2E-10` proves a
-cutover end to end. The store can sell and can be set up. It still cannot take a payment on
-account, close a shift, add a user, change a setting or read its own audit trail.
+`TASK-036` and `TASK-038` closed the two that stopped a store trading at all: it can be stocked
+(`TC-E2E-10`) and its till can be counted (`TC-E2E-11`). What is left is taking a payment on
+account, adding a user, changing a setting and reading the audit trail.
 
 | ID | Task | Screens | Why it blocks release |
 | :--- | :--- | :--- | :--- |
 | `TASK-037` | Customer and credit screens | `SCR-401`–`SCR-403` | No way to add a customer, set a limit, or take a payment on account (`FR_4.3`) |
-| `TASK-038` | Shift screens | `SCR-501`–`SCR-503` | Shift open exists inside the POS screen; **there is no close screen**, so `FR_5.3` cannot be performed by a cashier |
 | `TASK-039` | Settings screen | `SCR-702` | No way to set the printer, the receipt width, the backup folder or any `OPS-005` figure |
 | `TASK-040` | User administration | `SCR-701` | No way to create the cashiers. The store would trade on the owner login, which defeats `TX-412` and every audit row |
 | `TASK-041` | Audit trail viewer | `SCR-703` | The trail is written and queryable but cannot be read by the owner (`FR_1.5`) |
 
-`TASK-038` is the sharpest: a shift that can be opened and not closed is a till that cannot be
-counted, and the close is where `POS-509`, `POS-510`, the variance and the automatic backup all
-happen.
+`TASK-040` is now the sharpest of what is left: without it the store trades on the owner login,
+which defeats `TX-412` and puts the wrong name on every audit row.
 
 ## Open — v1.1 "Supply" (no task files yet; write them at v1.0 close)
 
@@ -134,10 +133,11 @@ a test**, and 51 of 51 rules outside the obligation as well.
 one of those screens has a working, tested API underneath. The suite was green because the
 suite tests the API.
 
-`TASK-036` closed the catalogue half. In practical terms now: a store can be set up and
-stocked, and a cashier can sell, take a split tender, park a cart, print a receipt and read the
-day's reports. Nobody can take a payment on account, close a shift, create a user, change a
-setting, or read the audit trail from the application.
+`TASK-036` and `TASK-038` closed the catalogue and the till. In practical terms now: a store
+can be set up and stocked, and a cashier can open a drawer, sell, take a split tender, park a
+cart, print a receipt, move cash in and out, count the drawer and close it against a verified
+backup. Nobody can take a payment on account, create a user, change a setting, or read the
+audit trail from the application.
 
 **Where the release gate stands.** `07_TEST_PLAN.md` §10 carries the per-criterion outcome.
 Seven of eleven criteria are green. Four need the store and cannot be settled from a build

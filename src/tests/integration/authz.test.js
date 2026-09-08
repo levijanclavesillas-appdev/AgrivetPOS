@@ -12,8 +12,10 @@ const permissions = require('../../services/permissions');
 const { SESSION_HEADER } = require('../../middleware/auth');
 const temp = require('../helpers/tempdb');
 
-const PORT = 47897;
-const BASE = `http://127.0.0.1:${PORT}/api/v1`;
+// Port 0: the OS picks a free one and the real port is read back off the server.
+// A fixed port collides whenever two runs overlap or a socket lingers, which is a
+// flake that looks like a defect in whatever test happens to be running.
+let BASE = null;
 const PASSWORD = 'correct-horse-battery';
 
 let instance;
@@ -30,7 +32,8 @@ const call = (path, { token = null, method = 'GET', body = null } = {}) => fetch
 
 test.before(async () => {
   temp.openEmpty('authz');
-  instance = await server.start({ listenPort: PORT });
+  instance = await server.start({ listenPort: 0 });
+  BASE = `http://127.0.0.1:${instance.address().port}/api/v1`;
   temp.seedStore({ withOwner: false });   // the roles below include the owner
 
   for (const role of permissions.ROLES) {

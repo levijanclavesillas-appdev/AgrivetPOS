@@ -15,8 +15,10 @@ const settingsService = require('../../services/settingsService');
 const auditRepository = require('../../repositories/auditRepository');
 const temp = require('../helpers/tempdb');
 
-const PORT = 47894;
-const BASE = `http://127.0.0.1:${PORT}/api/v1`;
+// Port 0: the OS picks a free one and the real port is read back off the server.
+// A fixed port collides whenever two runs overlap or a socket lingers, which is a
+// flake that looks like a defect in whatever test happens to be running.
+let BASE = null;
 const PASSWORD = 'correct-horse-battery';
 
 let instance;
@@ -30,7 +32,8 @@ const call = (path, { token = null, method = 'GET' } = {}) => fetch(`${BASE}${pa
 
 test.before(async () => {
   temp.openEmpty('audit');
-  instance = await server.start({ listenPort: PORT });
+  instance = await server.start({ listenPort: 0 });
+  BASE = `http://127.0.0.1:${instance.address().port}/api/v1`;
   temp.seedStore({ withOwner: false });
 
   for (const role of ['OWNER', 'MANAGER', 'CASHIER']) {

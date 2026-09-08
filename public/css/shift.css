@@ -1,0 +1,39 @@
+/* SCR-501 – SCR-503. Tokens come from app.css; nothing here redefines a colour. */
+
+.shift { padding: 1rem 1.25rem 3rem; max-width: 56rem; }
+.shift h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+.shift .check { display: flex; align-items: center; gap: .5rem; margin: 0 0 1rem; }
+.shift .check input { min-width: 1.15rem; min-height: 1.15rem; }
+
+.shift table { width: 100%; border-collapse: collapse; background: #fff; margin: .5rem 0 1rem; }
+.shift th, .shift td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--rule); }
+.shift thead th { font-size: .8125rem; color: var(--muted); }
+.shift .money { text-align: right; font-variant-numeric: tabular-nums; }
+.shift .total-row th, .shift .total-row td { font-weight: 700; border-top: 2px solid var(--ink); }
+
+/* POS-509's terms, so the expected figure is arithmetic rather than a number to trust. */
+.shift-expected { max-width: 34rem; }
+
+/* POS-510: the count is typed, never pre-filled. The input is wide enough to read. */
+.shift-close input { min-height: var(--touch); width: 100%; padding: 0 .6rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; text-align: right;
+  font-variant-numeric: tabular-nums; background: #fff; }
+.shift-close .variance { font-weight: 600; }
+.shift-close .variance.down { color: var(--error); }
+.shift-close .variance.up { color: var(--warn-ink); }
+.shift-close .variance.zero { color: var(--muted); }
+/* CREDIT takes no money, so its row is visibly not a thing to count. */
+.shift-close tr.not-counted td { color: var(--muted); }
+
+.variance-reason { min-height: var(--touch); width: 100%; padding: 0 .6rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+
+.close-verdict { font-size: 1.125rem; font-weight: 600; margin: 1rem 0 .25rem; }
+.close-verdict.balanced { color: var(--accent); }
+.close-verdict.beyond { color: var(--error); }
+.close-verdict.within { color: var(--warn-ink); }
+.close-reason { margin: 0 0 1rem; color: var(--muted); }
+
+@media (max-width: 1023px) {
+  .shift { max-width: none; }
+}

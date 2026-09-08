@@ -192,6 +192,81 @@ app.whenReady().then(async () => {
   const after = (await api('/carts/active')).json;
   log(after.cart === null, 'the counter is cleared after the sale');
 
+  console.log('\n— SCR-501 to SCR-503: the shift —');
+  await run(OPEN_RAIL('Shift'));
+  await waitFor(`!!document.querySelector('.shift')`, { label: 'SCR-501' });
+  const drawer = await run(`(document.querySelector('.shift-expected') || {}).textContent || ''`);
+  log(/Opening float/.test(drawer) && /Expected in the drawer/.test(drawer),
+    'POS-509: the drawer shows its terms, not just a total',
+    drawer.replace(/\s+/g, ' ').slice(0, 90));
+
+  // SCR-502
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Cash in/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.shift form')`, { label: 'SCR-502' });
+  await waitFor(`document.querySelectorAll('.shift select')[1].options.length > 1`,
+    { label: 'the till reasons' });
+  const tillReasons = await run(`document.querySelectorAll('.shift select')[1].options.length - 1`);
+  log(tillReasons > 0, 'POS-504: till reasons come from the configured list', `${tillReasons} reasons`);
+
+  await run(`[...document.querySelectorAll('.shift button')].find(b => /Cancel/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.shift-expected')`);
+
+  // SCR-503 — the one that did not exist before TASK-038.
+  await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Close shift/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.shift-close')`, { label: 'SCR-503' });
+
+  const counted = await run(`[...document.querySelectorAll('.shift-close input')].map(i => i.value)`);
+  log(counted.length > 0 && counted.every((v) => v === ''),
+    'POS-510: every counted field starts empty — nothing is pre-filled',
+    `${counted.length} inputs, all blank`);
+
+  const creditRow = await run(`(document.querySelector('.shift-close tr.not-counted') || {}).textContent || ''`);
+  log(/credit sale takes no money/i.test(creditRow), 'CREDIT is explained, not asked for',
+    creditRow.replace(/\s+/g, ' ').slice(0, 80));
+  log(await run(`!document.querySelector('.shift-close tr.not-counted input')`),
+    'and it carries no counted input at all');
+
+  // Count it short, on purpose, and watch the screen refuse.
+  const expectedApi = await api(`/shifts/current`);
+  const expectedCash = expectedApi.json.expected.expected_cash_centavos;
+  await run(`(() => {
+    const rows = [...document.querySelectorAll('.shift-close tbody tr')];
+    const cash = rows.find(r => /CASH/.test(r.children[0].textContent) && r.querySelector('input'));
+    const el = cash.querySelector('input');
+    el.value = ${JSON.stringify(((expectedCash - 30000) / 100).toFixed(2))};
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(400);
+  const varianceCell = await run(`(document.querySelector('.shift-close .variance.down') || {}).textContent || ''`);
+  log(/-/.test(varianceCell), 'the variance is computed and coloured as a shortage', varianceCell);
+
+  await run(`[...document.querySelectorAll('.shift button')].find(b => /Count and close/.test(b.textContent)).click()`);
+  await settle(1200);
+  const refusal = await run(`document.body.textContent`);
+  log(/never silently forced to balance/.test(refusal),
+    'POS-510: closing short without a reason is refused, in the rule\u2019s own words');
+  log(await run(`!!document.querySelector('.shift-close')`), 'and the shift is still open');
+
+  await run(`(() => {
+    const el = document.querySelector('.variance-reason');
+    el.value = 'Two 100 notes missing after the afternoon rush; counted three times';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+  await run(`[...document.querySelectorAll('.shift button')].find(b => /Count and close/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.summary')`, { label: 'the close summary', timeoutMs: 20000 });
+
+  const summary = await run(`document.querySelector('.summary').textContent`);
+  log(/short/.test(summary), 'the summary states the shortage', (summary.match(/The drawer is [^.]+\./) || [''])[0]);
+  log(/counted three times/.test(summary), 'AUD-602: and the reason recorded against it');
+  log(/backed up and the copy was opened/.test(summary),
+    'OPS-002: the close says the backup was verified');
+  log(/cannot be changed \(POS-511\)/.test(summary), 'POS-511: and that it cannot be changed');
+  log(await run(`!document.querySelector('.summary input')`), 'the summary offers no field to edit');
+
+  await run(`[...document.querySelectorAll('.summary button')].find(b => /Done/.test(b.textContent)).click()`);
+  await settle(900);
+
   console.log('\n— SCR-601: the dashboard —');
   await run(OPEN_RAIL('Reports'));
   await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
@@ -349,8 +424,8 @@ app.whenReady().then(async () => {
   await run(`[...document.querySelectorAll('.admin-head button')].find(b => /Back up now/.test(b.textContent)).click()`);
   await waitFor(`document.querySelectorAll('.backup-list tbody tr').length >= 1`,
     { label: 'the backup to appear', timeoutMs: 20000 });
-  const rows = await run(`document.querySelectorAll('.backup-list tbody tr').length`);
-  log(rows >= 1, 'a manual backup appears in the list', `${rows} row(s)`);
+  const backupRows = await run(`document.querySelectorAll('.backup-list tbody tr').length`);
+  log(backupRows >= 1, 'a manual backup appears in the list', `${backupRows} row(s)`);
   log(await run(`/Verified/.test((document.querySelector('.backup-list') || {}).textContent || '')`),
     'OPS-002: and it says it was verified');
 
@@ -359,9 +434,19 @@ app.whenReady().then(async () => {
     'the server agrees it verified', backups.json.backups[0] && backups.json.backups[0].file_name);
 
   console.log('\n— OPS-004: the restore confirmation —');
+  // The panel reloads itself after a backup, so wait for the table to settle rather
+  // than reading it in the gap between the skeleton and the rows.
+  await waitFor(`!!document.querySelector('.backup-list tbody tr')`, { label: 'the backup list' });
+  const restoreButtons = await run(`document.querySelectorAll('.backup-list .restore').length`);
+  if (restoreButtons === 0) {
+    console.log('        row html:', String(await run(
+      `(document.querySelector('.backup-list tbody tr') || {}).innerHTML || '(no row)'`
+    )).replace(/\s+/g, ' ').slice(0, 200));
+  }
   await run(`(document.querySelector('.backup-list .restore') || { click(){} }).click()`);
   await settle(900);
-  log(await run(`!!document.querySelector('.restore-dialog')`), 'the dialog opens');
+  log(await run(`!!document.querySelector('.restore-dialog')`), 'the dialog opens',
+    `${restoreButtons} restore button(s) across ${backupRows} row(s)`);
   log(await run(`document.querySelector('.restore-dialog .danger').disabled === true`),
     'and Restore is disabled until the filename is typed');
 

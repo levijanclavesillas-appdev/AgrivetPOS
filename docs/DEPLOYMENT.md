@@ -11,22 +11,23 @@ network connection at the store.
 >
 > **v1.0 cannot yet be deployed to a store**, and the reason is not the installer.
 >
-> Nine of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
-> collections, shift close, users, settings and the audit viewer (`06_TASKS/README.md`,
-> *the screen gap*). Every service and API behind them is built and tested; there is simply
-> no screen to reach them from.
+> Six of the twenty-six screens in `04_UX_SPEC.md` do not exist yet — customers and
+> collections, users, settings and the audit viewer (`06_TASKS/README.md`, *the screen gap*).
+> Every service and API behind them is built and tested; there is simply no screen to reach
+> them from.
 >
-> `TASK-036` has landed, so **section 6's catalogue half now works**: products, barcodes,
-> packs, prices, opening stock and adjustments are all reachable from `SCR-201`–`SCR-204`, and
-> `TC-E2E-10` walks that path from an empty install to a completed sale.
+> `TASK-036` and `TASK-038` have landed, so a store can now be **stocked** and its till can be
+> **counted**: products, barcodes, packs, prices, opening stock and adjustments from
+> `SCR-201`–`SCR-204`, and open, cash in and out, and a counted close from `SCR-501`–`SCR-503`.
+> `TC-E2E-10` and `TC-E2E-11` walk both paths end to end.
 >
 > What is still impossible as written: **section 4 (hardware)** and **section 5 (users)**,
 > which need the settings and user screens, and the opening **credit balances** in section 6,
-> which need the customer screens. A shift can be opened but **not closed**, which is the
-> sharpest of the remaining gaps — a till that cannot be counted.
+> which need the customer screens.
 >
-> Until `TASK-037`–`TASK-041` land, the only route to those operations is the HTTP API, which
-> is not a thing to do on a store counter.
+> Until `TASK-037` and `TASK-039`–`TASK-041` land, the only route to those operations is the
+> HTTP API, which is not a thing to do on a store counter. **Section 5 is the one to watch**:
+> without it the store trades on the owner login, and every audit row carries the wrong name.
 >
 > **Do not schedule the cutover on the strength of a green test suite.** The suite is green
 > because it tests the API.
@@ -217,6 +218,10 @@ the time they start.
 *The catalogue screens (`SCR-201`–`SCR-204`) are built and this half is performable today. The
 customer screens (`SCR-401`–`SCR-403`) are not, so opening **credit balances** still cannot be
 entered — that part waits for `TASK-037`.*
+
+*The shift screens (`SCR-501`–`SCR-503`) are built too, so UAT check 6 — a full day's takings
+reconciling at close — can now be performed by the cashier rather than by a technician with an
+HTTP client.*
 
 ### Products
 

@@ -18,6 +18,8 @@ import { createHealth } from '../admin/health.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
+import { createShift } from '../shift/view.js';
+import { createShiftSummary } from '../shift/summary.js';
 
 /** §2's role → landing screen. */
 // §2's role → landing screen. MANAGER and OWNER land on SCR-601, which lives under
@@ -177,6 +179,7 @@ export function createApp({ root }) {
     if (id === 'admin') return showAdmin();
     if (id === 'products') return showProducts();
     if (id === 'low-stock') return showProducts({ mode: 'low-stock' });
+    if (id === 'shift') return showShift();
 
     // The admin and catalog screens are their own tasks. Saying so beats a dead
     // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
@@ -222,6 +225,35 @@ export function createApp({ root }) {
       // A newly created product reopens in the editor rather than dropping back to the
       // list: its packs, prices and barcodes are the next four things anybody does.
       onClose: (createdId) => (createdId ? showProductEditor(createdId) : showProducts()),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-501 – SCR-503. `shiftId` opens another user's drawer, from the POS-508 alert. */
+  function showShift(shiftId = null) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    renderRail('shift');
+    current = createShift({
+      root: main,
+      session,
+      shiftId,
+      onClosed: (result) => showShiftSummary(result),
+    });
+    current.mount();
+    return current;
+  }
+
+  function showShiftSummary(result) {
+    if (current?.unmount) current.unmount();
+    clear(main);
+    current = createShiftSummary({
+      root: main,
+      result,
+      // POS-511: a closed shift is immutable, so there is nowhere to go back to. The
+      // cashier lands where the day starts again.
+      onDone: () => show(LANDING[session.role] || 'pos'),
     });
     current.mount();
     return current;
@@ -299,10 +331,12 @@ export function createApp({ root }) {
     }
 
     if (!shift.open) {
+      // POS-501. The open form lives on SCR-501 and nowhere else: two forms that open
+      // a shift are two places for the confirmation tick to drift apart.
       ui.empty(main, {
         title: 'Open your shift before selling. Count the drawer and enter the opening float.',
         action: 'Open shift',
-        onAction: () => openShift(),
+        onAction: () => showShift(),
       });
       return null;
     }
@@ -314,34 +348,6 @@ export function createApp({ root }) {
     });
     current.mount();
     return current;
-  }
-
-  function openShift() {
-    const float = h('input', { type: 'text', inputmode: 'decimal', required: true, 'aria-label': 'Opening float in pesos' });
-    const confirmed = h('input', { type: 'checkbox', required: true });
-
-    clear(main).append(h('form', {
-      class: 'open-shift',
-      onsubmit: async (event) => {
-        event.preventDefault();
-        try {
-          // POS-503: counted and confirmed. The server refuses without the tick.
-          await api.post('/shifts/open', {
-            openingFloatCentavos: Math.round(Number.parseFloat(float.value) * 100),
-            confirmed: confirmed.checked,
-          });
-          show('pos');
-        } catch (err) {
-          ui.toast(err.message, { kind: 'error' });
-        }
-      },
-    }, [
-      h('h1', { text: 'Open shift' }),
-      h('label', { text: 'Opening float (₱)' }, [float]),
-      h('label', { class: 'check' }, [confirmed, h('span', { text: 'I have counted this and it is correct' })]),
-      h('button', { type: 'submit', class: 'primary', text: 'Open shift' }),
-    ]));
-    queueMicrotask(() => float.focus());
   }
 
   function showPayment({ cart, priced, approver }) {

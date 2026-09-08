@@ -46,7 +46,23 @@ const codeOf = (relative) => fs.readFileSync(path.join(root, 'public', relative)
  */
 const proseOf = (relative) => fs.readFileSync(path.join(root, 'public', relative), 'utf8')
   .replace(/'\s*\n\s*\+\s*'/g, '')
-  .replace(/"\s*\n\s*\+\s*"/g, '');
+  .replace(/"\s*\n\s*\+\s*"/g, '')
+  .replace(/`\s*\n\s*\+\s*`/g, '');
+
+/**
+ * Comment prose with its line wrapping undone.
+ *
+ * The reasoning these guards check for is written in comments, and a comment wraps at
+ * eighty columns wherever the sentence happens to be. Grepping the raw file for a
+ * phrase finds it only when the wrap falls somewhere else, which makes the guard pass
+ * or fail on formatting.
+ */
+const commentsOf = (relative) => fs.readFileSync(path.join(root, 'public', relative), 'utf8')
+  .split('\n')
+  .filter((line) => line.trim().startsWith('//') || line.trim().startsWith('*'))
+  .map((line) => line.trim().replace(/^\/\/\s?|^\*\s?/, ''))
+  .join(' ')
+  .replace(/\s+/g, ' ');
 
 /** Every file under public/, so a guard cannot be dodged by adding a new module. */
 function walkFiles(dir, files = []) {
@@ -661,4 +677,85 @@ test('NFR_4.3: the catalogue controls are touchable', () => {
   // 04_UX_SPEC §3's two row treatments.
   assert.match(cssRule(css, '.catalogue-list tr.is-low'), /border-left-color/);
   assert.match(cssRule(css, '.catalogue-list tr.is-inactive'), /color/);
+});
+
+// ── SCR-501 – SCR-503 (TASK-038) ────────────────────────────────────────────
+
+test('TC-UI-04: the close never pre-fills a counted figure from the expected one', () => {
+  // POS-510 forbids a silent forced balance, and one line — `value: expected` — would
+  // be the whole of the control this screen exists to provide. A pre-filled count is a
+  // count nobody made, and the temptation is strongest at seven in the evening when
+  // the drawer is ₱200 short.
+  const source = codeOf('js/shift/view.js');
+
+  assert.match(source, /value: typed === undefined \? '' : typed/, 'the input shows what was typed');
+  assert.equal(
+    /value:\s*(money\()?\s*expected|value:\s*expectedCentavos/.test(source), false,
+    'nothing seeds a counted field from an expected figure'
+  );
+  // And the intent is written down, so a future edit has to argue with it.
+  assert.match(commentsOf('js/shift/view.js'), /a count nobody made/);
+});
+
+test('TC-UI-05: CREDIT is shown, explained, and carries no counted input', () => {
+  const source = codeOf('js/shift/view.js');
+
+  // A credit sale takes no money, so there is nothing to count against it. Asking
+  // would ask for a count nobody can make, and would count the same peso twice — once
+  // as credit given today, once as cash collected next week.
+  assert.match(source, /COUNTED = \['CASH', 'GCASH', 'QRPH'\]/);
+  assert.match(source, /!COUNTED\.includes\(method\.method\)/, 'unreconcilable rows branch early');
+  assert.match(commentsOf('js/shift/view.js'), /CREDIT takes no money/i);
+
+  // The summary renders the same distinction from the server's own flag.
+  assert.match(codeOf('js/shift/summary.js'), /line\.reconcilable/);
+});
+
+test('OPS-002: the close summary states what happened to the backup', () => {
+  const source = proseOf('js/shift/summary.js');
+
+  // A close whose backup failed has to say so on the screen that closed it. In the
+  // alert centre only, the person who could still plug the drive back in before going
+  // home never sees it.
+  assert.match(source, /it is not backed up/);
+  assert.match(source, /Tell the owner before you go home/);
+  assert.match(source, /opened.*and checked/i, 'and says verified, not merely written');
+  assert.match(codeOf('js/shift/summary.js'), /backup\.ok/);
+});
+
+test('POS-511: the closed summary offers no way to change anything', () => {
+  const source = codeOf('js/shift/summary.js');
+
+  // It is a read. A button implying otherwise would be a button the server refuses.
+  assert.equal(/api\.(post|put|del)\(/.test(source), false, 'the summary writes nothing');
+  assert.equal(/<input|h\('input'/.test(source), false, 'and offers no field');
+  assert.match(proseOf('js/shift/summary.js'), /cannot be changed \(POS-511\)/);
+});
+
+test('POS-501: there is exactly one place a shift is opened', () => {
+  // The POS screen used to carry its own float form. Two forms that open a shift are
+  // two places for POS-503's confirmation tick to drift apart.
+  const shell = codeOf('js/shell/app.js');
+  assert.equal(/openingFloatCentavos/.test(shell), false, 'the shell no longer opens shifts');
+  assert.match(shell, /onAction: \(\) => showShift\(\)/, 'the POS empty state routes to SCR-501');
+
+  const opens = walkFiles(path.join(root, 'public', 'js'))
+    .filter((f) => f.endsWith('.js'))
+    .filter((f) => /openingFloatCentavos/.test(codeOf(path.relative(path.join(root, 'public'), f))));
+  assert.deepEqual(
+    opens.map((f) => path.basename(f)), ['view.js'],
+    'only the shift view posts an opening float'
+  );
+});
+
+test('NFR_4.3: the shift controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'shift.css'), 'utf8');
+  for (const selector of ['.shift-close input', '.variance-reason']) {
+    const rule = cssRule(css, selector);
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
+  }
+  // The variance column is coloured per row, as 04_UX_SPEC §3 asks.
+  assert.match(cssRule(css, '.shift-close .variance.down'), /color/);
+  assert.match(cssRule(css, '.shift-close .variance.up'), /color/);
 });
