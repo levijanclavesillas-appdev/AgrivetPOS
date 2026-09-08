@@ -1,11 +1,12 @@
 # 06 — Tasks
 
-Open work items. Each task is self-contained: an implementer should need this file, plus the
-specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
+Work items, closed and open. Each task is self-contained: an implementer should need this file,
+plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**`TASK-001` through `TASK-018` are built, committed and green** (`c08f3af`, 2026-09-08). The
-v1.0 backlog as written is closed. What that does **not** mean is that v1.0 is finished — see
-[Status](#status) below, which names a screen gap the backlog never assigned to anybody.
+**v1.0 is code-complete.** `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
+screens the original backlog never assigned to anybody — see [the screen gap](#the-screen-gap--found-and-closed),
+which is worth reading before writing the next backlog. What code-complete does **not** mean is
+shippable: nothing has run in the store. [Status](#status) has the detail.
 
 ---
 
@@ -26,6 +27,11 @@ not preference.
       └──▶ 010 shift+till ───────────────────────┘        └──▶ 013 close ──▶ 016 reports
                                                                               017 backup
 ```
+
+The diagram is the original backlog and is kept as it was written, because it was right about
+the dependencies. What it does not show is the six screen tasks — `TASK-036`–`TASK-041` — which
+hang off the tasks that built their services and were missed precisely because nothing in this
+picture said a service needs a screen before anybody can use it.
 
 ## Closed — v1.0 "Till"
 
@@ -113,53 +119,56 @@ again quietly.
 | `TASK-034` | Bad-debt write-off | `FT-409` |
 | `TASK-035` | Evaluate SQLCipher encryption against POS latency | `SEC-9` |
 
-## Closed
-
-`TASK-001` – `TASK-018`, listed above with their commits.
-
----
-
 <a id="status"></a>
 ## Status — 2026-09-08
 
-**What is built.** 19,700 lines across 113 source files, 9 migrations, and 14,700 lines of
-tests. `npm run test:all` is green: **642 cases** — 160 unit, 436 integration and API, 46
-end-to-end — plus 4 performance files and two out-of-gate harnesses (`tools/browser-smoke`
-drives the real renderer in Chromium; `tools/installer/check.sh` compiles the NSIS macros).
+**What is built.** 23,300 lines across 127 source files — 9 migrations, 28 renderer modules,
+no build step and four runtime dependencies — against 17,900 lines of tests and harnesses.
 
-Every v1.0 service, repository, API route and business rule is implemented and tested.
-`TC-UT-98` asserts the coverage obligation mechanically: **62 covered v1.0 rules, all cited by
-a test**, and 51 of 51 rules outside the obligation as well.
+`npm run test:all` is green: **750 cases** across 48 files — 195 unit, 437 integration and API,
+118 end-to-end. Beside it, 4 performance files and two harnesses that are deliberately outside
+the gate because they need things a gate machine may not have: `tools/browser-smoke` drives the
+real renderer in Chromium through nineteen screens, and `tools/installer/check.sh` compiles the
+NSIS macros with `makensis`.
 
-**What is not built.** Nine of the twenty-six screens in `04_UX_SPEC.md` do not exist — see
-[the screen gap](#open--v10-till-the-screen-gap) above. The backlog assigned screens to
-`TASK-015`, `016` and `017` and never assigned the rest, and nothing caught it because every
-one of those screens has a working, tested API underneath. The suite was green because the
-suite tests the API.
+Every v1.0 service, repository, API route, business rule **and screen** is implemented and
+tested. `TC-UT-98` asserts the rule-coverage obligation mechanically — 62 covered v1.0 rules,
+all cited by a test, and 51 of 51 outside the obligation as well — and `TC-UI-10` asserts every
+screen in `04_UX_SPEC.md` §3 has a view.
 
-All six screen tasks are closed. In practical terms: a store can be installed, configured,
-stocked and staffed from the application; a cashier can open a drawer, sell, take a split
-tender, park a cart, print a receipt, move cash in and out, count the drawer and close it
-against a verified backup; a credit customer can be created, given a limit, sold to on account
-and paid off with the oldest invoice settled first; and the owner can read who did all of it.
+**What that means at a counter.** A store can be installed, configured, stocked and staffed from
+the application. A cashier can open a drawer, sell, take a split tender, park a cart, print a
+receipt, move cash in and out, count the drawer and close it against a verified backup. A credit
+customer can be created, given a limit, sold to on account and paid off with the oldest invoice
+settled first. The owner can read who did all of it.
 
-**Where the release gate stands.** `07_TEST_PLAN.md` §10 carries the per-criterion outcome.
-Seven of eleven criteria are green. Four need the store and cannot be settled from a build
-machine — the store's own hardware, a backup restored onto a second machine, `TAX-006` read on
-paper, and the power-cut half of `OPS-008`. The screen gap above is now a fifth reason, and
-unlike the other four it is code, not a visit.
+**Where the release gate stands.** `07_TEST_PLAN.md` §10 carries the per-criterion outcome:
+**four of eleven met, four partly, three not started.** Every one of the seven that is not met
+reduces to the same fact — **nothing has run in the store.** No receipt has been printed on
+paper, no drawer has opened, no scanner has been used, no backup has been restored onto a second
+machine, and every performance figure was measured on a build machine, which §6 says plainly is
+not a measurement at all.
 
-**The two open business questions are answered.** `Q-1`: the store is **not BIR-registered**,
-so `tax_mode` is `NONE` at install. `Q-4`: the product list is small enough to key in by hand,
-so `TASK-026` stays in v1.1. `TASK-036` built the screens that hand entry needs.
+Two of the seven are half-proved rather than unproved, and the distinction matters:
+`TC-E2E-08` shows the application reaches for no network but not that the machine has none, and
+`TC-E2E-09` shows a killed process loses nothing but `SIGKILL` does not empty the write cache a
+power cut does. Both have a UAT check waiting for them.
+
+**Nothing further can be settled from a build machine.** The next step is a visit:
+`npm run build:exe` on Windows with a signing certificate, then `docs/UAT_RECORD.md` at the
+store's own counter.
+
+**The two open business questions are answered.** `Q-1`: the store is **not BIR-registered**, so
+`tax_mode` is `NONE` at install. `Q-4`: the product list is small enough to key in by hand, so
+`TASK-026` stays in v1.1 — and `TASK-036` built the screens that hand entry needs.
 
 `Q-2` (cold-chain veterinary stock) and `Q-3` (delivery charges) remain open and affect only
 v1.2 scope.
 
 **One thing that is deliberately not software.** The off-machine backup copy in
-`05_TECH_SPEC.md` §7 is a **process control handed to the owner**, not something the
-application does. It is stated as such in `HANDOVER.md` §2 rather than quietly assumed, and
-the store is told in those words that backups on the shop PC do not survive the shop PC.
+`05_TECH_SPEC.md` §7 is a **process control handed to the owner**, not something the application
+does. It is stated as such in `HANDOVER.md` §2 rather than quietly assumed, and the store is
+told in those words that backups on the shop PC do not survive the shop PC.
 
 ---
 
