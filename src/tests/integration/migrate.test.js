@@ -30,9 +30,9 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(result.from, 0);
   assert.equal(result.to, migrate.binaryVersion());
   assert.deepEqual(result.applied, migrate.available().map((m) => m.file));
-  assert.deepEqual(result.applied.slice(0, 6), [
+  assert.deepEqual(result.applied.slice(0, 7), [
     '001_foundation.sql', '002_catalog.sql', '003_inventory.sql', '004_customers_credit.sql',
-    '005_shifts.sql', '006_sales.sql',
+    '005_shifts.sql', '006_sales.sql', '007_carts.sql',
   ]);
 
   const rows = migrate.applied();
@@ -44,6 +44,7 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   assert.equal(rows[3].name, 'customers_credit');
   assert.equal(rows[4].name, 'shifts');
   assert.equal(rows[5].name, 'sales');
+  assert.equal(rows[6].name, 'carts');
   for (const row of rows) assert.match(row.applied_at, /Z$/, 'applied_at is stored UTC (VR-102)');
 });
 
@@ -126,6 +127,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'cashier_closings', 'cashier_shifts', 'closing_method_lines', 'till_movements',
     // 006_sales
     'sale_discounts', 'sale_items', 'sale_tenders', 'sales',
+    // 007_carts
+    'carts',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
@@ -135,7 +138,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'idx_alloc_collection', 'idx_alloc_sale',
     'idx_shift_open', 'idx_till_shift', 'idx_closing_lines',
     'idx_sales_date', 'idx_sales_shift', 'idx_sales_cust', 'idx_sales_no',
-    'idx_saleitems_product', 'idx_tender_sale', 'idx_tender_ref', 'idx_discounts_sale']) {
+    'idx_saleitems_product', 'idx_tender_sale', 'idx_tender_ref', 'idx_discounts_sale',
+    'idx_carts_user_shift', 'idx_carts_shift']) {
     assert.ok(repo.listIndexes().includes(index), `missing index ${index}`);
   }
   assert.ok(repo.integrityCheck().ok, 'a freshly migrated database passes integrity_check');

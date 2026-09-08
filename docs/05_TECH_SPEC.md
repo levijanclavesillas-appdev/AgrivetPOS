@@ -483,6 +483,29 @@ CREATE TABLE sale_discounts (            -- PR-204: the discount audit trail
   created_at        TEXT NOT NULL
 );
 
+CREATE TABLE carts (                     -- POS-105, POS-106; added by TASK-015
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  shift_id    TEXT NOT NULL REFERENCES cashier_shifts(id),
+  customer_id TEXT REFERENCES customers(id),
+  status      TEXT NOT NULL DEFAULT 'ACTIVE'
+                CHECK (status IN ('ACTIVE','PARKED','RESUMED','EXPIRED','COMPLETED')),
+  label       TEXT,
+  payload     TEXT NOT NULL,            -- lines as JSON; prices are never stored
+  line_count  INTEGER NOT NULL DEFAULT 0,
+  parked_at   TEXT, resumed_at TEXT, expired_at TEXT,
+  created_at  TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_carts_user_shift ON carts (user_id, shift_id, status);
+CREATE INDEX idx_carts_shift      ON carts (shift_id, status);
+
+-- The cart is a table rather than renderer storage because POS-105 requires an
+-- in-progress cart to survive an application restart, and localStorage is lost to a
+-- reinstall, a Windows profile change and v1.3's second terminal. It holds its lines
+-- as JSON deliberately: a cart is not a business record — nothing reports on it and no
+-- rule constrains it, and the moment it becomes real it is a sale with its own rows
+-- (POS-107). A cart_items table would invite the reporting that must read sale_items.
+
 CREATE TABLE backup_log (                -- OPS-002, OPS-006
   id TEXT PRIMARY KEY,
   file_path   TEXT NOT NULL,

@@ -635,6 +635,19 @@ function assertFractionAllowed(qtyMilli, allowsFraction, unitCode) {
   );
 }
 
+/**
+ * POS-207 — the same-day duplicates of one tender reference.
+ *
+ * The screen asks this to warn early; `settleTenders` asks the repository again at the
+ * sale, because a warning the cashier has already dismissed is not a check.
+ */
+function duplicateReferences(method, referenceNo, { at = clock.nowUtc() } = {}) {
+  if (!TENDER_METHODS.includes(method) || !referenceNo) return [];
+  return saleRepository.referenceUsedToday({
+    method, referenceNo, fromAt: dayStart(at), toAt: dayEnd(at),
+  }).map((row) => ({ sale_no: row.sale_no, amount_centavos: row.amount_centavos, occurred_at: row.occurred_at }));
+}
+
 // ── POS-208 — the reprint ───────────────────────────────────────────────────
 
 /**
@@ -774,6 +787,6 @@ function forShift(shiftId) {
 
 module.exports = {
   TENDERS, TENDER_METHODS,
-  complete, get, getByNo, present, forShift, reprint, printReceipt,
+  complete, get, getByNo, present, forShift, reprint, printReceipt, duplicateReferences,
   assertClientTotalMatches, settleTenders, resolveLineQuantity,
 };

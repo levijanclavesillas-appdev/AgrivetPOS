@@ -58,6 +58,26 @@ router.get('/sales/sequence-audit', [authenticate, requirePermission('TX-421')],
   }
 });
 
+/**
+ * POS-207 — has this reference been used today?
+ *
+ * Asked when the cashier leaves the field rather than at Complete, because
+ * 04_UX_SPEC.md §6 puts rule validation at the point of action: finding out that a
+ * GCash reference is a duplicate *after* keying the whole payment is finding out too
+ * late to do anything but retype it. The server re-checks at the sale regardless.
+ */
+router.get('/sales/tender-references', atTheCounter, (req, res, next) => {
+  try {
+    const method = String(req.query.method || '').toUpperCase();
+    const reference = String(req.query.reference || '').trim();
+    if (!reference) return res.json({ duplicates: [] });
+
+    return res.json({ duplicates: saleService.duplicateReferences(method, reference) });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 router.get('/sales/:id', atTheCounter, (req, res, next) => {
   try {
     res.json(saleService.get(req.params.id));

@@ -469,6 +469,11 @@ function close({
 
     const closed = shiftRepository.close(shiftId, { closedAt: at });
 
+    // POS-106: parked carts expire at shift close. Inside the transaction, because a
+    // cart that outlived its drawer is one somebody could complete tomorrow at
+    // yesterday's prices against a till that has already been counted.
+    require('./cartService').expireForShift(shiftId, { at });
+
     auditService.write({
       actor,
       approver: approver && approver.id && approver.id !== actor.id ? approver : null,

@@ -15,10 +15,17 @@ and current gate status**.
 | API | project runner | Every endpoint, including authorisation refusals | `npm run test` |
 | E2E | project runner | A scripted trading day end to end | `npm run test:e2e` |
 | Performance | project runner | `NFR_1.*` budgets against a seeded 5,000-product database | `npm run test:perf` |
+| Browser smoke | scripted, out of gate | The real renderer in Chromium: sign in, open the shift, scan, park, resume, pay, receipt | `./tools/browser-smoke/run.sh` |
 | Installer | manual, scripted | The signed `.exe` on the reference machine: clean install, upgrade, uninstall | — |
 | UAT | manual | `07_TEST_PLAN.md` §8, on the store's own hardware | — |
 
 `npm run test:all` runs unit + integration + API + E2E, and is the release gate.
+
+The browser smoke is deliberately **outside** that gate. It needs Electron's Chromium and a
+display, and a gate that silently skips a level it cannot run is worse than one that never
+claimed it. It is the automatable part of §8: what it covers is layout-independent behaviour —
+that the screens render, that the keyboard map reaches them, and that a cart survives a reload —
+while the eyes-on checks in §8 stay manual.
 
 ## 2. Rule coverage obligation
 
@@ -189,27 +196,39 @@ of how small it looks.
 
 | # | Criterion | Status |
 | :-: | :--- | :--- |
-| 1 | All `FR_1`–`FR_7` acceptance criteria met | ☐ Not started |
-| 2 | `npm run test:all` green | ☐ No tests exist |
-| 3 | `TC-UT-98` passes — every covered rule has a test | ☐ Not started |
-| 4 | `TC-UT-99` passes — layering intact | ☐ Not started |
-| 5 | Zero open S1 or S2 defects | ☐ Not started |
-| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ☐ Not started |
-| 7 | `TC-E2E-08` passes with networking disabled | ☐ Not started |
-| 8 | `TC-E2E-09` passes — power-loss durability | ☐ Not started |
-| 9 | UAT §7 complete on the store's hardware, owner signed | ☐ Not started |
-| 10 | Backup verified restorable onto a second machine | ☐ Not started |
-| 11 | `TAX-006` confirmed on the printed document | ☐ Not started |
+| 1 | All `FR_1`–`FR_7` acceptance criteria met | ◐ `FR_1`–`FR_5` built; `FR_6` (reports) and `FR_7` (backup/health) are `TASK-016`/`TASK-017` |
+| 2 | `npm run test:all` green | ☑ green — unit 14 files, integration 18, E2E 4 |
+| 3 | `TC-UT-98` passes — every covered rule has a test | ☐ Not written. `TASK-016` onward |
+| 4 | `TC-UT-99` passes — layering intact | ☑ green |
+| 5 | Zero open S1 or S2 defects | ◐ None known; nothing has run on the store's hardware |
+| 6 | `NFR_1.1`–`NFR_1.5` met on the reference machine — `TC-PERF-01`–`TC-PERF-05` | ◐ `TC-PERF-01`–`03` measure and report; `04`, `05` not written. **No figure here was taken on the reference machine** (§6) |
+| 7 | `TC-E2E-08` passes with networking disabled | ☐ Not written |
+| 8 | `TC-E2E-09` passes — power-loss durability | ☐ Not written |
+| 9 | UAT §8 complete on the store's hardware, owner signed | ☐ Not started |
+| 10 | Backup verified restorable onto a second machine | ☐ Not started — `TASK-017` |
+| 11 | `TAX-006` confirmed on the printed document | ◐ Asserted in the encoder's output; never seen on paper |
 
-> ### Gate status, 2026-09-07 — **NOT SHIPPABLE**
+> ### Gate status, 2026-09-08 — **NOT SHIPPABLE**
 >
-> **No code exists.** The repository contains documentation only; the last commit before this
-> restructuring was `2c3218e Add PRD documentation`. There is no application, no schema, no test
-> suite, and therefore no criterion above can be assessed. This is stated plainly rather than
-> left blank, per `docsrequirement.md` §10: a product is not documented because seven files
-> exist, and it is not shippable because a plan says v1.0 is thin.
+> `TASK-001` through `TASK-015` are built: schema, auth, catalog, inventory, customers and
+> credit, pricing and tax, shifts and till, the sale, collections, shift close, ESC/POS printing,
+> and the POS, payment and receipt screens. The release gate is green and the counter can take a
+> sale end to end.
 >
-> The path to the first assessable gate is `06_TASKS/README.md`, `TASK-001` through `TASK-013`.
+> It is not shippable, and the reasons are specific rather than a matter of polish:
+>
+> - **Nothing has run on the store's hardware.** Every performance figure above was measured on a
+>   developer machine, and §6 says plainly that a budget measured anywhere else is not a budget.
+>   No receipt has been printed on paper, no drawer has opened, no scanner has been used.
+> - **`FR_6` and `FR_7` do not exist yet** — reports (`TASK-016`) and backup, restore and health
+>   (`TASK-017`). A store cannot be handed a system whose backup has never been restored.
+> - **Three gate cases are unwritten**: `TC-UT-98` (rule coverage), `TC-E2E-08` (offline) and
+>   `TC-E2E-09` (power loss). The last of those is the one that decides whether a power cut in
+>   Sultan Kudarat costs a day's takings, and asserting durability without testing it is exactly
+>   the false comfort §1 exists to prevent.
+> - **UAT has not begun** (`TASK-018`).
+>
+> The path to the next assessable gate is `06_TASKS/README.md`, `TASK-016` through `TASK-018`.
 
 ---
 

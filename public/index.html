@@ -3,22 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    SEC-8 says the API binds to 127.0.0.1 and nothing else. This is the same statement
+    made on the renderer's side: every script, style and connection is same-origin, and
+    there is no inline script, no eval and no remote asset anywhere in this shell.
+    Nothing here needs the network beyond its own server, so nothing is allowed it.
+
+    frame-ancestors is deliberately absent: a browser ignores it in a <meta> element,
+    and stating it here would only look like a control that is not one.
+  -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Chachi Agrivet POS</title>
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pos.css">
 </head>
 <body>
   <!--
-    Placeholder shell. TASK-015 replaces this with SCR-301..304 and TASK-004 with the
-    SCR-001 setup wizard. It exists so that TASK-001 is verifiable end to end: the
-    window loads, the renderer reaches the embedded API, and the schema is reported.
+    The application shell. 04_UX_SPEC.md §2's rail and screen are built by
+    js/shell/app.js; this file holds only the mount point, because the screen a user
+    sees depends on their role and their shift, and neither is known until they sign in.
   -->
-  <main class="boot">
-    <h1>Chachi Agrivet POS</h1>
-    <p class="muted">Application skeleton — no counter, no catalogue, no sale yet.</p>
-    <section id="health" aria-live="polite">
-      <p class="muted">Checking the local API…</p>
-    </section>
-  </main>
+  <div id="app" class="app-root">
+    <p class="muted">Starting…</p>
+  </div>
   <script type="module" src="/js/boot.js"></script>
 </body>
 </html>

@@ -1,30 +1,19 @@
-// Vanilla ES module, no build step (05_TECH_SPEC.md §2). Server-side validation is
-// authoritative; anything here is a courtesy (SEC-6).
+// The renderer's entry point. Vanilla ES modules, no build step (05_TECH_SPEC.md §2):
+// a store PC gets a folder that runs.
 
-const target = document.querySelector('#health');
+import { createApp } from './shell/app.js';
 
-const row = (label, value) => `<div class="row"><dt>${label}</dt><dd>${value}</dd></div>`;
+const root = document.querySelector('#app');
 
 try {
-  const res = await fetch('/api/v1/health');
-  if (!res.ok) throw new Error(`API answered ${res.status}`);
-  const h = await res.json();
-
-  const tables = Object.entries(h.database.row_counts)
-    .map(([name, n]) => `${name} ${n}`)
-    .join(' · ');
-
-  target.innerHTML = `
-    <dl>
-      ${row('Application', h.app_version)}
-      ${row('Schema version', `${h.schema.version} of ${h.schema.binary_version}`)}
-      ${row('Database', `${(h.database.size_bytes / 1024).toFixed(1)} KB`)}
-      ${row('Pragmas', Object.entries(h.database.pragmas).map(([k, v]) => `${k}=${v}`).join(' · '))}
-      ${row('Tables', tables || 'none')}
-    </dl>`;
+  const app = createApp({ root });
+  await app.mount();
 } catch (err) {
-  // 04_UX_SPEC.md §5: an error state says what failed and what to do, never a stack trace.
-  target.innerHTML = `<p class="error">The local API did not answer (${err.message}).
-    Close the application and start it again; if it keeps happening the database may be
-    in use by another copy.</p>`;
+  // 04_UX_SPEC.md §5: what failed and what to do, never a stack trace.
+  root.innerHTML = '';
+  const message = document.createElement('p');
+  message.className = 'error';
+  message.textContent = `The application did not start (${err.message}). `
+    + 'Close it and start it again; if it keeps happening the database may be in use by another copy.';
+  root.append(message);
 }

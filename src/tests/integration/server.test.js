@@ -36,7 +36,7 @@ test('GET /api/v1/health reports schema version, size and row counts (OPS-006)',
   assert.equal(body.schema.binary_version, require('../../config/migrate').binaryVersion());
   assert.ok(body.database.size_bytes > 0, 'a migrated database has a size');
   assert.deepEqual(Object.keys(body.database.row_counts).sort(), [
-    'audit_logs', 'brands', 'cashier_closings', 'cashier_shifts', 'categories',
+    'audit_logs', 'brands', 'carts', 'cashier_closings', 'cashier_shifts', 'categories',
     'closing_method_lines', 'credit_allocations', 'customer_credit_accounts',
     'customer_credit_transactions', 'customers', 'inventory', 'inventory_movements',
     'product_barcodes', 'product_packs', 'product_prices', 'products',
