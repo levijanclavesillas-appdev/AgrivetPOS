@@ -66,6 +66,11 @@ const ACTIONS = Object.freeze({
   CUSTOMER_CREATED: { what: 'Customer created', rule: 'VR-301' },
   CUSTOMER_MODIFIED: { what: 'Customer modified', rule: 'VR-301' },
   CUSTOMER_DEACTIVATED: { what: 'Customer deactivated', rule: 'VR-304' },
+  // Not on AUD-601's list — a collection is not a mutation of a rule-governed figure,
+  // it is the ordinary business of getting paid. Recorded because CR-205 makes a cash
+  // collection till cash: it moves the drawer, and every peso that moves the drawer
+  // needs a name against it when the close comes up short.
+  COLLECTION_RECORDED: { what: 'Collection recorded', rule: 'CR-201' },
   CREDIT_ADJUSTED: { what: 'Credit balance adjusted', rule: 'CR-103' },
 
   // ── AUD-601: users and access ─────────────────────────────────────────────
