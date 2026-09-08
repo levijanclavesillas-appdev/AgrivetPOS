@@ -448,18 +448,22 @@ test('TC-INT-51: computeExpected is a pure read', () => {
   assert.equal(auditService.browse({ entityId: shift.id, action: 'TILL_CASH_MOVED' }).total, 0);
 });
 
-test('TC-INT-51: the terms sources that do not exist yet report zero, not an error', () => {
-  // sale_tenders arrives with TASK-011 and sale_returns with TASK-020. At schema
-  // version 5 there are no sales, so there are no tenders — a true answer, not an
-  // assumption, and one that starts counting the moment the table exists.
+test('TC-INT-51: a term whose table does not exist yet reports zero, not an error', () => {
+  // sale_returns arrives with TASK-020 (v1.1). At this schema version there are no
+  // returns because there is no table for one — a true answer, not an assumption, and
+  // one that starts counting the moment the table exists with no edit to the caller.
   const schemaRepository = require('../../repositories/schemaRepository');
-  assert.equal(schemaRepository.listTables().includes('sale_tenders'), false);
-  assert.equal(schemaRepository.listTables().includes('sale_returns'), false);
+  assert.equal(schemaRepository.listTables().includes('sale_returns'), false, 'returns are v1.1');
 
   const { shift } = openShiftFor();
   const expected = shiftService.computeExpected(shift.id);
-  assert.equal(expected.cash_sales_centavos, 0);
+
   assert.equal(expected.cash_refunds_centavos, 0);
+  // sales and sale_tenders exist now (006), so these are counted rather than skipped —
+  // and a shift with no sales still reads zero, which is the same answer for a
+  // different and better reason.
+  assert.equal(schemaRepository.listTables().includes('sale_tenders'), true);
+  assert.equal(expected.cash_sales_centavos, 0, 'this shift has sold nothing');
   assert.equal(expected.change_given_centavos, 0);
 });
 

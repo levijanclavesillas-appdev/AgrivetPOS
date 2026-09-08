@@ -596,19 +596,28 @@ test('the credit reconciliation endpoint is owner-only and reports clean', async
 
 // ── The soft references (05_TECH_SPEC.md §3.4 deviation) ────────────────────
 
-test('TC-INT-47: a credit transaction is writable before the tables it references exist', () => {
+test('TC-INT-47: sale_id and shift_id carry no foreign key, and a transaction writes without one', () => {
   // The same trap 001 documented for audit_logs.shift_id. SQLite resolves a foreign
   // key's parent table at INSERT time, so declaring REFERENCES sales(id) here would
-  // make every insert fail until migration 006 — a NULL sale_id included. An OPENING
-  // balance from the notebook (TASK-026) carries neither a sale nor a shift and must
-  // be writable the day this table exists.
+  // have made every insert fail with "no such table" until migration 006 — a NULL
+  // sale_id included — and an OPENING balance from TASK-026's notebook migration
+  // carries neither a sale nor a shift.
   //
-  // cashier_shifts has since arrived in 005, which is itself the argument: had the
-  // foreign key been declared, every credit transaction would have been unwritable for
-  // the whole window between migration 004 and 005 — a window that exists in the real
-  // upgrade path, not only in a test.
+  // Both tables have since arrived, which is the argument rather than a reason to drop
+  // the case: had the keys been declared, every credit transaction would have been
+  // unwritable across the whole window from migration 004 to 006. That window exists
+  // in the real upgrade path, not only in a test. So this asserts the durable property
+  // — the columns carry no constraint — rather than the moment.
   const schemaRepository = require('../../repositories/schemaRepository');
-  assert.equal(schemaRepository.listTables().includes('sales'), false, 'sales arrive in 006');
+  const sql = db.get()
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'customer_credit_transactions'")
+    .get().sql;
+
+  for (const column of ['sale_id', 'shift_id']) {
+    const line = sql.split('\n').find((l) => l.trim().startsWith(column));
+    assert.ok(line, `${column} is declared`);
+    assert.equal(/REFERENCES/i.test(line), false, `${column} must stay a soft reference`);
+  }
 
   const { account } = makeCreditCustomer();
   assert.doesNotThrow(() => creditService.postStandalone({
@@ -616,12 +625,14 @@ test('TC-INT-47: a credit transaction is writable before the tables it reference
     actor: sessions.OWNER, documentNo: 'OPEN-003',
   }), 'no sale, no shift');
 
+  // And with ids that match no row in either table — which a declared key would refuse
+  // even now that the tables exist.
   assert.doesNotThrow(() => creditService.postStandalone({
     accountId: account.id, type: 'CREDIT_SALE', amountCentavos: 1000,
     actor: sessions.CASHIER, documentNo: 'S-I',
-    saleId: 'a-sale-whose-table-does-not-exist-yet',
+    saleId: 'a-sale-that-was-never-made',
     shiftId: 'a-shift-that-was-never-opened',
-  }), 'and with both ids set');
+  }), 'and with both ids set to nothing');
 
   assert.deepEqual(schemaRepository.foreignKeyCheck(), [], 'no foreign key violations introduced');
 });

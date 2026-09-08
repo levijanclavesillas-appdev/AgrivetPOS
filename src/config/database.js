@@ -61,7 +61,7 @@ function close() {
  * another service's transaction is the design error the standard names, and it is
  * cheaper to fail here than to debug a half-committed sale.
  */
-function transaction(fn) {
+function transaction(fn, { immediate = false } = {}) {
   if (typeof fn !== 'function') throw new TypeError('transaction(fn) needs a function');
   if (depth > 0) {
     throw new Error(
@@ -73,7 +73,13 @@ function transaction(fn) {
   const wrapped = handle.transaction((...args) => fn(...args));
   depth += 1;
   try {
-    return wrapped();
+    // 05_TECH_SPEC.md §4.1 requires BEGIN IMMEDIATE for the sale. SQLite's default
+    // BEGIN is deferred: it takes a read lock first and upgrades on the first write,
+    // which can fail with SQLITE_BUSY partway through a transaction that has already
+    // done work. IMMEDIATE takes the write lock up front, so a sale either starts or
+    // does not — it never gets halfway and loses the race. v1.0 has one writer, so
+    // this costs nothing today and is correct when v1.3's terminals arrive.
+    return immediate ? wrapped.immediate() : wrapped();
   } finally {
     depth -= 1;
   }

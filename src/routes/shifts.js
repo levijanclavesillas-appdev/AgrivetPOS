@@ -62,7 +62,14 @@ router.post('/shifts/open', ownShift, (req, res, next) => {
 
     // POS-502: a second attempt resumes rather than creating a second shift, so it is
     // a 200 on the existing one, not a 201 and not a conflict.
-    res.status(result.resumed ? 200 : 201).json(result);
+    //
+    // The expected figure comes back with it, as it does from a till movement: SCR-501
+    // shows the drawer immediately after opening, and a resumed shift has a figure
+    // that is not the float it was opened with.
+    res.status(result.resumed ? 200 : 201).json({
+      ...result,
+      expected: shiftService.computeExpected(result.shift.id),
+    });
   } catch (err) {
     next(err);
   }

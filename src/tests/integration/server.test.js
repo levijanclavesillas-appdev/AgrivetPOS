@@ -40,6 +40,7 @@ test('GET /api/v1/health reports schema version, size and row counts (OPS-006)',
     'closing_method_lines', 'credit_allocations', 'customer_credit_accounts',
     'customer_credit_transactions', 'customers', 'inventory', 'inventory_movements',
     'product_barcodes', 'product_packs', 'product_prices', 'products',
+    'sale_discounts', 'sale_items', 'sale_tenders', 'sales',
     'schema_migrations', 'store_profile', 'system_settings', 'till_movements',
     'units', 'users',
   ]);
