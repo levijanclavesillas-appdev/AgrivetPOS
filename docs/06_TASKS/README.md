@@ -91,7 +91,7 @@ again quietly.
 | ID | Task | Commit | What it left behind |
 | :--- | :--- | :--- | :--- |
 | [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | `372b2ba` | `010_purchasing.sql`; `supplierService`, `purchaseOrderService`, `goodsReceiptService` and their repositories; `SCR-801`–`SCR-804`; `TC-INT-76`–`TC-INT-80`, `TC-E2E-16`. The v1.1 gate in `07_TEST_PLAN.md` §10 |
-| [TASK-020](TASK-020-sales-returns.md) | Sales returns with the restock/write-off decision | *this commit* | `011_returns.sql`; `returnService` and its repository; `SCR-305`; `TC-INT-81`–`TC-INT-84`, `TC-E2E-17`. `RPT-101`'s fourth term stopped being zero |
+| [TASK-020](TASK-020-sales-returns.md) | Sales returns with the restock/write-off decision | `3ea6fd1` | `011_returns.sql`; `returnService` and its repository; `SCR-305`; `TC-INT-81`–`TC-INT-84`, `TC-E2E-17`. `RPT-101`'s fourth term stopped being zero |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
