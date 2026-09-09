@@ -10,6 +10,14 @@ export function createCart() {
   let lines = [];
   let customer = null;
   let transactionDiscountCentavos = 0;
+  // TAX-004's claim: the ID type, the ID number and the name on it.
+  //
+  // Held here and **never** parked. `POST /carts/active` takes lines, a customer and a
+  // transaction discount, and this is deliberately not among them: a beneficiary's ID
+  // number sitting in a parked cart for a week is personal data the store has no reason
+  // to keep (RA 10173's minimisation), and a resumed cart asks for the ID again, which
+  // is a second look at the card rather than a copy of it.
+  let statutory = null;
 
   /**
    * Add a product, or increase the line already holding it.
@@ -74,6 +82,7 @@ export function createCart() {
     lines = [];
     customer = null;
     transactionDiscountCentavos = 0;
+    statutory = null;
   }
 
   /** The request body for price-check and for the sale — one shape, two callers. */
@@ -81,6 +90,9 @@ export function createCart() {
     return {
       customerId: customer?.id ?? null,
       transactionDiscountCentavos,
+      // TAX-004: sent to price-check and to the sale, which are the two callers that
+      // may act on it. `PUT /carts/active` reads neither it nor anything like it.
+      statutory,
       lines: lines.map((line) => ({
         productId: line.productId,
         qtyMilli: line.qtyMilli,
@@ -138,5 +150,7 @@ export function createCart() {
     set customer(value) { customer = value; },
     get transactionDiscountCentavos() { return transactionDiscountCentavos; },
     set transactionDiscountCentavos(value) { transactionDiscountCentavos = Math.max(0, value || 0); },
+    get statutory() { return statutory; },
+    set statutory(value) { statutory = value || null; },
   };
 }

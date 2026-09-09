@@ -997,11 +997,11 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/shifts/:id/till` | `TX-420` | `POS-504` |
 | `GET` | `/shifts/:id/expected` | `TX-418` | `POS-509` |
 | `POST` | `/shifts/:id/close` | `TX-418` | `POS-510`, triggers `OPS-001` |
-| `POST` | `/sales/price-check` | `TX-401` | resolves `PR-101` for a cart without committing. Since `TASK-023` it also applies `PR-106`'s tier and `PR-202`'s category ceiling, and reports `PR-206`'s choice per line |
+| `POST` | `/sales/price-check` | `TX-401` | resolves `PR-101` for a cart without committing. Since `TASK-023` it also applies `PR-106`'s tier and `PR-202`'s category ceiling, and reports `PR-206`'s choice per line. Since `TASK-027` it takes an optional `statutory` block — `{ idType, idNo, name }` — and refuses it here rather than at the sale (`TAX-004`) |
 | `GET` `PUT` | `/products/:id/quantity-breaks` | `TX-422` / `TX-411` | `PR-104`. The `PUT` takes a **whole set** for one price level — a band added on its own is a set nobody validated. An empty list removes them |
 | `GET` `PUT` | `/customers/:id/prices` | `TX-413` / `TX-411` | `PR-103`. Behind `TX-411`, not `TX-413`: a negotiated price is a selling price that happens to be attached to a customer, and `TX-413` reaches a cashier |
-| `GET` | `/sales/pricing-policy` | `TX-401` | The acting user's ceiling, who may approve above it, and — since `TASK-023` — the configured tiers and capped categories, so no screen holds a copy (`OPS-005`) |
-| `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5` |
+| `GET` | `/sales/pricing-policy` | `TX-401` | The acting user's ceiling, who may approve above it, and — since `TASK-023` — the configured tiers and capped categories, so no screen holds a copy (`OPS-005`). Since `TASK-027` it also reports whether the store grants the statutory discount, at what rate and on which ID types (`TAX-004`) |
+| `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5`. Takes the same optional `statutory` block as the price check; the discount itself is never sent, only the claim (`TAX-004`) |
 | `POST` | `/sales/:id/reprint` | `TX-430` | `POS-208` |
 | `GET` | `/reports/dashboard?date=` | `TX-421` | `FR_6.1` — every tile from the query behind it |
 | `GET` | `/reports/alerts` | `TX-421` | `OPS-007` |

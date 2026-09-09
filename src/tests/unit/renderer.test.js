@@ -160,8 +160,16 @@ test('the cart request is the shape POST /sales takes', async () => {
   assert.deepEqual(cart.toRequest(), {
     customerId: 'c1',
     transactionDiscountCentavos: 250,
+    statutory: null,
     lines: [{ productId: 'p1', qtyMilli: 1255, packUnitId: null, discountCentavos: 500 }],
   });
+
+  // TAX-004's claim travels in the same request — and out of the cart the moment it is
+  // cleared, because a beneficiary's ID belongs to the sale it was presented for.
+  cart.statutory = { idType: 'SENIOR_CITIZEN', idNo: '12-3456789', name: 'Lolo Ambrosio Cruz' };
+  assert.deepEqual(cart.toRequest().statutory, { idType: 'SENIOR_CITIZEN', idNo: '12-3456789', name: 'Lolo Ambrosio Cruz' });
+  cart.clear();
+  assert.equal(cart.toRequest().statutory, null);
 });
 
 test('the cart computes no total — every figure comes from the server', async () => {
@@ -315,16 +323,18 @@ test('the keyboard map is the spec’s, in full', async () => {
   // §7's table, key for key. The acceptance criterion is a sale completable without a
   // mouse, so a missing key is a mouse.
   assert.deepEqual(Object.keys(KEYMAP).sort(), [
-    'Delete', 'Escape', 'F1', 'F10', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F9',
+    'Delete', 'Escape', 'F1', 'F10', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9',
   ]);
+  // TAX-004 (TASK-027). Mapped in every store and shown in the help bar only where the
+  // owner has switched it on — a key advertised and then refused is a key cashiers
+  // learn to skip, and this one has to work the day somebody presents an ID.
+  assert.equal(actionFor('F8'), 'statutory');
   assert.equal(actionFor('F3'), 'quantity');
   assert.equal(actionFor('F9'), 'pay');
   assert.equal(actionFor('F10'), 'exactCash');
   assert.equal(actionFor('Delete'), 'removeLine');
   // §7: Escape cancels the current field and never the cart.
   assert.equal(actionFor('Escape'), 'cancelField');
-  assert.equal(actionFor('F8'), null, 'F8 is not in the map');
-
   // Every helped key is mapped, and the bar renders from the map rather than a copy.
   for (const key of HELP_ORDER) assert.ok(KEYMAP[key], `${key} is in the help bar but not the map`);
 });
@@ -332,7 +342,7 @@ test('the keyboard map is the spec’s, in full', async () => {
 test('the POS dispatches every action the map names', () => {
   const source = fs.readFileSync(path.join(root, 'public', 'js', 'pos', 'view.js'), 'utf8');
   const actions = [
-    'search', 'customer', 'quantity', 'lineDiscount', 'txnDiscount',
+    'search', 'customer', 'quantity', 'lineDiscount', 'txnDiscount', 'statutory',
     'park', 'retrieve', 'pay', 'exactCash', 'parkAndNew', 'removeLine', 'cancelField',
   ];
   for (const action of actions) {

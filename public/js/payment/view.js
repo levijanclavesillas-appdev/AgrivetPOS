@@ -88,14 +88,23 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
   function renderSummary() {
     const blocked = tenders.blockedReason();
 
-    clear(summaryHost).append(
+    clear(summaryHost).append(...[
       line('Amount due', money(priced.total_centavos), 'due'),
+      // TAX-004, restated where the money changes hands: the cashier confirms the name
+      // on the ID out loud, and the figure is separate from every other discount
+      // because it is a different claim.
+      priced.statutory
+        ? line(`${priced.statutory.id_type_label} discount`, money(-priced.statutory_discount_centavos), 'statutory')
+        : null,
+      priced.statutory
+        ? h('p', { class: 'payment-statutory', text: `${priced.statutory.name} · ${priced.statutory.id_no}` })
+        : null,
       line('Tendered', money(tenders.tenderedCentavos())),
       tenders.remainingCentavos() > 0
         ? line('Remaining', money(tenders.remainingCentavos()), 'remaining')
         // MON-007: change appears only once cash exceeds the balance.
-        : line('Change', money(tenders.changeCentavos()), 'change')
-    );
+        : line('Change', money(tenders.changeCentavos()), 'change'),
+    ].filter(Boolean));
 
     completeButton.disabled = Boolean(blocked);
     blockedNote.textContent = blocked || '';

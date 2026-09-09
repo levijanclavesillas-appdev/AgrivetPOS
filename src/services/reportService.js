@@ -178,7 +178,11 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
   const tendered = reportRepository.tenderTotal(q);
   const profit = reportRepository.profitTotals(q);
 
-  const discounts = totals.line_discount_centavos + totals.txn_discount_centavos;
+  // TAX-004 / requirement 7: statutory and voluntary are separate claims — the store
+  // deducts one and simply gave away the other — so they are added for the identity
+  // and reported apart. A single "discounts" figure answers neither question.
+  const voluntaryDiscounts = totals.line_discount_centavos + totals.txn_discount_centavos;
+  const discounts = voluntaryDiscounts + totals.statutory_discount_centavos;
   // RPT-101's fourth term, no longer zero (TASK-020). It was rendered at zero from
   // TASK-016 precisely so the identity had somewhere to put a figure the day returns
   // existed, and this is that day.
@@ -205,6 +209,8 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
       gross_centavos: totals.gross_centavos,
       line_discount_centavos: totals.line_discount_centavos,
       txn_discount_centavos: totals.txn_discount_centavos,
+      statutory_discount_centavos: totals.statutory_discount_centavos,
+      voluntary_discount_centavos: voluntaryDiscounts,
       discount_centavos: discounts,
       returns_centavos: returns,
       return_count: returned.return_count,
@@ -235,7 +241,12 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
       rule_id: 'RPT-101',
       // Printed as a sentence so the report carries its own arithmetic, per FR_6.2.
       statement: `${money.toDisplay(totals.gross_centavos)} gross`
-        + ` − ${money.toDisplay(discounts)} discounts`
+        + ` − ${money.toDisplay(voluntaryDiscounts)} discounts`
+        // Named in the sentence only where there is one, so a store that does not grant
+        // the entitlement reads the identity it always read (TAX-004 ships off).
+        + (totals.statutory_discount_centavos > 0
+          ? ` − ${money.toDisplay(totals.statutory_discount_centavos)} statutory`
+          : '')
         + ` − ${money.toDisplay(returns)} returns`
         + ` = ${money.toDisplay(reconciledNet)} net`,
       gross_less_discounts_centavos: reconciledNet,
@@ -533,6 +544,9 @@ function exportCsv(report, params, actor) {
       ['Gross', built.totals.gross_centavos],
       ['Line discounts', built.totals.line_discount_centavos],
       ['Transaction discounts', built.totals.txn_discount_centavos],
+      // TAX-004: its own row. An accountant reading this file is reading it to find
+      // exactly this figure, and it is not derivable from a merged total.
+      ['Statutory discounts', built.totals.statutory_discount_centavos],
       ['Returns', built.totals.returns_centavos],
       ['  refunded off a balance', built.totals.refund_credit_centavos],
       ['  refunded in cash', built.totals.refund_cash_centavos],

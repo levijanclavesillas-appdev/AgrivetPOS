@@ -3,13 +3,16 @@
 Work items, closed and open. Each task is self-contained: an implementer should need this file,
 plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**v1.0 is code-complete; v1.1 is under way** — `TASK-019` to `TASK-026` are closed. With
+**v1.0 is code-complete; v1.1 is under way** — `TASK-019` to `TASK-027` are closed. With
 `TASK-024` went the last of `PR-101`'s stubs, so every price the rules describe now resolves; with
 `TASK-025` the store's data can leave the machine as something other than an opaque backup, and with
 `TASK-026` another store's data can come *in* — a cutover from three spreadsheets rather than eight
 hundred products keyed by hand. With them
 come both of `POS-107`'s corrections, so a sale can be unsold either way round, and the
-stocktake, so the shelf figure can be checked against the shelf.
+stocktake, so the shelf figure can be checked against the shelf. With `TASK-027` the store can
+grant the senior citizen and PWD discount correctly on the day it is asked for one — and grants it
+to nobody until an owner switches it on, which is the only honest thing to do with a question
+belonging to the store's accountant.
 `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
 screens the original backlog never assigned to anybody — see [the screen gap](#the-screen-gap--found-and-closed),
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
@@ -104,6 +107,7 @@ again quietly.
 | [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `52d7fe9` | `013_negotiated_pricing.sql`; `PR-101`'s top two levels, stubbed since `TASK-009`, now resolve; band and agreed-price editors; `TC-UT-48`–`TC-UT-49`, `TC-INT-93`, and `TC-UT-31` updated |
 | [TASK-025](TASK-025-json-export-and-import.md) | JSON export and validated import | `9e134b0` | No schema. `exportService`, `importService`, `dataRepository`; `zip.js` grew multi-entry; `SCR-706`; `TC-INT-94`–`TC-INT-97`, `TC-E2E-20`. `api.saveAs` extracted from two screens that had each rolled their own |
 | [TASK-026](TASK-026-opening-data-load.md) | Opening-data load from CSV | `f254088` | No schema. `openingDataService`; `config/csv.js` — the RFC 4180 **reader**, with `reportService`'s writer moved into it so both halves are one understanding of the format; the opening load on `SCR-706`; `TC-UT-100`, `TC-INT-98`–`TC-INT-100`, `TC-E2E-21`. `productService.create` and `customerService.create` split into `createWithin` so a whole cutover fits in one transaction |
+| [TASK-027](TASK-027-statutory-discount.md) | Senior citizen and PWD statutory discount | *this commit* | No schema — `sales.statutory_discount_centavos`, `sale_discounts`' three ID columns and `products.statutory_discount_eligible`, carried unused since `TASK-011`, all finally written. `taxService.statutoryLine` and `chooseStatutory`; `statutory_discount_enabled` (off, owner-only); `F8` on `SCR-301`; `TC-UT-50`–`TC-UT-51`, `TC-INT-101`–`TC-INT-102`. And `POS-207`'s day window, which had been eight hours out since `TASK-011` |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
@@ -172,6 +176,27 @@ unpicking it would make money the customer actually paid disappear. Both name th
 `sales.approved_by` column turned out not to be the void's approver — it records who released a
 discount at the time of *sale* — so the void report reads `AUD-603`'s own audit row instead.
 
+**What `TASK-027` decided that `TAX-005` did not settle, and it is the one to read.** In `VAT`
+mode the entitlement is *two* things — the line becomes exempt **and** 20% comes off — and the rule
+says only that the statutory and voluntary discounts do not compound, "the larger, not the sum".
+Read as one figure, a 6% clearance discount would beat the statutory treatment and thereby cancel a
+beneficiary's **VAT exemption**, which is not the store's to withhold. So the exemption stands
+whichever discount wins and only the 20% is in the scale. The same question has a second half
+nobody would think to ask: `PR-106`'s basket tier is apportioned across lines, so a statutory line
+taking its share would have received 20% *and* a slice of the band — the 25% `TAX-005` exists to
+forbid, arriving by the back door. A line under the entitlement therefore neither earns the tier nor
+takes a share of it.
+
+**And what `TASK-027` found, which only the clock could have shown.** `POS-207`'s duplicate-
+reference check built its "that day" window as the Manila date at **UTC** midnight — the Manila day
+slid eight hours late. Between midnight and 08:00 Manila the window began in the future, the check
+found nothing, and a double-keyed GCash reference went through unremarked: on a store that opens at
+seven, the first hour of every day. `TC-INT-38` had been asserting it since `TASK-011` and fails
+only when the suite is run in those hours, which is how it survived every green run in this
+project's history — this task happened to be worked at 23:20 UTC. `auditService` had done the same
+conversion correctly since `TASK-005`; the defect was a *second* implementation of one idea, and the
+fix was to delete it rather than to correct it.
+
 ## Open — v1.1 "Supply"
 
 Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
@@ -187,19 +212,25 @@ already written and tested by it.
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
-| [TASK-027](TASK-027-statutory-discount.md) | Senior citizen / PWD statutory discount | `FT-309` | — |
 | [TASK-028](TASK-028-store-credit.md) | Store credit balances | `FT-408` | `TASK-020` |
 
-One of them still carries a question that must be answered before the work starts, in the same
-shape `TASK-016` and `TASK-018` used: `TASK-027` asks whether the store is required to grant the
-statutory discount — a question for the store's accountant, which is why `TAX-004` ships it off
-by default. (`TASK-019`'s was answered: the store does raise purchase orders, so the full
-lifecycle was built.)
+`TASK-027` carried a question that had to be answered before the work started, in the same shape
+`TASK-016` and `TASK-018` used: whether the store is required to grant the statutory discount — a
+question for the store's accountant. **It was not answered, and the task landed anyway**, which is
+worth recording as a pattern rather than as an exception: the question governs whether the store
+*switches it on*, not whether the code is correct, and `TAX-004` had already decided that by
+shipping it off. A task blocked on an answer nobody at a keyboard can give is only really blocked
+where the answer would change the code. (`TASK-019`'s was answered the other way: the store does
+raise purchase orders, so the full lifecycle was built.)
 
 Four fill things v1.0 deliberately left stubbed rather than absent: `PR-101`'s top two
 precedence levels (`TASK-024`), `RPT-101`'s `returns` term (`TASK-020`), `sales.voided_at` and
 its siblings (`TASK-021`), and `sale_tenders`' `STORE_CREDIT` method (`TASK-028`). Each was
 built with the seam in place, and each task's job is to fill it rather than to reshape anything.
+`TASK-027` was a fifth of the same kind and is now filled: `sales.statutory_discount_centavos`,
+`sale_discounts`' three ID columns and `products.statutory_discount_eligible` have carried nothing
+since `TASK-011` precisely so that granting the discount would be a settings change and not a
+migration — and it was.
 
 ## Open — v1.2 "Trace"
 
@@ -214,21 +245,26 @@ built with the seam in place, and each task's job is to fill it rather than to r
 | `TASK-035` | Evaluate SQLCipher encryption against POS latency | `SEC-9` |
 
 <a id="status"></a>
-## Status — 2026-09-08
+## Status — 2026-09-10
 
-**What is built.** 23,300 lines across 127 source files — 9 migrations, 28 renderer modules,
-no build step and four runtime dependencies — against 17,900 lines of tests and harnesses.
+**What is built.** 25,300 lines across 102 server files — 13 migrations — and 9,700 lines across
+35 renderer modules, with no build step and four runtime dependencies, against 26,800 lines of
+tests and harnesses.
 
-`npm run test:all` is green: **750 cases** across 48 files — 195 unit, 437 integration and API,
-118 end-to-end. Beside it, 4 performance files and two harnesses that are deliberately outside
+*(The figures above were written once at v1.0 close and not recomputed until now, so they had
+drifted by seven tasks. They are counted as: `src/**/*.js` outside `src/tests`, then `public/js`,
+then `src/tests` plus `tools`.)*
+
+`npm run test:all` is green: **972 cases** across 63 files — 257 unit, 545 integration and API,
+170 end-to-end. Beside it, 4 performance files and two harnesses that are deliberately outside
 the gate because they need things a gate machine may not have: `tools/browser-smoke` drives the
 real renderer in Chromium through nineteen screens, and `tools/installer/check.sh` compiles the
 NSIS macros with `makensis`.
 
 Every v1.0 service, repository, API route, business rule **and screen** is implemented and
-tested. `TC-UT-98` asserts the rule-coverage obligation mechanically — 62 covered v1.0 rules,
-all cited by a test, and 51 of 51 outside the obligation as well — and `TC-UI-10` asserts every
-screen in `04_UX_SPEC.md` §3 has a view.
+tested. `TC-UT-98` asserts the rule-coverage obligation mechanically — 62 covered v1.0 rules and
+28 built v1.1 rules, all cited by a test, and 51 of 51 outside the obligation as well — and
+`TC-UI-10` asserts every screen in `04_UX_SPEC.md` §3 has a view.
 
 **What that means at a counter.** A store can be installed, configured, stocked and staffed from
 the application. A cashier can open a drawer, sell, take a split tender, park a cart, print a
@@ -252,7 +288,14 @@ power cut does. Both have a UAT check waiting for them.
 `npm run build:exe` on Windows with a signing certificate, then `docs/UAT_RECORD.md` at the
 store's own counter.
 
-**The two open business questions are answered.** `Q-1`: the store is **not BIR-registered**, so
+**One question is deliberately still open, and the software is finished around it.** `TASK-027`
+asks whether an agrivet's goods carry the senior citizen and PWD entitlement at all. Nobody at a
+keyboard can answer that — it is the store's accountant's — so the discount is built, tested and
+**off**, a claim made while it is off is refused rather than quietly priced at nothing, and the
+switch records who turned it on and when. The `07_TEST_PLAN.md` §10 row for it says "not started"
+and will until somebody grants one at the counter.
+
+**The two open business questions from the brief are answered.** `Q-1`: the store is **not BIR-registered**, so
 `tax_mode` is `NONE` at install. `Q-4`: the product list is small enough to key in by hand, so
 `TASK-026` stayed in v1.1 — and `TASK-036` built the screens that hand entry needs. **`TASK-026` has
 since been built anyway**, which changes nothing about the first store: it is there for the second,

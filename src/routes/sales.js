@@ -53,6 +53,10 @@ router.post('/sales', atTheCounter, (req, res, next) => {
       approver: body.approver || null,
       acceptDuplicateReference: body.acceptDuplicateReference === true,
       reason: body.reason || null,
+      // TAX-004: the beneficiary's ID type, number and name. Passed straight through —
+      // whether the store grants the discount at all, and which lines it reaches, are
+      // decisions the pricing engine makes and this route holds no copy of.
+      statutory: body.statutory || null,
     }, req.session);
 
     res.status(201).json(result);

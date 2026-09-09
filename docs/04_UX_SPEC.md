@@ -152,6 +152,19 @@ Rules surfaced here: `POS-102` (both units shown, base stored), `POS-104` (stock
 `PR-101` (resolved price level named), `INV-104` (a line that would go negative is blocked or
 warned per setting), `PR-105` (below-cost opens the authorisation panel).
 
+**And, from `TASK-027`, the discount the *statute* grants rather than the store** (`F8`, `TAX-004`).
+The panel asks for the three things the law wants — which ID, its number, and the name on it — and
+decides nothing: whether the store grants the discount at all, which of the products in the cart it
+reaches, what the rate is and whether it beats a discount already on the line are every one of them
+the server's answer. The rail shows the figure on its own row, never folded into "Discount", because
+they are different claims; under it stands the beneficiary's name, which is what the cashier reads
+back off the card. On the line itself the entitlement carries the accent a resolved price level
+carries rather than the grey of a hand-typed discount, and where the line was VAT-exempted the
+screen says so in those words — *VAT-exempt, less ₱120 VAT* — because that is a tax treatment the
+customer is entitled to and not money the store gave away (`TAX-002`). Where a discount already on
+the line was the larger, `TAX-005`'s own sentence appears under it: the customer receives the
+larger, never both.
+
 **And, from `TASK-023`, the discounts the store configured rather than typed.** Where a basket
 earns a tier the rail names the band **in the owner's own words** (`PR-106`) — "why is there ₱300
 off" is a question a customer asks and the cashier must be able to answer. Where an automatic
@@ -180,6 +193,11 @@ over limit (`CR-104`). Complete is disabled until `SUM(tenders) ≥ due` (`POS-2
 
 Non-cash rows carry the word **RECORDED** next to the amount (`POS-206`) — in the UI, on the
 receipt, and in reports.
+
+Where a statutory discount was claimed on `SCR-301`, the amount due is followed by the discount and
+the beneficiary's name and ID number (`TAX-004`). Restated here rather than left behind on the
+previous screen because this is where the money changes hands and the name is the thing the cashier
+says out loud before taking it.
 
 ### `SCR-304` — Receipt · `FT-304`, and the void · `FT-308` — v1.1
 
@@ -371,6 +389,13 @@ entered. **Server-side validation is authoritative**; the client's copy is a cou
 | `F4` | Line discount | `F12` | Park and start new |
 | `F5` | Transaction discount | `Del` | Remove line |
 | `F6` | Park cart | `Esc` | Cancel current field, never the cart |
+| `F8` | Senior citizen / PWD discount | | |
+
+`F8` is mapped in every store and appears in the foot bar **only where the owner has switched the
+statutory discount on** (`TAX-004` ships it off). A key advertised to every store and refused in
+most of them is a key cashiers learn to skip past, and this is the one key that has to work on the
+day somebody puts an ID on the counter — so it stays mapped, and pressing it in a store that does
+not grant the discount says so in a sentence rather than doing nothing.
 
 A barcode scanner in keyboard-wedge mode types into the search field wherever focus is, provided
 no modal is open.

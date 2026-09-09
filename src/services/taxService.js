@@ -28,6 +28,35 @@ const VAT_INCLUSIVE_NUMERATOR = 100n;
 const VAT_INCLUSIVE_DENOMINATOR = 112n;
 const VAT_RATE_LABEL = '12%';
 
+/**
+ * TAX-004 / TAX-005 — the statutory discount, as a rate and a label.
+ *
+ * 20%, and — like the VAT rate above — deliberately **not** an `OPS-005` setting. RA
+ * 9994 and RA 10754 fix the figure; a store that could type a different one would be
+ * either short-changing a senior citizen or claiming a deduction it is not owed, and
+ * both are the kind of mistake nobody notices until an assessment. What *is*
+ * configurable is whether the store grants it at all (`statutory_discount_enabled`),
+ * because whether an agrivet's stock qualifies is a question for the store's
+ * accountant — see TASK-027's opening section.
+ */
+const STATUTORY_DISCOUNT_NUMERATOR = 20n;
+const STATUTORY_DISCOUNT_DENOMINATOR = 100n;
+const STATUTORY_DISCOUNT_BP = 2000;
+const STATUTORY_RATE_LABEL = '20%';
+
+/**
+ * The two entitlements, and the words a receipt prints for them.
+ *
+ * TAX-004 requires the ID *type* alongside the number, because they are different
+ * statutes with different registries: a senior citizen's ID is issued by the OSCA, a
+ * PWD's by the local government or the NCDA. A single "ID number" column with no type
+ * is a record that cannot be checked against either.
+ */
+const STATUTORY_ID_TYPES = Object.freeze({
+  SENIOR_CITIZEN: { label: 'Senior citizen', receipt: 'SC ID', statute: 'RA 9994' },
+  PWD: { label: 'PWD', receipt: 'PWD ID', statute: 'RA 10754' },
+});
+
 function assertMode(taxMode) {
   if (!MODES.includes(taxMode)) {
     throw new RangeError(`unknown tax mode: ${taxMode} (TAX-001)`);
@@ -130,6 +159,111 @@ function computeTax({ lines, taxMode }) {
 }
 
 /**
+ * TAX-004 / TAX-002 / TAX-003 — one statutory line, as pure arithmetic.
+ *
+ * The rule that is most often implemented wrongly, and expensively: in `VAT` mode the
+ * entitlement is **an exemption and a discount**, not a 20% price cut. The line stops
+ * being VATable, the 20% applies to what is left, and the customer pays
+ * `P / 1.12 × 0.8` — not `P × 0.8`. Getting it backwards overstates the discount the
+ * store may claim and understates the output VAT it declares.
+ *
+ * In `NONE` and `NON_VAT` there is no VAT to lift (TAX-002: the selling price is the
+ * final price), so the 20% applies to the selling price and the tax class is untouched.
+ *
+ * Pure, and takes the mode as an argument for the reason the rest of this file does:
+ * all three modes are testable without a store profile.
+ *
+ * `amountCentavos` is the line **before any discount** — the gross. TAX-005 puts the
+ * statutory computation before the voluntary one, and `chooseStatutory` below decides
+ * which of the two the customer actually receives.
+ */
+function statutoryLine({ amountCentavos, taxClass, taxMode }) {
+  money.assertCentavos(amountCentavos, 'line amount');
+  assertClass(taxClass);
+  assertMode(taxMode);
+
+  // The exemption, where there is one to give. Only a VATable line in VAT mode carries
+  // VAT to lift; an already-exempt line is exempt for its own reason and stays so.
+  const exempt = computesTax(taxMode) && taxClass === 'VATABLE';
+  const base = exempt ? decomposeLine(amountCentavos, taxClass).net_centavos : amountCentavos;
+
+  const discount = money.toSafeNumber(
+    money.divRoundHalfUp(BigInt(base) * STATUTORY_DISCOUNT_NUMERATOR, STATUTORY_DISCOUNT_DENOMINATOR),
+    'statutory discount'
+  );
+
+  return {
+    rule_id: 'TAX-004',
+    // What the 20% was taken on: the VAT-exclusive amount in VAT mode, the selling
+    // price otherwise. Returned rather than left implicit because it is the figure a
+    // receipt and an assessment both want to see.
+    base_centavos: base,
+    vat_exemption_centavos: amountCentavos - base,
+    discount_centavos: discount,
+    net_centavos: base - discount,
+    discount_bp: STATUTORY_DISCOUNT_BP,
+    // TAX-003: the line's class for the rest of the computation. An exempt line yields
+    // no VAT, which is the whole of what the exemption means downstream.
+    tax_class: exempt ? 'VAT_EXEMPT' : taxClass,
+    exempted: exempt,
+  };
+}
+
+/**
+ * TAX-005 — statutory first, and never both.
+ *
+ * "Computed **before** any voluntary discount and the two do not compound: the customer
+ * receives the larger, not the sum." A shop that gives 20% statutory on top of a 5%
+ * loyalty discount is giving 25% and cannot claim the difference back.
+ *
+ * The comparison is between the two **discounts**, not between two final prices, and
+ * that distinction is this function's one judgement call. Where the statutory line is
+ * also VAT-exempt, the exemption is a tax treatment the beneficiary is entitled to
+ * either way (TAX-002) — it is not a discount, it is not the store's to give, and
+ * weighing it against a voluntary discount would let a 6% loyalty discount cancel a
+ * customer's VAT exemption. So the exemption stands whichever discount wins, and only
+ * the 20% is in the scale.
+ *
+ * Shaped like `discountRuleService.chooseDiscount` on purpose: PR-206 already answers
+ * "two discounts, one line, which applies" and a second answer with a different shape
+ * is how the two drift.
+ */
+function chooseStatutory({ statutoryCentavos, voluntaryCentavos, voluntaryReason = null }) {
+  money.assertCentavos(statutoryCentavos, 'statutory discount');
+  money.assertCentavos(voluntaryCentavos, 'voluntary discount');
+
+  const statutoryWins = statutoryCentavos >= voluntaryCentavos;
+
+  return {
+    applied_centavos: statutoryWins ? statutoryCentavos : voluntaryCentavos,
+    source: statutoryWins ? 'STATUTORY' : 'VOLUNTARY',
+    rule_id: 'TAX-005',
+    statutory_centavos: statutoryCentavos,
+    voluntary_centavos: voluntaryCentavos,
+    suppressed: statutoryWins
+      ? (voluntaryCentavos > 0
+        ? { source: 'VOLUNTARY', centavos: voluntaryCentavos, reason: voluntaryReason }
+        : null)
+      : { source: 'STATUTORY', centavos: statutoryCentavos, reason: null },
+    why: statutoryWins
+      ? (voluntaryCentavos > 0
+        ? `${money.toDisplay(statutoryCentavos)} statutory beats `
+          + `${money.toDisplay(voluntaryCentavos)} given by the store; they do not add together (TAX-005).`
+        : `${STATUTORY_RATE_LABEL} statutory discount (TAX-004).`)
+      : `${money.toDisplay(voluntaryCentavos)} given by the store beats the `
+        + `${money.toDisplay(statutoryCentavos)} statutory discount; they do not add together (TAX-005).`,
+  };
+}
+
+/** TAX-004's ID type, refused by name rather than written as whatever arrived. */
+function assertStatutoryIdType(idType) {
+  if (!Object.prototype.hasOwnProperty.call(STATUTORY_ID_TYPES, idType)) {
+    throw new RangeError(`unknown statutory ID type: ${idType} (TAX-004)`);
+  }
+  return idType;
+}
+
+/**
  * TAX-007 — the VATable / VAT-exempt / zero-rated / VAT-amount block.
  *
  * Needed for the store's own bookkeeping, and printed subject to TAX-006: the document
@@ -152,5 +286,7 @@ function summaryBlock(lines) {
 
 module.exports = {
   MODES, CLASSES, VAT_RATE_LABEL,
+  STATUTORY_DISCOUNT_BP, STATUTORY_RATE_LABEL, STATUTORY_ID_TYPES,
   assertMode, assertClass, computesTax, decomposeLine, computeTax, summaryBlock,
+  statutoryLine, chooseStatutory, assertStatutoryIdType,
 };

@@ -154,6 +154,106 @@ test('the VAT summary buckets by class and sums to the VAT charged (TAX-007)', (
   );
 });
 
+// ── TC-UT-50 — TAX-005, and the promise TC-UT-20 made at v1.0 ───────────────
+//
+// 07_TEST_PLAN.md §3 carries `TC-UT-20` — "statutory and voluntary discounts do not
+// compound; larger wins" — against a rule scheduled for 1.1, so there was nothing to
+// assert it against until now. It is this case, under the id TASK-027 assigned it.
+
+test('TC-UT-50: a statutory discount is computed before a voluntary one, and they never add', () => {
+  // The expensive mistake, stated as arithmetic: ₱1,000 of goods, a 20% statutory
+  // entitlement and a 5% loyalty discount the store gives. TAX-005 says the customer
+  // receives ₱200 off, not ₱250 — a shop that gives both is giving 25% and cannot
+  // claim the difference back.
+  const statutory = taxService.statutoryLine({ amountCentavos: 100000, taxClass: 'VATABLE', taxMode: 'NONE' });
+  assert.equal(statutory.discount_centavos, 20000, '20% of the selling price');
+
+  const chosen = taxService.chooseStatutory({ statutoryCentavos: statutory.discount_centavos, voluntaryCentavos: 5000 });
+  assert.equal(chosen.applied_centavos, 20000, 'the larger, not the sum');
+  assert.equal(chosen.source, 'STATUTORY');
+  assert.equal(chosen.statutory_centavos + chosen.voluntary_centavos, 25000,
+    'the two are both known — which is what makes "not the sum" an assertion rather than an absence');
+  assert.deepEqual(chosen.suppressed, { source: 'VOLUNTARY', centavos: 5000, reason: null });
+  assert.match(chosen.why, /do not add together/);
+});
+
+test('TC-UT-50: where the store’s own discount is the larger, the customer receives that instead', () => {
+  // TAX-005 is symmetric: "the customer receives the larger". A 30% clearance beats
+  // the 20% entitlement, and the beneficiary is not made worse off for presenting an
+  // ID — which is the failure mode a "statutory always wins" implementation has.
+  const chosen = taxService.chooseStatutory({ statutoryCentavos: 20000, voluntaryCentavos: 30000 });
+  assert.equal(chosen.applied_centavos, 30000);
+  assert.equal(chosen.source, 'VOLUNTARY');
+  assert.deepEqual(chosen.suppressed, { source: 'STATUTORY', centavos: 20000, reason: null });
+
+  // Equal figures go to the statutory one, because it is the claimable one: the store
+  // deducts a statutory discount and merely gives away a voluntary one.
+  assert.equal(taxService.chooseStatutory({ statutoryCentavos: 20000, voluntaryCentavos: 20000 }).source, 'STATUTORY');
+});
+
+// ── TC-UT-51 — VAT mode: the exemption, then the 20% ────────────────────────
+
+test('TC-UT-51: in VAT mode the line is exempt and the 20% is on the VAT-exclusive amount', () => {
+  // ₱1,120 inclusive. The wrong answer — and the one a "20% off" implementation gives
+  // — is ₱896. The right one lifts the VAT first (TAX-002, TAX-003): ₱1,000 exclusive,
+  // less ₱200, is ₱800.
+  const line = taxService.statutoryLine({ amountCentavos: 112000, taxClass: 'VATABLE', taxMode: 'VAT' });
+
+  assert.equal(line.vat_exemption_centavos, 12000, 'the VAT the line is relieved of');
+  assert.equal(line.base_centavos, 100000, 'net = round(P / 1.12) — TAX-003');
+  assert.equal(line.discount_centavos, 20000, '20% of the VAT-exclusive amount, not of ₱1,120');
+  assert.equal(line.net_centavos, 80000);
+  assert.notEqual(line.net_centavos, 89600, 'a 20% price cut on the inclusive amount is the wrong answer');
+
+  // TAX-003: exempt from here on, so the line yields no VAT at all downstream.
+  assert.equal(line.tax_class, 'VAT_EXEMPT');
+  assert.equal(line.exempted, true);
+  const taxed = taxService.computeTax({ taxMode: 'VAT', lines: [{ amountCentavos: line.net_centavos, taxClass: line.tax_class }] });
+  assert.equal(taxed.total_vat_centavos, 0);
+  assert.equal(taxed.summary.vat_exempt_sales_centavos, 80000, 'TAX-007: it lands in the exempt bucket');
+});
+
+test('TC-UT-51: in NONE and NON_VAT there is no VAT to lift, so the 20% is on the selling price', () => {
+  for (const taxMode of ['NONE', 'NON_VAT']) {
+    // TAX-002: the selling price is the final price in these modes, so lifting a VAT
+    // that was never charged would hand the customer a second discount.
+    const line = taxService.statutoryLine({ amountCentavos: 112000, taxClass: 'VATABLE', taxMode });
+    assert.equal(line.vat_exemption_centavos, 0, taxMode);
+    assert.equal(line.base_centavos, 112000, taxMode);
+    assert.equal(line.discount_centavos, 22400, taxMode);
+    assert.equal(line.tax_class, 'VATABLE', `${taxMode}: TAX-003 still carries the class`);
+  }
+});
+
+test('TC-UT-51: an already-exempt line is not exempted twice', () => {
+  // A VAT-exempt product in VAT mode carries no VAT to lift — it is exempt for its own
+  // reason — so the 20% is on the whole line and nothing is decomposed.
+  const line = taxService.statutoryLine({ amountCentavos: 100000, taxClass: 'VAT_EXEMPT', taxMode: 'VAT' });
+  assert.equal(line.vat_exemption_centavos, 0);
+  assert.equal(line.base_centavos, 100000);
+  assert.equal(line.discount_centavos, 20000);
+});
+
+test('TAX-004: the 20% is statute, and the ID type is one of two', () => {
+  // Like the VAT rate above, and for the same reason: a store that could type a
+  // different figure would be either short-changing a senior citizen or claiming a
+  // deduction it is not owed.
+  const settingsService = require('../../services/settingsService');
+  assert.equal(taxService.STATUTORY_DISCOUNT_BP, 2000);
+  assert.equal(Object.keys(settingsService.REGISTRY).some((k) => /statutory.*(bp|rate|percent)/i.test(k)), false);
+
+  // What *is* configurable is whether the store grants it at all — and it ships off.
+  assert.equal(settingsService.REGISTRY.statutory_discount_enabled.value, false);
+  assert.equal(settingsService.REGISTRY.statutory_discount_enabled.ownerOnly, true);
+
+  assert.deepEqual(Object.keys(taxService.STATUTORY_ID_TYPES), ['SENIOR_CITIZEN', 'PWD']);
+  assert.throws(() => taxService.assertStatutoryIdType('SENIOR'), RangeError);
+  assert.throws(
+    () => taxService.statutoryLine({ amountCentavos: 1000, taxClass: 'VATABLE', taxMode: 'PERCENTAGE' }),
+    RangeError
+  );
+});
+
 // ── Guards ──────────────────────────────────────────────────────────────────
 
 test('the mode and the class are checked, and the VAT rate is not a setting', () => {

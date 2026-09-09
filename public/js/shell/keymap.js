@@ -13,6 +13,10 @@ export const KEYMAP = Object.freeze({
   F5: { action: 'txnDiscount', label: 'Txn discount' },
   F6: { action: 'park', label: 'Park' },
   F7: { action: 'retrieve', label: 'Retrieve' },
+  // TAX-004. In the map always, in the help bar only where the store grants it — a key
+  // advertised to every store and refused in most of them is a key cashiers learn to
+  // ignore, and this one has to work the day somebody presents an ID.
+  F8: { action: 'statutory', label: 'SC/PWD' },
   F9: { action: 'pay', label: 'Pay' },
   F10: { action: 'exactCash', label: 'Exact cash' },
   F12: { action: 'parkAndNew', label: 'Park & new' },
@@ -23,7 +27,7 @@ export const KEYMAP = Object.freeze({
 });
 
 /** The bar along the foot of SCR-301, in the spec's own order. */
-export const HELP_ORDER = Object.freeze(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F9', 'F10', 'F12']);
+export const HELP_ORDER = Object.freeze(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F12']);
 
 export function actionFor(key) {
   return KEYMAP[key]?.action ?? null;

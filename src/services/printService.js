@@ -18,6 +18,7 @@ const net = require('net');
 const clock = require('../config/clock');
 const money = require('./money');
 const escpos = require('./escpos');
+const taxService = require('./taxService');
 const documentService = require('./documentService');
 const settingsService = require('./settingsService');
 
@@ -65,6 +66,22 @@ function footer(columns, { reprint = false } = {}) {
 }
 
 /**
+ * TAX-004's two labels: the short one that fits beside a figure on 32 columns, and the
+ * registry's own name for the ID.
+ *
+ * Read from `taxService` rather than written here, so the receipt and the screen say
+ * the same words about the same entitlement.
+ */
+function statutoryLabel(sale) {
+  const declared = sale.statutory
+    ? taxService.STATUTORY_ID_TYPES[sale.statutory.id_type]
+    : null;
+  return declared ? declared.receipt.replace(/ ID$/, '') : 'SC/PWD';
+}
+
+const statutoryReceiptLabel = (idType) => (taxService.STATUTORY_ID_TYPES[idType] || {}).receipt || 'ID';
+
+/**
  * The sale receipt (SCR-304).
  *
  * TAX-007: in `VAT` mode it adds the VATable / exempt / zero-rated / VAT-amount block,
@@ -89,8 +106,23 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
       lineTotal: money.toDisplay(item.line_total_centavos, { symbol: false }),
     }, columns));
 
-    if (item.discount_centavos > 0) {
-      lines.push(escpos.leftRight('  Discount', `-${money.toDisplay(item.discount_centavos, { symbol: false })}`, columns));
+    // TAX-004, per line, so the printed arithmetic closes: the VAT lifted, then the
+    // 20%, then whatever else came off. A statutory line whose only sub-line said
+    // "Discount −200.00" beside a total of 800.00 on a 1,120.00 line leaves the
+    // customer to find the missing 120 themselves.
+    if (item.vat_exemption_centavos > 0) {
+      lines.push(escpos.leftRight('  Less VAT', `-${money.toDisplay(item.vat_exemption_centavos, { symbol: false })}`, columns));
+    }
+    if (item.statutory_discount_centavos > 0) {
+      lines.push(escpos.leftRight(
+        `  ${statutoryLabel(sale)} disc`,
+        `-${money.toDisplay(item.statutory_discount_centavos, { symbol: false })}`,
+        columns
+      ));
+    }
+    const voluntary = item.discount_centavos - (item.statutory_discount_centavos || 0);
+    if (voluntary > 0) {
+      lines.push(escpos.leftRight('  Discount', `-${money.toDisplay(voluntary, { symbol: false })}`, columns));
     }
   }
 
@@ -102,6 +134,16 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
   }
   if (sale.txn_discount_centavos > 0) {
     lines.push(escpos.leftRight('Discount', `-${money.toDisplay(sale.txn_discount_centavos, { symbol: false })}`, columns));
+  }
+  // TAX-004: printed on its own line and never merged with the discounts above. It is
+  // a different claim — the store deducts it, the others it simply gave away — and the
+  // law requires the beneficiary's record to appear on the document.
+  if (sale.statutory_discount_centavos > 0) {
+    lines.push(escpos.leftRight(
+      `${statutoryLabel(sale)} disc`,
+      `-${money.toDisplay(sale.statutory_discount_centavos, { symbol: false })}`,
+      columns
+    ));
   }
 
   lines.push(escpos.leftRight('TOTAL', money.toDisplay(sale.total_centavos, { symbol: false }), columns));
@@ -118,6 +160,18 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
 
   if (sale.change_centavos > 0) {
     lines.push(escpos.leftRight('CHANGE', money.toDisplay(sale.change_centavos, { symbol: false }), columns));
+  }
+
+  // TAX-004's record, in the two lines the statute asks for: whose ID, and which. A
+  // discount printed without them is one the store cannot claim back, so it is printed
+  // whenever the entitlement was granted — including where TAX-005 gave the customer a
+  // larger voluntary discount instead, because the line was still sold as exempt.
+  if (sale.statutory) {
+    lines.push('');
+    lines.push(escpos.truncate(
+      `${statutoryReceiptLabel(sale.statutory.id_type)} ${sale.statutory.id_no}`, columns
+    ));
+    lines.push(escpos.truncate(`Name ${sale.statutory.name}`, columns));
   }
 
   // TAX-007, in VAT mode only.

@@ -50,9 +50,15 @@ function dailyTotals({ fromAt, toAt, shiftId = null }) {
   return db.get().prepare(`
     SELECT
       COUNT(*)                                                      AS sale_count,
-      COALESCE(SUM(s.subtotal_centavos + s.line_discount_centavos), 0) AS gross_centavos,
+      -- TAX-004: the statutory discount is part of what was rung up and part of what
+      -- came off, so it belongs in gross as well as in the discounts below. What is
+      -- **not** in it is the VAT an exempt line was relieved of: the store never
+      -- charged it, so it was never revenue and cannot be a discount off revenue.
+      COALESCE(SUM(s.subtotal_centavos + s.line_discount_centavos + s.statutory_discount_centavos), 0)
+                                                                    AS gross_centavos,
       COALESCE(SUM(s.line_discount_centavos), 0)                    AS line_discount_centavos,
       COALESCE(SUM(s.txn_discount_centavos), 0)                     AS txn_discount_centavos,
+      COALESCE(SUM(s.statutory_discount_centavos), 0)               AS statutory_discount_centavos,
       COALESCE(SUM(s.total_centavos), 0)                            AS net_centavos,
       COALESCE(SUM(s.vat_centavos), 0)                              AS vat_centavos,
       COALESCE(SUM(s.change_centavos), 0)                           AS change_centavos

@@ -189,6 +189,20 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 10000, group: 'PRICING', ruleId: 'PR-201', ownerOnly: true,
     what: 'Highest discount an owner may apply, in basis points', min: 0, max: 10000,
   },
+  // TAX-004 — the one figure in this file that is a *question for an accountant*
+  // rather than a preference. RA 9994 and RA 10754 grant the discount on goods for the
+  // beneficiary's own use, and whether an agrivet's stock qualifies — feed for a farm
+  // does not, a sack for a household's chickens might be argued either way — is not a
+  // thing this backlog may decide for a store. So it ships off, the code that grants it
+  // is built and tested, and turning it on is the owner's decision with their
+  // accountant, recorded with who turned it on and when (AUD-601).
+  //
+  // The 20% itself is not here: it is statute, and it lives in taxService beside the
+  // VAT rate for the same reason.
+  statutory_discount_enabled: {
+    type: 'BOOL', value: false, group: 'PRICING', ruleId: 'TAX-004', ownerOnly: true,
+    what: 'Grant the senior citizen and PWD statutory discount on eligible products',
+  },
   cash_rounding_centavos: {
     type: 'INT', value: 1, group: 'PRICING', ruleId: 'MON-008', ownerOnly: true,
     what: 'Cash payable rounding step in centavos; 1 is off', min: 1, max: 100,

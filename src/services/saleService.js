@@ -30,6 +30,7 @@ const money = require('./money');
 const quantity = require('./quantity');
 const auditService = require('./auditService');
 const pricingService = require('./pricingService');
+const taxService = require('./taxService');
 const storeProfileService = require('./storeProfileService');
 const inventoryService = require('./inventoryService');
 const creditService = require('./creditService');
@@ -84,7 +85,7 @@ function complete(input, actor) {
   const {
     lines = [], customerId = null, tenders = [], transactionDiscountCentavos = 0,
     clientTotalCentavos = null, approver = null, acceptDuplicateReference = false,
-    reason = null,
+    reason = null, statutory = null,
   } = input || {};
 
   if (!actor || !actor.id) throw new TypeError('a sale needs an acting user (POS-501)');
@@ -129,6 +130,10 @@ function complete(input, actor) {
       actorRole: actor.role,
       approverRole: approver ? approver.role : null,
       transactionDiscountCentavos,
+      // TAX-004: the claim, refused inside `priceCart` where the store's setting and
+      // the product's eligibility are already in hand. The sale never sees a statutory
+      // figure it did not compute itself.
+      statutory,
       at,
     });
 
@@ -453,11 +458,21 @@ function settleTenders({
   };
 }
 
-const dayStart = (at) => `${clock.manilaDate(at)}T00:00:00.000Z`;
-const dayEnd = (at) => {
-  const next = new Date(Date.parse(`${clock.manilaDate(at)}T00:00:00.000Z`) + 86400000);
-  return next.toISOString();
-};
+/**
+ * POS-207's "that day" — the Manila day, in the UTC the column stores.
+ *
+ * These two lines used to build the window as `manilaDate(at)` at **UTC** midnight,
+ * which is not the Manila day: it is the Manila day slid eight hours late. Between
+ * midnight and 08:00 Manila the window therefore began in the future, the duplicate
+ * check found nothing, and a double-keyed GCash reference went through unremarked —
+ * on a store that opens at seven, the first hour of every day.
+ *
+ * `auditService` already knew how to do this and had done it right since TASK-005. The
+ * bug was a second implementation of the same idea, which is the only reason the two
+ * could disagree.
+ */
+const dayStart = (at) => auditService.dayStartUtc(clock.manilaDate(at));
+const dayEnd = (at) => auditService.dayEndUtc(clock.manilaDate(at));
 
 // ── Step 9 — writing it down ────────────────────────────────────────────────
 
@@ -479,7 +494,9 @@ function writeSale({ saleId, saleNo, shift, customer, priced, resolvedLines, set
     subtotal_centavos: priced.subtotal_centavos,
     line_discount_centavos: priced.line_discount_centavos,
     txn_discount_centavos: priced.transaction_discount_centavos,
-    statutory_discount_centavos: 0,          // TAX-004 is v1.1
+    // TAX-004: the server's own figure, never the screen's, and separate from both
+    // voluntary totals above — they are different claims (requirement 7).
+    statutory_discount_centavos: priced.statutory_discount_centavos || 0,
     vatable_centavos: summary.vatable_sales_centavos,
     vat_exempt_centavos: summary.vat_exempt_sales_centavos,
     zero_rated_centavos: summary.zero_rated_sales_centavos,
@@ -513,7 +530,12 @@ function writeSale({ saleId, saleNo, shift, customer, priced, resolvedLines, set
       // The cost snapshot RPT-104 reads. Changing a product's cost afterwards does not
       // change this sale's gross profit — TC-INT-35.
       unit_cost_centavos: product.avg_cost_centavos,
-      discount_centavos: line.line_discount_centavos + line.transaction_discount_centavos,
+      // MON-005: every discount that came off this line, statutory included. The VAT
+      // an exempt line was relieved of is **not** in it — that is a tax treatment, not
+      // a discount, and a line total below `unit price × quantity − discounts` by
+      // exactly the lifted VAT is the arithmetic saying so.
+      discount_centavos: line.line_discount_centavos + line.transaction_discount_centavos
+        + line.statutory_discount_centavos,
       tax_class_snapshot: line.tax_class,
       tax_centavos: line.tax_amount_centavos,
       line_total_centavos: line.amount_centavos,
@@ -563,6 +585,41 @@ function writeSale({ saleId, saleNo, shift, customer, priced, resolvedLines, set
     saleRepository.insertDiscount(row);
     discounts.push(row);
   });
+
+  // TAX-004 / PR-204 — the statutory record, one row per line the entitlement reached.
+  //
+  // Written even where the line's voluntary discount was the larger and the statutory
+  // 20% was therefore not applied (TAX-005): the beneficiary presented an ID, the line
+  // was treated as exempt on the strength of it, and a claim with no record of whose
+  // ID it was made on is not a claim. The row's own reason says which way it went.
+  if (priced.statutory) {
+    priced.lines.forEach((line, index) => {
+      if (!line.under_statutory) return;
+      const applied = line.statutory_discount_centavos;
+      const row = {
+        id: ids.uuidv7(),
+        sale_id: saleId,
+        sale_item_id: items[index].id,
+        discount_type: 'STATUTORY',
+        original_centavos: line.statutory_base_centavos,
+        discount_centavos: applied,
+        discount_bp: applied > 0
+          ? pricingService.basisPoints(applied, line.statutory_base_centavos)
+          : 0,
+        reason: applied > 0
+          ? `${priced.statutory.id_type_label} discount (TAX-004)`
+          : line.statutory_choice.why,
+        applied_by: actor.id,
+        approved_by: approver && approver.id ? approver.id : null,
+        statutory_id_type: priced.statutory.id_type,
+        statutory_id_no: priced.statutory.id_no,
+        statutory_name: priced.statutory.name,
+        created_at: at,
+      };
+      saleRepository.insertDiscount(row);
+      discounts.push(row);
+    });
+  }
 
   if (priced.transaction_discount_centavos > 0) {
     const row = {
@@ -740,6 +797,14 @@ function getByNo(saleNo) {
 function present(sale) {
   const items = saleRepository.itemsFor(sale.id);
   const tenders = saleRepository.tendersFor(sale.id);
+  // TAX-004: the ID the discount was granted on, and which lines it reached, read from
+  // where they were written rather than kept a second time on the sale. `sale_discounts`
+  // carries `sale_item_id` and the amount the 20% was taken on, which is what lets a
+  // receipt show the VAT it lifted as well as the discount it gave — the two together
+  // are what make the printed line add up.
+  const statutoryRows = saleRepository.discountsFor(sale.id).filter((d) => d.discount_type === 'STATUTORY');
+  const statutoryRow = statutoryRows[0] || null;
+  const statutoryByItem = new Map(statutoryRows.map((row) => [row.sale_item_id, row]));
 
   return {
     sale: {
@@ -753,6 +818,7 @@ function present(sale) {
       subtotal_centavos: sale.subtotal_centavos,
       line_discount_centavos: sale.line_discount_centavos,
       txn_discount_centavos: sale.txn_discount_centavos,
+      statutory_discount_centavos: sale.statutory_discount_centavos,
       vatable_centavos: sale.vatable_centavos,
       vat_exempt_centavos: sale.vat_exempt_centavos,
       zero_rated_centavos: sale.zero_rated_centavos,
@@ -763,6 +829,20 @@ function present(sale) {
       occurred_at: sale.occurred_at,
       occurred_at_manila: clock.toManila(sale.occurred_at),
       created_by: sale.created_by,
+      // TAX-004: whose ID the discount was granted on. Part of the sale rather than
+      // beside it, because the receipt renderer takes a sale and the law wants this on
+      // the document.
+      statutory: statutoryRow
+        ? {
+          rule_id: 'TAX-004',
+          id_type: statutoryRow.statutory_id_type,
+          id_type_label: (taxService.STATUTORY_ID_TYPES[statutoryRow.statutory_id_type] || {}).label
+            || statutoryRow.statutory_id_type,
+          id_no: statutoryRow.statutory_id_no,
+          name: statutoryRow.statutory_name,
+          discount_centavos: sale.statutory_discount_centavos,
+        }
+        : null,
     },
     items: items.map((item) => ({
       line_no: item.line_no,
@@ -775,6 +855,14 @@ function present(sale) {
       price_level_applied: item.price_level_applied,
       unit_cost_centavos: item.unit_cost_centavos,
       discount_centavos: item.discount_centavos,
+      // TAX-004's two figures for this line: what the 20% came to, and the VAT the line
+      // was relieved of — which is not a discount and is never printed as one.
+      statutory_discount_centavos: statutoryByItem.has(item.id)
+        ? statutoryByItem.get(item.id).discount_centavos
+        : 0,
+      vat_exemption_centavos: statutoryByItem.has(item.id)
+        ? money.mulQty(item.unit_price_centavos, item.qty_milli) - statutoryByItem.get(item.id).original_centavos
+        : 0,
       tax_class: item.tax_class_snapshot,
       tax_centavos: item.tax_centavos,
       line_total_centavos: item.line_total_centavos,

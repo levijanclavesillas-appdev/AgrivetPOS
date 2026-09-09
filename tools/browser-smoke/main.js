@@ -947,6 +947,85 @@ app.whenReady().then(async () => {
   await api('/carts/active', { method: 'DELETE' });
   log((await api('/carts/active')).json.cart === null, 'and the counter is left empty for the next walk');
 
+  console.log('\n— SCR-301: the statutory discount (TAX-004, TAX-005) —');
+
+  // The one feature in this product that ships **off**, so the walk is in two halves:
+  // what the counter does before an owner switches it on, and what it does after.
+  const offPolicy = (await api('/sales/pricing-policy')).json;
+  log(offPolicy.statutory.enabled === false,
+    'TAX-004: it ships off, and the counter is told so rather than deciding for itself');
+
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+  log(await run(`!/SC\\/PWD/.test((document.querySelector('.pos-help') || {}).textContent || '')`),
+    'and F8 is not advertised in a store that does not grant it');
+  await press('F8');
+  await settle(500);
+  log(await run(`/does not grant/.test(document.body.textContent)`),
+    'but the key still answers, in a sentence rather than by doing nothing');
+
+  // The owner switches it on and flags the one product the entitlement reaches.
+  await api('/settings', { method: 'PUT', body: { statutory_discount_enabled: true } });
+  await api(`/products/${PRODUCT_ID}`, { method: 'PUT', body: { statutoryDiscountEligible: true } });
+
+  await run(OPEN_RAIL('Products'));
+  await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-201' });
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+  log(await run(`/SC\\/PWD/.test((document.querySelector('.pos-help') || {}).textContent || '')`),
+    'once the owner switches it on, F8 appears in the foot bar');
+
+  await run(`(() => {
+    const el = document.querySelector('.pos-search');
+    el.focus();
+    for (const ch of '4800012345678') {
+      el.value += ch;
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  })()`);
+  await settle(1200);
+
+  await press('F8');
+  await settle(500);
+  log(await run(`!!document.querySelector('.statutory-prompt')`), 'F8 opens the panel');
+  log(await run(`/20%/.test((document.querySelector('.statutory-prompt') || {}).textContent || '')`),
+    'OPS-005 at the counter: the rate on it is the server’s, not the screen’s');
+
+  // The three things the law wants, typed as a cashier types them.
+  await run(`(() => {
+    const form = document.querySelector('.statutory-prompt');
+    const [idNo, name] = form.querySelectorAll('input');
+    idNo.value = '12-3456789';
+    name.value = 'Lolo Ambrosio Cruz';
+    form.requestSubmit();
+  })()`);
+  await settle(1200);
+
+  const statRail = await run(`(document.querySelector('.rail-totals') || {}).textContent || ''`);
+  log(/SC\/PWD/.test(statRail), 'TAX-004: the rail gives the entitlement its own row',
+    statRail.replace(/\s+/g, ' ').slice(0, 90));
+  log(/Lolo Ambrosio Cruz/.test(statRail), 'and names the beneficiary under it, for the cashier to read back');
+  log(/12\.50/.test(statRail), 'the 20% comes off — ₱62.50 becomes ₱50.00', statRail.replace(/\s+/g, ' ').slice(0, 90));
+  log(await run(`/SC\\/PWD/.test((document.querySelector('.cart-line-discount') || {}).textContent || '')`),
+    'and the line it came off says so, because the entitlement reaches some products and not others');
+
+  // Removing it puts the price back — the panel is not one-way.
+  await press('F8');
+  await settle(400);
+  await clickOn('.statutory-prompt button', '/Remove/');
+  await settle(1000);
+  log(await run(`!/SC\\/PWD/.test((document.querySelector('.rail-totals') || {}).textContent || '')`),
+    'and it can be taken off again — a mis-keyed ID is not a sale that has to be voided');
+
+  // Put the shop back: off, unflagged, and the counter empty for the walks below.
+  await api('/settings', { method: 'PUT', body: { statutory_discount_enabled: false } });
+  await api(`/products/${PRODUCT_ID}`, { method: 'PUT', body: { statutoryDiscountEligible: false } });
+  await api('/carts/active', { method: 'DELETE' });
+  log((await api('/sales/pricing-policy')).json.statutory.enabled === false,
+    'the store is left as it was found — off');
+
   console.log('\n— SCR-205: the stocktake (INV-110 to INV-113) —');
 
   await run(OPEN_RAIL('Products'));

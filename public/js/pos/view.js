@@ -20,6 +20,7 @@ export function createPos({ root, session, onPay }) {
   const cart = createCart();
   const catalogue = new Map();
   let priced = null;
+  let policy = null;             // GET /sales/pricing-policy — TAX-004's switch and rate
   let selectedKey = null;
   let modalOpen = false;
   let saveTimer = null;
@@ -33,6 +34,9 @@ export function createPos({ root, session, onPay }) {
   const railHost = h('aside', { class: 'pos-rail' });
   const panelHost = h('div', { class: 'pos-panel' });
   const results = h('div', { class: 'search-results', hidden: true });
+  // Its own host, because the bar's contents depend on the policy the server has not
+  // sent yet when the screen is first drawn.
+  const helpHost = h('div', { class: 'pos-help-host' });
 
   // The scanner only detects scans. What a person types is already in the search
   // field, and the input listener below searches on it.
@@ -147,7 +151,30 @@ export function createPos({ root, session, onPay }) {
    */
   function discountLine(pricedLine, line) {
     const applied = pricedLine ? pricedLine.line_discount_centavos : line.discountCentavos;
-    if (!applied) return null;
+    const statutory = pricedLine && pricedLine.under_statutory ? pricedLine.statutory_choice : null;
+    if (!applied && !statutory) return null;
+
+    // TAX-004 / TAX-005 on the line it happened to. Shown per line rather than only in
+    // the rail because the entitlement reaches some products and not others, and
+    // "which of these did the 20% come off" is the question the customer asks.
+    if (statutory) {
+      return h('div', { class: 'cart-line-discount statutory' }, [
+        h('span', {
+          text: pricedLine.statutory_discount_centavos > 0
+            ? `SC/PWD ${money(-pricedLine.statutory_discount_centavos)}`
+            : `Store discount ${money(-applied)}`,
+        }),
+        pricedLine.vat_exemption_centavos > 0
+          // TAX-002: not a discount, and never labelled as one. The line stopped being
+          // VATable, which is a different thing from money the store gave away.
+          ? h('small', { class: 'discount-why', text: `VAT-exempt, less ${money(pricedLine.vat_exemption_centavos)} VAT` })
+          : null,
+        // TAX-005's sentence, the server's own: the customer receives the larger of the
+        // two, and a cashier who sees only one figure would otherwise think the till
+        // had dropped the other.
+        statutory.suppressed ? h('small', { class: 'discount-why', text: statutory.why }) : null,
+      ]);
+    }
 
     const choice = pricedLine && pricedLine.discount_choice;
     return h('div', { class: 'cart-line-discount' }, [
@@ -196,6 +223,14 @@ export function createPos({ root, session, onPay }) {
         priced?.transaction_discount_choice?.suppressed
           ? h('p', { class: 'rail-tier-why', text: priced.transaction_discount_choice.why })
           : null,
+        // TAX-004: its own row, never folded into the discount above — the store
+        // deducts one and gave the other away, and the cashier is asked about both.
+        priced?.statutory
+          ? row(`SC/PWD ${percent(policy?.statutory?.discount_bp)}`, money(-priced.statutory_discount_centavos), 'statutory')
+          : null,
+        priced?.statutory
+          ? h('p', { class: 'rail-statutory', text: `${priced.statutory.id_type_label} · ${priced.statutory.name} · ${priced.statutory.id_no}` })
+          : null,
         priced?.tax_summary ? row('VAT', money(priced.tax_amount_centavos)) : null,
         h('hr'),
         row('TOTAL', priced ? money(priced.total_centavos) : money(0), 'total'),
@@ -212,6 +247,9 @@ export function createPos({ root, session, onPay }) {
       priced?.requires_authorisation ? authorisations() : null
     );
   }
+
+  /** A rate the server sent, in words. The figure is never this screen's (OPS-005). */
+  const percent = (bp) => (Number.isFinite(bp) ? `${bp / 100}%` : '');
 
   const row = (label, value, cls = '') => h('div', { class: `rail-row ${cls}` }, [
     h('span', { text: label }),
@@ -232,6 +270,7 @@ export function createPos({ root, session, onPay }) {
   function render() {
     renderLines();
     renderRail();
+    clear(helpHost).append(helpBar());
   }
 
   // ── Pricing (§4.1 step 2 — the client computes nothing that is banked) ─────
@@ -355,9 +394,78 @@ export function createPos({ root, session, onPay }) {
     queueMicrotask(() => input.select());
   }
 
+  /**
+   * `TAX-004` — the senior citizen and PWD claim (`F8`).
+   *
+   * Three fields, because the law wants three things: which ID, its number, and the
+   * name on it. Nothing here decides anything — whether the store grants the discount,
+   * what the rate is, which of the products it reaches and whether it beats a discount
+   * already on the line are all the server's answers, and the panel's job is to collect
+   * the record and let `reprice()` find out.
+   *
+   * The refusal when the store does not grant it is shown here rather than at the sale,
+   * because a cashier who has already asked a customer for their ID and typed it in has
+   * done something they cannot undo in front of them.
+   */
+  function claimStatutory() {
+    if (!policy?.statutory?.enabled) {
+      return ui.toast(
+        'This store does not grant the senior citizen and PWD discount. The owner turns '
+        + 'it on in Settings.',
+        { kind: 'error' }
+      );
+    }
+
+    modalOpen = true;
+    const claim = cart.statutory;
+    const types = policy.statutory.id_types;
+    const idType = h('select', { 'aria-label': 'ID type' }, types.map((type) => h('option', {
+      value: type.id, text: `${type.label} (${type.statute})`, selected: claim?.idType === type.id,
+    })));
+    const idNo = h('input', { type: 'text', value: claim?.idNo || '', autocomplete: 'off', 'aria-label': 'ID number' });
+    const name = h('input', { type: 'text', value: claim?.name || '', autocomplete: 'off', 'aria-label': 'Name on the ID' });
+    const close = () => { modalOpen = false; clear(panelHost); search.focus(); };
+
+    clear(panelHost).append(h('form', {
+      class: 'pos-prompt statutory-prompt',
+      onsubmit: async (event) => {
+        event.preventDefault();
+        if (!idNo.value.trim() || !name.value.trim()) {
+          return ui.toast('The ID number and the name on it are both required (TAX-004).', { kind: 'error' });
+        }
+        cart.statutory = { idType: idType.value, idNo: idNo.value.trim(), name: name.value.trim() };
+        close();
+        await reprice();
+        // The claim is refused by the server where no line is eligible, and `reprice`
+        // has already said so. Dropping it here keeps the screen and the cart agreed.
+        if (!priced) cart.statutory = null;
+      },
+    }, [
+      h('h2', { text: `${policy.statutory.rate_label} senior citizen / PWD discount` }),
+      // The server's own sentence about how it interacts with the rest — TAX-005 and
+      // the VAT exemption. No copy of either lives here.
+      h('p', { class: 'muted', text: policy.statutory.note }),
+      h('label', { text: 'ID type' }, [idType]),
+      h('label', { text: 'ID number' }, [idNo]),
+      h('label', { text: 'Name on the ID' }, [name]),
+      h('div', { class: 'prompt-actions' }, [
+        h('button', { type: 'submit', class: 'primary', text: 'Apply' }),
+        claim
+          ? h('button', {
+            type: 'button', text: 'Remove',
+            onclick: async () => { cart.statutory = null; close(); await reprice(); },
+          })
+          : null,
+        h('button', { type: 'button', text: 'Cancel', onclick: close }),
+      ]),
+    ]));
+    queueMicrotask(() => idNo.focus());
+  }
+
   const actions = {
     search: () => search.focus(),
     customer: () => chooseCustomer(),
+    statutory: () => claimStatutory(),
 
     quantity: () => {
       const line = selected();
@@ -573,7 +681,11 @@ export function createPos({ root, session, onPay }) {
   // ── Mount ─────────────────────────────────────────────────────────────────
 
   function helpBar() {
-    return h('div', { class: 'pos-help' }, HELP_ORDER.map((key) => h('span', { class: 'help-key' }, [
+    // TAX-004 ships off, and a foot bar that offers a key most stores cannot use is a
+    // foot bar cashiers stop reading. The key stays mapped either way, and pressing it
+    // in a store that does not grant the discount says so.
+    const keys = HELP_ORDER.filter((key) => key !== 'F8' || policy?.statutory?.enabled);
+    return h('div', { class: 'pos-help' }, keys.map((key) => h('span', { class: 'help-key' }, [
       h('kbd', { text: key }),
       h('span', { text: KEYMAP[key].label }),
     ])));
@@ -587,7 +699,7 @@ export function createPos({ root, session, onPay }) {
           attachBar,
           linesHost,
           panelHost,
-          helpBar(),
+          helpHost,
         ]),
         railHost,
       ])
@@ -598,6 +710,13 @@ export function createPos({ root, session, onPay }) {
       else results.hidden = true;
     });
     document.addEventListener('keydown', onKeyDown);
+
+    // OPS-005 at the counter: the ceilings, the bands and TAX-004's switch and rate all
+    // come from the server. A screen holding its own copy of any of them is a screen
+    // that is wrong the day the owner changes one.
+    try {
+      policy = await api.get('/sales/pricing-policy');
+    } catch { /* the sale re-checks every one of them regardless */ }
 
     render();
 

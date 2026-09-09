@@ -15,6 +15,7 @@ const discountRuleService = require('../services/discountRuleService');
 const taxService = require('../services/taxService');
 const storeProfileService = require('../services/storeProfileService');
 const customerService = require('../services/customerService');
+const settingsService = require('../services/settingsService');
 const errors = require('../services/errors');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
@@ -51,6 +52,10 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
       actorRole: req.session.role,
       approverRole: body.approverRole || null,
       transactionDiscountCentavos: body.transactionDiscountCentavos || 0,
+      // TAX-004, previewed on the same terms it is sold on: the cashier sees the
+      // refusal — the store does not grant it, no line is eligible, the ID is
+      // incomplete — before the customer is at the payment screen.
+      statutory: body.statutory || null,
     });
 
     res.json(result);
@@ -82,6 +87,21 @@ router.get('/sales/pricing-policy', atTheCounter, (req, res, next) => {
       // PR-106's bands, PR-202's capped categories and PR-206's "these do not add".
       // The screen renders them; it decides none of them.
       discount_rules: discountRuleService.policy(),
+      // TAX-004 — whether this store grants the statutory discount, at what rate, and
+      // on which IDs. The counter needs all three to offer it at all, and a screen
+      // carrying its own copy of "20%" is a screen that is wrong the day the statute
+      // moves (OPS-005's obligation, applied to a figure the statute owns).
+      statutory: {
+        rule_id: 'TAX-004',
+        enabled: settingsService.get('statutory_discount_enabled'),
+        discount_bp: taxService.STATUTORY_DISCOUNT_BP,
+        rate_label: taxService.STATUTORY_RATE_LABEL,
+        id_types: Object.entries(taxService.STATUTORY_ID_TYPES)
+          .map(([id, declared]) => ({ id, label: declared.label, statute: declared.statute })),
+        note: 'The 20% is computed before any voluntary discount and the two never add '
+          + 'together: the customer receives the larger (TAX-005). In VAT mode the line '
+          + 'is exempt and the 20% is taken on the VAT-exclusive amount.',
+      },
     });
   } catch (err) {
     next(err);

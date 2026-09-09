@@ -17,6 +17,11 @@
 // than here. The split is by kind: this file computes what a cart costs, that one
 // answers what the store's policy says. `priceCart` below asks it three questions and
 // makes no discount policy decision of its own.
+//
+// TASK-027 added the statutory discount the same way. The arithmetic — the 20%, the
+// VAT exemption, and TAX-005's "the larger, never the sum" — is `taxService`'s and is a
+// pure function tested on its own; what lives here is *which lines it reaches* and
+// *what it does to the basket*, which is a pricing question and nothing else's.
 
 const clock = require('../config/clock');
 const errors = require('./errors');
@@ -479,6 +484,78 @@ function assertNotBelowCost(input) {
   throw errors.forbidden(decision.message, { ruleId: 'PR-105', requiresRole: decision.requires_role });
 }
 
+// ── TAX-004 / TAX-005 — the statutory discount ──────────────────────────────
+
+/**
+ * TAX-004 — the claim, checked before anything is priced with it.
+ *
+ * Three refusals, in the order a counter meets them:
+ *
+ *   • the store does not grant it. `statutory_discount_enabled` ships **off** and this
+ *     is what off means — not a discount of zero, which would price the cart as though
+ *     the claim had been honoured and quietly give nothing.
+ *   • the ID type is not one of the two. A senior citizen's ID and a PWD's come from
+ *     different registries under different statutes, and "ID number" with no type is a
+ *     record nobody can check against either.
+ *   • the ID number or the beneficiary's name is missing. TAX-004 requires both to be
+ *     captured, and a discount without them is not claimable — the store would be
+ *     giving away 20% and be unable to deduct it.
+ *
+ * Returns the claim in the shape `sale_discounts` stores, or null where none was made.
+ */
+function normaliseStatutoryClaim(statutory) {
+  if (!statutory) return null;
+
+  if (!settingsService.get('statutory_discount_enabled')) {
+    throw errors.conflict(
+      'This store does not grant the senior citizen and PWD discount. The owner turns it '
+      + "on in Settings, after checking with the store's accountant which goods qualify.",
+      { ruleId: 'TAX-004' }
+    );
+  }
+
+  const idType = String(statutory.idType || statutory.id_type || '').trim().toUpperCase();
+  if (!Object.prototype.hasOwnProperty.call(taxService.STATUTORY_ID_TYPES, idType)) {
+    throw errors.badRequest(
+      `A statutory discount needs the ID type: ${Object.keys(taxService.STATUTORY_ID_TYPES).join(' or ')}.`,
+      { ruleId: 'TAX-004' }
+    );
+  }
+
+  const idNo = String(statutory.idNo || statutory.id_no || '').trim();
+  const name = String(statutory.name || '').trim();
+  if (!idNo || !name) {
+    throw errors.badRequest(
+      'A statutory discount needs the ID number and the name on the ID. The law requires '
+      + 'the record, and a discount without one cannot be claimed back.',
+      { ruleId: 'TAX-004' }
+    );
+  }
+
+  return { id_type: idType, id_no: idNo, name };
+}
+
+/** Whether a claim reaches this product at all (TAX-004's per-product flag). */
+const statutoryReaches = (claim, product) => Boolean(claim) && Boolean(product.statutory_discount_eligible);
+
+/**
+ * PR-205 on a statutory line, where `computeLineTotal` cannot do it.
+ *
+ * That function refuses a discount larger than `unit price × quantity`, which on an
+ * exempt line is the wrong ceiling: the discount is taken on the VAT-exclusive amount,
+ * and a discount between the two figures would drive the line negative while passing
+ * a check made against the larger one.
+ */
+function assertWithinLine(discountCentavos, baseCentavos, productName) {
+  if (discountCentavos <= baseCentavos) return discountCentavos;
+  throw errors.badRequest(
+    `A discount of ${money.toDisplay(discountCentavos)} is more than the `
+    + `${money.toDisplay(baseCentavos)} ${productName} comes to once the VAT is lifted. `
+    + 'A discount may not make a line negative.',
+    { ruleId: 'PR-205' }
+  );
+}
+
 // ── The whole cart (POST /sales/price-check) ────────────────────────────────
 
 /**
@@ -494,13 +571,17 @@ function assertNotBelowCost(input) {
  */
 function priceCart({
   lines, customer = null, taxMode, actorRole = null, approverRole = null,
-  transactionDiscountCentavos = 0, at = null,
+  transactionDiscountCentavos = 0, statutory = null, at = null,
 }) {
   taxService.assertMode(taxMode);
   if (!Array.isArray(lines) || lines.length === 0) {
     throw errors.badRequest('A cart needs at least one line', { ruleId: 'POS-101' });
   }
   const when = at || clock.nowUtc();
+
+  // TAX-004, before a single price is resolved: a claim the store does not grant, or
+  // one without the record the law requires, is refused rather than priced.
+  const claim = normaliseStatutoryClaim(statutory);
 
   // 1–2. Resolve each line server-side and take its line discount.
   const resolved = lines.map((line, index) => {
@@ -554,34 +635,82 @@ function priceCart({
       }
       : listed;
 
-    const discount = brokeOnQuantity && !manualBeatTheBreak ? 0 : chosen.applied_centavos;
+    const voluntary = brokeOnQuantity && !manualBeatTheBreak ? 0 : chosen.applied_centavos;
 
-    const totals = money.computeLineTotal({
-      unitPrice: price.price_centavos, qtyMilli: line.qtyMilli, lineDiscount: discount,
-    });
+    // ── TAX-004 / TAX-005, at the line level ──
+    //
+    // Only where the claim reaches this product. TAX-004 flags eligibility per product
+    // for the reason its own text gives: feed for a farm is not for the beneficiary's
+    // own use, so an agrivet's ordinary lines fall outside the entitlement and only
+    // the ones the owner has flagged are inside it.
+    const underStatutory = statutoryReaches(claim, product);
+    const statutory_ = underStatutory
+      ? taxService.statutoryLine({
+        amountCentavos: money.mulQty(price.price_centavos, line.qtyMilli),
+        taxClass: product.tax_class,
+        taxMode,
+      })
+      : null;
+
+    // TAX-005's choice, made against the amount the discount is actually taken on: in
+    // VAT mode the line is exempt first, so a hand-typed discount on a statutory line
+    // may not exceed the VAT-exclusive amount either (PR-205).
+    const pick = underStatutory
+      ? taxService.chooseStatutory({
+        statutoryCentavos: statutory_.discount_centavos,
+        voluntaryCentavos: assertWithinLine(voluntary, statutory_.base_centavos, product.name),
+        voluntaryReason: chosen.why,
+      })
+      : null;
+
+    const discount = pick ? (pick.source === 'VOLUNTARY' ? voluntary : 0) : voluntary;
+    const statutoryDiscount = pick && pick.source === 'STATUTORY' ? statutory_.discount_centavos : 0;
+
+    const totals = underStatutory
+      ? {
+        // The gross is still what the shelf says: unit price × quantity. What the
+        // exemption removes is VAT the store never charged, and it is not a discount —
+        // it is carried separately so no report or receipt can call it one.
+        gross: money.mulQty(price.price_centavos, line.qtyMilli),
+        discount,
+        net: statutory_.base_centavos - pick.applied_centavos,
+      }
+      : money.computeLineTotal({
+        unitPrice: price.price_centavos, qtyMilli: line.qtyMilli, lineDiscount: discount,
+      });
+
+    // What a discount is measured against, and what PR-205 and PR-201 bound it by. On
+    // a statutory line in VAT mode that is the VAT-exclusive amount, not the shelf
+    // gross — a 5% ceiling checked against a figure 12% larger is not a 5% ceiling.
+    const discountable = underStatutory ? statutory_.base_centavos : totals.gross;
 
     // An automatic discount is the store's own decision and needs no authority — it is
     // the ceiling's business only where a person chose the figure. PR-201 is about
     // discount *authority*, and nobody exercised any.
     const discountDecision = discount === 0 || chosen.source === 'AUTOMATIC'
       ? {
-        allowed: true, requested_bp: basisPoints(discount, totals.gross),
+        allowed: true, requested_bp: basisPoints(discount, discountable),
         ceiling_bp: effectiveCeilingBp(actorRole, { categoryMaxDiscountBp }),
         rule_id: chosen.source === 'AUTOMATIC' ? 'PR-106' : 'PR-201',
       }
       : evaluateDiscount({
         role: actorRole,
-        lineTotalCentavos: totals.gross,
+        lineTotalCentavos: discountable,
         discountCentavos: discount,
         categoryMaxDiscountBp,
         categoryName: product.category_name,
         approverRole,
       });
 
+    // PR-105 against **everything** that came off the line, statutory included. The
+    // entitlement is not a licence to sell below cost unnoticed, which is the same
+    // sentence PR-103's negotiated price already answers to — and an owner who is
+    // losing money on every senior sale of a thin-margin line is the person the
+    // authorisation prompt exists to tell.
     const costDecision = evaluateBelowCost({
       unitPriceCentavos: price.price_centavos,
       qtyMilli: line.qtyMilli,
-      discountCentavos: discount,
+      discountCentavos: totals.gross - totals.net,
       avgCostCentavos: product.avg_cost_centavos,
       actorRole,
       authorisedByRole: approverRole,
@@ -592,7 +721,11 @@ function priceCart({
       product_id: product.id,
       sku: product.sku,
       name: product.name,
-      tax_class: product.tax_class,
+      // TAX-003, after TAX-004 has had its say: a statutory line in VAT mode is exempt
+      // from here on, and the summary block, the sale row and the receipt all read it
+      // from this one field.
+      tax_class: statutory_ ? statutory_.tax_class : product.tax_class,
+      product_tax_class: product.tax_class,
       category_id: product.category_id,
       category_name: product.category_name,
       category_max_discount_bp: categoryMaxDiscountBp,
@@ -608,18 +741,65 @@ function priceCart({
       gross_centavos: totals.gross,
       line_discount_centavos: totals.discount,
       net_centavos: totals.net,
+      // TAX-004's three figures, kept apart because they answer three different
+      // questions: what the store gave away, what VAT it never charged, and what it
+      // took the 20% on.
+      statutory_discount_centavos: statutoryDiscount,
+      vat_exemption_centavos: statutory_ ? statutory_.vat_exemption_centavos : 0,
+      statutory_base_centavos: statutory_ ? statutory_.base_centavos : null,
+      statutory_eligible: Boolean(product.statutory_discount_eligible),
+      under_statutory: underStatutory,
+      // TAX-005: which of the two applied, and what it beat. The screen is asked to
+      // say why the other did not, and cannot without it.
+      statutory_choice: pick,
       // PR-206, in the payload: which discount was used, and what was suppressed. The
       // screen is asked to say why the other one did not apply, and cannot without it.
-      discount_source: chosen.source,
+      // TAX-005 can override the answer: a statutory discount that beat both is the
+      // one the customer received, and the field says so rather than naming the loser.
+      discount_source: pick && pick.source === 'STATUTORY' ? 'STATUTORY' : chosen.source,
       discount_choice: chosen,
       discount_decision: discountDecision,
       below_cost: costDecision,
     };
   });
 
+  // TAX-004: a claim that reaches nothing is refused, not silently priced at nothing.
+  // The cashier has asked for the customer's ID and typed it in; being handed a total
+  // with no discount and no explanation is how a beneficiary is turned away by
+  // accident.
+  const statutoryLines = resolved.filter((l) => l.under_statutory);
+  if (claim && statutoryLines.length === 0) {
+    throw errors.conflict(
+      'None of these products is eligible for the senior citizen and PWD discount. '
+      + 'The entitlement covers goods for the beneficiary\'s own use, and the owner flags '
+      + 'which of the store\'s products those are.',
+      { ruleId: 'TAX-004' }
+    );
+  }
+
   // 3. Sum, then apportion the transaction discount (MON-006).
   const subtotal = resolved.reduce((sum, l) => sum + l.net_centavos, 0);
   money.assertCentavos(transactionDiscountCentavos, 'transaction discount');
+
+  // ── TAX-005 at the basket level: a statutory line takes no share ──
+  //
+  // The rule forbids compounding, and a transaction discount apportioned across every
+  // line compounds onto the statutory ones by the back door — the customer would have
+  // received 20% *and* a share of the basket band, which is exactly the 25% TAX-005
+  // exists to stop. So a line under the entitlement neither earns the tier nor
+  // receives a share of it: it is priced by statute, and the store's own generosity
+  // applies to the rest of the basket.
+  const voluntaryLines = resolved.filter((l) => !l.under_statutory);
+  const voluntarySubtotal = voluntaryLines.reduce((sum, l) => sum + l.net_centavos, 0);
+
+  if (transactionDiscountCentavos > 0 && voluntaryLines.length === 0) {
+    throw errors.badRequest(
+      'Every line in this basket is under the senior citizen and PWD discount, so a '
+      + 'further discount would compound with it. The customer receives the larger of '
+      + 'the two, never both.',
+      { ruleId: 'TAX-005' }
+    );
+  }
 
   // ── PR-106 — the tier, on the **pre-discount** subtotal ──
   //
@@ -630,7 +810,11 @@ function priceCart({
   // smaller tier for having had a hand discount on one line, which is not a rule
   // anybody wrote.
   const preDiscountSubtotal = resolved.reduce((sum, l) => sum + l.gross_centavos, 0);
-  const tier = discountRuleService.tierFor(preDiscountSubtotal);
+  // The tier is earned by the part of the basket it can be applied to (see above), so
+  // a band chosen against the whole of it could not be given without compounding.
+  const tier = discountRuleService.tierFor(
+    voluntaryLines.reduce((sum, l) => sum + l.gross_centavos, 0)
+  );
 
   // ── PR-206, at the transaction level ──
   //
@@ -644,7 +828,7 @@ function priceCart({
   });
   const appliedTransactionDiscount = txnChoice.applied_centavos;
 
-  if (appliedTransactionDiscount > subtotal) {
+  if (appliedTransactionDiscount > voluntarySubtotal) {
     // PR-205's second half: the sum of discounts may never exceed the subtotal. The
     // tier can reach here on its own — a band on the pre-discount subtotal, applied to
     // a basket whose lines were then discounted by hand, can exceed what is left.
@@ -652,9 +836,9 @@ function priceCart({
       txnChoice.source === 'AUTOMATIC'
         ? `The ${discountRuleService.formatBp(tier.discount_bp)} basket discount comes to `
           + `${money.toDisplay(appliedTransactionDiscount)}, which is more than the `
-          + `${money.toDisplay(subtotal)} left after the line discounts. Reduce those first.`
+          + `${money.toDisplay(voluntarySubtotal)} left after the line discounts. Reduce those first.`
         : `A transaction discount of ${money.toDisplay(appliedTransactionDiscount)} is more than the `
-          + `${money.toDisplay(subtotal)} subtotal.`,
+          + `${money.toDisplay(voluntarySubtotal)} subtotal.`,
       { ruleId: 'PR-205' }
     );
   }
@@ -662,17 +846,22 @@ function priceCart({
   // PR-201/PR-203 apply to the transaction discount too, and only where a person chose
   // it: a tier is the owner's standing decision, not an exercise of anybody's ceiling.
   const txnDecision = appliedTransactionDiscount === 0 || txnChoice.source === 'AUTOMATIC'
-    ? { allowed: true, requested_bp: basisPoints(appliedTransactionDiscount, subtotal), rule_id: 'PR-106' }
+    ? { allowed: true, requested_bp: basisPoints(appliedTransactionDiscount, voluntarySubtotal), rule_id: 'PR-106' }
     : evaluateDiscount({
       role: actorRole,
-      lineTotalCentavos: subtotal,
+      lineTotalCentavos: voluntarySubtotal,
       discountCentavos: appliedTransactionDiscount,
       approverRole,
     });
 
-  const shares = appliedTransactionDiscount === 0
-    ? resolved.map(() => 0)
-    : money.apportionDiscount(resolved.map((l) => l.net_centavos), appliedTransactionDiscount);
+  // MON-006 across the lines that may take a share; a statutory line takes none, and
+  // the remainder lands on the largest of the rest rather than on it.
+  const voluntaryShares = appliedTransactionDiscount === 0
+    ? voluntaryLines.map(() => 0)
+    : money.apportionDiscount(voluntaryLines.map((l) => l.net_centavos), appliedTransactionDiscount);
+
+  const shareByIndex = new Map(voluntaryLines.map((l, i) => [l.index, voluntaryShares[i]]));
+  const shares = resolved.map((l) => shareByIndex.get(l.index) || 0);
 
   const withShares = resolved.map((line, i) => ({
     ...line,
@@ -728,6 +917,21 @@ function priceCart({
     subtotal_centavos: subtotal,
     pre_discount_subtotal_centavos: preDiscountSubtotal,
     line_discount_centavos: priced.reduce((sum, l) => sum + l.line_discount_centavos, 0),
+    // TAX-004 / TAX-005, as the sale row and every report want them: the statutory
+    // discount is never folded into the voluntary figures, because they are different
+    // claims and a total that merges them answers neither.
+    statutory_discount_centavos: priced.reduce((sum, l) => sum + l.statutory_discount_centavos, 0),
+    vat_exemption_centavos: priced.reduce((sum, l) => sum + l.vat_exemption_centavos, 0),
+    statutory: claim
+      ? {
+        rule_id: 'TAX-004',
+        ...claim,
+        id_type_label: taxService.STATUTORY_ID_TYPES[claim.id_type].label,
+        discount_bp: taxService.STATUTORY_DISCOUNT_BP,
+        line_count: statutoryLines.length,
+        eligible_line_count: resolved.filter((l) => l.statutory_eligible).length,
+      }
+      : null,
     transaction_discount_centavos: appliedTransactionDiscount,
     // PR-106 and PR-206 at the transaction level: the band the basket earned, whether
     // it applied, and what it beat or lost to. A screen that showed only the amount
@@ -753,5 +957,6 @@ module.exports = {
   roleCeilingBp, effectiveCeilingBp, evaluateDiscount, assertDiscountAllowed,
   basisPoints, maxDiscountCentavos, rolesAbove,
   evaluateBelowCost, assertNotBelowCost,
+  normaliseStatutoryClaim,
   priceCart,
 };

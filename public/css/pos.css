@@ -121,6 +121,11 @@
 }
 .price-level.fell-through { border-style: dashed; }
 
+/* The bar's own host: its contents depend on a policy the server has not sent when the
+   screen is first drawn, so it is a node the screen can re-fill rather than a node it
+   would have to replace. Laid out as nothing, so the column reads as it did before. */
+.pos-help-host { display: contents; }
+
 .pos-help {
   display: flex; flex-wrap: wrap; gap: .75rem;
   padding-top: .6rem; border-top: 1px solid var(--line);
@@ -204,6 +209,21 @@
 .rail-tier-why { margin: .25rem 0 0; font-size: .75rem; line-height: 1.4; color: var(--muted); }
 .cart-line-discount .discount-why { display: block; margin-top: .15rem; font-size: .75rem;
   line-height: 1.4; color: var(--muted); }
+
+/* TAX-004 / TAX-005 (TASK-027). The statutory discount reads as an entitlement rather
+   than as a kindness: it carries the accent the resolved price level carries, not the
+   muted grey of a discount somebody typed. The beneficiary's name sits under the
+   figure because the cashier reads it back off the ID. */
+.cart-line-discount.statutory { color: var(--accent); }
+.rail-row.statutory { color: var(--accent); }
+.rail-statutory { margin: .25rem 0 0; font-size: .75rem; line-height: 1.4; color: var(--muted); }
+.statutory-prompt label { display: block; margin: .6rem 0; }
+.statutory-prompt select, .statutory-prompt input {
+  width: 100%; min-height: var(--touch); padding: 0 .6rem;
+  font: inherit; border: 1px solid var(--rule); border-radius: 4px;
+}
+.statutory-prompt .muted { max-width: 34rem; font-size: .8125rem; line-height: 1.45; }
+.payment-statutory { margin: .15rem 0 .5rem; font-size: .8125rem; color: var(--muted); }
 
 .receipt { max-width: 44rem; }
 .receipt-sheet { margin: 1rem 0; padding: 1rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; }
