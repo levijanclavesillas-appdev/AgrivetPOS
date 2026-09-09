@@ -18,6 +18,18 @@ function findByCode(code) {
   return db.get().prepare(`SELECT ${COLUMNS} FROM customers WHERE code = ? COLLATE NOCASE`).get(code) || null;
 }
 
+/**
+ * Exact name, case-insensitively — `OPS-107`'s "is this customer already here?".
+ *
+ * Distinct from `search`, which is a `LIKE` for a person at a counter and would match
+ * three farms on one word. A cutover matching that loosely would post somebody else's
+ * opening balance to the wrong account, which is the one mistake in this whole file
+ * that costs actual money.
+ */
+function findByName(name) {
+  return db.get().prepare(`SELECT ${COLUMNS} FROM customers WHERE name = ? COLLATE NOCASE`).get(name) || null;
+}
+
 function countAll() {
   return db.get().prepare('SELECT COUNT(*) AS n FROM customers').get().n;
 }
@@ -116,6 +128,6 @@ function transactionCount(customerId) {
 }
 
 module.exports = {
-  findById, findByCode, countAll, search, countSearch, insert, updateFields,
+  findById, findByCode, findByName, countAll, search, countSearch, insert, updateFields,
   transactionCount, tableExists,
 };

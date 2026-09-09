@@ -75,13 +75,13 @@ than starting mid-story with a number nobody can source.
 
 ## Acceptance Criteria
 
-- [ ] A 500-row product CSV loads, or reports every bad row with its line number and reason
-- [ ] Opening stock without a unit cost is rejected, not defaulted
-- [ ] Average cost after the load equals the opening cost
-- [ ] Opening balances appear on a statement as the first line, referencing "opening balance"
-- [ ] Validate-only writes nothing and reports the same thing the load would
-- [ ] A failed load leaves the database untouched and names the pre-load backup
-- [ ] Both reconciliations hold afterwards, and the load says so
+- [x] A 500-row product CSV loads, or reports every bad row with its line number and reason
+- [x] Opening stock without a unit cost is rejected, not defaulted
+- [x] Average cost after the load equals the opening cost
+- [x] Opening balances appear on a statement as the first line, referencing "opening balance"
+- [x] Validate-only writes nothing and reports the same thing the load would
+- [x] A failed load leaves the database untouched and names the pre-load backup
+- [x] Both reconciliations hold afterwards, and the load says so
 
 ## Tests
 
@@ -91,6 +91,7 @@ than starting mid-story with a number nobody can source.
 | `TC-INT-99` | `OPS-107`: an opening balance is the first line of the statement and reconciles |
 | `TC-INT-100` | Validate-only writes nothing, and reports what the load would |
 | `TC-E2E-21` | A whole cutover from three CSVs, then a sale, then both reconciliations |
+| `TC-UT-100` | The CSV reader against the writer the exports use — and the line numbers `OPS-105` reports rejections with |
 
 ---
 

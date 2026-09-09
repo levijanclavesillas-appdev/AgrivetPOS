@@ -1438,6 +1438,68 @@ test('SEC-1: the export screen says what an archive does not contain', () => {
   assert.match(source, /before anybody can sign in/);
 });
 
+// ── SCR-706, the opening load (TASK-026) ────────────────────────────────────
+
+test('OPS-105: the load button waits for the row check, and cannot be pressed first', () => {
+  const source = codeOf('js/admin/data.js');
+
+  // The same sequence the import half enforces — check, present, confirm — because an
+  // operator learns one screen, not two.
+  assert.match(source, /api\.post\('\/data\/opening\/validate'/);
+  assert.match(source, /disabled: busy \|\| !report\.ok/);
+  assert.match(source, /opening\.checked \? openingSummaryBlock\(\) : null/);
+
+  // Choosing a different file drops the last report: it described another spreadsheet.
+  assert.match(source, /opening\.checked = null;\s*\n\s*render\(\);/);
+});
+
+test('OPS-105: a rejected row is shown with the line number, not just a count', () => {
+  const source = codeOf('js/admin/data.js');
+
+  // The only part of the report an owner can act on. Against a 500-row catalogue,
+  // "3 rows are invalid" sends nobody anywhere.
+  assert.match(source, /`Row \$\{p\.line\}: \$\{p\.message\} \(\$\{p\.rule_id\}\)`/);
+  assert.match(source, /Will load/);
+  assert.match(source, /Rejected/);
+});
+
+test('requirement 2: the templates are offered on the screen that needs them', () => {
+  const source = codeOf('js/admin/data.js');
+
+  assert.match(source, /\/data\/opening\/template\/\$\{kind\}/);
+  assert.match(source, /Start from a template/);
+  // OPS-106 named where the column is asked for, not only where it is refused.
+  assert.match(source, /what it cost \(OPS-106\)/);
+});
+
+test('OPS-107: the screen asks for the cutover date, and says what it dates', () => {
+  const source = codeOf('js/admin/data.js');
+
+  assert.match(source, /Cutover date/);
+  assert.match(source, /The day the notebook was closed/);
+  assert.match(source, /cutoverAt: opening\.cutoverAt \|\| null/);
+});
+
+test('OPS-103: the pre-load backup is named after the load, as the import’s is', () => {
+  const source = codeOf('js/admin/data.js');
+
+  assert.match(source, /done\.pre_load_backup\.file_name/);
+  assert.match(source, /A full backup is taken first/);
+  // Requirement 8: the reconciliation verdict is shown as the sentence it was written
+  // as, because somebody signing off a cutover is not looking for `true`.
+  assert.match(source, /done\.reconciliation\.statement/);
+});
+
+test('a served BOM survives the download helper, which text() would eat', () => {
+  const api = codeOf('js/shell/api.js');
+
+  // The opening templates are served with a BOM so Excel on a Philippine desktop reads
+  // them as UTF-8. `response.text()` strips it per the encoding standard, which would
+  // silently undo the fix at the last step.
+  assert.match(api, /ignoreBOM: true/);
+  assert.equal(/await response\.text\(\), blob: null/.test(api), false);
+});
+
 test('the object-URL save lives in the shell, once, and every caller uses it', () => {
   const api = codeOf('js/shell/api.js');
   assert.match(api, /export function saveAs/);

@@ -306,8 +306,14 @@ function findByBarcode(rawCode, session) {
  *
  * Retail is required at creation (PR-102). A product that exists but cannot be sold is
  * a trap: it is findable, scannable and refuses at the counter, in front of a customer.
+ *
+ * Split into `createWithin` and `create` the way `inventoryService.post` and
+ * `postStandalone` are, and for the same reason: `TASK-026` loads a whole catalogue
+ * inside one transaction (`OPS-103`), and a caller that already owns a transaction
+ * cannot open another — §8.3 makes nesting a hard error rather than a silent
+ * savepoint. Every existing call site keeps calling `create` and is unchanged.
  */
-function create(input, actor, session = actor) {
+function createWithin(input, actor, session = actor) {
   const at = clock.nowUtc();
   const sku = validateSku(input.sku);
   const name = validateName(input.name);
@@ -330,47 +336,49 @@ function create(input, actor, session = actor) {
   const barcodes = (input.barcodes || []).map(validateBarcode);
   const packs = (input.packs || []).map((pack) => normalisePack(pack, baseUnit));
 
-  return db.transaction(() => {
-    const row = productRepository.insert({
-      id: ids.uuidv7(),
-      sku,
-      name,
-      category_id: category.id,
-      brand_id: input.brandId || null,
-      base_unit_id: baseUnit.id,
-      description: text(input.description, { max: 500 }) || null,
-      tax_class: taxClass,
-      statutory_discount_eligible: input.statutoryDiscountEligible ? 1 : 0,
-      avg_cost_centavos: avgCost,
-      avg_cost_as_of: avgCost > 0 ? at : null,
-      min_stock_milli: minStock,
-      is_batch_tracked: input.isBatchTracked ? 1 : 0,
-      is_active: 1,
-      created_at: at,
-      created_by: actor.id || null,
-    });
-
-    for (const barcode of barcodes) attachBarcodeRow(row.id, barcode, at);
-    for (const pack of packs) addPackRow(row.id, pack, at);
-    writePrice(row.id, 'RETAIL', retail, { at, actor });
-
-    for (const level of ['WHOLESALE', 'DEALER']) {
-      const key = `${level.toLowerCase()}PriceCentavos`;
-      if (input[key] === undefined || input[key] === null || input[key] === '') continue;
-      writePrice(row.id, level, validateCentavos(input[key], `The ${level.toLowerCase()} price`, 'VR-203'), { at, actor });
-    }
-
-    auditService.write({
-      actor,
-      action: 'PRODUCT_CREATED',
-      entityType: 'products',
-      entityId: row.id,
-      after: { sku, name, category: category.name, base_unit: baseUnit.code, tax_class: taxClass, retail_price_centavos: retail },
-    });
-
-    return detail(productRepository.findById(row.id), session, { at });
+  const row = productRepository.insert({
+    id: ids.uuidv7(),
+    sku,
+    name,
+    category_id: category.id,
+    brand_id: input.brandId || null,
+    base_unit_id: baseUnit.id,
+    description: text(input.description, { max: 500 }) || null,
+    tax_class: taxClass,
+    statutory_discount_eligible: input.statutoryDiscountEligible ? 1 : 0,
+    avg_cost_centavos: avgCost,
+    avg_cost_as_of: avgCost > 0 ? at : null,
+    min_stock_milli: minStock,
+    is_batch_tracked: input.isBatchTracked ? 1 : 0,
+    is_active: 1,
+    created_at: at,
+    created_by: actor.id || null,
   });
+
+  for (const barcode of barcodes) attachBarcodeRow(row.id, barcode, at);
+  for (const pack of packs) addPackRow(row.id, pack, at);
+  writePrice(row.id, 'RETAIL', retail, { at, actor });
+
+  for (const level of ['WHOLESALE', 'DEALER']) {
+    const key = `${level.toLowerCase()}PriceCentavos`;
+    if (input[key] === undefined || input[key] === null || input[key] === '') continue;
+    writePrice(row.id, level, validateCentavos(input[key], `The ${level.toLowerCase()} price`, 'VR-203'), { at, actor });
+  }
+
+  auditService.write({
+    actor,
+    action: 'PRODUCT_CREATED',
+    entityType: 'products',
+    entityId: row.id,
+    after: { sku, name, category: category.name, base_unit: baseUnit.code, tax_class: taxClass, retail_price_centavos: retail },
+  });
+
+  return detail(productRepository.findById(row.id), session, { at });
 }
+
+const create = (input, actor, session = actor) => db.transaction(
+  () => createWithin(input, actor, session)
+);
 
 /**
  * Change a product. Identity, units, stock threshold and status here; prices and cost
@@ -892,7 +900,7 @@ module.exports = {
   validateSku, validateName, validateTaxClass, validateBarcode, classifyBarcode,
   toPublic, detail, resolvePrice, isSellable,
   get, search, findByBarcode,
-  create, update, deactivate, assertBaseUnitChangeable,
+  create, createWithin, update, deactivate, assertBaseUnitChangeable,
   attachBarcode, detachBarcode, addPack, removePack, normalisePack,
   setPrices, setQuantityBreaks, quantityBreaks, validateBandSet, setCost, assertMayChangeCost,
 };

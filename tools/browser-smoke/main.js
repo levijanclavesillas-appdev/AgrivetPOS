@@ -1609,6 +1609,51 @@ app.whenReady().then(async () => {
   log(aborting.json.ok === false && aborting.json.problems.some((p) => p.rule_id === 'OPS-104'),
     'OPS-104: choosing "do not import" is reported as a refusal, not silently ignored');
 
+  console.log('\n— SCR-706: the opening load (OPS-105 to OPS-107) —');
+
+  // The same screen, third block. It is rendered in the same view, so the assertions
+  // below are against the text the operator is actually looking at.
+  log(/Load opening data/.test(dataText), 'the opening load is on the same screen as the import');
+  log(/what it cost \(OPS-106\)/.test(dataText),
+    'OPS-106: the cost is asked for by name, not only refused later');
+  log(/The day the notebook was closed/.test(dataText),
+    'OPS-107: and the cutover date says what it dates');
+
+  // Requirement 2: the template, over the endpoint the button calls.
+  const template = await api('/data/opening/template/stock');
+  log(template.status === 200, 'requirement 2: the stock template downloads', String(template.status));
+
+  // The BOM Excel needs, asserted on the bytes — `text()` would strip it and the
+  // assertion would pass whether the fix were there or not.
+  const templateBom = await run(`(async () => {
+    const res = await fetch('${API}/data/opening/template/stock', {
+      headers: { authorization: 'Bearer ' + ${JSON.stringify(TOKEN)} },
+    });
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return [bytes[0], bytes[1], bytes[2]].join(',');
+  })()`);
+  log(templateBom === '239,187,191',
+    'and it carries the BOM Excel needs to read it as UTF-8', templateBom);
+
+  // OPS-105/OPS-106: a rehearsal that finds the costless row, and writes nothing.
+  const productsBefore = (await api('/products?limit=1')).json.total;
+  const rehearsal = await api('/data/opening/validate', {
+    method: 'POST',
+    body: {
+      products: '"sku","name","category","base_unit","retail_price"\r\n'
+        + '"SMOKE-OPEN","Smoke Opening Feed","Feeds","KG","52.00"\r\n',
+      stock: '"sku","quantity","unit_cost"\r\n"SMOKE-OPEN","100",""\r\n',
+    },
+  });
+  log(rehearsal.status === 200 && rehearsal.json.ok === false,
+    'OPS-105: a rehearsal that finds a problem still answers 200 — it is not a failure');
+  const costless = (rehearsal.json.problems || []).find((p) => p.rule_id === 'OPS-106');
+  log(!!costless && costless.line === 2,
+    'OPS-106: the costless row is rejected, with the line the operator scrolls to',
+    costless ? `line ${costless.line}` : 'not reported');
+  log((await api('/products?limit=1')).json.total === productsBefore,
+    'and the rehearsal wrote nothing at all', `${productsBefore} products, unchanged`);
+
   console.log('\n— SCR-703: the audit trail —');
   await run(`[...document.querySelectorAll('.admin-tab')].find(t => /Audit/.test(t.textContent)).click()`);
   await waitFor(`!!document.querySelector('.audit')`, { label: 'SCR-703' });

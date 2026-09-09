@@ -151,7 +151,10 @@ function search(opts = {}) {
  * marked eligible with no account is a credit tender that fails at the counter for a
  * reason nobody can see.
  */
-function create(input, actor) {
+// Split like `productService.createWithin` and for the same reason: `TASK-026`'s
+// cutover load creates customers inside its own transaction (`OPS-103`), and §8.3
+// makes a nested one an error rather than a savepoint.
+function createWithin(input, actor) {
   const at = clock.nowUtc();
   const name = validateName(input.name);
   const code = text(input.code, { max: 30 }).toUpperCase() || null;
@@ -175,40 +178,40 @@ function create(input, actor) {
   const terms = eligible ? creditService.validateTerms(input.termsDays) : 0;
   const limit = eligible ? creditService.validateLimit(input.creditLimitCentavos) : 0;
 
-  return db.transaction(() => {
-    const row = customerRepository.insert({
-      id: ids.uuidv7(),
-      code,
-      name,
-      contact_no: contact,
-      address: text(input.address, { max: 200 }) || null,
-      customer_type: type,
-      price_level: priceLevel,
-      is_credit_eligible: eligible ? 1 : 0,
-      is_active: 1,
-      notes: text(input.notes, { max: 500 }) || null,
-      created_at: at,
-      created_by: actor.id || null,
-    });
-
-    if (eligible) {
-      creditService.openAccount(row.id, { limitCentavos: limit, termsDays: terms, at });
-    }
-
-    auditService.write({
-      actor,
-      action: 'CUSTOMER_CREATED',
-      entityType: 'customers',
-      entityId: row.id,
-      after: {
-        name: row.name, code: row.code, customer_type: type, price_level: priceLevel,
-        is_credit_eligible: eligible, credit_limit_centavos: limit, terms_days: terms,
-      },
-    });
-
-    return get(row.id);
+  const row = customerRepository.insert({
+    id: ids.uuidv7(),
+    code,
+    name,
+    contact_no: contact,
+    address: text(input.address, { max: 200 }) || null,
+    customer_type: type,
+    price_level: priceLevel,
+    is_credit_eligible: eligible ? 1 : 0,
+    is_active: 1,
+    notes: text(input.notes, { max: 500 }) || null,
+    created_at: at,
+    created_by: actor.id || null,
   });
+
+  if (eligible) {
+    creditService.openAccount(row.id, { limitCentavos: limit, termsDays: terms, at });
+  }
+
+  auditService.write({
+    actor,
+    action: 'CUSTOMER_CREATED',
+    entityType: 'customers',
+    entityId: row.id,
+    after: {
+      name: row.name, code: row.code, customer_type: type, price_level: priceLevel,
+      is_credit_eligible: eligible, credit_limit_centavos: limit, terms_days: terms,
+    },
+  });
+
+  return get(row.id);
 }
+
+const create = (input, actor) => db.transaction(() => createWithin(input, actor));
 
 function update(id, changes, actor) {
   const current = customerRepository.findById(id);
@@ -460,6 +463,6 @@ module.exports = {
   setPrices, priceList,
   TYPES, PRICE_LEVELS,
   validateName, validateContact, validateType, validatePriceLevel,
-  toPublic, get, find, search, create, update, deactivate,
+  toPublic, get, find, search, create, createWithin, update, deactivate,
   assertNoBalance, assertDeletable,
 };

@@ -159,7 +159,13 @@ export async function download(path, { method = 'GET', body = null } = {}) {
 
   const type = response.headers.get('content-type') || '';
   if (/^text\/|json|csv/.test(type)) {
-    return { text: await response.text(), blob: null, filename, type };
+    // Decoded from the bytes with `ignoreBOM`, not through `response.text()`.
+    // `text()` follows the encoding standard and *strips* a leading BOM, which would
+    // quietly undo the three bytes the opening-data templates are served with — and
+    // those three bytes are the whole reason Excel on a Philippine desktop reads the
+    // file as UTF-8 instead of the system code page.
+    const decoded = new TextDecoder('utf-8', { ignoreBOM: true }).decode(await response.arrayBuffer());
+    return { text: decoded, blob: null, filename, type };
   }
   return { text: null, blob: await response.blob(), filename, type };
 }

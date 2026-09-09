@@ -33,6 +33,7 @@
 // written to notice it later is a report that will be wrong in the meantime.
 
 const clock = require('../config/clock');
+const csv = require('../config/csv');
 const money = require('./money');
 const quantity = require('./quantity');
 const errors = require('./errors');
@@ -486,13 +487,13 @@ const mixSummary = (paid) => (paid.methods.length === 0
 // ── Export (TX-426, AUD-601) ────────────────────────────────────────────────
 
 /** RFC 4180: quote everything, double an embedded quote. Same rule as SCR-703's. */
-function csvCell(value) {
-  if (value === null || value === undefined) return '""';
-  const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return `"${text.replace(/"/g, '""')}"`;
-}
+// The CSV writer moved to `config/csv.js` with TASK-026, which needed a **reader** —
+// and a reader written against a different understanding of the format from the writer
+// is how a store ends up with an export it cannot re-import. Kept as local names so
+// every call site below reads as it did.
+const csvCell = csv.cell;
 
-const csvRow = (cells) => cells.map(csvCell).join(',');
+const csvRow = csv.row;
 
 /**
  * A report as CSV, figure for figure with the screen.
