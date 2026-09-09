@@ -100,7 +100,7 @@ again quietly.
 | [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `b5b34a3` | `012_stock_counts.sql`; `stockCountService` and its repository; `SCR-205`; `TC-INT-88`–`TC-INT-91`, `TC-E2E-19`. The `INV-` prefix joined the audit guard's rule pattern |
 | [TASK-023](TASK-023-discount-rules-engine.md) | Discount rules engine and category ceilings | `c9ad009` | No schema — `categories.max_discount_bp` finally read. `discountRuleService`; `PR-106` tiers in the registry; `TC-UT-45`–`TC-UT-47`, `TC-INT-92`. `settingsService`'s JSON coercion learned structured entries |
 | [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `52d7fe9` | `013_negotiated_pricing.sql`; `PR-101`'s top two levels, stubbed since `TASK-009`, now resolve; band and agreed-price editors; `TC-UT-48`–`TC-UT-49`, `TC-INT-93`, and `TC-UT-31` updated |
-| [TASK-025](TASK-025-json-export-and-import.md) | JSON export and validated import | *this commit* | No schema. `exportService`, `importService`, `dataRepository`; `zip.js` grew multi-entry; `SCR-706`; `TC-INT-94`–`TC-INT-97`, `TC-E2E-20`. `api.saveAs` extracted from two screens that had each rolled their own |
+| [TASK-025](TASK-025-json-export-and-import.md) | JSON export and validated import | `9e134b0` | No schema. `exportService`, `importService`, `dataRepository`; `zip.js` grew multi-entry; `SCR-706`; `TC-INT-94`–`TC-INT-97`, `TC-E2E-20`. `api.saveAs` extracted from two screens that had each rolled their own |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
