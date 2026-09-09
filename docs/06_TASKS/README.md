@@ -93,7 +93,7 @@ again quietly.
 | :--- | :--- | :--- | :--- |
 | [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | `372b2ba` | `010_purchasing.sql`; `supplierService`, `purchaseOrderService`, `goodsReceiptService` and their repositories; `SCR-801`–`SCR-804`; `TC-INT-76`–`TC-INT-80`, `TC-E2E-16`. The v1.1 gate in `07_TEST_PLAN.md` §10 |
 | [TASK-020](TASK-020-sales-returns.md) | Sales returns with the restock/write-off decision | `3ea6fd1` | `011_returns.sql`; `returnService` and its repository; `SCR-305`; `TC-INT-81`–`TC-INT-84`, `TC-E2E-17`. `RPT-101`'s fourth term stopped being zero |
-| [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | *this commit* | No schema — `006_sales.sql`'s four unused columns finally used. `voidService`; the void on `SCR-304`; `POS-404`'s void report; `TC-INT-85`–`TC-INT-87`, `TC-E2E-18`, and `TC-INT-62` re-pointed at a real void |
+| [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `5cc8370` | No schema — `006_sales.sql`'s four unused columns finally used. `voidService`; the void on `SCR-304`; `POS-404`'s void report; `TC-INT-85`–`TC-INT-87`, `TC-E2E-18`, and `TC-INT-62` re-pointed at a real void |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
