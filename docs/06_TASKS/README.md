@@ -98,7 +98,7 @@ again quietly.
 | [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `5cc8370` | No schema — `006_sales.sql`'s four unused columns finally used. `voidService`; the void on `SCR-304`; `POS-404`'s void report; `TC-INT-85`–`TC-INT-87`, `TC-E2E-18`, and `TC-INT-62` re-pointed at a real void |
 | [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `b5b34a3` | `012_stock_counts.sql`; `stockCountService` and its repository; `SCR-205`; `TC-INT-88`–`TC-INT-91`, `TC-E2E-19`. The `INV-` prefix joined the audit guard's rule pattern |
 | [TASK-023](TASK-023-discount-rules-engine.md) | Discount rules engine and category ceilings | `c9ad009` | No schema — `categories.max_discount_bp` finally read. `discountRuleService`; `PR-106` tiers in the registry; `TC-UT-45`–`TC-UT-47`, `TC-INT-92`. `settingsService`'s JSON coercion learned structured entries |
-| [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | *this commit* | `013_negotiated_pricing.sql`; `PR-101`'s top two levels, stubbed since `TASK-009`, now resolve; band and agreed-price editors; `TC-UT-48`–`TC-UT-49`, `TC-INT-93`, and `TC-UT-31` updated |
+| [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `52d7fe9` | `013_negotiated_pricing.sql`; `PR-101`'s top two levels, stubbed since `TASK-009`, now resolve; band and agreed-price editors; `TC-UT-48`–`TC-UT-49`, `TC-INT-93`, and `TC-UT-31` updated |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
