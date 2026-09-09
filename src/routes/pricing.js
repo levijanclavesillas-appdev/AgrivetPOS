@@ -11,6 +11,7 @@
 
 const express = require('express');
 const pricingService = require('../services/pricingService');
+const discountRuleService = require('../services/discountRuleService');
 const taxService = require('../services/taxService');
 const storeProfileService = require('../services/storeProfileService');
 const customerService = require('../services/customerService');
@@ -39,6 +40,9 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
         productId: line.productId,
         qtyMilli: line.qtyMilli,
         discountCentavos: line.discountCentavos || 0,
+        // PR-204 records the reason against a manual discount; PR-206 needs it to say
+        // what was suppressed when an automatic one beats it.
+        discountReason: line.discountReason || null,
       })),
       customer,
       // TAX-001: the mode is the store's, read at the moment of pricing. A client that
@@ -56,12 +60,13 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
 });
 
 /**
- * What the POS screen needs to render a discount field: the acting user's ceiling, and
- * who can approve above it.
+ * What the POS screen needs to render a discount field: the acting user's ceiling, who
+ * can approve above it, and — since TASK-023 — the rules an owner has configured.
  *
- * Served rather than hard-coded, because PR-201's figures are settings (OPS-005) and a
- * screen with its own copy of "2%" is a screen that is wrong the day an owner changes
- * it.
+ * Served rather than hard-coded, because every figure here is operator-owned
+ * (`OPS-005`) and a screen with its own copy of "2%" or of a tier band is a screen
+ * that is wrong the day an owner changes it. `TC-UI-07` enforces exactly this for the
+ * settings screen; requirement 7 extends the obligation to the counter.
  */
 router.get('/sales/pricing-policy', atTheCounter, (req, res, next) => {
   try {
@@ -74,6 +79,9 @@ router.get('/sales/pricing-policy', atTheCounter, (req, res, next) => {
       precedence: pricingService.precedenceLevels(),
       discount_ceiling_bp: pricingService.roleCeilingBp(req.session.role),
       approving_roles: pricingService.rolesAbove(10000),
+      // PR-106's bands, PR-202's capped categories and PR-206's "these do not add".
+      // The screen renders them; it decides none of them.
+      discount_rules: discountRuleService.policy(),
     });
   } catch (err) {
     next(err);

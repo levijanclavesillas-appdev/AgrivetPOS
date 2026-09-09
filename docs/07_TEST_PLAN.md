@@ -73,6 +73,9 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-UT-35` | Discount cannot drive a line negative | `PR-205` |
 | `TC-UT-40` | Credit tender without a customer rejected | `CR-102` |
 | `TC-UT-44` | Ageing derives from due date at read time across a date boundary | `CR-107` |
+| `TC-UT-45` | `PR-106`: the highest band the basket reaches and **only one** — a ₱10,000 basket over three bands earns 8%, not 2 + 5 + 8. Thresholds are inclusive; overlapping and descending bands are refused where they are typed | `PR-106`, `OPS-005` |
+| `TC-UT-46` | `PR-202`: the effective ceiling is the **lower** of role and category, so an owner's 100% is still capped at the category's 5%. The refusal names which bound, and offers no approver where the category did | `PR-202`, `PR-201` |
+| `TC-UT-47` | `PR-206`: the larger applies and never the sum — asserted with both figures non-zero and equal, which is the input an additive implementation fails and the only one it fails | `PR-206` |
 | `TC-UT-90` | Timestamps stored UTC, rendered `Asia/Manila` | `VR-102`, `NFR_4.2` |
 | `TC-UT-98` | Every rule in the covered sections is cited by ≥ 1 test | `NFR_5.2` |
 | `TC-UT-99` | No SQL and no `better-sqlite3` import outside `repositories/` and `config/` | `05` §8.1 |
@@ -137,6 +140,7 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-INT-89` | `INV-111`: one movement for the product that varied, and **none at all** for the one that matched — asserted as an absence, since a suite checking only the varying line would pass against an implementation writing a movement of zero for every product in the shop. And an uncounted line is not a zero: it writes nothing, while a counted `0` writes the whole quantity off | `INV-111`, `INV-103` |
 | `TC-INT-90` | `INV-112`: self-approval refused on **identity**, not role — a manager who took the count is still the counter. Waived, stated and recorded on the row for a single-user store, in a database of its own | `INV-112`, `AUD-601` |
 | `TC-INT-91` | `INV-113`: a stale session is refused, a manager is not enough, an owner releases it, and the release is an `AUD-603`-shaped row with two distinct actors. An owner posting their own stale count needs nobody else | `INV-113`, `AUD-603` |
+| `TC-INT-92` | The whole precedence in one pass: `PR-202` binds an owner whose role ceiling is 100% and the refusal names the category with **no approver to fetch**; the same discount keyed by a cashier reports `PR-203` *and* `PR-105` together rather than one at a time; `PR-106`'s tier applies to the basket and exercises nobody's ceiling; `PR-206` resolves the tier against a hand-typed figure both ways round; `PR-205` still caps the lot | `PR-106`, `PR-202`, `PR-203`, `PR-205`, `PR-206`, `PR-105` |
 | `TC-API-01` | Every route refuses an actor lacking its `TX-*`, with 403, and audits it | `SEC-6` |
 | `TC-API-02` | No endpoint returns `password_hash`, `pin_hash` or `recovery_code_hash` | `SEC-1` |
 
@@ -220,7 +224,7 @@ two `TC-INT-84`s that assert different things.
 | ~~`TC-INT-81` – `TC-INT-84`~~ | `TASK-020` | **Written** — see §4. Returns: the quantity ceiling, write-off defaults, refund precedence, both movements |
 | ~~`TC-INT-85` – `TC-INT-87`~~ | `TASK-021` | **Written** — see §4. Voids: full reversal, the shift window, the authorisation |
 | ~~`TC-INT-88` – `TC-INT-91`~~ | `TASK-022` | **Written** — see §4. Stock counts: the freeze, no movement when matched, self-approval, staleness |
-| `TC-INT-92` – `TC-INT-93`, `TC-UT-45` – `TC-UT-49` | `TASK-023`, `TASK-024` | Discount tiers, category ceilings, non-compounding, the four precedence levels |
+| ~~`TC-INT-92`, `TC-UT-45` – `TC-UT-47`~~, `TC-INT-93`, `TC-UT-48` – `TC-UT-49` | `TASK-023`, `TASK-024` | **`TASK-023`'s are written** — see §3 and §4. Discount tiers, category ceilings, non-compounding; `TASK-024`'s four precedence levels remain |
 | `TC-INT-94` – `TC-INT-100` | `TASK-025`, `TASK-026` | Import validation before writing, determinism, collisions, the opening load |
 | `TC-INT-101` – `TC-INT-102`, `TC-UT-50` – `TC-UT-51` | `TASK-027` | Statutory discount: off by default, no compounding, VAT exemption |
 | `TC-INT-103` – `TC-INT-106` | `TASK-028` | Store credit: both sources, spending it, reconciliation, never aged overdue |
@@ -319,11 +323,13 @@ none of them is a question a suite can answer.
 | 6 | `TC-INT-85`–`TC-INT-87`, `TC-E2E-18` green | ☑ green |
 | 7 | `FT-209` built, tested and reachable | ☑ **done** (`TASK-022`). `SCR-205` exists; `INV-110`'s freeze is a stored column |
 | 8 | `TC-INT-88`–`TC-INT-91`, `TC-E2E-19` green | ☑ green |
-| 9 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-023` – `TASK-028` outstanding |
-| 10 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
-| 11 | A return taken at the counter on the store's own stock | ☐ **not started.** `POS-304`'s default is the one rule in this release whose value is decided by whether a cashier reads the sentence beside it, and that is not a thing a test can answer |
-| 12 | A void taken at the counter, and the drawer counted after it | ☐ **not started.** `TC-E2E-18` proves the arithmetic; what it cannot prove is that a cashier under pressure finds the button and a manager is willing to walk over. `POS-403` is a workflow before it is a rule |
-| 13 | A stocktake walked in the store, on the store's own shelves | ☐ **not started.** `TC-E2E-19` proves 200 products. What it cannot prove is that somebody counting an aisle understands that a blank field and a `0` are different answers — which is the one misunderstanding on `SCR-205` that costs real money |
+| 9 | `FT-306` built, tested and reachable | ☑ **done** (`TASK-023`). Tiers are in the registry; `PR-202` binds on `SCR-301`; the counter holds no copy |
+| 10 | `TC-UT-45`–`TC-UT-47`, `TC-INT-92` green | ☑ green |
+| 11 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-024` – `TASK-028` outstanding |
+| 12 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
+| 13 | A return taken at the counter on the store's own stock | ☐ **not started.** `POS-304`'s default is the one rule in this release whose value is decided by whether a cashier reads the sentence beside it, and that is not a thing a test can answer |
+| 14 | A void taken at the counter, and the drawer counted after it | ☐ **not started.** `TC-E2E-18` proves the arithmetic; what it cannot prove is that a cashier under pressure finds the button and a manager is willing to walk over. `POS-403` is a workflow before it is a rule |
+| 15 | A stocktake walked in the store, on the store's own shelves | ☐ **not started.** `TC-E2E-19` proves 200 products. What it cannot prove is that somebody counting an aisle understands that a blank field and a `0` are different answers — which is the one misunderstanding on `SCR-205` that costs real money |
 
 Measured on a build machine, reported for regression purposes and for nothing else:
 

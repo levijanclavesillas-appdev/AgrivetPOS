@@ -65,12 +65,63 @@ category. An owner with a 100% role ceiling still cannot give 20% on a category 
 
 ## Acceptance Criteria
 
-- [ ] A tier applies to a basket above its band, and only one tier ever applies
-- [ ] A category ceiling below the role ceiling binds, and the refusal says which did
-- [ ] An automatic 5% and a manual 5% yield 5%, not 10%
-- [ ] The larger of the two applies, and the screen says which and why
-- [ ] Nothing compounds a line below cost without `PR-105` catching it
-- [ ] No screen holds a copy of the tiers
+- [x] A tier applies to a basket above its band, and only one tier ever applies
+- [x] A category ceiling below the role ceiling binds, and the refusal says which did
+- [x] An automatic 5% and a manual 5% yield 5%, not 10%
+- [x] The larger of the two applies, and the screen says which and why
+- [x] Nothing compounds a line below cost without `PR-105` catching it
+- [x] No screen holds a copy of the tiers
+
+## What it decided
+
+**`PR-206` compares like with like at each level, and this is an interpretation.** The rule
+names `PR-104` (per line) and `PR-106` (per transaction) together and says they do not compound
+with manual discounts "on the same line" — but `PR-106` is not a line-level discount, so
+"the same line" cannot be read literally for it. The engine therefore resolves the choice
+**twice**: per line, a quantity break against the manual line discount; per transaction, the
+tier against the manual transaction discount. The larger wins each time.
+
+A line may still carry both a line discount and a share of a transaction discount, as it could
+in v1.0. That is deliberate, and this task's own acceptance criteria confirm it — *"nothing
+compounds a line below cost **without `PR-105` catching it**"* is a sentence that only makes
+sense if cross-level compounding remains possible and `PR-105` is the guard. The alternative
+reading, in which a basket tier silently suppresses a hand-given discount on one line, surprises
+the counter in the other direction and nothing asks for it.
+
+**A tier exercises nobody's discount authority.** `PR-201`'s ceilings are about who may *give*
+a discount, and a tier is the owner's standing decision rather than anybody's act. So a cashier
+whose limit is 2% may complete a basket that earns 5%, and the ceiling check applies only to the
+figure a person typed. Reading it the other way round would make every large basket need a
+manager, which is the opposite of what configuring a tier is for.
+
+**A category cap offers no approver, and that is the point.** Where `PR-202` is the binding
+ceiling, the refusal sets `requires_role` to **null**: no manager can release a cap the owner set
+on the category, and naming one would send the cashier on an errand that ends in the same
+refusal. Where the role is the binding ceiling the v1.0 behaviour is unchanged and an approver is
+named.
+
+**The tier is measured on the pre-discount subtotal**, as `PR-106` says in its own words —
+`priceCart` now returns `pre_discount_subtotal_centavos` beside the net one. Measuring it against
+a subtotal the tier has already moved is a fixed point nobody meant to compute, and measuring it
+after line discounts would make a basket earn a *smaller* tier for having had a hand discount on
+one line, which is not a rule anybody wrote.
+
+**Requirement 4's seam is a function call, not a comment.** `pricingService.automaticLineDiscount`
+returns zero today and is already fed through `PR-206`'s chooser by `priceCart`, so `TASK-024`
+fills in one function and changes nothing else. A quantity break is modelled as a **discount off
+the resolved price** rather than as a second price: `PR-101` resolves prices and `PR-206` governs
+discounts, and a break arriving as a price would be an automatic discount that escaped the rule
+saying automatic discounts do not compound with manual ones.
+
+**One thing the registry needed.** The JSON coercion in `settingsService` cleaned every entry
+with `String(item).trim()`, which is right for a list of words and gives `"[object Object]"` for
+a band. A declaration whose entries are structured now supplies `validateList` — the same escape
+hatch `validate` already provides for a `STRING` whose rule needs more than a type.
+
+**What it did not do.** `PR-104`'s quantity breaks and `PR-103`'s customer-specific prices are
+`TASK-024`'s and remain unresolved in `PRECEDENCE`, as `TASK-009` left them. The tiers have no
+editor of their own on `SCR-702` beyond the registry's generic JSON list editor; a purpose-built
+band editor is worth having and is not worth blocking this on.
 
 ## Tests
 

@@ -11,12 +11,19 @@
 // **The client's prices are never trusted** (05_TECH_SPEC.md §4.1 step 2). Everything
 // here re-resolves server-side; a cart arrives as products and quantities, and what it
 // claims anything costs is compared, not banked.
+//
+// TASK-023 added the rules an owner configures — PR-106's tiers, PR-202's category
+// ceilings and PR-206's no-compounding — and put them in `discountRuleService` rather
+// than here. The split is by kind: this file computes what a cart costs, that one
+// answers what the store's policy says. `priceCart` below asks it three questions and
+// makes no discount policy decision of its own.
 
 const clock = require('../config/clock');
 const errors = require('./errors');
 const money = require('./money');
 const taxService = require('./taxService');
 const settingsService = require('./settingsService');
+const discountRuleService = require('./discountRuleService');
 const productRepository = require('../repositories/productRepository');
 
 const PRICE_LEVELS = Object.freeze(['RETAIL', 'WHOLESALE', 'DEALER']);
@@ -105,6 +112,24 @@ function resolvePrice({ product, productId = null, customer = null, qtyMilli = n
   );
 }
 
+/**
+ * PR-104's quantity break, as an automatic line discount — TASK-024's to fill in.
+ *
+ * Requirement 4 asks that this task define the precedence quantity breaks slot into
+ * and not need reworking when they arrive. This is that seam, and it is a call rather
+ * than a comment on purpose: `priceCart` already asks the question and already feeds
+ * the answer through PR-206's chooser, so TASK-024 returns a figure here and changes
+ * nothing else.
+ *
+ * A break is modelled as a **discount off the resolved price**, not as a second price.
+ * PR-101 resolves the price and PR-206 governs discounts, and a quantity break that
+ * arrived as a price would be an automatic discount that escaped the rule saying
+ * automatic discounts do not compound with manual ones.
+ */
+function automaticLineDiscount() {
+  return { centavos: 0, rule_id: 'PR-104', release: '1.1', why: null };
+}
+
 /** The v1.1 levels, named so a caller can see what is not yet resolving. */
 function precedenceLevels() {
   return PRECEDENCE.map(({ level, rule, release }) => ({ level, rule_id: rule, release }));
@@ -129,17 +154,16 @@ function roleCeilingBp(role) {
  * PR-202 — a category's maximum overrides a higher role ceiling; the effective ceiling
  * is the **lower** of the two.
  *
- * PR-202 is v1.1 (TASK-023 owns the rules engine), and `categories.max_discount_bp`
- * defaults to NULL, so in a v1.0 store this changes nothing. It is computed here
- * anyway because "the lower of role and category" is a property of the ceiling, and a
- * ceiling function that ignores half its inputs is one somebody has to remember to
- * replace.
+ * `categories.max_discount_bp` defaults to NULL, so a store that caps nothing is
+ * unaffected. Where it is set, this is the one place the direction is decided, and
+ * `discountRuleService.bindingCeiling` is where it is decided — including *which* of
+ * the two bound, which the refusal has to say. "5% is above your limit" is unactionable
+ * to an owner who knows their ceiling is 100%.
  */
 function effectiveCeilingBp(role, { categoryMaxDiscountBp = null } = {}) {
-  const roleBp = roleCeilingBp(role);
-  if (roleBp === null) return null;
-  if (categoryMaxDiscountBp === null || categoryMaxDiscountBp === undefined) return roleBp;
-  return Math.min(roleBp, categoryMaxDiscountBp);
+  return discountRuleService.bindingCeiling({
+    roleCeilingBp: roleCeilingBp(role), categoryMaxDiscountBp,
+  }).ceiling_bp;
 }
 
 /**
@@ -151,7 +175,8 @@ function effectiveCeilingBp(role, { categoryMaxDiscountBp = null } = {}) {
  * names an approver is a prompt, and PR-203 asks for the second.
  */
 function evaluateDiscount({
-  role, lineTotalCentavos, discountCentavos, categoryMaxDiscountBp = null, approverRole = null,
+  role, lineTotalCentavos, discountCentavos, categoryMaxDiscountBp = null,
+  categoryName = null, approverRole = null,
 }) {
   money.assertCentavos(lineTotalCentavos, 'line total');
   money.assertCentavos(discountCentavos, 'discount');
@@ -175,7 +200,11 @@ function evaluateDiscount({
     };
   }
 
-  const ceilingBp = effectiveCeilingBp(role, { categoryMaxDiscountBp });
+  // PR-202: which of the two bound, kept so the refusal can name it.
+  const binding = discountRuleService.bindingCeiling({
+    roleCeilingBp: roleCeilingBp(role), categoryMaxDiscountBp, categoryName,
+  });
+  const ceilingBp = binding.ceiling_bp;
   const requestedBp = lineTotalCentavos === 0
     ? 0
     : basisPoints(discountCentavos, lineTotalCentavos);
@@ -194,8 +223,10 @@ function evaluateDiscount({
 
   if (requestedBp <= ceilingBp) {
     return {
-      allowed: true, reason: null, rule_id: 'PR-201',
-      requested_bp: requestedBp, ceiling_bp: ceilingBp, requires_role: null,
+      allowed: true, reason: null, rule_id: binding.rule_id,
+      requested_bp: requestedBp, ceiling_bp: ceilingBp,
+      bound_by: binding.bound_by, category_name: binding.category_name,
+      requires_role: null,
     };
   }
 
@@ -213,17 +244,31 @@ function evaluateDiscount({
   }
 
   const approvers = rolesAbove(requestedBp, { categoryMaxDiscountBp });
+
+  // PR-202: **the refusal names which of the two ceilings bound.** Where the category
+  // is the lower one, no approver exists — a manager cannot release a cap the owner
+  // put on the category, and telling the cashier to fetch one would send them on an
+  // errand that ends in the same refusal.
+  const boundByCategory = binding.bound_by === 'CATEGORY';
+
   return {
     allowed: false,
-    reason: 'ABOVE_CEILING',
-    rule_id: 'PR-203',
-    message: `${formatBp(requestedBp)} is above your ${formatBp(ceilingBp)} limit. `
-      + (approvers.length
-        ? `A ${approvers.join(' or ').toLowerCase()} can approve it.`
-        : 'Nobody may approve a discount this large.'),
+    reason: boundByCategory ? 'ABOVE_CATEGORY_CEILING' : 'ABOVE_CEILING',
+    rule_id: boundByCategory ? 'PR-202' : 'PR-203',
+    bound_by: binding.bound_by,
+    category_name: binding.category_name,
+    message: boundByCategory
+      ? `${formatBp(requestedBp)} is above the ${formatBp(ceilingBp)} cap on `
+        + `${binding.category_name || 'that category'}. That cap overrides any role ceiling, `
+        + 'so nobody at the counter can release it — the owner sets it on the category.'
+      : `${formatBp(requestedBp)} is above your ${formatBp(ceilingBp)} limit. `
+        + (approvers.length
+          ? `A ${approvers.join(' or ').toLowerCase()} can approve it.`
+          : 'Nobody may approve a discount this large.'),
     requested_bp: requestedBp,
     ceiling_bp: ceilingBp,
-    requires_role: approvers.join(' or ') || null,
+    // Nobody to fetch where the category is the binding one.
+    requires_role: boundByCategory ? null : (approvers.join(' or ') || null),
   };
 }
 
@@ -361,17 +406,47 @@ function priceCart({
     }
 
     const price = resolvePrice({ product, customer, qtyMilli: line.qtyMilli, at: when });
-    const discount = line.discountCentavos || 0;
+
+    // PR-202's ceiling for this line, joined onto the product rather than looked up
+    // per line: twenty cart lines would otherwise be twenty round trips.
+    const categoryMaxDiscountBp = product.category_max_discount_bp ?? null;
+
+    const gross = money.mulQty(price.price_centavos, line.qtyMilli);
+
+    // ── PR-206, at the line level ──
+    //
+    // The automatic line discount is a quantity break, which is TASK-024's. It resolves
+    // to nothing today and the choice is made anyway, so that when PR-104 lands it
+    // fills in `automaticCentavos` and changes nothing else here — requirement 4's
+    // "must not need reworking when they arrive", as a call rather than as a promise.
+    const automatic = automaticLineDiscount({ product, price, qtyMilli: line.qtyMilli, customer });
+    const chosen = discountRuleService.chooseDiscount({
+      automaticCentavos: automatic.centavos,
+      manualCentavos: line.discountCentavos || 0,
+      automaticReason: automatic.why,
+      manualReason: line.discountReason || null,
+    });
+    const discount = chosen.applied_centavos;
+
     const totals = money.computeLineTotal({
       unitPrice: price.price_centavos, qtyMilli: line.qtyMilli, lineDiscount: discount,
     });
 
-    const discountDecision = discount === 0
-      ? { allowed: true, requested_bp: 0, ceiling_bp: effectiveCeilingBp(actorRole), rule_id: 'PR-201' }
+    // An automatic discount is the store's own decision and needs no authority — it is
+    // the ceiling's business only where a person chose the figure. PR-201 is about
+    // discount *authority*, and nobody exercised any.
+    const discountDecision = discount === 0 || chosen.source === 'AUTOMATIC'
+      ? {
+        allowed: true, requested_bp: basisPoints(discount, gross),
+        ceiling_bp: effectiveCeilingBp(actorRole, { categoryMaxDiscountBp }),
+        rule_id: chosen.source === 'AUTOMATIC' ? 'PR-106' : 'PR-201',
+      }
       : evaluateDiscount({
         role: actorRole,
         lineTotalCentavos: totals.gross,
         discountCentavos: discount,
+        categoryMaxDiscountBp,
+        categoryName: product.category_name,
         approverRole,
       });
 
@@ -390,6 +465,9 @@ function priceCart({
       sku: product.sku,
       name: product.name,
       tax_class: product.tax_class,
+      category_id: product.category_id,
+      category_name: product.category_name,
+      category_max_discount_bp: categoryMaxDiscountBp,
       qty_milli: line.qtyMilli,
       unit_price_centavos: price.price_centavos,
       price_level: price.resolved_level,
@@ -397,6 +475,10 @@ function priceCart({
       gross_centavos: totals.gross,
       line_discount_centavos: totals.discount,
       net_centavos: totals.net,
+      // PR-206, in the payload: which discount was used, and what was suppressed. The
+      // screen is asked to say why the other one did not apply, and cannot without it.
+      discount_source: chosen.source,
+      discount_choice: chosen,
       discount_decision: discountDecision,
       below_cost: costDecision,
     };
@@ -406,18 +488,58 @@ function priceCart({
   const subtotal = resolved.reduce((sum, l) => sum + l.net_centavos, 0);
   money.assertCentavos(transactionDiscountCentavos, 'transaction discount');
 
-  if (transactionDiscountCentavos > subtotal) {
-    // PR-205's second half: the sum of discounts may never exceed the subtotal.
+  // ── PR-106 — the tier, on the **pre-discount** subtotal ──
+  //
+  // The rule says pre-discount in its own words, so the band is chosen against the
+  // gross of the basket rather than against a subtotal that has already had line
+  // discounts taken off it. Measuring the tier against a figure the tier has already
+  // moved is a fixed point nobody meant to compute — and it would make a basket earn a
+  // smaller tier for having had a hand discount on one line, which is not a rule
+  // anybody wrote.
+  const preDiscountSubtotal = resolved.reduce((sum, l) => sum + l.gross_centavos, 0);
+  const tier = discountRuleService.tierFor(preDiscountSubtotal);
+
+  // ── PR-206, at the transaction level ──
+  //
+  // The configured tier against the figure somebody typed. The larger applies; they do
+  // not add. See discountRuleService's header for why the comparison is like-with-like
+  // at each level rather than the tier suppressing line discounts too.
+  const txnChoice = discountRuleService.chooseDiscount({
+    automaticCentavos: tier.discount_centavos,
+    manualCentavos: transactionDiscountCentavos,
+    automaticReason: tier.why,
+  });
+  const appliedTransactionDiscount = txnChoice.applied_centavos;
+
+  if (appliedTransactionDiscount > subtotal) {
+    // PR-205's second half: the sum of discounts may never exceed the subtotal. The
+    // tier can reach here on its own — a band on the pre-discount subtotal, applied to
+    // a basket whose lines were then discounted by hand, can exceed what is left.
     throw errors.badRequest(
-      `A transaction discount of ${money.toDisplay(transactionDiscountCentavos)} is more than the `
-      + `${money.toDisplay(subtotal)} subtotal.`,
+      txnChoice.source === 'AUTOMATIC'
+        ? `The ${discountRuleService.formatBp(tier.discount_bp)} basket discount comes to `
+          + `${money.toDisplay(appliedTransactionDiscount)}, which is more than the `
+          + `${money.toDisplay(subtotal)} left after the line discounts. Reduce those first.`
+        : `A transaction discount of ${money.toDisplay(appliedTransactionDiscount)} is more than the `
+          + `${money.toDisplay(subtotal)} subtotal.`,
       { ruleId: 'PR-205' }
     );
   }
 
-  const shares = transactionDiscountCentavos === 0
+  // PR-201/PR-203 apply to the transaction discount too, and only where a person chose
+  // it: a tier is the owner's standing decision, not an exercise of anybody's ceiling.
+  const txnDecision = appliedTransactionDiscount === 0 || txnChoice.source === 'AUTOMATIC'
+    ? { allowed: true, requested_bp: basisPoints(appliedTransactionDiscount, subtotal), rule_id: 'PR-106' }
+    : evaluateDiscount({
+      role: actorRole,
+      lineTotalCentavos: subtotal,
+      discountCentavos: appliedTransactionDiscount,
+      approverRole,
+    });
+
+  const shares = appliedTransactionDiscount === 0
     ? resolved.map(() => 0)
-    : money.apportionDiscount(resolved.map((l) => l.net_centavos), transactionDiscountCentavos);
+    : money.apportionDiscount(resolved.map((l) => l.net_centavos), appliedTransactionDiscount);
 
   const withShares = resolved.map((line, i) => ({
     ...line,
@@ -451,14 +573,36 @@ function priceCart({
       requires_role: decision.requires_role,
     })));
 
+  // The transaction discount's own decision, in the same list. It is not a line, and a
+  // caller that only walked the lines would complete a sale whose transaction discount
+  // was above the cashier's ceiling — the one gap in "every blocking decision" that
+  // v1.0 left, because a transaction discount could not be refused before PR-202.
+  if (!txnDecision.allowed) {
+    authorisations.push({
+      line: null,
+      product: null,
+      rule_id: txnDecision.rule_id,
+      message: txnDecision.message,
+      requires_role: txnDecision.requires_role,
+    });
+  }
+
   return {
     priced_at: when,
     tax_mode: taxMode,
     customer_price_level: (customer && customer.price_level) || 'RETAIL',
     lines: priced,
     subtotal_centavos: subtotal,
+    pre_discount_subtotal_centavos: preDiscountSubtotal,
     line_discount_centavos: priced.reduce((sum, l) => sum + l.line_discount_centavos, 0),
-    transaction_discount_centavos: transactionDiscountCentavos,
+    transaction_discount_centavos: appliedTransactionDiscount,
+    // PR-106 and PR-206 at the transaction level: the band the basket earned, whether
+    // it applied, and what it beat or lost to. A screen that showed only the amount
+    // could not tell a customer why their large basket earned nothing.
+    transaction_tier: tier,
+    transaction_discount_source: txnChoice.source,
+    transaction_discount_choice: txnChoice,
+    transaction_discount_decision: txnDecision,
     total_centavos: priced.reduce((sum, l) => sum + l.amount_centavos, 0),
     tax_amount_centavos: tax.total_vat_centavos,
     tax_summary: tax.summary,
@@ -471,7 +615,7 @@ function priceCart({
 
 module.exports = {
   PRICE_LEVELS, PRECEDENCE, CEILING_KEYS,
-  resolvePrice, precedenceLevels,
+  resolvePrice, precedenceLevels, automaticLineDiscount,
   roleCeilingBp, effectiveCeilingBp, evaluateDiscount, assertDiscountAllowed,
   basisPoints, maxDiscountCentavos, rolesAbove,
   evaluateBelowCost, assertNotBelowCost,

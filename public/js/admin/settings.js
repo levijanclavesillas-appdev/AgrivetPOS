@@ -206,6 +206,30 @@ export function createSettings({ root }) {
       }, setting.one_of.map((option) => h('option', {
         value: option, text: option, selected: option === setting.value,
       })));
+    } else if (setting.value_type === 'JSON' && setting.entry_shape === 'OBJECT') {
+      // A list whose entries have structure — PR-106's discount bands. Rendered as
+      // JSON and parsed back, because "one per line" has nothing to put on a line.
+      //
+      // Which shape a list has is the **server's** answer, from `entry_shape`: a
+      // screen that guessed by looking at the value would render "[object Object]"
+      // the first time somebody declared a structured list it had not met, and one
+      // that knew the key would be the copy of the registry TC-UI-07 forbids.
+      input = h('textarea', {
+        id, rows: String(Math.max(6, JSON.stringify(setting.value || [], null, 2).split('\n').length)),
+        class: 'json-entry',
+        oninput: (event) => {
+          try {
+            edited.set(setting.key, JSON.parse(event.target.value));
+            event.target.setCustomValidity('');
+          } catch {
+            // Left unset rather than saved as broken. The server would refuse it
+            // anyway; refusing to stage it means Save does not silently skip the one
+            // field somebody was in the middle of.
+            event.target.setCustomValidity('This is not valid JSON yet.');
+          }
+        },
+      });
+      input.value = JSON.stringify(setting.value || [], null, 2);
     } else if (setting.value_type === 'JSON') {
       // A short, ordered list of labels — the adjustment reasons, the till reasons.
       // One per line is the shape somebody can actually edit.

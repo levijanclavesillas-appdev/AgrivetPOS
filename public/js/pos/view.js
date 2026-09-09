@@ -90,9 +90,11 @@ export function createPos({ root, session, onPay }) {
             : null,
           h('span', { class: 'line-total', text: pricedLine ? money(pricedLine.amount_centavos) : '—' }),
         ]),
-        line.discountCentavos > 0
-          ? h('div', { class: 'cart-line-discount', text: `Discount ${money(-line.discountCentavos)}` })
-          : null,
+        // PR-206: the discount that actually applied, and — where one beat the other —
+        // which and why. A cashier who typed 5% and sees 5% taken off has no way to
+        // know whether their figure was used or an automatic one of the same size was,
+        // and the difference is whose decision the sale records.
+        discountLine(pricedLine, line),
         // POS-104: remaining stock after this line.
         h('div', {
           class: 'cart-line-stock',
@@ -103,6 +105,29 @@ export function createPos({ root, session, onPay }) {
           : null,
       ]));
     });
+  }
+
+  /**
+   * What came off this line, and whose decision it was.
+   *
+   * The applied figure is the server's — PR-206 chose between the automatic discount
+   * and the typed one, and the screen must not re-derive that choice or it would show
+   * one figure while the till charged another.
+   */
+  function discountLine(pricedLine, line) {
+    const applied = pricedLine ? pricedLine.line_discount_centavos : line.discountCentavos;
+    if (!applied) return null;
+
+    const choice = pricedLine && pricedLine.discount_choice;
+    return h('div', { class: 'cart-line-discount' }, [
+      h('span', { text: `Discount ${money(-applied)}` }),
+      // Requirement 3's second half: say why the other one did not apply. The sentence
+      // is the server's; a screen that wrote its own would be a second place PR-206
+      // lives.
+      choice && choice.suppressed
+        ? h('small', { class: 'discount-why', text: choice.why })
+        : null,
+    ]);
   }
 
   function stockAfter(line) {
@@ -128,6 +153,18 @@ export function createPos({ root, session, onPay }) {
       h('div', { class: 'rail-block rail-totals' }, [
         row('Subtotal', priced ? money(priced.subtotal_centavos) : money(0)),
         row('Discount', priced ? money(-(priced.line_discount_centavos + priced.transaction_discount_centavos)) : money(0)),
+        // PR-106: the band this basket earned, named. "Why is there ₱300 off" is a
+        // question the customer asks and the cashier has to be able to answer — and
+        // the label is the owner's own, from the registry, so no copy lives here.
+        priced?.transaction_tier?.applies
+          ? h('p', { class: 'rail-tier', text: priced.transaction_tier.band.label })
+          : null,
+        // PR-206 at the transaction level: the tier beat what somebody typed, or lost
+        // to it. Said, because a cashier who entered ₱100 and sees ₱300 off would
+        // otherwise think the till had added them together.
+        priced?.transaction_discount_choice?.suppressed
+          ? h('p', { class: 'rail-tier-why', text: priced.transaction_discount_choice.why })
+          : null,
         priced?.tax_summary ? row('VAT', money(priced.tax_amount_centavos)) : null,
         h('hr'),
         row('TOTAL', priced ? money(priced.total_centavos) : money(0), 'total'),

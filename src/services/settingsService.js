@@ -103,6 +103,23 @@ const REGISTRY = Object.freeze({
     // the lot; the default is a year because that is what anyone asks for in practice.
     what: 'Longest range a single report may cover', min: 1, max: 1826,
   },
+  // PR-106 — the tiers an owner configures, on the pre-discount subtotal. A short
+  // ordered list with no identity of its own, so it is a setting rather than a table:
+  // the same judgement `till_reasons` and `adjustment_reasons` already carry.
+  //
+  // Empty is meaningful and is the default: a store that gives no basket discount has
+  // no tiers, and OPS-005's "configurable" does not mean "on". The JSON coercion
+  // refuses an empty list for every other key, so this one is seeded as a single band
+  // at zero discount — a shape that documents the format on SCR-702 and applies
+  // nothing until somebody edits it.
+  transaction_discount_tiers: {
+    type: 'JSON', group: 'PRICING', ruleId: 'PR-106', ownerOnly: true,
+    what: 'Basket-size discount bands, on the subtotal before any discount',
+    value: Object.freeze([
+      Object.freeze({ min_subtotal_centavos: 0, discount_bp: 0, label: 'No basket discount' }),
+    ]),
+    validateList: (list) => require('./discountRuleService').validateTiers(list),
+  },
   return_window_days: {
     type: 'INT', value: 7, group: 'SALES', ruleId: 'POS-307', ownerOnly: true,
     what: 'Days a return is accepted without manager authorisation', min: 0, max: 365,
@@ -375,6 +392,13 @@ function coerce(key, raw) {
     if (!Array.isArray(list) || list.length === 0) {
       throw errors.badRequest(`${key} must be a non-empty list`, { ruleId: declared.ruleId });
     }
+    // Most JSON settings are a list of words — reasons, categories — and the cleaning
+    // below is right for those. One is not: PR-106's tiers are a list of *bands*, and
+    // `String(item)` on an object gives "[object Object]". A declaration whose entries
+    // are structured says so and validates its own shape, which is the same escape
+    // hatch `validate` already provides for a STRING whose rule needs more than a type.
+    if (declared.validateList) return declared.validateList(list);
+
     const cleaned = list.map((item) => String(item).trim()).filter(Boolean);
     if (cleaned.length !== list.length) {
       throw errors.badRequest(`${key} may not contain a blank entry`, { ruleId: declared.ruleId });
@@ -478,6 +502,14 @@ function describe({ includeOwnerOnly = true } = {}) {
         min: declared.min ?? null,
         max: declared.max ?? null,
         one_of: declared.oneOf ?? null,
+        // What one entry of a JSON list looks like. Most are words — a reason, a
+        // category name — and SCR-702 edits those one per line. PR-106's tiers are
+        // objects, and a screen that guessed from the value would render
+        // "[object Object]" the first time somebody declared a structured list. The
+        // declaration says which, so the screen renders it without knowing the key.
+        entry_shape: declared.type === 'JSON'
+          ? (declared.validateList ? 'OBJECT' : 'TEXT')
+          : null,
         owner_only: Boolean(declared.ownerOnly),
         immutable: Boolean(declared.immutable),
         is_default: !row,

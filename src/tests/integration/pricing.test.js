@@ -1,6 +1,7 @@
 'use strict';
 
-// PR-101–PR-205 — price resolution, discount authority and the below-cost floor.
+// PR-101–PR-206 — price resolution, discount authority, the below-cost floor, and the
+// rules engine TASK-023 added on top of them.
 //
 // TC-UT-31, TC-UT-32, TC-UT-34 and TC-UT-35 are named unit cases and are here instead,
 // for the reason TC-UT-10 and TC-UT-32 already are: a price is a stored row and a
@@ -555,5 +556,173 @@ test('the store’s tax mode drives the engine end to end', async () => {
     assert.equal(asNonVat.total_centavos, 112000, 'the price the customer pays is unchanged');
   } finally {
     storeProfileService.setTaxMode('VAT', sessions.OWNER);
+  }
+});
+
+// ── TC-INT-92 — the whole precedence, in one pass (TASK-023) ────────────────
+
+test('TC-INT-92: every rule resolves in one pass, and every blocking decision is reported', () => {
+  const referenceService = require('../../services/referenceService');
+  const discountRuleService = require('../../services/discountRuleService');
+
+  // A category capped at 5% (PR-202), and a product in it priced at ₱100 with an
+  // average cost of ₱90 — so a discount over 10% is also below cost (PR-105).
+  const capped = referenceService.create('categories', { name: 'Capped Vet Lines', maxDiscountBp: 500 }, sessions.OWNER);
+  const vet = makeProduct({ categoryId: capped.id, retailPriceCentavos: 10000 });
+  inventoryService.postStandalone({
+    productId: vet.id, type: 'RECEIPT', qtyMilli: 100000, unitCostCentavos: 9000, actor: sessions.OWNER,
+  });
+
+  const plain = makeProduct({ retailPriceCentavos: 10000 });
+  inventoryService.postStandalone({
+    productId: plain.id, type: 'RECEIPT', qtyMilli: 100000, unitCostCentavos: 2000, actor: sessions.OWNER,
+  });
+
+  const before = settingsService.get('transaction_discount_tiers');
+  settingsService.set('transaction_discount_tiers', [
+    { min_subtotal_centavos: 100000, discount_bp: 200, label: '2% over ₱1,000' },
+    { min_subtotal_centavos: 500000, discount_bp: 500, label: '5% over ₱5,000' },
+  ], sessions.OWNER);
+
+  try {
+    // ── PR-202 binds an OWNER, whose role ceiling is 100% ──
+    //
+    // This is the case the rule exists for and the one a backwards implementation gets
+    // wrong: the owner outranks everybody and is still stopped by the category. They
+    // are **not** stopped by PR-105 — TX-404 is theirs — so this cart reports exactly
+    // one refusal, and it is the category's.
+    const overCap = pricingService.priceCart({
+      lines: [{ productId: vet.id, qtyMilli: 1000, discountCentavos: 2000 }],   // 20% of ₱100
+      taxMode: 'NONE',
+      actorRole: 'OWNER',
+    });
+    assert.equal(overCap.requires_authorisation, true);
+    assert.deepEqual(overCap.authorisations.map((a) => a.rule_id), ['PR-202']);
+
+    const capRefusal = overCap.authorisations[0];
+    assert.match(capRefusal.message, /above the 5% cap on Capped Vet Lines/);
+    assert.match(capRefusal.message, /overrides any role ceiling/);
+    assert.equal(capRefusal.requires_role, null, 'nobody at the counter can release a category cap');
+    assert.equal(overCap.lines[0].category_max_discount_bp, 500);
+
+    // ── Requirement 6: **both** blocking decisions on one line, in one pass ──
+    //
+    // The same 20% keyed by a cashier is above their 2% ceiling (the role binds here,
+    // being lower than the category's 5%) *and* prices the line below the ₱90 average
+    // cost. A counter told about one, sent to fetch a manager, and only then told about
+    // the other has been made to ask twice for one sale — which is the behaviour
+    // TASK-009 established this reporting to prevent.
+    const both = pricingService.priceCart({
+      lines: [{ productId: vet.id, qtyMilli: 1000, discountCentavos: 2000 }],
+      taxMode: 'NONE',
+      actorRole: 'CASHIER',
+    });
+    assert.deepEqual(both.authorisations.map((a) => a.rule_id).sort(), ['PR-105', 'PR-203']);
+
+    // And the role is what bound, not the category — the lower of the two, in the
+    // direction that happens to be the ordinary one.
+    assert.equal(both.lines[0].discount_decision.bound_by, 'ROLE');
+    assert.match(
+      both.authorisations.find((a) => a.rule_id === 'PR-203').message,
+      /above your 2% limit/
+    );
+
+    // ── PR-106 applies to the basket, and only one band ──
+    const basket = pricingService.priceCart({
+      lines: [{ productId: plain.id, qtyMilli: 60000 }],       // 60 KG at ₱100 = ₱6,000
+      taxMode: 'NONE',
+      actorRole: 'CASHIER',
+    });
+    assert.equal(basket.pre_discount_subtotal_centavos, 600000);
+    assert.equal(basket.transaction_tier.applies, true);
+    assert.equal(basket.transaction_tier.discount_bp, 500, 'the 5% band, not 2% + 5%');
+    assert.equal(basket.transaction_discount_centavos, 30000);
+    assert.equal(basket.transaction_discount_source, 'AUTOMATIC');
+    assert.equal(basket.total_centavos, 570000);
+    // A tier is the owner's standing decision, so it exercises nobody's ceiling — a
+    // cashier whose limit is 2% may still sell a basket that earns 5%.
+    assert.equal(basket.requires_authorisation, false);
+
+    // ── PR-206 at the transaction level: the tier against a hand-typed figure ──
+    const beaten = pricingService.priceCart({
+      lines: [{ productId: plain.id, qtyMilli: 60000 }],
+      taxMode: 'NONE',
+      actorRole: 'OWNER',
+      transactionDiscountCentavos: 10000,                      // ₱100 by hand
+    });
+    assert.equal(beaten.transaction_discount_centavos, 30000, 'the ₱300 tier wins, and they do not add');
+    assert.equal(beaten.transaction_discount_source, 'AUTOMATIC');
+    assert.equal(beaten.transaction_discount_choice.suppressed.source, 'MANUAL');
+    assert.equal(beaten.transaction_discount_choice.suppressed.centavos, 10000);
+
+    // And the other way round: a hand-typed figure larger than the band applies, and
+    // is then subject to the ceiling, because a person chose it.
+    const bigger = pricingService.priceCart({
+      lines: [{ productId: plain.id, qtyMilli: 60000 }],
+      taxMode: 'NONE',
+      actorRole: 'OWNER',
+      transactionDiscountCentavos: 60000,                      // ₱600 by hand, 10%
+    });
+    assert.equal(bigger.transaction_discount_centavos, 60000);
+    assert.equal(bigger.transaction_discount_source, 'MANUAL');
+    assert.equal(bigger.transaction_discount_choice.suppressed.source, 'AUTOMATIC');
+
+    // A cashier typing the same figure is refused, and the refusal is in the same list
+    // the lines' refusals are in — a caller that only walked the lines would have
+    // completed it.
+    const overCeiling = pricingService.priceCart({
+      lines: [{ productId: plain.id, qtyMilli: 60000 }],
+      taxMode: 'NONE',
+      actorRole: 'CASHIER',
+      transactionDiscountCentavos: 60000,
+    });
+    assert.equal(overCeiling.requires_authorisation, true);
+    const txnRefusal = overCeiling.authorisations.find((a) => a.line === null);
+    assert.ok(txnRefusal, 'the transaction discount has its own entry');
+    assert.equal(txnRefusal.rule_id, 'PR-203');
+    assert.ok(txnRefusal.requires_role);
+
+    // ── PR-205 still caps the lot ──
+    assert.throws(
+      () => pricingService.priceCart({
+        lines: [{ productId: plain.id, qtyMilli: 60000, discountCentavos: 600000 }],
+        taxMode: 'NONE',
+        actorRole: 'OWNER',
+        transactionDiscountCentavos: 100000,
+      }),
+      (err) => err.ruleId === 'PR-205'
+    );
+
+    // ── Requirement 4: the quantity-break seam exists and resolves to nothing ──
+    assert.deepEqual(pricingService.automaticLineDiscount(), {
+      centavos: 0, rule_id: 'PR-104', release: '1.1', why: null,
+    });
+    assert.equal(basket.lines[0].discount_source, 'NONE');
+  } finally {
+    settingsService.set('transaction_discount_tiers', before, sessions.OWNER);
+  }
+});
+
+test('TC-INT-92: the policy endpoint serves the tiers, so no screen holds a copy', async () => {
+  const before = settingsService.get('transaction_discount_tiers');
+  settingsService.set('transaction_discount_tiers', [
+    { min_subtotal_centavos: 250000, discount_bp: 300, label: '3% over ₱2,500' },
+  ], sessions.OWNER);
+
+  try {
+    const res = await call('/sales/pricing-policy', { token: tokens.CASHIER });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    // Requirement 7, and TC-UI-07's obligation applied to the counter.
+    assert.equal(body.discount_rules.transaction_tiers.bands.length, 1);
+    assert.equal(body.discount_rules.transaction_tiers.bands[0].discount_bp, 300);
+    assert.equal(body.discount_rules.compounding.compounds, false);
+    assert.ok(Array.isArray(body.discount_rules.category_ceilings.categories));
+
+    // The cashier's own ceiling still comes with it, as it did before.
+    assert.equal(body.discount_ceiling_bp, settingsService.get('discount_ceiling_cashier_bp'));
+  } finally {
+    settingsService.set('transaction_discount_tiers', before, sessions.OWNER);
   }
 });

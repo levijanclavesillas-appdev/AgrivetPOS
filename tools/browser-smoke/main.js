@@ -746,6 +746,108 @@ app.whenReady().then(async () => {
   // Back to the owner for the admin section, which is TX-423 and not the clerk's.
   log(await signInAs('chachi', 'sack-of-feed-2026'), 'the owner signs back in');
 
+  console.log('\n— SCR-301: the discount rules (PR-106, PR-202, PR-206) —');
+
+  // A basket tier and a category cap, configured through the registry as an owner
+  // would, then driven at the counter.
+  const catForCap = (await api('/categories')).json.categories[0];
+  await api(`/categories/${catForCap.id}`, { method: 'PUT', body: { maxDiscountBp: 500 } });
+  // PUT /settings takes the keys at the top level — `setMany(body)` — not wrapped.
+  const tiersSaved = await api('/settings', {
+    method: 'PUT',
+    body: {
+      // The first band is set at ₱50 so that a single scan — 1 KG at ₱62.50 — reaches
+      // it, which is what the on-screen assertion below actually drives. The second is
+      // where the API assertions exercise "the highest band, not every band passed".
+      transaction_discount_tiers: [
+        { min_subtotal_centavos: 5000, discount_bp: 200, label: '2% over ₱50' },
+        { min_subtotal_centavos: 50000, discount_bp: 500, label: '5% over ₱500' },
+      ],
+    },
+  });
+  log(tiersSaved.status === 200, 'the owner configures two discount bands', String(tiersSaved.status));
+
+  // PR-202 and PR-106, through the endpoint the counter actually calls.
+  const policy = (await api('/sales/pricing-policy')).json;
+  log(policy.discount_rules.transaction_tiers.bands.length === 2,
+    'requirement 7: the tiers are served to the counter, not held by it',
+    `${policy.discount_rules.transaction_tiers.bands.length} bands`);
+  log(policy.discount_rules.compounding.compounds === false,
+    'PR-206: and the policy says the two kinds do not add together');
+  log(policy.discount_rules.category_ceilings.categories.some((c) => c.max_discount_bp === 500),
+    'PR-202: the capped category is served too');
+
+  // A basket over the second band: 10 KG at ₱62.50 is ₱625, which earns 5%.
+  const tiered = await api('/sales/price-check', {
+    method: 'POST',
+    body: { lines: [{ productId: PRODUCT_ID, qtyMilli: 10000 }] },
+  });
+  log(tiered.json.transaction_tier.applies === true,
+    'PR-106: a basket over the band earns the tier',
+    tiered.json.transaction_tier.band && tiered.json.transaction_tier.band.label);
+  log(tiered.json.transaction_tier.discount_bp === 500,
+    'and it is the highest band reached, not every band passed',
+    `${tiered.json.transaction_tier.discount_bp} bp`);
+  log(tiered.json.transaction_discount_source === 'AUTOMATIC',
+    'PR-206: with nothing typed, the automatic one applies');
+
+  // PR-206: the same basket with a smaller figure typed by hand.
+  const beaten = await api('/sales/price-check', {
+    method: 'POST',
+    body: {
+      lines: [{ productId: PRODUCT_ID, qtyMilli: 10000 }],
+      transactionDiscountCentavos: 100,
+    },
+  });
+  log(beaten.json.transaction_discount_centavos === tiered.json.transaction_discount_centavos,
+    'PR-206: a smaller hand-typed figure does not add to the tier — the larger applies',
+    `₱${(beaten.json.transaction_discount_centavos / 100).toFixed(2)}`);
+  log(beaten.json.transaction_discount_choice.suppressed
+    && beaten.json.transaction_discount_choice.suppressed.source === 'MANUAL',
+    'and the payload says which was suppressed, so the screen can explain it');
+
+  // PR-202: an owner with a 100% ceiling, stopped by a category capped at 5%.
+  const capped = await api('/sales/price-check', {
+    method: 'POST',
+    body: { lines: [{ productId: PRODUCT_ID, qtyMilli: 1000, discountCentavos: 2000 }] },
+  });
+  const capRefusal = (capped.json.authorisations || []).find((a) => a.rule_id === 'PR-202');
+  log(Boolean(capRefusal), 'PR-202: an owner is stopped by the category cap',
+    capRefusal && capRefusal.message.slice(0, 70));
+  log(Boolean(capRefusal) && capRefusal.requires_role === null,
+    'and no approver is offered, because nobody at the counter can release it');
+
+  // The counter renders the tier by the owner's own label.
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+  await run(`(() => {
+    const el = document.querySelector('.pos-search');
+    el.focus();
+    for (const ch of '4800012345678') {
+      el.value += ch;
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  })()`);
+  await settle(1400);
+
+  const railTier = await run(`(document.querySelector('.rail-tier') || {}).textContent || ''`);
+  log(/over ₱50/.test(railTier), 'PR-106: the counter names the band, in the owner’s own words',
+    railTier.trim());
+
+  // Put the shop back, so the sections after this one price as they did before — and
+  // **clear the cart this section left on the counter.** The void walk below rings a
+  // sale of its own through SCR-301, and a line left behind here would change its
+  // total and leave it stuck on the payment screen. Found exactly that way.
+  await api('/settings', {
+    method: 'PUT',
+    body: { transaction_discount_tiers: [{ min_subtotal_centavos: 0, discount_bp: 0, label: 'No basket discount' }] },
+  });
+  await api(`/categories/${catForCap.id}`, { method: 'PUT', body: { maxDiscountBp: null } });
+  await api('/carts/active', { method: 'DELETE' });
+  log((await api('/carts/active')).json.cart === null, 'and the counter is left empty for the next walk');
+
   console.log('\n— SCR-205: the stocktake (INV-110 to INV-113) —');
 
   await run(OPEN_RAIL('Products'));

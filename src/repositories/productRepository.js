@@ -17,6 +17,11 @@ const COLUMNS = `
 const JOINED = `
   ${COLUMNS},
   c.name AS category_name,
+  -- PR-202's ceiling, joined rather than looked up per line at pricing time. The
+  -- category is already joined for its name, so this costs nothing and saves the
+  -- pricing engine a query per cart line — which on a twenty-line basket is twenty
+  -- round trips inside NFR_1.1's two-second budget.
+  c.max_discount_bp AS category_max_discount_bp,
   b.name AS brand_name,
   u.code AS base_unit_code,
   u.name AS base_unit_name,

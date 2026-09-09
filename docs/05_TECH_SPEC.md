@@ -895,7 +895,8 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/shifts/:id/till` | `TX-420` | `POS-504` |
 | `GET` | `/shifts/:id/expected` | `TX-418` | `POS-509` |
 | `POST` | `/shifts/:id/close` | `TX-418` | `POS-510`, triggers `OPS-001` |
-| `POST` | `/sales/price-check` | `TX-401` | resolves `PR-101` for a cart without committing |
+| `POST` | `/sales/price-check` | `TX-401` | resolves `PR-101` for a cart without committing. Since `TASK-023` it also applies `PR-106`'s tier and `PR-202`'s category ceiling, and reports `PR-206`'s choice per line |
+| `GET` | `/sales/pricing-policy` | `TX-401` | The acting user's ceiling, who may approve above it, and — since `TASK-023` — the configured tiers and capped categories, so no screen holds a copy (`OPS-005`) |
 | `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5` |
 | `POST` | `/sales/:id/reprint` | `TX-430` | `POS-208` |
 | `GET` | `/reports/dashboard?date=` | `TX-421` | `FR_6.1` — every tile from the query behind it |
@@ -957,6 +958,13 @@ unauthenticated endpoint reporting row counts and the database path would go wit
 for a `CASHIER`, so `requirePermission` admits them and `reportService` decides which shift they
 may read — refusing with `403` and writing an audit row, never narrowing the answer silently. A
 cashier handed their own till's figures under a store-wide heading has been told something false.
+
+**`PR-202` inverts the usual direction, and the API says so where it refuses.** A category
+maximum overrides a *higher* role ceiling: the effective ceiling is the **lower** of the two, so
+an owner with a 100% role ceiling still cannot give 20% on a category capped at 5%. The refusal
+therefore names which of the two bound — and where it is the category, `requires_role` is
+**null**, because no manager can release a cap the owner set on the category and sending the
+cashier to fetch one would be an errand that ends in the same refusal.
 
 **Counting is `TX-407` and approving is `TX-408`, and the split is the control.** §10 grants
 `TX-407` — "post an inventory adjustment" — to the owner, the manager and the inventory clerk,

@@ -1006,6 +1006,71 @@ test('NFR_4.3: the audit filters are touchable', () => {
   }
 });
 
+// ── SCR-301's discount rules (TASK-023) ─────────────────────────────────────
+
+test('PR-206: the counter says which discount applied and why the other did not', () => {
+  const source = codeOf('js/pos/view.js');
+
+  // The applied figure is the server's choice, not the typed one. A screen that showed
+  // `line.discountCentavos` would show one number while the till charged another the
+  // moment an automatic discount beat it.
+  assert.match(source, /pricedLine\.line_discount_centavos/);
+  assert.match(source, /discount_choice/);
+  assert.match(source, /choice\.suppressed/);
+
+  // And the sentence is the server's too — a screen that wrote its own would be a
+  // second place PR-206 lives, and the two would drift.
+  assert.match(source, /text: choice\.why/);
+  assert.equal(/do not add together/.test(source), false, 'the explanation is fetched, not written here');
+});
+
+test('PR-106: the tier is named on the rail, and the label comes from the registry', () => {
+  const source = codeOf('js/pos/view.js');
+
+  // "Why is there ₱300 off" is a question the customer asks at the counter.
+  assert.match(source, /transaction_tier\?\.applies/);
+  assert.match(source, /priced\.transaction_tier\.band\.label/);
+  assert.match(source, /transaction_discount_choice\?\.suppressed/);
+
+  // OPS-005 / requirement 7: not one band, threshold or percentage is written here.
+  assert.equal(/min_subtotal_centavos\s*[:=]\s*\d/.test(source), false,
+    'the screen holds no copy of a band');
+  assert.equal(/discount_bp\s*[:=]\s*\d/.test(source), false, 'nor of a rate');
+});
+
+test('TC-UI-07: a structured JSON setting is rendered from the server’s own entry_shape', () => {
+  const source = codeOf('js/admin/settings.js');
+
+  // PR-106's bands are objects, and "one per line" has nothing to put on a line. Which
+  // shape a list has is the server's answer — a screen that guessed by inspecting the
+  // value would render "[object Object]" the first time it met a structured list, and
+  // one that knew the key would be the copy of the registry this case forbids.
+  assert.match(source, /setting\.entry_shape === 'OBJECT'/);
+  assert.match(source, /JSON\.parse\(event\.target\.value\)/);
+  assert.equal(source.includes('transaction_discount_tiers'), false,
+    'the screen does not name the setting it is rendering');
+
+  // A half-typed band is not staged as broken: the server would refuse it, and Save
+  // silently skipping the one field somebody was editing is worse than a message.
+  assert.match(source, /setCustomValidity/);
+});
+
+test('requirement 7: the counter reads the discount rules from the policy endpoint', () => {
+  const source = codeOf('js/pos/view.js') + codeOf('js/pos/cart.js') + codeOf('js/payment/view.js');
+
+  // The whole of PR-106 and PR-202 arrives through /sales/price-check and
+  // /sales/pricing-policy. No screen names a category cap or a tier of its own.
+  assert.equal(/max_discount_bp\s*[:=]\s*\d/.test(source), false);
+  assert.equal(/PR-106'\s*:/.test(source), false);
+
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'pos.css'), 'utf8');
+  // Both explanations are quiet: the figures above them are what the eye should land
+  // on, and a rule note in the error colour beside every discounted line would be read
+  // as a problem rather than as an answer.
+  assert.match(cssRule(css, '.rail-tier-why'), /color:\s*var\(--muted\)/);
+  assert.match(cssRule(css, '.cart-line-discount .discount-why'), /color:\s*var\(--muted\)/);
+});
+
 // ── SCR-205 (TASK-022) ──────────────────────────────────────────────────────
 
 test('INV-110: the sheet labels the frozen figure as frozen, and says what that means', () => {

@@ -152,6 +152,19 @@ Rules surfaced here: `POS-102` (both units shown, base stored), `POS-104` (stock
 `PR-101` (resolved price level named), `INV-104` (a line that would go negative is blocked or
 warned per setting), `PR-105` (below-cost opens the authorisation panel).
 
+**And, from `TASK-023`, the discounts the store configured rather than typed.** Where a basket
+earns a tier the rail names the band **in the owner's own words** (`PR-106`) — "why is there ₱300
+off" is a question a customer asks and the cashier must be able to answer. Where an automatic
+discount and a hand-typed one meet, the larger applies and the screen says which and why the
+other did not (`PR-206`), because a cashier who entered ₱100 and sees ₱300 off would otherwise
+conclude the till had added them together. Both sentences are the server's; the screen holds no
+copy of a band, a threshold or a rate (`OPS-005`, and `TC-UI-07`'s obligation applied to the
+counter).
+
+A `PR-202` refusal reads differently from a `PR-203` one and deliberately so: where a **category**
+cap binds, no approver is offered, because no manager can release a cap the owner set on the
+category and offering one would send the cashier on an errand that ends in the same refusal.
+
 *States* — **empty**: "Scan an item to begin" with the search focused. **Unknown barcode**: a bar
 offering "Attach `4800xxxx` to a product" — never a silent no-op (`FR_3.1`). **Out of stock**:
 line refused with the on-hand figure quoted. **Offline**: no indicator at all, because offline is

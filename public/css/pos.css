@@ -198,6 +198,13 @@
 
 /* ── SCR-304 ───────────────────────────────────────────────────────────── */
 
+/* PR-106 and PR-206 on the counter (TASK-023). Both are explanations rather than
+   figures, so both are quiet — the numbers above them are what the eye lands on. */
+.rail-tier { margin: .25rem 0 0; font-size: .8125rem; color: var(--accent); }
+.rail-tier-why { margin: .25rem 0 0; font-size: .75rem; line-height: 1.4; color: var(--muted); }
+.cart-line-discount .discount-why { display: block; margin-top: .15rem; font-size: .75rem;
+  line-height: 1.4; color: var(--muted); }
+
 .receipt { max-width: 44rem; }
 .receipt-sheet { margin: 1rem 0; padding: 1rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; }
 .receipt-paper { margin: 0; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .8125rem; line-height: 1.35; white-space: pre; }
