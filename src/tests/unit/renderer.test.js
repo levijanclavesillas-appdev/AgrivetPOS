@@ -1006,6 +1006,107 @@ test('NFR_4.3: the audit filters are touchable', () => {
   }
 });
 
+// ── SCR-305 (TASK-020) ──────────────────────────────────────────────────────
+
+test('POS-304: the screen shows the rule’s own sentence, and warns only on the exception', () => {
+  const source = codeOf('js/returns/view.js');
+
+  // The sentence explaining the write-off default is the server's — `default_reason`
+  // off GET /sales/:id/returnable — because a screen that wrote its own could soften
+  // it, and softening this one is how a returned bottle of antibiotic gets resold.
+  assert.match(source, /spec\.default_reason/);
+  assert.equal(/is batch-tracked/.test(source), false,
+    'the reason is fetched, not spelled out in the renderer');
+
+  // Two different treatments, and the difference is the point: the default is stated
+  // quietly, and the warning appears only once somebody has overridden it.
+  assert.match(source, /default_disposition === 'WRITE_OFF'/);
+  assert.match(source, /line\.disposition === 'RESTOCK'/);
+  assert.match(source, /must authorise putting this back \(POS-304\)/);
+
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'returns.css'), 'utf8');
+  assert.match(cssRule(css, '.return-table .default-why'), /color:\s*var\(--muted\)/);
+  assert.match(cssRule(css, '.return-table .override-note'), /var\(--warn-ink\)/);
+});
+
+test('POS-301 / POS-307: the limit and the window are the server’s answers, not the screen’s', () => {
+  const source = codeOf('js/returns/view.js');
+
+  // Every rule on this screen arrives from the endpoint. A renderer that computed the
+  // remaining quantity or decided whether a sale was late would eventually disagree
+  // with the refusal it then got, and the cashier would hold the difference.
+  assert.match(source, /\/sales\/\$\{[a-zA-Z.]+\}\/returnable/);
+  assert.match(source, /view\.window\.beyond/);
+  assert.match(source, /spec\.remaining_qty_milli/);
+  assert.match(source, /up to \$\{spec\.remaining_display\}/);
+
+  // POS-307 is answered on load rather than as a refusal at the end: authorising a
+  // late return means asking somebody to walk over.
+  assert.match(proseOf('js/returns/view.js'), /before the goods come out of the bag/);
+
+  // POS-302's list is served too, so a reason added on SCR-702 appears with no edit.
+  assert.match(source, /view\.reasons\.map/);
+});
+
+test('POS-301: the lookup asks the server which sales still have something on them', () => {
+  const source = codeOf('js/returns/view.js');
+
+  // `returnable=true` rather than the screen filtering by status. Offering a voided
+  // sale and refusing it two clicks later teaches people to distrust the buttons.
+  assert.match(source, /\/sales\?returnable=true/);
+  assert.equal(/'VOIDED'|'PARTIALLY_RETURNED'/.test(source), false,
+    'the screen keeps no copy of which statuses POS-301 admits');
+});
+
+test('POS-305: the refund preview says how it will be paid, and admits it is an estimate', () => {
+  const source = codeOf('js/returns/view.js');
+
+  // Being handed store credit instead of notes is not a thing to discover afterwards.
+  assert.match(source, /POS-305/);
+  assert.match(source, /POS-306/);
+  assert.match(source, /sold_on_credit/);
+
+  // And the same admission SCR-403's balance preview carries: the figures that count
+  // are the server's, on the slip the return prints.
+  assert.match(source, /this screen’s arithmetic/);
+});
+
+test('AUD-603: the approver authenticates, and the submit stays disabled until they have', () => {
+  const source = codeOf('js/returns/view.js');
+
+  // The same shape SCR-803 uses: /auth/login issues no session header, so the cashier
+  // stays signed in and the trail records two distinct actors.
+  assert.match(source, /ui\.authorisationPanel/);
+  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /disabled: posting \|\| \(Boolean\(refusal\) && !approver\)/);
+  assert.match(source, /\['POS-304', 'POS-307'\]\.includes\(err\.ruleId\)/);
+});
+
+test('NFR_4.3: the return screen’s controls are touchable', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'returns.css'), 'utf8');
+  for (const selector of ['.returns .field-row input', '.returns .field-row button',
+    '.returns .editor-field select']) {
+    const rule = cssRule(css, selector);
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)/);
+  }
+
+  // §4: a wide table scrolls inside its own container, never the page. Seven columns
+  // on a 1366-wide store PC is exactly the case the rule is written for.
+  assert.match(cssRule(css, '.return-table'), /min-width/);
+});
+
+test('TX-406: the rail shows Returns to the roles that hold it, and to nobody else', () => {
+  const source = codeOf('js/shell/app.js');
+  assert.match(source, /id: 'returns', label: 'Returns', tx: 'TX-406', screen: 'SCR-305'/);
+  assert.match(source, /'TX-406': \['OWNER', 'MANAGER', 'CASHIER'\]/);
+
+  // §2: an item the role cannot reach is hidden, and the route is refused server-side
+  // regardless — the hiding is a courtesy, the refusal is the control.
+  const permissions = require(path.join(root, 'src', 'services', 'permissions.js'));
+  assert.deepEqual(permissions.rolesHolding('TX-406').sort(), ['CASHIER', 'MANAGER', 'OWNER']);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

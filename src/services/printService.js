@@ -2,8 +2,9 @@
 
 // FR_3.7 / INT-1, INT-2 — the templates, the transport and the reprint.
 //
-// Three documents: the sale receipt, the collection acknowledgement (CR-206) and the
-// shift closing summary. Every one of them is an **internal transaction record**
+// Four documents: the sale receipt, the collection acknowledgement (CR-206), the
+// return acknowledgement (TASK-020) and the shift closing summary. Every one of them
+// is an **internal transaction record**
 // (TAX-006), and this file is where that boundary is either honoured or quietly broken
 // by a helpful template — 01_PRODUCT_BRIEF.md §5 puts BIR receipting permanently out of
 // scope, so nothing rendered here may look like an Official Receipt.
@@ -194,6 +195,81 @@ function renderAcknowledgement({
 }
 
 /** The shift closing summary the store files with the drawer count. */
+/**
+ * The refund slip, in `renderAcknowledgement`'s shape because it answers the same
+ * question from the other side.
+ *
+ * What it must carry is what the customer will be asked about later: which sale the
+ * goods came off, what came back, and — the part a collection acknowledgement never
+ * needs — **where the money went**. POS-305 splits a refund across up to three
+ * destinations, so a slip that printed one "Refund" line would be a slip that lied
+ * about two of them whenever the split happened.
+ *
+ * POS-303's disposition is printed per line. A customer holding a slip that says a
+ * bottle was written off is a customer who cannot later be told it was restocked, and
+ * the reason POS-304 exists is worth putting on paper.
+ */
+function renderReturnAcknowledgement({
+  profile, document, lines = [], receivedBy, columns = width(), reprint = false,
+}) {
+  escpos.assertWidth(columns);
+  const refund = document.refund || {};
+
+  const out = [
+    ...header(profile, 'RETURN ACKNOWLEDGEMENT', columns),
+    escpos.centre(document.return_no, columns),
+    escpos.centre(clock.toManila(document.occurred_at), columns),
+    escpos.divider(columns),
+    ...escpos.wrap(`Against sale ${document.sale_no}`, columns),
+    ...(document.customer
+      ? escpos.wrap(
+        `Customer: ${document.customer.name}${document.customer.code ? ` (${document.customer.code})` : ''}`,
+        columns
+      )
+      : ['Walk-in']),
+    ...escpos.wrap(`Reason: ${document.reason}`, columns),
+    escpos.divider(columns),
+  ];
+
+  for (const line of lines) {
+    out.push(escpos.leftRight(
+      escpos.truncate(line.product_name, columns - 12),
+      money.toDisplay(line.line_total_centavos, { symbol: false }),
+      columns
+    ));
+    out.push(`  ${line.qty_display} · ${line.disposition === 'RESTOCK' ? 'back on the shelf' : 'written off'}`);
+  }
+
+  out.push(
+    escpos.divider(columns),
+    escpos.leftRight('TOTAL RETURNED', money.toDisplay(document.total_centavos, { symbol: false }), columns),
+    ''
+  );
+
+  // POS-305's three destinations, and only the ones that carry money. A line of zero
+  // beside two real figures is a line somebody has to work out is not an amount.
+  for (const [label, amount] of [
+    ['Off your balance', refund.credit_centavos],
+    ['Cash refunded', refund.cash_centavos],
+    ['Held as store credit', refund.store_credit_centavos],
+  ]) {
+    if (amount > 0) out.push(escpos.leftRight(label, money.toDisplay(amount, { symbol: false }), columns));
+  }
+
+  out.push(
+    escpos.leftRight('Received by', escpos.truncate(receivedBy, 16), columns),
+    ...footer(columns, { reprint })
+  );
+
+  return {
+    kind: 'RETURN_ACKNOWLEDGEMENT',
+    document_no: document.return_no,
+    reprint,
+    columns,
+    text: out.join('\n'),
+  };
+}
+
 function renderClosingSummary({
   profile, shift, expected, lines: methodLines, variance, beyondTolerance, tolerance,
   reason, closedBy, at, columns = width(), reprint = false,
@@ -380,6 +456,6 @@ function clearQueue() {
 
 module.exports = {
   width, header, footer,
-  renderSaleReceipt, renderAcknowledgement, renderClosingSummary,
+  renderSaleReceipt, renderAcknowledgement, renderReturnAcknowledgement, renderClosingSummary,
   send, sendOverTcp, install, uninstall, enqueue, queued, clearQueue,
 };

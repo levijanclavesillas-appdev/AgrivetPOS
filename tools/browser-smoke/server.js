@@ -60,6 +60,22 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
     body: { productId: product.id, type: 'RECEIPT', qtyMilli: 500000, unitCostCentavos: 4000, reason: 'Received but not recorded' },
   });
 
+  // A batch-tracked line, so SCR-305 has something POS-304 actually defaults to
+  // write-off. Without one the return screen's central rule renders in only its easy
+  // case, which is the half nobody gets wrong.
+  const vet = (await api('/categories', { method: 'POST', token, body: { name: 'Veterinary' } })).json.category;
+  const medicine = (await api('/products', {
+    method: 'POST', token,
+    body: {
+      sku: 'VET-AMOX-100', name: 'Amoxicillin 100ml', categoryId: vet.id, baseUnitId: kg.id,
+      retailPriceCentavos: 32000, isBatchTracked: true,
+    },
+  })).json.product;
+  await api('/inventory/adjustments', {
+    method: 'POST', token,
+    body: { productId: medicine.id, type: 'RECEIPT', qtyMilli: 20000, unitCostCentavos: 21000, reason: 'Received but not recorded' },
+  });
+
   // A credit customer, so SCR-401 to SCR-403 have something to show.
   const farm = (await api('/customers', {
     method: 'POST', token,
@@ -84,5 +100,5 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
   });
 
   // Everything the browser side needs to drive and to check against.
-  console.log(`READY ${JSON.stringify({ port: PORT, token, productId: product.id, customerId: farm.id, supplierId: mill.id })}`);
+  console.log(`READY ${JSON.stringify({ port: PORT, token, productId: product.id, medicineId: medicine.id, customerId: farm.id, supplierId: mill.id })}`);
 })().catch((err) => { console.error('SERVER CRASH', err); process.exit(2); });

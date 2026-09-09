@@ -29,6 +29,7 @@ import { createShiftSummary } from '../shift/summary.js';
 import { createPurchaseOrders } from '../purchasing/orders.js';
 import { createPurchaseOrder } from '../purchasing/order.js';
 import { createGoodsReceipt } from '../purchasing/receive.js';
+import { createReturn } from '../returns/view.js';
 import { createSuppliers } from '../purchasing/suppliers.js';
 
 /** §2's role → landing screen. */
@@ -40,6 +41,10 @@ const LANDING = { CASHIER: 'pos', INVENTORY: 'products', MANAGER: 'reports', OWN
 /** The rail, with the TX-* each item needs. Hidden without it; refused regardless. */
 const RAIL = [
   { id: 'pos', label: 'POS', tx: 'TX-401', screen: 'SCR-301' },
+  // TX-406 — "process a return". Its own rail item rather than a corner of the POS,
+  // because a return is a different conversation from a sale and starts with a
+  // receipt in somebody's hand, not a barcode.
+  { id: 'returns', label: 'Returns', tx: 'TX-406', screen: 'SCR-305' },
   { id: 'customers', label: 'Customers', tx: 'TX-413', screen: 'SCR-401' },
   { id: 'products', label: 'Products', tx: 'TX-422', screen: 'SCR-201' },
   { id: 'shift', label: 'Shift', tx: 'TX-418', screen: 'SCR-501' },
@@ -59,6 +64,7 @@ const RAIL = [
  */
 const GRANTS = {
   'TX-401': ['OWNER', 'MANAGER', 'CASHIER'],
+  'TX-406': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-409': ['OWNER', 'MANAGER', 'INVENTORY'],
   'TX-413': ['OWNER', 'MANAGER', 'CASHIER', 'INVENTORY'],
   'TX-418': ['OWNER', 'MANAGER', 'CASHIER'],
@@ -213,6 +219,7 @@ export function createApp({ root }) {
     if (id === 'shift') return showShift();
     if (id === 'customers') return showCustomers();
     if (id === 'buying') return showPurchaseOrders();
+    if (id === 'returns') return showReturn();
 
     // The admin and catalog screens are their own tasks. Saying so beats a dead
     // button, and 04_UX_SPEC.md §5's empty state is exactly this shape.
@@ -369,6 +376,25 @@ export function createApp({ root }) {
       // PO-206: a posted delivery is immutable, so there is nothing to go back to.
       // Landing on the order shows the new status and what is still outstanding.
       onPosted: (gr) => (gr.po_id ? showPurchaseOrder(gr.po_id) : showPurchaseOrders()),
+    });
+    current.mount();
+    return current;
+  }
+
+  /**
+   * SCR-305. Opened from the rail with no sale, or from a receipt with one.
+   *
+   * `onDone` lands on the POS rather than back on the lookup: the customer has their
+   * goods and their slip, and the next thing that happens at that counter is a sale.
+   */
+  function showReturn(forSaleId = null) {
+    if (current?.unmount) current.unmount();
+    renderRail('returns');
+    current = createReturn({
+      root: host(),
+      saleId: forSaleId,
+      onBack: () => show(LANDING[session.role] || 'pos'),
+      onDone: () => show(LANDING[session.role] || 'pos'),
     });
     current.mount();
     return current;

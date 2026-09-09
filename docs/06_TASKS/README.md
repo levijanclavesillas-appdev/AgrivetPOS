@@ -3,7 +3,8 @@
 Work items, closed and open. Each task is self-contained: an implementer should need this file,
 plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**v1.0 is code-complete; v1.1 is under way.** `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
+**v1.0 is code-complete; v1.1 is under way** — `TASK-019` and `TASK-020` are closed.
+`TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
 screens the original backlog never assigned to anybody — see [the screen gap](#the-screen-gap--found-and-closed),
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
 shippable: nothing has run in the store. [Status](#status) has the detail.
@@ -90,28 +91,45 @@ again quietly.
 | ID | Task | Commit | What it left behind |
 | :--- | :--- | :--- | :--- |
 | [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | `372b2ba` | `010_purchasing.sql`; `supplierService`, `purchaseOrderService`, `goodsReceiptService` and their repositories; `SCR-801`–`SCR-804`; `TC-INT-76`–`TC-INT-80`, `TC-E2E-16`. The v1.1 gate in `07_TEST_PLAN.md` §10 |
+| [TASK-020](TASK-020-sales-returns.md) | Sales returns with the restock/write-off decision | *this commit* | `011_returns.sql`; `returnService` and its repository; `SCR-305`; `TC-INT-81`–`TC-INT-84`, `TC-E2E-17`. `RPT-101`'s fourth term stopped being zero |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
 
-**What it also fixed, found by the browser smoke.** Switching screens while the previous one had
+**What `TASK-019` also fixed, found by the browser smoke.** Switching screens while the previous one had
 a fetch in flight left the *new* screen blank: the old view's reply landed after the switch and
 cleared the shared `main` element from under it. Each screen now gets its own host element
 (`shell/app.js`), so a late render writes into a node that is no longer in the document. It
 predates this task — the products and customers lists could both do it — and nothing before this
 walk switched screens fast enough to see it.
 
+**What `TASK-020` found, and it is the kind of thing only a walk finds.** `POS-306` says a
+return against a credit sale "never pays out cash while a balance remains", and the first
+implementation read that as *no cash while the customer owes anything*. `TC-E2E-17` walked a
+farm that owed ₱900 on one sale and returned ₱2,920 of goods off a **cash** sale, and the
+refund was held as store credit — which is confiscating a refund to settle an unrelated debt.
+The rule is scoped to a return against a credit sale, `POS-305` says a refund follows the means
+it was tendered by, and both readings are now asserted so the wider one cannot come back.
+
+**And what the smoke itself needed.** The catalogue walk opened "the first row of the product
+list" and asserted its pack conversion. `TASK-020` seeded a second product so `SCR-305` would
+have a batch-tracked line to default to write-off, the first row became the other product, and
+two assertions started checking a product they were never about. The walk now finds its fixture
+by name — a harness that reads its fixture by position is a harness that fails for a reason
+nobody can see.
+
 ## Open — v1.1 "Supply"
 
 Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
-`TASK-024` because the second slots into the precedence the first defines, `TASK-020` before
-`TASK-028` because a return is the other thing that creates store credit, and `TASK-025` before
-`TASK-026` because the opening load reuses its validation pass rather than growing a second one.
+`TASK-024` because the second slots into the precedence the first defines, and `TASK-025`
+before `TASK-026` because the opening load reuses its validation pass rather than growing a
+second one. `TASK-020` came before `TASK-028` for the same kind of reason and has now landed —
+a return is the other thing that creates store credit, and `CR-108`'s negative balance is
+already written and tested by it.
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
 | [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `FT-308` | — |
-| [TASK-020](TASK-020-sales-returns.md) | Sales returns with restock/write-off decision | `FT-307` | — |
 | [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `FT-209` | — |
 | [TASK-023](TASK-023-discount-rules-engine.md) | Discount rules engine and category ceilings | `FT-306` | — |
 | [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `FT-211`, `FT-212` | `TASK-023` |

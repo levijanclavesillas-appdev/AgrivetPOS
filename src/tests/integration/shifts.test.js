@@ -378,7 +378,8 @@ test('with no driver installed the pulse is recorded and reported undelivered', 
   assert.equal(record.delivered, false);
   assert.match(record.error, /TASK-014/);
   assert.equal(record.reason_label, 'Till cash in or out');
-  assert.deepEqual(Object.keys(drawerService.REASONS), ['CASH_TENDER', 'CASH_COLLECTION', 'TILL_MOVEMENT']);
+  assert.deepEqual(Object.keys(drawerService.REASONS),
+    ['CASH_TENDER', 'CASH_COLLECTION', 'CASH_REFUND', 'TILL_MOVEMENT']);
 });
 
 // ── TC-INT-51 / POS-509 — the expected-cash arithmetic ──────────────────────
@@ -449,25 +450,6 @@ test('TC-INT-51: computeExpected is a pure read', () => {
 
   assert.equal(db.get().prepare('SELECT COUNT(*) AS n FROM till_movements').get().n, before);
   assert.equal(auditService.browse({ entityId: shift.id, action: 'TILL_CASH_MOVED' }).total, 0);
-});
-
-test('TC-INT-51: a term whose table does not exist yet reports zero, not an error', () => {
-  // sale_returns arrives with TASK-020 (v1.1). At this schema version there are no
-  // returns because there is no table for one — a true answer, not an assumption, and
-  // one that starts counting the moment the table exists with no edit to the caller.
-  const schemaRepository = require('../../repositories/schemaRepository');
-  assert.equal(schemaRepository.listTables().includes('sale_returns'), false, 'returns are v1.1');
-
-  const { shift } = openShiftFor();
-  const expected = shiftService.computeExpected(shift.id);
-
-  assert.equal(expected.cash_refunds_centavos, 0);
-  // sales and sale_tenders exist now (006), so these are counted rather than skipped —
-  // and a shift with no sales still reads zero, which is the same answer for a
-  // different and better reason.
-  assert.equal(schemaRepository.listTables().includes('sale_tenders'), true);
-  assert.equal(expected.cash_sales_centavos, 0, 'this shift has sold nothing');
-  assert.equal(expected.change_given_centavos, 0);
 });
 
 // ── POS-508 — the long-open shift ───────────────────────────────────────────
@@ -591,4 +573,57 @@ test('closing is reachable, and is covered by shift-close.test.js', async () => 
   const body = await res.json();
   assert.equal(body.variance_centavos, 0, 'a counted drawer that matches');
   assert.equal(body.shift.status, 'CLOSED');
+});
+
+// ── Last, deliberately ──────────────────────────────────────────────────────
+//
+// The case below opens a **different database** — one migrated only as far as 010 —
+// to exercise POS-509's guard against a table that does not exist yet. Every test
+// above it, and the running server, hold the file's own database, so it goes at the
+// end rather than in the POS-509 section where it belongs by subject.
+
+test('TC-INT-51: a term whose table does not exist yet reports zero, not an error', () => {
+  // `sale_returns` arrived with TASK-020, so at the current schema version the table
+  // exists and the term counts. What the guard protects is the schema version *before*
+  // it: a v1.0 database opened by a v1.1 binary between the two migrations, which is
+  // every store's database for the moment an upgrade takes.
+  //
+  // The test therefore migrates to 010 rather than asserting the table is absent at
+  // head, which is an assertion that could only ever have been true once.
+  const fs = require('fs');
+  const path = require('path');
+  const paths = require('../../config/paths');
+  const migrate = require('../../config/migrate');
+  const schemaRepository = require('../../repositories/schemaRepository');
+
+  const dir = temp.openEmpty('shift-pre-returns');
+  const migDir = path.join(dir, 'migrations');
+  fs.mkdirSync(migDir);
+  for (const file of fs.readdirSync(paths.migrationsDir()).sort()) {
+    if (Number.parseInt(file.slice(0, 3), 10) > 10) continue;
+    fs.copyFileSync(path.join(paths.migrationsDir(), file), path.join(migDir, file));
+  }
+  migrate.migrate({ dir: migDir });
+
+  assert.equal(schemaRepository.listTables().includes('sale_returns'), false, 'v1.0 has no returns');
+
+  temp.seedStore({ withOwner: false });
+  temp.seedUser({ username: 'preupgrade', role: 'CASHIER', password: PASSWORD });
+  const actor = authService.verifyToken(
+    authService.login({ username: 'preupgrade', password: PASSWORD }).token
+  );
+  const shift = shiftService.open({ actor, openingFloatCentavos: 100000, confirmed: true }).shift;
+
+  // POS-509's sixth term, on a database that has nowhere to hold one. Zero because it
+  // is true, not because the arithmetic was skipped — and it starts counting the
+  // moment 011 lands, with no edit to the caller.
+  const expected = shiftService.computeExpected(shift.id);
+  assert.equal(expected.cash_refunds_centavos, 0);
+
+  // sales and sale_tenders exist at 006, so these are counted rather than skipped —
+  // and a shift with no sales still reads zero, which is the same answer for a
+  // different and better reason.
+  assert.equal(schemaRepository.listTables().includes('sale_tenders'), true);
+  assert.equal(expected.cash_sales_centavos, 0, 'this shift has sold nothing');
+  assert.equal(expected.change_given_centavos, 0);
 });

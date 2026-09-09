@@ -68,7 +68,7 @@ test('GET /api/v1/health/panel reports OPS-006’s six figures, behind TX-428', 
     'inventory', 'inventory_movements',
     'product_barcodes', 'product_packs', 'product_prices', 'products',
     'purchase_order_items', 'purchase_orders',
-    'sale_discounts', 'sale_items', 'sale_tenders', 'sales',
+    'sale_discounts', 'sale_items', 'sale_return_items', 'sale_returns', 'sale_tenders', 'sales',
     'schema_migrations', 'store_profile', 'suppliers', 'system_events', 'system_settings',
     'till_movements', 'units', 'users',
   ]);

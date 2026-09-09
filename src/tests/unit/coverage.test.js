@@ -50,12 +50,29 @@ const COVERED = Object.freeze(['MON', 'UOM', 'INV', 'POS', 'PO', 'CR']);
  * than merely reported.
  *
  * This list is what makes §2's obligation follow the implementation instead of leading
- * it. `PO` is here because TASK-019 built the whole of §9; the v1.1 rules in `POS`,
- * `INV` and `CR` are TASK-020 to TASK-028's, and requiring a citation for them today
- * would force exactly the fake that the "never faked" case below exists to prevent.
- * A task that lands adds its prefix here.
+ * it. `PO` is here because TASK-019 built the whole of §9 in one go; requiring a
+ * citation for a rule nobody has built would force exactly the fake that the "never
+ * faked" case below exists to prevent.
  */
 const BUILT_AT_1_1 = Object.freeze(['PO']);
+
+/**
+ * And the individual v1.1 rules built by a task that did **not** land a whole section.
+ *
+ * TASK-020 built `POS-301`–`POS-307` and `CR-108`; `POS-401`–`POS-404` are TASK-021's
+ * void and are not written yet. A prefix is too coarse to say that, so the obligation
+ * is expressed per rule — the alternative was either demanding a citation for the void
+ * (a fake) or letting seven built rules go uncovered (a gap), and both are worse than
+ * a list somebody has to add two lines to.
+ *
+ * A task that lands part of a section adds its rules here; one that lands a whole
+ * section adds its prefix above.
+ */
+const BUILT_RULES_AT_1_1 = Object.freeze([
+  // TASK-020 — sales returns
+  'POS-301', 'POS-302', 'POS-303', 'POS-304', 'POS-305', 'POS-306', 'POS-307',
+  'CR-108',
+]);
 
 /**
  * The rules the document declares, with the release each is scheduled for.
@@ -141,8 +158,16 @@ test('TC-UT-98: a v1.1 rule in a built section is cited too (NFR_5.2)', () => {
   // §6 and §7 have carried since v1.0 — a rule with no test is treated as
   // unimplemented, whatever the code says.
   const rules = declaredRules().filter(
-    (r) => BUILT_AT_1_1.includes(r.prefix) && r.version === '1.1'
+    (r) => r.version === '1.1'
+      && (BUILT_AT_1_1.includes(r.prefix) || BUILT_RULES_AT_1_1.includes(r.id))
   );
+
+  // The per-rule list is only honest if every id on it is a rule the document still
+  // declares at 1.1. A typo there would quietly excuse itself from the check.
+  const declaredIds = new Set(declaredRules().filter((r) => r.version === '1.1').map((r) => r.id));
+  for (const id of BUILT_RULES_AT_1_1) {
+    assert.ok(declaredIds.has(id), `${id} is listed as built but is not a v1.1 rule in the document`);
+  }
   const cited = citedRules();
   const missing = rules.filter((rule) => !cited.has(rule.id));
 

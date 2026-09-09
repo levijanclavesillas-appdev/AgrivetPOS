@@ -768,7 +768,7 @@ test('the sale snapshots the tax mode in force (RPT-106)', () => {
 
 // ── POS-107 — immutability ──────────────────────────────────────────────────
 
-test('POS-107: no repository method updates or deletes a sale', () => {
+test('POS-107: the only writes to a sale are the two narrow setters a return needs', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'repositories', 'saleRepository.js'), 'utf8');
@@ -777,13 +777,42 @@ test('POS-107: no repository method updates or deletes a sale', () => {
     .map((m) => m[1] ?? m[2] ?? m[3] ?? ''));
   const templates = source.match(/`[\s\S]*?`/g) || [];
 
+  /**
+   * The two statements TASK-020 added, verbatim.
+   *
+   * POS-107 says a completed sale is immutable, and 006_sales.sql put
+   * `sales.status` and `sale_items.returned_qty_milli` there for a return to move.
+   * Those two columns are the exception, and the way it stays an exception is that
+   * this guard lists the exact statements rather than being relaxed to "no general
+   * update": the next column somebody wants to write has to be added here first,
+   * in front of whoever reviews it.
+   */
+  const PERMITTED = [
+    'UP' + 'DATE sales SET status = ? WHERE id = ?',
+    'UP' + 'DATE sale_items SET returned_qty_milli = ? WHERE id = ?',
+  ];
+
   for (const verb of ['UP' + 'DATE', 'DEL' + 'ETE', 'DR' + 'OP', 'TRUN' + 'CATE']) {
     for (const table of ['sales', 'sale_items', 'sale_tenders']) {
       const pattern = new RegExp(`${verb}[\\s\\S]{0,40}\\b${table}\\b`, 'i');
-      const offender = [...literals, ...templates].find((text) => pattern.test(text));
+      const offender = [...literals, ...templates]
+        .filter((text) => !PERMITTED.includes(text.trim()))
+        .find((text) => pattern.test(text));
       assert.equal(offender, undefined, `${verb} path on ${table}`);
     }
   }
+
+  // And both of the permitted two are actually there — a guard whose allow-list has
+  // gone stale passes by describing code that no longer exists.
+  for (const statement of PERMITTED) {
+    assert.ok(source.includes(statement), `${statement} is the statement POS-301 needs`);
+  }
+
+  // The status setter refuses anything outside POS-107's machine, so the CHECK
+  // constraint is not the only thing between the ledger and a typo.
+  assert.throws(() => saleRepository.setStatus('any-sale', 'COMPLETED'), RangeError);
+  assert.deepEqual([...saleRepository.SETTABLE_STATUSES].sort(),
+    ['PARTIALLY_RETURNED', 'RETURNED', 'VOIDED']);
 });
 
 // ── Over HTTP ───────────────────────────────────────────────────────────────

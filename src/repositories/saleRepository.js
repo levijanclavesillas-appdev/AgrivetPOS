@@ -8,9 +8,17 @@
 // editing these. TC-INT-34's sibling reads this source to prove the absence, as
 // TC-INT-24 does for the inventory ledger.
 //
-// The one exception, deliberately not written here: voiding sets sales.status and the
-// voided_* columns. That is TASK-021's, and it will add a narrowly named method that
-// touches those columns and nothing else — not a general update.
+// Two narrowly named exceptions live at the bottom of this file, added by TASK-020:
+// `setStatus` and `setReturnedQty`. Between them they touch three columns —
+// `sales.status`, `sale_items.returned_qty_milli` — and nothing else. They exist
+// because POS-301 needs the sale to say how much of it has come back, and 006_sales.sql
+// put both columns there for exactly that. What they are deliberately *not* is a
+// general `updateFields`: the difference between "the sale records that goods came
+// back" and "the sale can be edited" is the whole of POS-107, and it is kept as the
+// difference between two named methods and one open one.
+//
+// The remaining exception, still not written here: voiding sets the voided_* columns.
+// That is TASK-021's, in the same shape.
 
 const db = require('../config/database');
 
@@ -129,24 +137,106 @@ function listForShift(shiftId) {
     .all(shiftId);
 }
 
-function search({ from = null, to = null, customerId = null, shiftId = null, limit = 50, offset = 0 } = {}) {
+const SEARCH_WHERE = `
+  WHERE (@from IS NULL OR s.occurred_at >= @from)
+    AND (@to IS NULL OR s.occurred_at <= @to)
+    AND (@customerId IS NULL OR s.customer_id = @customerId)
+    AND (@shiftId IS NULL OR s.shift_id = @shiftId)
+    AND (@status IS NULL OR s.status = @status)
+    AND (@returnable = 0 OR s.status IN ('COMPLETED','PARTIALLY_RETURNED'))
+    AND (@q IS NULL
+         OR s.sale_no LIKE @like COLLATE NOCASE
+         OR c.name LIKE @like COLLATE NOCASE)
+`;
+
+/**
+ * The sale lookup SCR-305 reads.
+ *
+ * `returnable` is the filter a counter actually wants — a voided or fully returned
+ * sale has nothing left to give back — expressed as a flag rather than making the
+ * screen keep its own copy of which two statuses those are.
+ */
+function search({
+  from = null, to = null, customerId = null, shiftId = null,
+  q = null, status = null, returnable = false, limit = 50, offset = 0,
+} = {}) {
   return db.get().prepare(`
-    SELECT ${SALE_COLUMNS} FROM sales
-     WHERE (@from IS NULL OR occurred_at >= @from)
-       AND (@to IS NULL OR occurred_at <= @to)
-       AND (@customerId IS NULL OR customer_id = @customerId)
-       AND (@shiftId IS NULL OR shift_id = @shiftId)
-     ORDER BY occurred_at DESC, sale_no DESC
+    SELECT ${SALE_COLUMNS.trim().split(/,\s*/).map((c) => `s.${c}`).join(', ')},
+           c.name AS customer_name, u.username AS created_by_username
+      FROM sales s
+      LEFT JOIN customers c ON c.id = s.customer_id
+      LEFT JOIN users u ON u.id = s.created_by
+    ${SEARCH_WHERE}
+     ORDER BY s.occurred_at DESC, s.sale_no DESC
      LIMIT @limit OFFSET @offset
-  `).all({ from, to, customerId, shiftId, limit, offset });
+  `).all({
+    from, to, customerId, shiftId, status, q, like: q ? `%${q}%` : null,
+    returnable: returnable ? 1 : 0, limit, offset,
+  });
+}
+
+function countSearch({
+  from = null, to = null, customerId = null, shiftId = null,
+  q = null, status = null, returnable = false,
+} = {}) {
+  return db.get().prepare(`
+    SELECT COUNT(*) AS n
+      FROM sales s
+      LEFT JOIN customers c ON c.id = s.customer_id
+    ${SEARCH_WHERE}
+  `).get({
+    from, to, customerId, shiftId, status, q, like: q ? `%${q}%` : null,
+    returnable: returnable ? 1 : 0,
+  }).n;
 }
 
 function countAll() {
   return db.get().prepare('SELECT COUNT(*) AS n FROM sales').get().n;
 }
 
+// ── POS-301's two columns, and only those two ───────────────────────────────
+
+/**
+ * Move a sale between the statuses POS-107's machine allows after COMPLETED.
+ *
+ * The status list is repeated here rather than imported, because this is the layer
+ * that writes it and a repository that would accept any string is a repository that
+ * makes the CHECK constraint the only thing standing between the ledger and a typo.
+ */
+const SETTABLE_STATUSES = Object.freeze(['PARTIALLY_RETURNED', 'RETURNED', 'VOIDED']);
+
+function setStatus(saleId, status) {
+  if (!SETTABLE_STATUSES.includes(status)) {
+    throw new RangeError(`a sale is not moved to ${status} from here (POS-107)`);
+  }
+  db.get().prepare('UPDATE sales SET status = ? WHERE id = ?').run(status, saleId);
+  return findById(saleId);
+}
+
+/**
+ * POS-301's running total of what has come back on one line.
+ *
+ * Set to an absolute figure rather than incremented: the caller has just computed what
+ * the line's cumulative returned quantity is, and an increment is a second way of
+ * arriving at the same number that can disagree with the first.
+ */
+function setReturnedQty(saleItemId, qtyMilli) {
+  if (!Number.isInteger(qtyMilli) || qtyMilli < 0) {
+    throw new RangeError('a returned quantity is whole thousandths, zero or more (MON-002)');
+  }
+  db.get().prepare('UPDATE sale_items SET returned_qty_milli = ? WHERE id = ?')
+    .run(qtyMilli, saleItemId);
+}
+
+function findItem(saleItemId) {
+  return db.get().prepare(`SELECT ${columnList(ITEM_COLUMNS)} FROM sale_items WHERE id = ?`)
+    .get(saleItemId) || null;
+}
+
 module.exports = {
+  SETTABLE_STATUSES,
   insertSale, insertItem, insertTender, insertDiscount,
-  findById, findByNo, itemsFor, tendersFor, discountsFor,
-  referenceUsedToday, listForShift, search, countAll,
+  findById, findByNo, itemsFor, findItem, tendersFor, discountsFor,
+  referenceUsedToday, listForShift, search, countSearch, countAll,
+  setStatus, setReturnedQty,
 };

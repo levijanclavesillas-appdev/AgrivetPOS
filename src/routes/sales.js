@@ -3,6 +3,7 @@
 // 05_TECH_SPEC.md §4:
 //
 //   POST /sales             TX-401   **the transaction** — FR_3.5
+//   GET  /sales             TX-401   the lookup SCR-305 opens with
 //   GET  /sales/:id         TX-401   the receipt view
 //
 // POST /sales/price-check lives in routes/pricing.js with the engine it calls.
@@ -75,6 +76,39 @@ router.get('/sales/tender-references', atTheCounter, (req, res, next) => {
     return res.json({ duplicates: saleService.duplicateReferences(method, reference) });
   } catch (err) {
     return next(err);
+  }
+});
+
+/**
+ * Find a sale. SCR-305's opening question, and SCR-304's "which receipt was that".
+ *
+ * `returnable=true` is the filter a counter actually wants — a voided or fully
+ * returned sale has nothing left to give back — expressed as a flag so the screen does
+ * not keep its own copy of which two statuses those are (POS-301). Everything it can
+ * filter on is a column of the sale; nothing here decides a rule.
+ */
+router.get('/sales', atTheCounter, (req, res, next) => {
+  try {
+    const filters = {
+      from: req.query.from || null,
+      to: req.query.to || null,
+      customerId: req.query.customerId || null,
+      shiftId: req.query.shiftId || null,
+      status: req.query.status || null,
+      q: req.query.q || null,
+      returnable: req.query.returnable === 'true',
+    };
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 25, 1), 200);
+    const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
+
+    res.json({
+      total: saleService.countSearch(filters),
+      limit,
+      offset,
+      sales: saleService.search({ ...filters, limit, offset }),
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

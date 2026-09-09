@@ -75,13 +75,48 @@ stands — otherwise the store hands over money to somebody who still owes it.
 
 ## Acceptance Criteria
 
-- [ ] A line can be returned partially, repeatedly, and never beyond what was sold
-- [ ] A medicine defaults to write-off, and restocking it requires a manager and is audited
-- [ ] A restock increases stock; a write-off nets to zero and both movements are on the ledger
-- [ ] A credit customer's return reduces their balance and pays no cash while they owe
-- [ ] A return beyond the window is refused without authorisation
-- [ ] The daily report's `returns` term is no longer always zero, and the reconciliation holds
-- [ ] The refund acknowledgement carries the `TAX-006` line
+- [x] A line can be returned partially, repeatedly, and never beyond what was sold
+- [x] A medicine defaults to write-off, and restocking it requires a manager and is audited
+- [x] A restock increases stock; a write-off nets to zero and both movements are on the ledger
+- [x] A credit customer's return reduces their balance and pays no cash while they owe
+- [x] A return beyond the window is refused without authorisation
+- [x] The daily report's `returns` term is no longer always zero, and the reconciliation holds
+- [x] The refund acknowledgement carries the `TAX-006` line
+
+## What it decided
+
+**`POS-306`'s cash prohibition is scoped to a return against a credit sale, as the rule is
+written.** The first implementation read it wider — no cash out while the customer owes
+*anything* — and `TC-E2E-17` caught it: a cash sale returned by a farm that owes ₱900 on a
+different sale was being held as store credit. That is confiscating a refund to settle an
+unrelated debt, which is not a thing a shop may do, and `POS-305` says plainly that a refund
+follows the means it was tendered by. The narrower reading is now asserted from both sides —
+the credit sale that withholds, and the cash sale that does not.
+
+**A credit sale's refund goes back to the account whether or not a balance still stands.**
+`POS-306` says a return against a credit sale "reduces the customer's outstanding balance and
+writes a credit transaction", unconditionally. The customer never handed the store money for
+those goods, so there is none to hand back; a farm already in credit gets more credit
+(`CR-108`). How much may go there is capped by what the sale put there — the `CREDIT` tenders
+on it, less what earlier returns of the same sale already sent back — or a half-cash sale
+returned in full would refund the whole of it to the account and call that "the same means".
+
+**`POS-304`'s "veterinary medicines and vaccines" is a setting, not a column.** `is_batch_tracked`
+is the clause the rule names outright and is read directly. There is no medicine flag on
+`products` and inventing one would invent a taxonomy the store already has, so the rest of the
+rule is expressed as `return_write_off_categories` — matched against `categories.name`, which is
+UNIQUE NOCASE (`VR-209`). A store that files vaccines under "Biologics" edits one list on
+`SCR-702`.
+
+**No till movement is written for a cash refund.** `POS-509` has subtracted
+`sale_returns.refund_cash_centavos` as its own term since `TASK-013`, and a till row as well
+would take the refund off the expected drawer twice. The drawer still pulses — that is hardware,
+and outside the transaction (`INT-1`).
+
+**What it did not do.** `RPT-104`'s gross profit still counts a returned line's revenue and
+cost. Netting returns out of margin is a change to what `RPT-104` means and belongs to whoever
+owns that rule, not to a task scoped to `FT-307`; `RPT-101`'s reconciliation — the one this task
+was asked to make carry a figure — is correct on both of its halves.
 
 ## Tests
 

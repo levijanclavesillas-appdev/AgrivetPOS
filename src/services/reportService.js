@@ -44,6 +44,7 @@ const inventoryService = require('./inventoryService');
 const creditService = require('./creditService');
 const alertService = require('./alertService');
 const reportRepository = require('../repositories/reportRepository');
+const returnRepository = require('../repositories/returnRepository');
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -177,12 +178,22 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
   const profit = reportRepository.profitTotals(q);
 
   const discounts = totals.line_discount_centavos + totals.txn_discount_centavos;
-  // POS-301 is v1.1. The row is on the report at zero rather than absent, because
-  // RPT-101's identity has four terms and a reader who cannot see the fourth cannot
-  // check the arithmetic.
-  const returns = 0;
+  // RPT-101's fourth term, no longer zero (TASK-020). It was rendered at zero from
+  // TASK-016 precisely so the identity had somewhere to put a figure the day returns
+  // existed, and this is that day.
+  //
+  // `returns_centavos` and the refunds are the same money seen from two sides — the
+  // value of the goods that came back, and what was given back for them — and the
+  // schema's CHECK makes them equal per row. That is what lets both halves of the
+  // identity below use it: the sales half subtracts what was returned, and the tender
+  // half subtracts what was refunded.
+  const returned = returnRepository.returnTotals({ from: scope.fromAt, to: scope.toAt, shiftId: shift });
+  const returns = returned.returns_centavos;
   const reconciledNet = totals.gross_centavos - discounts - returns;
-  const tenderNet = tendered - totals.change_centavos;
+  // Net of returns on both sides, or the two halves would be reconciling different
+  // days: `net_centavos` is what the sales were, and a returned sack is no longer one.
+  const netAfterReturns = totals.net_centavos - returns;
+  const tenderNet = tendered - totals.change_centavos - returns;
 
   const grossProfit = profit.revenue_centavos - profit.cost_centavos;
 
@@ -195,10 +206,18 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
       txn_discount_centavos: totals.txn_discount_centavos,
       discount_centavos: discounts,
       returns_centavos: returns,
-      net_centavos: totals.net_centavos,
+      return_count: returned.return_count,
+      // Both figures, because the pair is the check. `net_centavos` is the day net of
+      // returns; `gross_sales_net_centavos` is what was sold before any of it came
+      // back, which is the figure a cashier's own arithmetic will produce.
+      gross_sales_net_centavos: totals.net_centavos,
+      net_centavos: netAfterReturns,
       vat_centavos: totals.vat_centavos,
       tendered_centavos: tendered,
       change_centavos: totals.change_centavos,
+      refund_credit_centavos: returned.refund_credit_centavos,
+      refund_cash_centavos: returned.refund_cash_centavos,
+      refund_store_credit_centavos: returned.refund_store_credit_centavos,
     },
     // RPT-104, shipped in v1.0: the cost is the sale-line snapshot (MON-005), so
     // repricing or re-costing a product today cannot restate last week's margin.
@@ -219,16 +238,17 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
         + ` − ${money.toDisplay(returns)} returns`
         + ` = ${money.toDisplay(reconciledNet)} net`,
       gross_less_discounts_centavos: reconciledNet,
-      net_centavos: totals.net_centavos,
-      balances: reconciledNet === totals.net_centavos,
-      difference_centavos: reconciledNet - totals.net_centavos,
+      net_centavos: netAfterReturns,
+      balances: reconciledNet === netAfterReturns,
+      difference_centavos: reconciledNet - netAfterReturns,
       tender_statement: `${money.toDisplay(tendered)} tendered`
         + ` − ${money.toDisplay(totals.change_centavos)} change`
+        + ` − ${money.toDisplay(returns)} refunded`
         + ` = ${money.toDisplay(tenderNet)}`,
       tenders_less_change_centavos: tenderNet,
-      tenders_balance: tenderNet === totals.net_centavos,
-      tender_difference_centavos: tenderNet - totals.net_centavos,
-      reconciles: reconciledNet === totals.net_centavos && tenderNet === totals.net_centavos,
+      tenders_balance: tenderNet === netAfterReturns,
+      tender_difference_centavos: tenderNet - netAfterReturns,
+      reconciles: reconciledNet === netAfterReturns && tenderNet === netAfterReturns,
     },
     lines: reportRepository.dailyLines({ ...q, limit: lineLimit }).map((row) => ({
       product_id: row.product_id,
@@ -468,6 +488,9 @@ function exportCsv(report, params, actor) {
       ['Line discounts', built.totals.line_discount_centavos],
       ['Transaction discounts', built.totals.txn_discount_centavos],
       ['Returns', built.totals.returns_centavos],
+      ['  refunded off a balance', built.totals.refund_credit_centavos],
+      ['  refunded in cash', built.totals.refund_cash_centavos],
+      ['  held as store credit', built.totals.refund_store_credit_centavos],
       ['Net', built.totals.net_centavos],
       ['VAT', built.totals.vat_centavos],
       ['Tendered', built.totals.tendered_centavos],

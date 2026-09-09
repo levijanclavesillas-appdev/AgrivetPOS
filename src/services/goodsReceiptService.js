@@ -35,6 +35,7 @@ const errors = require('./errors');
 const money = require('./money');
 const quantity = require('./quantity');
 const permissions = require('./permissions');
+const authService = require('./authService');
 const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const sequenceService = require('./sequenceService');
@@ -44,7 +45,6 @@ const purchaseOrderService = require('./purchaseOrderService');
 const goodsReceiptRepository = require('../repositories/goodsReceiptRepository');
 const purchaseOrderRepository = require('../repositories/purchaseOrderRepository');
 const productRepository = require('../repositories/productRepository');
-const userRepository = require('../repositories/userRepository');
 
 /** Who may authorise PO-204 and PO-205. PO-205 names the manager; the owner is above. */
 const AUTHORISING_ROLES = Object.freeze(['MANAGER', 'OWNER']);
@@ -72,26 +72,15 @@ function varianceBasisPoints(actualCentavos, baselineCentavos) {
 // ── Authorisation (PO-204, PO-205, AUD-603) ─────────────────────────────────
 
 /**
- * Resolve the approver against the users table rather than believing the request.
+ * SEC-6's approver resolution — the username looked up, the **stored** role the one
+ * that counts, a deactivated user authorising nothing.
  *
- * SEC-6 says authorisation is server-side without exception. A body carrying
- * `{ role: 'OWNER' }` is a claim, not an authorisation, and on a route that can move
- * stock and rewrite average cost it is not one worth taking on trust — so the username
- * is looked up, the stored role is the one that counts, and a deactivated user
- * authorises nothing.
+ * It lives in authService, where identity lives, and is shared with returns
+ * (TASK-020). `roles: null` skips the role check so the refusal below can name PO-204
+ * or PO-205 rather than AUD-603 in general — which rule was broken is the part the
+ * person reading the screen needs.
  */
-function resolveApprover(approver) {
-  if (!approver || !approver.username) return null;
-
-  const row = userRepository.findByUsername(String(approver.username).trim());
-  if (!row) {
-    throw errors.forbidden('That user does not exist.', { ruleId: 'AUD-603' });
-  }
-  if (!row.is_active) {
-    throw errors.forbidden(`${row.username} is deactivated and cannot authorise this.`, { ruleId: 'AUD-603' });
-  }
-  return { id: row.id, username: row.username, role: row.role };
-}
+const resolveApprover = (approver) => authService.resolveApprover(approver, { roles: null });
 
 /**
  * Whether the exception is authorised, and by whom.

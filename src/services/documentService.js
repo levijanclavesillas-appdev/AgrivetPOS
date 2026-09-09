@@ -40,6 +40,7 @@ const FORBIDDEN = Object.freeze([
 const KINDS = Object.freeze({
   SALE_RECEIPT: 'Transaction record',
   COLLECTION_ACKNOWLEDGEMENT: 'Collection acknowledgement',
+  RETURN_ACKNOWLEDGEMENT: 'Return acknowledgement',
   SHIFT_CLOSING: 'Shift closing summary',
 });
 

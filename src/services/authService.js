@@ -360,8 +360,43 @@ function recover({ username, recoveryCode, newPassword }) {
   return { user: toPublic(userRepository.findById(user.id)), recoveryCode: replacement };
 }
 
+// ── AUD-603's second actor ──────────────────────────────────────────────────
+
+/**
+ * Resolve an approver against the users table rather than believing the request.
+ *
+ * SEC-6 says authorisation is server-side without exception. A body carrying
+ * `{ role: 'OWNER' }` is a claim, not an authorisation, and on a route that can move
+ * stock, rewrite average cost or pay out cash it is not one worth taking on trust — so
+ * the username is looked up, the **stored** role is the one that counts, and a
+ * deactivated user authorises nothing.
+ *
+ * Returns null where no approver was offered, so a caller can decide whether one was
+ * needed; throws where one was offered and is not usable, because "that user does not
+ * exist" and "no approver was given" are different sentences to show somebody.
+ */
+function resolveApprover(approver, { roles = ['MANAGER', 'OWNER'], ruleId = 'AUD-603' } = {}) {
+  if (!approver || !approver.username) return null;
+
+  const row = userRepository.findByUsername(String(approver.username).trim());
+  if (!row) throw errors.forbidden('That user does not exist.', { ruleId });
+  if (!row.is_active) {
+    throw errors.forbidden(`${row.username} is deactivated and cannot authorise this.`, { ruleId });
+  }
+  // `roles: null` skips the role check, for a caller that wants to name its own rule
+  // in the refusal rather than AUD-603 in general (goodsReceiptService does).
+  if (roles && !roles.includes(row.role)) {
+    throw errors.forbidden(
+      `${row.username} is a ${row.role.toLowerCase()} and cannot authorise this.`,
+      { ruleId, requiresRole: roles.join(' or ') }
+    );
+  }
+  return { id: row.id, username: row.username, role: row.role };
+}
+
 module.exports = {
   BCRYPT_COST, PIN_LENGTH, PASSWORD_MIN, CREDENTIAL_REFUSAL, workFactor,
+  resolveApprover,
   validateUsername, validatePassword, validatePin,
   hashSecretValue, verifySecretValue, generateRecoveryCode,
   toPublic, lockoutState, issueToken, verifyToken,

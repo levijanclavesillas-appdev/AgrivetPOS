@@ -18,6 +18,7 @@ const clock = require('../config/clock');
 const REASONS = Object.freeze({
   CASH_TENDER: 'A sale carrying a cash tender',
   CASH_COLLECTION: 'A cash collection on a credit account',
+  CASH_REFUND: 'A cash refund on a return (POS-305)',
   TILL_MOVEMENT: 'Till cash in or out',
 });
 

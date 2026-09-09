@@ -35,6 +35,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │                                                          │
 │  SELL         SCR-301 POS            SCR-302 Park        │
 │               SCR-303 Payment        SCR-304 Receipt     │
+│               SCR-305 Return                             │
 │  CUSTOMERS    SCR-401 List           SCR-402 Profile     │
 │               SCR-403 Collection                         │
 │  STOCK        SCR-201 Products       SCR-202 Product     │
@@ -137,6 +138,41 @@ receipt, and in reports.
 Preview of the internal transaction record, print and reprint. Reprints are stamped `REPRINT`
 and audited (`POS-208`). The document always carries "This is not an official receipt"
 (`TAX-006`); in `VAT` mode it adds the tax summary block (`TAX-007`).
+
+### `SCR-305` — Return · `FT-307` — v1.1
+
+Behind `TX-406`, so an owner, a manager and the cashier reach it and the inventory clerk does
+not. Its own rail item rather than a corner of `SCR-301`: a return is a different conversation
+from a sale and it starts with a receipt in somebody's hand, not a barcode.
+
+Two phases on one screen, because they are one conversation. **Find the sale** — by receipt
+number or customer, listing only what still has something to give back (`POS-301`), so a voided
+sale is never offered and then refused. **Then decide what comes back**, per line: the quantity
+sold, what has already been returned, what is coming back now with "up to *n*" beside the field,
+and **what happens to it**.
+
+That last column is the screen's reason for existing. `POS-304` makes a medicine, a vaccine and
+any batch-tracked product default to **write-off**, and the screen shows the rule's own sentence
+under the control — *"…is batch-tracked, so the store cannot attest to how it was stored while it
+was out"* — quietly, because for those lines that is the normal case. Only when somebody changes
+it to restock does the warning appear, naming `POS-304` and the role. A screen that shouted at
+every medicine line would teach the cashier to stop reading, which is exactly how a returned
+bottle of antibiotic gets back onto the shelf.
+
+`POS-307`'s window is answered **at the top, on load** rather than as a refusal at the bottom:
+authorising a late return means asking somebody to walk over, and that is worth knowing before
+the goods come out of the bag. `POS-304` and `POS-307` each open §4's inline authorisation panel
+on refusal, naming the rule; the submit stays disabled until a manager or owner has
+authenticated in it.
+
+The refund preview states **how** it will be paid before it is confirmed — off the balance, in
+cash, or held as store credit — because being handed store credit instead of notes is not a
+thing to discover after the fact (`POS-305`, `POS-306`). It is labelled as this screen's
+arithmetic: the figures that count are the server's, on the slip the return prints (`TAX-006`).
+
+Posted, it is immutable and the screen offers no edit. What it does offer is a per-line account
+of what happened to each thing — *"back on the shelf"* or *"written off, not resold"* — so the
+cashier can say it out loud while handing the slip over.
 
 ### `SCR-401`/`402` — Customers · `FT-401`, `FT-402`
 

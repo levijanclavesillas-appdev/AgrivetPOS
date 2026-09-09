@@ -54,6 +54,10 @@ const AUD_603_OVERRIDES = {
   'expired-stock sale': 'OVERRIDE_EXPIRED_STOCK_SALE',
   'over-receipt': 'OVERRIDE_OVER_RECEIPT',
   'cost variance': 'OVERRIDE_COST_VARIANCE',
+  // POS-304 and POS-307, added by TASK-020. The first is the override worth having a
+  // row of its own: it is the one that says a medicine went back on the shelf.
+  'restock against default': 'OVERRIDE_RESTOCK_AGAINST_DEFAULT',
+  'late return': 'OVERRIDE_LATE_RETURN',
 };
 
 /**
@@ -98,7 +102,7 @@ test('TC-UT-07: every override AUD-603 names is registered as a two-actor action
   assert.deepEqual(
     [...auditService.OVERRIDE_ACTIONS].sort(),
     Object.values(AUD_603_OVERRIDES).sort(),
-    'the override set is exactly AUD-603\'s six'
+    "the override set is exactly the one AUD-603 enumerates"
   );
 });
 

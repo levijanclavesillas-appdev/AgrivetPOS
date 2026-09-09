@@ -42,6 +42,20 @@ const referenceRepository = require('../repositories/referenceRepository');
 const customerRepository = require('../repositories/customerRepository');
 const inventoryRepository = require('../repositories/inventoryRepository');
 
+/**
+ * POS-107's four statuses, in the words a counter uses for them.
+ *
+ * Served rather than left to each screen, for the reason purchasing learned with
+ * PO-102: a status word rendered in three places drifts in two of them, and "part
+ * returned" is exactly the phrase somebody would shorten differently.
+ */
+const STATUS_LABELS = Object.freeze({
+  COMPLETED: 'Completed',
+  VOIDED: 'Voided',
+  PARTIALLY_RETURNED: 'Part returned',
+  RETURNED: 'Returned in full',
+});
+
 /** POS-201's tender types. STORE_CREDIT and OTHER exist in the schema for v1.1. */
 const TENDERS = Object.freeze({
   CASH: { needsReference: false, mayOverTender: true, movesStock: false, inDrawer: true },
@@ -785,8 +799,39 @@ function forShift(shiftId) {
   return saleRepository.listForShift(shiftId).map((sale) => present(sale).sale);
 }
 
+/**
+ * The sale lookup, in the shape a list wants rather than a receipt's.
+ *
+ * `present()` reads every line and tender of a sale to build a receipt view, and a
+ * page of fifty of those is a hundred round trips for a list that shows a number, a
+ * name and a total. The row the repository already joined is what is served.
+ */
+function search(opts = {}) {
+  return saleRepository.search(opts).map((row) => ({
+    id: row.id,
+    sale_no: row.sale_no,
+    status: row.status,
+    status_label: STATUS_LABELS[row.status] || row.status,
+    customer_id: row.customer_id,
+    customer_name: row.customer_name,
+    shift_id: row.shift_id,
+    total_centavos: row.total_centavos,
+    change_centavos: row.change_centavos,
+    tax_mode: row.tax_mode,
+    occurred_at: row.occurred_at,
+    occurred_at_manila: clock.toManila(row.occurred_at),
+    created_by: row.created_by_username || row.created_by,
+    // POS-301, said in the payload so a list can show "nothing left" rather than
+    // offering a return that will then be refused.
+    is_returnable: ['COMPLETED', 'PARTIALLY_RETURNED'].includes(row.status),
+  }));
+}
+
+const countSearch = (opts = {}) => saleRepository.countSearch(opts);
+
 module.exports = {
-  TENDERS, TENDER_METHODS,
-  complete, get, getByNo, present, forShift, reprint, printReceipt, duplicateReferences,
+  TENDERS, TENDER_METHODS, STATUS_LABELS,
+  complete, get, getByNo, present, forShift, search, countSearch,
+  reprint, printReceipt, duplicateReferences,
   assertClientTotalMatches, settleTenders, resolveLineQuantity,
 };

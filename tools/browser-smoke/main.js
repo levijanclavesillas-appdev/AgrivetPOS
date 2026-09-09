@@ -9,6 +9,7 @@ const TOKEN = process.env.UI_TOKEN;
 const PRODUCT_ID = process.env.UI_PRODUCT;
 const CUSTOMER_ID = process.env.UI_CUSTOMER;
 const SUPPLIER_ID = process.env.UI_SUPPLIER;
+const MEDICINE_ID = process.env.UI_MEDICINE;
 const API = `http://127.0.0.1:${PORT}/api/v1`;
 
 const fails = [];
@@ -467,7 +468,18 @@ app.whenReady().then(async () => {
   await waitFor(`document.querySelectorAll('.catalogue-list tbody tr').length >= 1`);
 
   console.log('\n— SCR-202: the editor —');
-  await run(`document.querySelector('.catalogue-list tbody tr').click()`);
+  // By name, not by row order. This walk opened whichever product happened to sort
+  // first until TASK-020 seeded a second one, and then quietly checked the wrong
+  // product's packs — a harness reading its fixture by position rather than by the
+  // thing it means to assert about.
+  const OPEN_HOG_GROWER = `(() => {
+    const row = [...document.querySelectorAll('.catalogue-list tbody tr')]
+      .find(r => /Hog Grower/.test(r.textContent));
+    if (!row) return false;
+    row.click();
+    return true;
+  })()`;
+  log(await run(OPEN_HOG_GROWER), 'the seeded product opens from the list');
   await waitFor(`!!document.querySelector('.editor')`, { label: 'SCR-202' });
   const tabs = await run(`[...document.querySelectorAll('.admin-tab')].map(t => t.textContent)`);
   log(tabs.length === 5, 'five tabs', tabs.join(', '));
@@ -500,7 +512,15 @@ app.whenReady().then(async () => {
   await run(`document.querySelector('.report-back').click()`);
   const backOk = await waitFor(`!!document.querySelector('.catalogue-list')`, { label: 'the list again' });
   log(backOk, 'the editor returns to the list');
-  if (backOk) await run(`document.querySelector('.catalogue-list .row-action').click()`);
+  // The same product, again by name: the adjustment below counts 440 KG against what
+  // this one actually has on the shelf.
+  if (backOk) {
+    await run(`(() => {
+      const row = [...document.querySelectorAll('.catalogue-list tbody tr')]
+        .find(r => /Hog Grower/.test(r.textContent));
+      if (row) row.querySelector('.row-action').click();
+    })()`);
+  }
   await waitFor(`!!document.querySelector('.adjustment')`, { label: 'SCR-203' });
 
   const reasonCount = await run(`document.querySelectorAll('.adjustment select option').length`);
@@ -725,6 +745,154 @@ app.whenReady().then(async () => {
 
   // Back to the owner for the admin section, which is TX-423 and not the clerk's.
   log(await signInAs('chachi', 'sack-of-feed-2026'), 'the owner signs back in');
+
+  console.log('\n— SCR-305: the return —');
+
+  // A shift, and a sale to take back off it. The shift the POS walk opened was closed
+  // in the SCR-503 section above; a return needs an open one of its own (POS-501), and
+  // the sale it cites may perfectly well belong to a closed one — that is the whole
+  // difference between a return and a void.
+  await api('/shifts/open', { method: 'POST', body: { openingFloatCentavos: 200000, confirmed: true } });
+  const forReturn = await api('/sales', {
+    method: 'POST',
+    body: {
+      lines: [
+        { productId: PRODUCT_ID, qtyMilli: 4000 },      // 4 KG of feed — ₱250.00
+        { productId: MEDICINE_ID, qtyMilli: 2000 },     // 2 × 100 ml — ₱640.00
+      ],
+      tenders: [{ method: 'CASH', amountCentavos: 100000 }],
+    },
+  });
+  log(forReturn.status === 201, 'a sale is made for the counter to take back', String(forReturn.status));
+  const returnSaleNo = forReturn.json && forReturn.json.sale && forReturn.json.sale.sale_no;
+  const stockBeforeReturn = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  const medicineBeforeReturn = (await api(`/inventory/${MEDICINE_ID}`)).json.on_hand.qty_on_hand_milli;
+
+  await run(OPEN_RAIL('Returns'));
+  const lookupOk = await waitFor(`!!document.querySelector('.return-lookup')`, { label: 'SCR-305' });
+  log(lookupOk, 'SCR-305 renders from the rail — TX-406 is the cashier’s too');
+  log(/against the sale the goods came off/i.test(await text('.returns')),
+    'POS-301: the screen says a return is always against its sale');
+
+  // Phase one: find it by receipt number, as somebody holding the slip would.
+  await run(`(() => {
+    const el = document.querySelector('.return-lookup input[type=search]');
+    el.value = ${JSON.stringify(String(returnSaleNo || ''))};
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.return-lookup form').requestSubmit();
+  })()`);
+  const found = await waitFor(`document.querySelectorAll('.return-results tbody tr').length >= 1`,
+    { label: 'the sale in the lookup', timeoutMs: 8000 });
+  log(found, 'the lookup finds the sale by its receipt number');
+
+  await run(`document.querySelector('.return-results .row-action').click()`);
+  const formOk = await waitFor(`!!document.querySelector('.return-form')`, { label: 'the return form', timeoutMs: 8000 });
+  log(formOk, 'and opens it on the return form');
+
+  // POS-304, which is what this screen exists to get right. Two lines, two defaults.
+  const dispositions = await run(`[...document.querySelectorAll('.return-table tbody tr')].map(r => ({
+    name: r.children[0].textContent,
+    chosen: r.querySelector('select').value,
+    why: (r.querySelector('.default-why') || {}).textContent || '',
+  }))`);
+  const feedRow = dispositions.find((r) => /Hog Grower/.test(r.name));
+  const medRow = dispositions.find((r) => /Amoxicillin/.test(r.name));
+
+  log(Boolean(feedRow) && feedRow.chosen === 'RESTOCK',
+    'POS-304: an ordinary feed line defaults to going back on the shelf', feedRow && feedRow.chosen);
+  log(Boolean(medRow) && medRow.chosen === 'WRITE_OFF',
+    'POS-304: the batch-tracked line defaults to write-off', medRow && medRow.chosen);
+  log(Boolean(medRow) && /batch-tracked/.test(medRow.why),
+    'and says why, next to the control that would change it', medRow && medRow.why.slice(0, 70));
+  log(Boolean(feedRow) && feedRow.why === '',
+    'while the ordinary line says nothing — a warning on every row is a warning nobody reads');
+
+  // The exception, and the warning that appears only once somebody makes it.
+  await run(`(() => {
+    const row = [...document.querySelectorAll('.return-table tbody tr')].find(r => /Amoxicillin/.test(r.textContent));
+    const sel = row.querySelector('select');
+    sel.value = 'RESTOCK';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await settle(300);
+  log(await run(`!!document.querySelector('.return-table .override-note')`),
+    'POS-304: restocking it against the default raises the warning where the choice was made');
+
+  await run(`(() => {
+    const row = [...document.querySelectorAll('.return-table tbody tr')].find(r => /Amoxicillin/.test(r.textContent));
+    const sel = row.querySelector('select');
+    sel.value = 'WRITE_OFF';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await settle(300);
+  log(await run(`!document.querySelector('.return-table .override-note')`),
+    'and it goes away again when the default is restored');
+
+  // POS-302's list is served, not spelled into the renderer.
+  const returnReasonCount = await run(`document.querySelectorAll('.returns .editor-field select option').length - 1`);
+  log(returnReasonCount > 0, 'POS-302: the reason list comes from the settings registry',
+    `${returnReasonCount} reasons`);
+
+  // Two KG of feed back on the shelf, one bottle written off.
+  await run(`(() => {
+    const rows = [...document.querySelectorAll('.return-table tbody tr')];
+    const set = (re, value) => {
+      const el = rows.find(r => re.test(r.textContent)).querySelector('input[inputmode=decimal]');
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    set(/Hog Grower/, '2');
+    set(/Amoxicillin/, '1');
+    const reason = document.querySelector('.returns .editor-field select');
+    reason.value = 'Wrong item sold';
+    reason.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await settle(400);
+
+  const preview = await text('.returns .preview');
+  log(/Refunded in cash|off their balance|store credit/i.test(preview),
+    'POS-305: the preview says how it will be paid before it is confirmed',
+    preview.replace(/\s+/g, ' ').slice(0, 90));
+  log(/this screen’s arithmetic/.test(preview),
+    'and admits the figures that count are the ones on the slip');
+
+  await run(`document.querySelector('.return-form form').requestSubmit()`);
+  const postedOk = await waitFor(`!!document.querySelector('.return-done')`,
+    { label: 'the posted return', timeoutMs: 15000 });
+  log(postedOk, 'the return posts');
+
+  if (postedOk) {
+    const done = await text('.return-done');
+    log(/RET-\d{8}-\d{6}/.test(done), 'and lands on its own number',
+      (done.match(/RET-[\d-]+/) || [''])[0]);
+    // POS-303, per line, in words the cashier can say while handing the slip over.
+    log(/back on the shelf/.test(done), 'POS-303: the restocked line says where it went');
+    log(/written off, not resold/.test(done), 'and the written-off one says it is not coming back');
+  }
+
+  // And the ledger, read off the API the screen just drove.
+  const stockAfterReturn = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(stockAfterReturn === stockBeforeReturn + 2000,
+    'POS-303: the restocked feed is back on the shelf',
+    `${stockBeforeReturn} + 2,000 = ${stockAfterReturn} milli`);
+  const medicineAfterReturn = (await api(`/inventory/${MEDICINE_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(medicineAfterReturn === medicineBeforeReturn,
+    'POS-303: the written-off bottle nets to zero, and both movements are on the ledger',
+    `${medicineAfterReturn} milli, unchanged`);
+  const movements = (await api(`/inventory/${MEDICINE_ID}/movements?limit=10`)).json.movements
+    .filter((m) => m.reference && /^RET-/.test(m.reference.no || ''));
+  log(movements.length === 2 && movements.some((m) => m.type === 'CUSTOMER_RETURN')
+    && movements.some((m) => m.type === 'DAMAGE'),
+    'INV-103: two movements, of the two declared types',
+    movements.map((m) => m.type).join(' + '));
+
+  // RPT-101's fourth term, which was rendered at zero from TASK-016 until today.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+  const daily = (await api(`/reports/daily?from=${today}`)).json;
+  log(daily.totals.returns_centavos > 0, 'RPT-101: the returns term is no longer zero',
+    `₱${(daily.totals.returns_centavos / 100).toFixed(2)}`);
+  log(daily.reconciliation.reconciles === true,
+    'and the day still reconciles on both halves', daily.reconciliation.statement);
 
   console.log('\n— SCR-701: users —');
   await run(OPEN_RAIL('Admin'));

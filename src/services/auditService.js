@@ -139,6 +139,10 @@ const ACTIONS = Object.freeze({
   OVERRIDE_EXPIRED_STOCK_SALE: { what: 'Expired-stock sale authorised', rule: 'AUD-603', override: true },
   OVERRIDE_OVER_RECEIPT: { what: 'Over-receipt authorised', rule: 'AUD-603', override: true },
   OVERRIDE_COST_VARIANCE: { what: 'Cost variance authorised', rule: 'AUD-603', override: true },
+  // POS-304 and POS-307. The first is the one worth reading a trail for: it is the
+  // row that says a medicine went back on the shelf, and who said it could.
+  OVERRIDE_RESTOCK_AGAINST_DEFAULT: { what: 'Restock against the write-off default authorised', rule: 'AUD-603', override: true },
+  OVERRIDE_LATE_RETURN: { what: 'Return beyond the window authorised', rule: 'AUD-603', override: true },
 });
 
 const ACTION_NAMES = Object.freeze(Object.keys(ACTIONS));

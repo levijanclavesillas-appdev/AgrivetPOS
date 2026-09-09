@@ -702,6 +702,80 @@ exactly the rollback the transaction exists to survive.
 `_items` here, matching §3.3's entity overview and `sale_items`, because §3.3 had already
 published the names and the data model is this document's to own.
 
+### 3.4.2 v1.1 schema — sales returns (`TASK-020`)
+
+Two tables, in `011_returns.sql`. `POS-107` is not contradicted by them: a return is a **new
+document that cites the sale**, exactly as a void will be. The two columns on the sale that a
+return does move — `sale_items.returned_qty_milli` and `sales.status` — already existed in
+`006_sales.sql` and were put there for this, and `saleRepository` gets two narrowly named
+setters rather than a general update path.
+
+**`POS-303` is the shape of `sale_return_items`.** The disposition is per line, and it is
+recorded next to what the rule *said* it should be. `default_disposition` is not redundant with
+`disposition`: `POS-304` makes a medicine default to write-off, and the pair of columns is what
+distinguishes "restocked, as normal" from "restocked against the default, and here is who
+authorised it". A single column would make that exception unfindable a month later.
+
+**`POS-305`'s precedence is three columns rather than one method**, because a single refund can
+split: a customer who owes ₱300 and returns ₱500 of goods has ₱300 taken off the balance and
+₱200 handed back. A `method` column would have to pick one and lose the other. A `CHECK` makes
+the three sum to the total, so that is a property of the table rather than a promise in a
+service.
+
+```sql
+CREATE TABLE sale_returns (
+  id TEXT PRIMARY KEY,
+  return_no TEXT NOT NULL UNIQUE,                  -- RET-YYYYMMDD-NNNNNN (VR-103)
+  sale_id TEXT NOT NULL REFERENCES sales(id),
+  customer_id TEXT REFERENCES customers(id),       -- NULL = the walk-in who bought it
+  shift_id TEXT NOT NULL REFERENCES cashier_shifts(id),          -- POS-509's sixth term
+  status TEXT NOT NULL DEFAULT 'POSTED' CHECK (status IN ('POSTED')),
+  reason TEXT NOT NULL, notes TEXT,                -- POS-302: listed, plus free text
+  total_centavos INTEGER NOT NULL CHECK (total_centavos > 0),
+  refund_credit_centavos       INTEGER NOT NULL DEFAULT 0,       -- POS-305, in precedence
+  refund_cash_centavos         INTEGER NOT NULL DEFAULT 0,
+  refund_store_credit_centavos INTEGER NOT NULL DEFAULT 0,
+  credit_txn_id TEXT REFERENCES customer_credit_transactions(id),-- POS-306
+  beyond_window INTEGER NOT NULL DEFAULT 0,        -- POS-307, recorded not inferred
+  approved_by TEXT REFERENCES users(id), approval_reason TEXT,
+  occurred_at TEXT NOT NULL,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id),
+  CHECK (refund_credit_centavos + refund_cash_centavos + refund_store_credit_centavos
+         = total_centavos)
+);
+
+CREATE TABLE sale_return_items (
+  id TEXT PRIMARY KEY,
+  return_id TEXT NOT NULL REFERENCES sale_returns(id),
+  line_no INTEGER NOT NULL,
+  sale_item_id TEXT NOT NULL REFERENCES sale_items(id),
+  product_id TEXT NOT NULL REFERENCES products(id),
+  product_name_snapshot TEXT NOT NULL,
+  qty_milli INTEGER NOT NULL CHECK (qty_milli > 0),              -- MON-002, base unit
+  unit_price_centavos INTEGER NOT NULL,            -- MON-005: from the sale line,
+  unit_cost_centavos  INTEGER NOT NULL,            -- never from the product today
+  tax_centavos INTEGER NOT NULL DEFAULT 0,
+  line_total_centavos INTEGER NOT NULL CHECK (line_total_centavos >= 0),
+  disposition         TEXT NOT NULL CHECK (disposition IN ('RESTOCK','WRITE_OFF')),
+  default_disposition TEXT NOT NULL CHECK (default_disposition IN ('RESTOCK','WRITE_OFF')),
+  restock_approved_by TEXT REFERENCES users(id),                 -- POS-304
+  return_movement_id    TEXT REFERENCES inventory_movements(id), -- POS-303: two columns,
+  write_off_movement_id TEXT REFERENCES inventory_movements(id), -- because two rows
+  UNIQUE (return_id, line_no)
+);
+```
+
+**`POS-307` is stored rather than derived from the dates.** The window is a setting; a report
+read next year must say whether a return was late *then*, not whether it would be late under
+today's figure.
+
+**Two figures are derived rather than stored.** How much of a sale line has come back is summed
+from `sale_return_items` whenever the limit is checked, and the sale's status is recomputed from
+those sums after each return. `sale_items.returned_qty_milli` is maintained alongside as the
+figure every screen reads — `INV-101`'s reasoning applied to a fourth table, with `TC-INT-81`
+asserting the two agree after repeated partial returns, because a materialised counter nobody
+reconciles is a counter that drifts.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -719,6 +793,7 @@ migrations/007_carts.sql            carts (POS-105's parked sale)
 migrations/008_report_indexes.sql   indexes only — no table
 migrations/009_backups_alerts.sql   backups, alert_dismissals, system_events
 migrations/010_purchasing.sql       suppliers, purchase orders and items, goods receipts and items
+migrations/011_returns.sql          sale returns and items (POS-301 – POS-307)
 ```
 
 ## 4. API
@@ -769,6 +844,11 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/goods-receipts` | `TX-409` | `PO-201`–`PO-207`. `poId` absent is the counter purchase and still needs a `supplierId`. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |
 | `PUT` `DELETE` | `/goods-receipts/:id` | `TX-409` | Always 409 — `PO-206`, and the refusal names the adjustment or return that is the correction |
 | `GET` | `/products/:id/purchase-history` | `TX-409` | What this product has cost, from whom, and when |
+| `GET` | `/sales?q=&from=&to=&customerId=&status=&returnable=` | `TX-401` | `SCR-305`'s lookup. `returnable=true` is `POS-301`'s two statuses, named server-side so the screen keeps no copy |
+| `GET` | `/sales/:id/returnable` | `TX-406` | What is left to give back per line, `POS-304`'s default and the sentence for it, and `POS-307`'s window — every one of them a rule, so none is computed in the renderer |
+| `POST` | `/sales/:id/returns` | `TX-406` | `POS-301`–`POS-307`. One transaction. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |
+| `GET` | `/sales/:id/returns` `/returns` `/returns/:id` | `TX-406` | The returns against one sale, the list, and one return with its lines |
+| `PUT` `DELETE` | `/returns/:id` | `TX-406` | Always 409 — a posted return is immutable, and the refusal names the adjustment that is the correction (`INV-102`) |
 | `GET` | `/audit?actor=&action=&entity=&from=&to=` | `TX-429` | `SCR-703`; serves the action and actor lists its filters are built from |
 | `GET` | `/audit/export` | `TX-429` | The same query as CSV. Not `TX-426`: exporting the trail is reading it, and the export is itself audited (`AUD-601`) |
 | `GET` | `/backups` | `TX-428` | `SCR-704` — the log, the folder, and `SEC-9`'s warning |

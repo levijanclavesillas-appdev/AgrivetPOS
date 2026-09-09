@@ -1,0 +1,46 @@
+/* SCR-305 — the return. Tokens come from app.css; nothing here redefines a colour.
+   `.table-scroll`, `.rule-note`, `.catalogue-list .qty input` and `.unit` are shared
+   with SCR-803 (purchasing.css), which is the screen this one is shaped like: a table
+   of lines, a decision per line, and an authorisation panel above the submit. */
+
+.returns { padding: 1rem 1.25rem 3rem; max-width: 82rem; }
+
+/* Seven columns on a 1366-wide store PC. §4: it scrolls inside its own container,
+   never the page. */
+.return-table { min-width: 56rem; }
+.return-results { min-width: 46rem; }
+
+.returns .editor-form { max-width: none; }
+.returns .field-row { display: flex; gap: .5rem; align-items: stretch; }
+.returns .field-row input { flex: 1 1 20rem; min-height: var(--touch); padding: 0 .6rem; }
+.returns .field-row button { min-height: var(--touch); padding: 0 1.25rem; }
+.returns .editor-field select { min-height: var(--touch); }
+.return-table select { min-width: 11rem; }
+
+/* POS-304's sentence, under the control it explains.
+   It is quiet — this is the *normal* case for a medicine, not a warning — and the
+   warning below it appears only once the default has actually been overridden. That
+   distinction is the whole point of showing both: a screen that shouted at every
+   medicine line would train the cashier to stop reading, which is precisely how a
+   returned bottle of antibiotic ends up back on the shelf. */
+.return-table .default-why { margin: .35rem 0 0; font-size: .75rem; color: var(--muted);
+  line-height: 1.45; max-width: 22rem; }
+.return-table .override-note { display: block; margin: .35rem 0 0; padding: .35rem .5rem;
+  font-size: .75rem; line-height: 1.45; max-width: 22rem; border-radius: 3px;
+  background: var(--warn-bg); color: var(--warn-ink); border-left: 3px solid var(--warn-ink); }
+
+.return-table .line-refund { font-variant-numeric: tabular-nums; }
+
+/* POS-305's split, after the fact: one line per destination that actually carried
+   money, so a refund paid three ways reads as three sentences rather than one number
+   somebody has to take apart. */
+.refund-split, .return-outcome { list-style: none; margin: .75rem 0; padding: 0; }
+.refund-split li, .return-outcome li { padding: .4rem 0; border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums; }
+.refund-split li:last-child, .return-outcome li:last-child { border-bottom: 0; }
+
+.return-done .preview-line { font-size: 1.0625rem; }
+
+@media (max-width: 900px) {
+  .returns .field-row { flex-direction: column; }
+}

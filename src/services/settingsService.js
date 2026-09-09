@@ -107,6 +107,46 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 7, group: 'SALES', ruleId: 'POS-307', ownerOnly: true,
     what: 'Days a return is accepted without manager authorisation', min: 0, max: 365,
   },
+  // POS-302, the same shape INV-108's adjustment reasons take and for the same
+  // reason: a return justified purely by whatever the cashier typed is a return
+  // nobody can count. Free text is permitted as a note *alongside* a listed reason.
+  return_reasons: {
+    type: 'JSON', group: 'SALES', ruleId: 'POS-302', ownerOnly: false,
+    what: 'Reasons a customer may return goods',
+    value: Object.freeze([
+      'Wrong item sold',
+      'Wrong item bought',
+      'Damaged on arrival',
+      'Expired stock',
+      'Animal refused the feed',
+      'Duplicate purchase',
+      'Customer changed their mind',
+    ]),
+  },
+  // POS-304's first two words, made configurable because the third is not.
+  //
+  // "any batch-tracked product" is a column — `products.is_batch_tracked` — and the
+  // service reads it directly. "Veterinary medicines and vaccines" is not: no column
+  // says a product is a medicine, and inventing one would be inventing a taxonomy the
+  // store already has. It categorises its own stock, so the rule is expressed as the
+  // categories whose goods the store cannot attest to the storage of, matched by name
+  // against `categories.name` — which is UNIQUE NOCASE (VR-209), so a name is an
+  // unambiguous handle.
+  //
+  // The default is what an agrivet in Sultan Kudarat stocks. A store that files its
+  // vaccines under "Biologics" edits this list on SCR-702; a store that files them
+  // under "Feeds" has a bigger problem than this setting.
+  return_write_off_categories: {
+    type: 'JSON', group: 'SALES', ruleId: 'POS-304', ownerOnly: true,
+    what: 'Categories whose returns default to write-off rather than restock',
+    value: Object.freeze([
+      'Veterinary',
+      'Veterinary Medicines',
+      'Medicines',
+      'Vaccines',
+      'Biologics',
+    ]),
+  },
   // OPS-005 lists a "void window"; POS-402 defines that window as the shift the sale
   // occurred in, not a duration. The setting therefore records the rule rather than a
   // number, and turning it off is not implemented — POS-402 would have to be amended

@@ -38,6 +38,7 @@ READY=$(sed -n 's/^READY //p' "$LOG")
 field() { node -e "console.log(JSON.parse(process.argv[1])[process.argv[2]])" "$READY" "$1"; }
 TOKEN=$(field token)
 PRODUCT=$(field productId)
+MEDICINE=$(field medicineId)
 CUSTOMER=$(field customerId)
 SUPPLIER=$(field supplierId)
 
@@ -46,7 +47,7 @@ SUPPLIER=$(field supplierId)
 LAUNCH=("$ELECTRON" --no-sandbox "$HERE/main.js")
 command -v xvfb-run >/dev/null && [ -z "${DISPLAY:-}" ] && LAUNCH=(xvfb-run -a "${LAUNCH[@]}")
 
-UI_TOKEN="$TOKEN" UI_PRODUCT="$PRODUCT" UI_CUSTOMER="$CUSTOMER" UI_SUPPLIER="$SUPPLIER" "${LAUNCH[@]}" 2>&1 \
+UI_TOKEN="$TOKEN" UI_PRODUCT="$PRODUCT" UI_MEDICINE="$MEDICINE" UI_CUSTOMER="$CUSTOMER" UI_SUPPLIER="$SUPPLIER" "${LAUNCH[@]}" 2>&1 \
   | grep -vE "GPU|Fontconfig|dbus|libva|Vulkan|gbm|DevTools|MESA|glx|sandbox|Passthrough|EGL"
 STATUS=${PIPESTATUS[0]}
 exit "$STATUS"
