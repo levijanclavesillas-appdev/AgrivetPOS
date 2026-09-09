@@ -254,13 +254,7 @@ export function createAudit({ root }) {
    */
   async function exportCsv() {
     try {
-      const { text, filename } = await api.download(`/audit/export?${query()}`);
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
-      const link = h('a', { href: url, download: filename });
-      document.body.append(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const filename = api.saveAs(await api.download(`/audit/export?${query()}`));
       ui.toast(`${filename} saved. The export is on the trail itself.`, { kind: 'success' });
       await refresh();
     } catch (err) {

@@ -18,6 +18,7 @@ import { createHealth } from '../admin/health.js';
 import { createUsers } from '../admin/users.js';
 import { createSettings } from '../admin/settings.js';
 import { createAudit } from '../admin/audit.js';
+import { createData } from '../admin/data.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
@@ -455,6 +456,9 @@ export function createApp({ root }) {
     { id: 'settings', label: 'Settings', screen: 'SCR-702', create: createSettings },
     { id: 'audit', label: 'Audit', screen: 'SCR-703', create: createAudit },
     { id: 'backup', label: 'Backups', screen: 'SCR-704', create: createBackup },
+    // SCR-706. Beside the backups because they answer the same question from two
+    // sides: how a store's data survives this machine.
+    { id: 'data', label: 'Export / import', screen: 'SCR-706', create: createData },
     { id: 'health', label: 'Health', screen: 'SCR-705', create: createHealth },
   ];
   // Users first: on the day a store is installed it is the first thing anybody needs,

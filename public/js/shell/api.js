@@ -108,9 +108,26 @@ export const del = (path, opts) => request('DELETE', path, null, opts);
  * instead of a spreadsheet. The response is fetched here and handed to the browser as
  * a blob, and a refusal comes back as an ApiError like any other.
  */
-export async function download(path) {
+/**
+ * Fetch a file the server produces, and hand it back with the name it gave it.
+ *
+ * Grew a method and a body for TASK-025: the audit and report exports are `GET`s
+ * returning CSV, and the data export is a `POST` returning a zip. One function rather
+ * than two, because the interesting half — the refusal shape, the session refresh, the
+ * filename out of `content-disposition` — is the same for both, and two copies of it
+ * would drift the first time one was fixed.
+ *
+ * Returns `text` for a textual response and `blob` for anything else. A caller that
+ * reads `.text` on a zip would get mojibake, so binary is not decoded at all.
+ */
+export async function download(path, { method = 'GET', body = null } = {}) {
   const response = await fetch(`${BASE}${path}`, {
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    method,
+    headers: {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(body ? { 'content-type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
   }).catch(() => null);
 
   if (!response) {
@@ -138,5 +155,33 @@ export async function download(path) {
 
   const disposition = response.headers.get('content-disposition') || '';
   const named = disposition.match(/filename="([^"]+)"/);
-  return { text: await response.text(), filename: named ? named[1] : 'export.csv' };
+  const filename = named ? named[1] : 'export.csv';
+
+  const type = response.headers.get('content-type') || '';
+  if (/^text\/|json|csv/.test(type)) {
+    return { text: await response.text(), blob: null, filename, type };
+  }
+  return { text: null, blob: await response.blob(), filename, type };
+}
+
+/**
+ * Save what `download` returned, as a file.
+ *
+ * The renderer has no build step and no file-saving library, and every screen that
+ * offers a download had been writing these five lines itself. Here once, so a browser
+ * quirk is fixed in one place.
+ */
+export function saveAs({ text, blob, filename, type }) {
+  const payload = blob || new Blob([text], { type: type || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(payload);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoked on the next tick: revoking synchronously races the browser's own read of
+  // the URL in some builds, and the download silently produces an empty file.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  return filename;
 }

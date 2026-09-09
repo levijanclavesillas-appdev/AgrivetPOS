@@ -1405,6 +1405,54 @@ test('TX-406: the rail shows Returns to the roles that hold it, and to nobody el
   assert.deepEqual(permissions.rolesHolding('TX-406').sort(), ['CASHIER', 'MANAGER', 'OWNER']);
 });
 
+// ── SCR-706 (TASK-025) ──────────────────────────────────────────────────────
+
+test('OPS-102: the import button waits for the validation, and cannot be pressed first', () => {
+  const source = codeOf('js/admin/data.js');
+
+  // The rule is a sequence — validate, present, confirm — and the screen enforces it
+  // by having no import call reachable until a report says `ok`.
+  assert.match(source, /api\.post\('\/data\/import\/validate'/);
+  assert.match(source, /disabled: busy \|\| !checked\.ok/);
+  assert.match(source, /checked \? summaryBlock\(\) : null/);
+
+  // OPS-104: one choice for the run, and changing it re-validates — what it does to
+  // the overlap is part of the summary, not a footnote.
+  assert.match(source, /mode = event\.target\.value; if \(file\) validate\(\)/);
+  assert.match(source, /applies to the whole import, not row/);
+});
+
+test('OPS-103: the pre-import backup is named on screen, before and after', () => {
+  const source = codeOf('js/admin/data.js');
+
+  assert.match(source, /A full backup is taken first/);
+  assert.match(source, /result\.pre_import_backup\.file_name/);
+  assert.match(source, /Restore it from the Backups tab/);
+});
+
+test('SEC-1: the export screen says what an archive does not contain', () => {
+  const source = codeOf('js/admin/data.js');
+
+  // Said where somebody is about to make the file, not where they later try to use it.
+  assert.match(source, /Passwords and PINs are never exported/);
+  assert.match(source, /before anybody can sign in/);
+});
+
+test('the object-URL save lives in the shell, once, and every caller uses it', () => {
+  const api = codeOf('js/shell/api.js');
+  assert.match(api, /export function saveAs/);
+  // Revoked a tick late: revoking synchronously races the browser's own read in some
+  // builds and silently produces an empty file.
+  assert.match(api, /setTimeout\(\(\) => URL\.revokeObjectURL\(url\), 0\)/);
+
+  for (const view of ['js/admin/data.js', 'js/admin/audit.js', 'js/reports/report.js']) {
+    const source = codeOf(view);
+    assert.match(source, /api\.saveAs\(/, `${view} saves through the shell`);
+    assert.equal(/URL\.createObjectURL/.test(source), false,
+      `${view} no longer rolls its own download`);
+  }
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

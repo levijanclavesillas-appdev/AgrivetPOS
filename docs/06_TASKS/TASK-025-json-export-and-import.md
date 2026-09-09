@@ -63,12 +63,61 @@ three in the morning are how half a catalogue ends up replaced and half skipped.
 
 ## Acceptance Criteria
 
-- [ ] An export round-trips into an empty database and reproduces it exactly
-- [ ] The same database exported twice gives byte-identical archives
-- [ ] A corrupted checksum, a dangling reference and a future schema version each refuse before writing
-- [ ] A collision is reported and the operator's one choice governs the run
-- [ ] A failed import leaves the database exactly as it was, and names the pre-import backup
-- [ ] The archive opens in a tool that is not this application
+- [x] An export round-trips into an empty database and reproduces it exactly
+- [x] The same database exported twice gives byte-identical archives
+- [x] A corrupted checksum, a dangling reference and a future schema version each refuse before writing
+- [x] A collision is reported and the operator's one choice governs the run
+- [x] A failed import leaves the database exactly as it was, and names the pre-import backup
+- [x] The archive opens in a tool that is not this application
+
+## What it decided
+
+**Credentials are not exported, and the consequence is stated everywhere it matters.** `SEC-1`
+says no endpoint returns `password_hash`, `pin_hash` or `recovery_code_hash`, and an export is an
+endpoint. They are removed **by column name across every table**, so a secret that moves or is
+copied somewhere new is still caught, and a test greps the whole archive for a bcrypt prefix
+rather than trusting the users file. The consequence — **an imported store has its people but
+none of their passwords** — is in the manifest, in the validation summary and on `SCR-706` before
+anybody makes a file, because discovering it at the counter the next morning is the wrong moment.
+`importService` writes an impossible hash rather than leaving the column absent, so an imported
+account cannot be signed into until somebody sets a password.
+
+**Collisions are detected on every unique key, not on identity — and getting that wrong first is
+what showed why.** The initial version checked `id`, which is a UUID: two stores set up
+independently never collide on one. They collide constantly on `users.username`,
+`categories.name`, `units.code` and `products.sku`, because those are what a person types and two
+shops type the same words. `OPS-104` blind to those reports "no collisions" and the import then
+fails on a constraint halfway through — the rule not working, wearing the clothes of a database
+error. `dataRepository.uniqueKeysOf` now reads the primary key **and** every non-partial UNIQUE
+index out of SQLite itself.
+
+**The checksum covers the entity files and not the manifest.** The manifest holds the checksum,
+so a checksum over it is a fixed point nobody can compute; and it holds `exported_at`, which must
+vary between two exports of the same data. Including that would make the checksum a clock rather
+than a statement about the contents — and requirement 8's whole value is that a diff between two
+archives means the **data** changed.
+
+**A constraint error is turned into a sentence.** `OPS-008` runs with foreign keys enforced, so
+SQLite refuses a bad row at the row, before the `foreign_key_check` sweep. That refusal is
+correct and arrives as `SQLITE_CONSTRAINT_FOREIGNKEY`, which nobody can act on. Each of the three
+kinds that actually reach a caller now names the table, the rule and its own remedy — they are
+different problems and a shared message would help with none of them.
+
+**The `backup_folder` setting is deliberately not carried over**, and `TC-E2E-20` asserts the
+difference rather than the sameness so nobody later "fixes" it. A backup folder is a property of
+the **machine**; an import that copied it would point the new PC's backups at a drive letter on
+the old one, and the store would find out the day it needed a backup.
+
+**`api.download` grew a method and a body, and `api.saveAs` was extracted.** Two screens were
+already hand-rolling the same object-URL dance and a third would have made three; the revoke is
+deferred a tick, because doing it synchronously races the browser's own read in some builds and
+silently produces an empty file.
+
+**What it did not do.** An import **adds to** a store rather than becoming it: there is no
+"replace this store entirely" mode, and the way to get one is to import into a fresh
+installation. `TC-E2E-20` therefore compares row by row rather than asserting two byte-identical
+archives, which was the first version of that assertion and was wrong — the target keeps its own
+setup owner, store profile and seeded settings, and it should.
 
 ## Tests
 

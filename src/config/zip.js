@@ -20,9 +20,17 @@
 // check it with Python's `zipfile`, an implementation that shares no code and no
 // author with it. A format is only correct if something else agrees.
 //
-// Scope: one file per archive, deflated, no encryption, no ZIP64. A backup is a single
-// SQLite file, and every limit that would need ZIP64 (4 GB) is far past the point
-// where this product would have told the operator to archive (NFR_2.2).
+// Scope: deflated, no encryption, no ZIP64. A backup is a single SQLite file and
+// `zipOne` writes exactly that; `zipMany` (TASK-025) writes the export archive, which
+// is one JSON file per entity plus a manifest. Every limit that would need ZIP64 (4 GB)
+// is far past the point where this product would have told the operator to archive
+// (NFR_2.2).
+//
+// **`zipOne` is `zipMany` of one entry**, and is kept as its own name rather than as a
+// call through: `unzipOne` refuses an archive holding more than one file, which is the
+// check that makes "this backup contains a database" true rather than assumed. A
+// backup that had quietly become a multi-entry archive is a restore nobody can reason
+// about.
 
 const zlib = require('zlib');
 
@@ -139,6 +147,163 @@ function zipOne(entryName, content, { at = new Date(), level = zlib.constants.Z_
 }
 
 /**
+ * Several files, deflated, as one ZIP archive (OPS-101).
+ *
+ * The export is one JSON file per entity plus `manifest.json`, and Explorer must show
+ * them as the separate files they are — an operator asked to check an export opens it
+ * and looks, and a single blob named `export.json` is not something anybody can look at.
+ *
+ * **Deterministic by construction** (requirement 8). Entries are written in the order
+ * given, the DOS timestamp defaults to the ZIP epoch rather than to now, and the
+ * deflate level is fixed. So the same data exported twice is byte-identical, and a
+ * diff between two archives means the data changed — which is the only way a person
+ * can use one export to check another.
+ */
+function zipMany(entries, { at = new Date(Date.UTC(1980, 0, 1)), level = zlib.constants.Z_BEST_SPEED } = {}) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new RangeError('an archive needs at least one entry');
+  }
+
+  const stamp = dosStamp(at);
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8');
+    const raw = Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content);
+
+    if (raw.length > MAX_ZIP32_BYTES) {
+      throw new RangeError(
+        `${entry.name} is ${raw.length} bytes, past the 4 GB limit of this archive writer.`
+      );
+    }
+
+    const deflated = zlib.deflateRawSync(raw, { level });
+    const crc = crc32(raw);
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(LOCAL_SIG, 0);
+    local.writeUInt16LE(VERSION_NEEDED, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(DEFLATED, 8);
+    local.writeUInt16LE(stamp.time, 10);
+    local.writeUInt16LE(stamp.date, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(deflated.length, 18);
+    local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(0, 28);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(CENTRAL_SIG, 0);
+    central.writeUInt16LE(VERSION_NEEDED, 4);
+    central.writeUInt16LE(VERSION_NEEDED, 6);
+    central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(DEFLATED, 10);
+    central.writeUInt16LE(stamp.time, 12);
+    central.writeUInt16LE(stamp.date, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(deflated.length, 20);
+    central.writeUInt32LE(raw.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0o644 << 16, 38);
+    // Where this entry's local header sits. The one field that made this more than a
+    // loop around zipOne, and the one every other reader navigates by.
+    central.writeUInt32LE(offset, 42);
+
+    locals.push(local, name, deflated);
+    centrals.push(central, name);
+    offset += local.length + name.length + deflated.length;
+  }
+
+  const body = Buffer.concat(locals);
+  const directory = Buffer.concat(centrals);
+
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(END_SIG, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(body.length, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([body, directory, end]);
+}
+
+/**
+ * Every entry back out, each checked against its own CRC.
+ *
+ * Navigated through the **central directory**, not by walking local headers, for the
+ * reason `unzipOne` already documents: every other tool finds files through that
+ * record, so an archive whose directory disagrees with its contents is one this module
+ * must refuse rather than quietly read past.
+ */
+function unzipMany(archive) {
+  if (archive.length < 22) throw new Error('not a zip archive');
+
+  const end = archive.length - 22;
+  if (end < 0 || archive.readUInt32LE(end) !== END_SIG) {
+    throw new Error('the archive has no end-of-central-directory record; it is truncated or damaged');
+  }
+
+  const count = archive.readUInt16LE(end + 10);
+  let cursor = archive.readUInt32LE(end + 16);
+  const out = [];
+
+  for (let i = 0; i < count; i += 1) {
+    if (cursor + 46 > end || archive.readUInt32LE(cursor) !== CENTRAL_SIG) {
+      throw new Error('the archive’s central directory is damaged');
+    }
+
+    const method = archive.readUInt16LE(cursor + 10);
+    const expectedCrc = archive.readUInt32LE(cursor + 16);
+    const compressedSize = archive.readUInt32LE(cursor + 20);
+    const uncompressedSize = archive.readUInt32LE(cursor + 24);
+    const nameLength = archive.readUInt16LE(cursor + 28);
+    const extraLength = archive.readUInt16LE(cursor + 30);
+    const commentLength = archive.readUInt16LE(cursor + 32);
+    const localOffset = archive.readUInt32LE(cursor + 42);
+    const name = archive.subarray(cursor + 46, cursor + 46 + nameLength).toString('utf8');
+
+    if (archive.readUInt32LE(localOffset) !== LOCAL_SIG) {
+      throw new Error(`entry ${name} has no local header where the directory says it is`);
+    }
+    // The two headers describe the same entry, and a difference means one was altered.
+    if (archive.readUInt32LE(localOffset + 14) !== expectedCrc) {
+      throw new Error(`the archive’s two headers disagree about ${name}’s checksum`);
+    }
+
+    const localNameLength = archive.readUInt16LE(localOffset + 26);
+    const localExtraLength = archive.readUInt16LE(localOffset + 28);
+    const start = localOffset + 30 + localNameLength + localExtraLength;
+    const body = archive.subarray(start, start + compressedSize);
+
+    if (method !== DEFLATED && method !== 0) throw new Error(`unsupported compression method ${method}`);
+    const content = method === DEFLATED ? zlib.inflateRawSync(body) : Buffer.from(body);
+
+    if (content.length !== uncompressedSize) {
+      throw new Error(`entry ${name} is ${content.length} bytes, header says ${uncompressedSize}`);
+    }
+    const actual = crc32(content);
+    if (actual !== expectedCrc) {
+      throw new Error(`entry ${name} failed its checksum (${actual} ≠ ${expectedCrc})`);
+    }
+
+    out.push({ name, content });
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+
+  return out;
+}
+
+/**
  * Read the single entry back out, checking its CRC.
  *
  * Used by verification (OPS-002), which is the point: proving the archive can be read
@@ -204,4 +369,4 @@ function unzipOne(archive) {
   return { name, content };
 }
 
-module.exports = { zipOne, unzipOne, crc32, MAX_ZIP32_BYTES };
+module.exports = { zipOne, unzipOne, zipMany, unzipMany, crc32, MAX_ZIP32_BYTES };

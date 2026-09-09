@@ -144,6 +144,10 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-INT-91` | `INV-113`: a stale session is refused, a manager is not enough, an owner releases it, and the release is an `AUD-603`-shaped row with two distinct actors. An owner posting their own stale count needs nobody else | `INV-113`, `AUD-603` |
 | `TC-INT-92` | The whole precedence in one pass: `PR-202` binds an owner whose role ceiling is 100% and the refusal names the category with **no approver to fetch**; the same discount keyed by a cashier reports `PR-203` *and* `PR-105` together rather than one at a time; `PR-106`'s tier applies to the basket and exercises nobody's ceiling; `PR-206` resolves the tier against a hand-typed figure both ways round; `PR-205` still caps the lot | `PR-106`, `PR-202`, `PR-203`, `PR-205`, `PR-206`, `PR-105` |
 | `TC-INT-93` | `PR-104`: an overlapping band set is refused over HTTP naming the offending pair, and **nothing is written** — a set is refused whole. A cashier may define neither a band nor a customer price (`TX-411`), and a customer price is superseded rather than updated, with both values on the trail | `PR-104`, `PR-103`, `TX-411`, `AUD-601` |
+| `TC-INT-94` | `OPS-102`: six invalid archives — an edited entity file, a future schema version, a dangling reference, a manifest whose counts disagree, another application's format, a missing file — each refuse, and **not one row moves** across any of them. The row counts before and after are the assertion; the refusals are not | `OPS-102`, `OPS-101` |
+| `TC-INT-95` | `OPS-103`: an archive that passes every pre-write check and fails **late**, inside the transaction, rolls back wholly — every table, not merely the first. The pre-import backup survives it, because it is taken before the transaction opens | `OPS-103`, `OPS-102` |
+| `TC-INT-96` | `OPS-104`: collisions reported in the summary; `SKIP` leaves the local rows and `REPLACE` overwrites them, both read back from the database rather than trusted from the counts; `ABORT` refuses; an unknown choice is refused rather than defaulted | `OPS-104` |
+| `TC-INT-97` | The export is deterministic: two exports byte-identical, the checksum unchanged by the clock, and moved by a single changed row | `OPS-101` |
 | `TC-API-01` | Every route refuses an actor lacking its `TX-*`, with 403, and audits it | `SEC-6` |
 | `TC-API-02` | No endpoint returns `password_hash`, `pin_hash` or `recovery_code_hash` | `SEC-1` |
 
@@ -169,6 +173,7 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-E2E-15` | A day's work is legible afterwards: a price change with its old figure, an adjustment naming both actors, a settings change, a reprint — findable by actor, action, entity and date, exportable, with no secret anywhere and no write path |
 
 | `TC-E2E-16` | A delivery: register the mill → order fifty sacks → nothing on the shelf moves → the clerk keys in forty-seven sound, three split, at 20% above the agreed price → refused, naming the rule and the role → the owner authorises → stock, average cost, ledger, order status and the damaged figure are all right afterwards, and the receipt cannot be edited |
+| `TC-E2E-20` | The move to a new machine: a store that has received stock, sold for cash, sold on credit and taken a part payment is exported → a second, empty installation validates the archive **writing nothing** → imports it with a backup taken first → and then every ledger is recomputed there and agrees: `INV-101`'s stock, `CR-103`'s balance, `RPT-101`'s day, all reconciling. Every row the archive carried is compared one by one against a fresh export of the imported store, and importing the same archive twice changes nothing |
 | `TC-E2E-19` | A stocktake at scale: open a count over 200 products → the shop keeps selling while the aisles are walked → the clerk reaches 170 of them and finds eight wrong → cannot approve their own count, and is refused at the route → a manager approves → posting writes eight movements and touches **nothing else**, neither the 162 that matched nor the 30 nobody reached → the variance report splits shortage from surplus at the frozen cost → and `INV-101`'s ledger reconciles across all 200 |
 | `TC-E2E-18` | A void: Tess opens her drawer, rings a good sale, then rings four sacks when the farmer wanted one → `SCR-304` asks whether it can be undone and is told yes, but not by her → she is refused naming `POS-403` → Rosa authorises → stock, ledger and account all reverse → the sale keeps its number, stays on the daily report marked voided, and appears on the void report with both actors → **the shift closes with no variance**, which is the assertion the whole task is for → and the same void, tried again after the close, is refused naming the return |
 | `TC-E2E-17` | A return: a farm buys feed and antibiotic for cash and a drench on account → the counter looks the sale up and is told what is left on it and which line defaults to write-off, and why → the cashier tries to restock the antibiotic and is refused, naming `POS-304` and the role → the manager authorises → a sack goes back on the shelf, the second bottle is written off with both movements → the drench goes back onto the account it was charged to and pays out nothing → the trail, the drawer, the balance and `RPT-101`'s reconciliation are all right afterwards, and the return cannot be edited |
@@ -228,10 +233,10 @@ two `TC-INT-84`s that assert different things.
 | ~~`TC-INT-85` – `TC-INT-87`~~ | `TASK-021` | **Written** — see §4. Voids: full reversal, the shift window, the authorisation |
 | ~~`TC-INT-88` – `TC-INT-91`~~ | `TASK-022` | **Written** — see §4. Stock counts: the freeze, no movement when matched, self-approval, staleness |
 | ~~`TC-INT-92` – `TC-INT-93`, `TC-UT-45` – `TC-UT-49`~~ | `TASK-023`, `TASK-024` | **Written** — see §3 and §4. Discount tiers, category ceilings, non-compounding, and all four precedence levels |
-| `TC-INT-94` – `TC-INT-100` | `TASK-025`, `TASK-026` | Import validation before writing, determinism, collisions, the opening load |
+| ~~`TC-INT-94` – `TC-INT-97`~~, `TC-INT-98` – `TC-INT-100` | `TASK-025`, `TASK-026` | **`TASK-025`'s are written** — see §4. Import validation before writing, determinism, collisions; `TASK-026`'s opening load remains |
 | `TC-INT-101` – `TC-INT-102`, `TC-UT-50` – `TC-UT-51` | `TASK-027` | Statutory discount: off by default, no compounding, VAT exemption |
 | `TC-INT-103` – `TC-INT-106` | `TASK-028` | Store credit: both sources, spending it, reconciliation, never aged overdue |
-| ~~`TC-E2E-16`~~ – ~~`TC-E2E-19`~~, `TC-E2E-20` – `TC-E2E-22` | one per task | The journey each task exists for. `TC-E2E-16` to `TC-E2E-19` are written — see §5 |
+| ~~`TC-E2E-16`~~ – ~~`TC-E2E-20`~~, `TC-E2E-21` – `TC-E2E-22` | one per task | The journey each task exists for. `TC-E2E-16` to `TC-E2E-20` are written — see §5 |
 
 **Two existing cases were re-pointed rather than replaced, and both are now done.**
 `TC-INT-62` forced a `VOIDED` status by hand because no void path existed; **`TASK-021` pointed
@@ -331,11 +336,13 @@ none of them is a question a suite can answer.
 | 10 | `TC-UT-45`–`TC-UT-47`, `TC-INT-92` green | ☑ green |
 | 11 | `FT-211`, `FT-212` built, tested and reachable | ☑ **done** (`TASK-024`). All four of `PR-101`'s levels resolve; the bands and the agreed prices have editors |
 | 12 | `TC-UT-31`, `TC-UT-48`–`TC-UT-49`, `TC-INT-93` green | ☑ green |
-| 13 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-025` – `TASK-028` outstanding |
-| 14 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
-| 15 | A return taken at the counter on the store's own stock | ☐ **not started.** `POS-304`'s default is the one rule in this release whose value is decided by whether a cashier reads the sentence beside it, and that is not a thing a test can answer |
-| 16 | A void taken at the counter, and the drawer counted after it | ☐ **not started.** `TC-E2E-18` proves the arithmetic; what it cannot prove is that a cashier under pressure finds the button and a manager is willing to walk over. `POS-403` is a workflow before it is a rule |
-| 17 | A stocktake walked in the store, on the store's own shelves | ☐ **not started.** `TC-E2E-19` proves 200 products. What it cannot prove is that somebody counting an aisle understands that a blank field and a `0` are different answers — which is the one misunderstanding on `SCR-205` that costs real money |
+| 13 | `FT-705`, `FT-706` built, tested and reachable | ☑ **done** (`TASK-025`). `SCR-706` exists; the archive opens in Python's `zipfile` |
+| 14 | `TC-INT-94`–`TC-INT-97`, `TC-E2E-20` green | ☑ green |
+| 15 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-026` – `TASK-028` outstanding |
+| 16 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
+| 17 | A return taken at the counter on the store's own stock | ☐ **not started.** `POS-304`'s default is the one rule in this release whose value is decided by whether a cashier reads the sentence beside it, and that is not a thing a test can answer |
+| 18 | A void taken at the counter, and the drawer counted after it | ☐ **not started.** `TC-E2E-18` proves the arithmetic; what it cannot prove is that a cashier under pressure finds the button and a manager is willing to walk over. `POS-403` is a workflow before it is a rule |
+| 19 | A stocktake walked in the store, on the store's own shelves | ☐ **not started.** `TC-E2E-19` proves 200 products. What it cannot prove is that somebody counting an aisle understands that a blank field and a `0` are different answers — which is the one misunderstanding on `SCR-205` that costs real money |
 
 Measured on a build machine, reported for regression purposes and for nothing else:
 

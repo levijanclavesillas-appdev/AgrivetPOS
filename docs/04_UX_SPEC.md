@@ -49,7 +49,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-603 Payments       SCR-604 Inventory   │
 │  ADMIN        SCR-701 Users          SCR-702 Settings    │
 │               SCR-703 Audit          SCR-704 Backup      │
-│               SCR-705 Health                             │
+│               SCR-705 Health         SCR-706 Data        │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -314,6 +314,27 @@ while an order is still outstanding.
 with its rule ID in a tooltip — **Audit** (filter by actor, action, entity, date; export),
 **Backup** (last backup and its verification status, manual backup, restore behind typed
 confirmation per `OPS-004`), **Health** (`OPS-006`).
+
+### `SCR-706` — Export and import · `FT-705`, `FT-706` — v1.1
+
+Two halves of one screen, shaped differently on purpose.
+
+**Export is one button.** `OPS-101` fixes what an archive contains, so there is nothing to
+configure; the screen's job is to hand over a file and say what is in it — including, before
+anybody makes one, that credentials are never exported and a store restored from it has its
+people but none of their passwords.
+
+**Import is a conversation, and `OPS-102` is why.** Choosing a file validates the whole of it
+server-side, **writing nothing**, and the screen then shows what would happen: rows per entity,
+how many are already here, what the one choice does to the overlap, and every problem found.
+Only then is there a button, and it stays disabled until the validation says the archive may be
+imported. A single button that validated and wrote in one call would put "present a summary for
+confirmation" inside a spinner.
+
+Skip / replace / abort is chosen **once for the whole run** (`OPS-104`) and changing it
+re-validates, because what it does to the overlap is part of the summary rather than a footnote
+to it. Afterwards the screen keeps the pre-import backup's filename on display: it is the thing
+the operator needs if the import turns out to have been a mistake (`OPS-103`).
 
 ## 4. Component rules
 

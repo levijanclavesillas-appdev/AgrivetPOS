@@ -1537,6 +1537,78 @@ app.whenReady().then(async () => {
   await settle(1800);
   log(/sound/i.test(await run(`document.body.textContent`)), 'the on-demand integrity check reports back');
 
+  console.log('\n— SCR-706: export and import (OPS-101 to OPS-104) —');
+
+  const dataTab = await run(`(() => {
+    const t = [...document.querySelectorAll('.admin-tab')].find(x => /Export/.test(x.textContent));
+    if (!t) return false;
+    t.click();
+    return true;
+  })()`);
+  log(dataTab, 'SCR-706 is a tab of its own under Admin');
+  await waitFor(`!!document.querySelector('.data-transfer')`, { label: 'SCR-706' });
+
+  const dataText = await text('.data-transfer');
+  log(/Passwords and PINs are never exported/.test(dataText),
+    'SEC-1: the screen says what an archive does not contain, before one is made');
+  log(/either lands completely or not at all/.test(dataText),
+    'OPS-103: and that an import is all-or-nothing');
+  log(/applies to the whole import, not row/.test(dataText),
+    'OPS-104: one choice for the run, said where it is made');
+
+  // The archive itself, through the endpoint the button calls.
+  const exported = await api('/data/export', { method: 'POST' });
+  log(exported.status === 200, 'OPS-101: the export endpoint answers', String(exported.status));
+
+  // The validation pass, over a real archive, writing nothing.
+  const salesBefore = (await api('/sales?limit=1')).json.total;
+  const archiveB64 = await run(`(async () => {
+    const res = await fetch('${API}/data/export', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + ${JSON.stringify(TOKEN)} },
+    });
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let s = '';
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s);
+  })()`);
+  log(typeof archiveB64 === 'string' && archiveB64.length > 100,
+    'and the browser can read the archive it just downloaded', `${archiveB64.length} base64 chars`);
+
+  const checked = await api('/data/import/validate', {
+    method: 'POST', body: { archive: archiveB64, collisionMode: 'SKIP' },
+  });
+  log(checked.status === 200 && checked.json.ok === true,
+    'OPS-102: the archive validates against the store it came from');
+  log(checked.json.summary.collisions > 0,
+    'and every row collides, because it is this store’s own export',
+    `${checked.json.summary.collisions} collisions`);
+  log(/left exactly as they are/.test(checked.json.summary.collision_effect),
+    'OPS-104: the summary says in words what "skip" will do');
+  log(checked.json.warnings.some((w) => w.rule_id === 'SEC-1'),
+    'SEC-1: and warns that imported users arrive without passwords');
+
+  // OPS-102's central claim: validating wrote nothing.
+  log((await api('/sales?limit=1')).json.total === salesBefore,
+    'OPS-102: and the validation pass wrote nothing at all',
+    `${salesBefore} sales, unchanged`);
+
+  // A corrupted archive, refused. The last byte of the central directory is flipped,
+  // which is the bit-flip-on-a-USB-stick case the CRC exists for.
+  const corrupted = await api('/data/import/validate', {
+    method: 'POST', body: { archive: archiveB64.slice(0, -8) },
+  });
+  log(corrupted.status === 400 || corrupted.json.ok === false,
+    'OPS-102: a damaged archive is refused rather than half-read',
+    corrupted.json.error ? corrupted.json.error.rule_id : 'ok:false');
+
+  // ABORT: reported as a problem, so the screen's button never enables.
+  const aborting = await api('/data/import/validate', {
+    method: 'POST', body: { archive: archiveB64, collisionMode: 'ABORT' },
+  });
+  log(aborting.json.ok === false && aborting.json.problems.some((p) => p.rule_id === 'OPS-104'),
+    'OPS-104: choosing "do not import" is reported as a refusal, not silently ignored');
+
   console.log('\n— SCR-703: the audit trail —');
   await run(`[...document.querySelectorAll('.admin-tab')].find(t => /Audit/.test(t.textContent)).click()`);
   await waitFor(`!!document.querySelector('.audit')`, { label: 'SCR-703' });

@@ -82,15 +82,11 @@ export function createReport({ root, session, report, onBack }) {
   /** TX-426. A refusal is shown as a refusal, not as a broken download. */
   async function exportCsv() {
     try {
-      const { text, filename } = await api.download(
+      // Saved through the shell's own helper (TASK-025), so the object-URL dance —
+      // including revoking it a tick late, which some builds need — lives once.
+      const filename = api.saveAs(await api.download(
         `/reports/${report}/export.csv?from=${params.from}&to=${params.to}`
-      );
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
-      const link = h('a', { href: url, download: filename });
-      document.body.append(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      ));
       ui.toast(`${filename} saved`, { kind: 'success' });
     } catch (err) {
       ui.toast(err.message, { kind: 'error' });

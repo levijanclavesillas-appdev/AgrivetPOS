@@ -925,6 +925,33 @@ no comparison with the break and no cheaper-of. A farm that negotiated ₱58 a k
 ₱58 at forty sacks even where the break would have been ₱50, which is the store's own
 deal to have made badly.
 
+### 3.4.5 The export archive — no schema, one format (`TASK-025`)
+
+`FT-705` adds no table. `OPS-101`'s archive is a `.zip` written by `src/config/zip.js`
+— the same codec the backups use, extended from one entry to many — holding one
+pretty-printed JSON file per entity plus `manifest.json`. The entity list, **in
+dependency order**, is `dataRepository.EXPORTABLE`; the order is the whole of the
+import's correctness, because rows are written in it and a foreign key's parent is
+therefore always already present.
+
+**Deterministic by construction** (requirement 8). Three things make it so, and all
+three are needed: rows read in primary-key order, keys serialised in the table's own
+column order rather than the driver's, and a fixed DOS timestamp in the zip headers.
+The manifest's `exported_at` is the one field that must vary, so the checksum covers
+the **entity files only** — a checksum over the manifest would be a fixed point, and
+one including the timestamp would be a clock rather than a statement about the data.
+
+**Credentials are not exported** (`SEC-1`): `password_hash`, `pin_hash` and
+`recovery_code_hash` are removed by column name across every table, so a secret that
+moves somewhere new is still caught. The consequence is stated in the manifest itself
+and in the import summary rather than left to be discovered: **an imported store has
+its people but none of their passwords**, and `importService` writes an impossible
+hash so an imported account cannot be signed into until somebody sets one.
+
+`schema_migrations` is deliberately absent — the target has its own, applied by its own
+binary — and so is `carts`, because a parked cart is a moment in a shift rather than
+data anybody archives.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -1014,6 +1041,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/sales/:id/returns` | `TX-406` | `POS-301`–`POS-307`. One transaction. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |
 | `GET` | `/sales/:id/returns` `/returns` `/returns/:id` | `TX-406` | The returns against one sale, the list, and one return with its lines |
 | `PUT` `DELETE` | `/returns/:id` | `TX-406` | Always 409 — a posted return is immutable, and the refusal names the adjustment that is the correction (`INV-102`) |
+| `POST` | `/data/export` | `TX-426` | `OPS-101` — the whole store as one `.zip`, one JSON file per entity plus `manifest.json`. Deterministic: the same data twice is byte-identical. Credentials are never in it (`SEC-1`) |
+| `POST` | `/data/import/validate` | `TX-427` | `OPS-102` — the complete check, **writing nothing**, answering `200` with `ok: false` and the problems. Its own endpoint rather than a `dryRun` flag, so the rule is not inside a boolean somebody forgets |
+| `POST` | `/data/import` | `TX-427` | `OPS-102`–`OPS-104`. Revalidates, takes `OPS-103`'s backup, then one transaction. Refuses outright if the backup cannot be taken |
 | `GET` | `/audit?actor=&action=&entity=&from=&to=` | `TX-429` | `SCR-703`; serves the action and actor lists its filters are built from |
 | `GET` | `/audit/export` | `TX-429` | The same query as CSV. Not `TX-426`: exporting the trail is reading it, and the export is itself audited (`AUD-601`) |
 | `GET` | `/backups` | `TX-428` | `SCR-704` — the log, the folder, and `SEC-9`'s warning |
