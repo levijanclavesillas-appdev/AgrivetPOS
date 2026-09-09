@@ -202,6 +202,25 @@
 .receipt-sheet { margin: 1rem 0; padding: 1rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; }
 .receipt-paper { margin: 0; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .8125rem; line-height: 1.35; white-space: pre; }
 
+/* SCR-304's void (TASK-021, FT-308).
+   `.danger` itself lives in reports.css, beside OPS-004's restore — the two
+   destructive controls in this product, styled once so they read alike. */
+.void-panel { margin-top: 1rem; padding: 1rem 1.25rem; background: var(--surface);
+  border: 1px solid var(--rule); border-left: 4px solid var(--error); border-radius: 6px; }
+.void-panel h2 { margin: 0 0 .75rem; font-size: 1rem; }
+.void-panel label { display: block; margin: .75rem 0; }
+.void-panel .void-reason { width: 100%; min-height: var(--touch); padding: 0 .6rem;
+  font: inherit; border: 1px solid var(--rule); border-radius: 4px; }
+.void-panel .editor-actions { display: flex; gap: .5rem; margin-top: 1rem; }
+.void-panel .editor-actions button { min-height: var(--touch); padding: 0 1.25rem; }
+
+/* POS-402's refusal, in the place the button would have been. A missing control with
+   no explanation is the one thing worse than a refusal. */
+.void-refusal { margin: .75rem 0 0; font-size: .875rem; max-width: 40rem; }
+
+.receipt-voided .close-verdict { margin: 0 0 .75rem; }
+.receipt-voided p.muted { margin: .35rem 0; max-width: 40rem; }
+
 /* ── The five states (§5) ──────────────────────────────────────────────── */
 
 .state { padding: 2rem 1rem; text-align: center; color: var(--muted); }

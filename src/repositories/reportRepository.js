@@ -63,6 +63,49 @@ function dailyTotals({ fromAt, toAt, shiftId = null }) {
   `).get({ fromAt, toAt, shiftId });
 }
 
+/**
+ * POS-404's void report — the sales that were voided, and by whom.
+ *
+ * The one query in this file that looks *for* `VOIDED` rather than past it. Everything
+ * else here filters voids out of a total; this is the report that exists so they are
+ * not thereby out of sight, which is the difference POS-404 draws in its own sentence.
+ */
+function voidsInRange({ fromAt, toAt, shiftId = null, limit = 500 }) {
+  return db.get().prepare(`
+    SELECT
+      s.id, s.sale_no, s.occurred_at, s.total_centavos, s.change_centavos,
+      s.shift_id, s.void_reason, s.voided_at,
+      c.name AS customer_name,
+      u.username AS cashier_username,
+      v.username AS voided_by_username,
+      -- Who authorised the void, which is NOT sales.approved_by: that column records
+      -- the approver of a discount or an over-limit credit at the time of sale, and
+      -- reading it here would name the wrong person on any sale that had one.
+      -- AUD-603's own row is the record of who released the void, so that is where
+      -- this reads from. NULL where the person voiding already held TX-405 --
+      -- recordOverride writes no row when the two actors would be one.
+      (SELECT l.approver_username FROM audit_logs l
+        WHERE l.entity_type = 'sales' AND l.entity_id = s.id
+          AND l.action = 'OVERRIDE_SALE_VOID'
+        ORDER BY l.occurred_at DESC LIMIT 1) AS approved_by_username,
+      (SELECT COUNT(*) FROM sale_items i WHERE i.sale_id = s.id) AS line_count,
+      -- What actually left the drawer again. Not the sale total: a sale settled part
+      -- in GCash and part in cash returns only the cash, and a report that quoted the
+      -- total would overstate every mixed-tender void.
+      (SELECT COALESCE(SUM(t.amount_centavos), 0) FROM sale_tenders t
+        WHERE t.sale_id = s.id AND t.method = 'CASH') AS cash_tendered_centavos
+    FROM sales s
+    LEFT JOIN customers c ON c.id = s.customer_id
+    LEFT JOIN users u ON u.id = s.created_by
+    LEFT JOIN users v ON v.id = s.voided_by
+    WHERE s.status = 'VOIDED'
+      AND s.occurred_at >= @fromAt AND s.occurred_at <= @toAt
+      AND (@shiftId IS NULL OR s.shift_id = @shiftId)
+    ORDER BY s.voided_at DESC, s.sale_no DESC
+    LIMIT @limit
+  `).all({ fromAt, toAt, shiftId, limit });
+}
+
 /** The other side of RPT-101: net = SUM(tenders) − change. */
 function tenderTotal({ fromAt, toAt, shiftId = null }) {
   return db.get().prepare(`
@@ -238,7 +281,7 @@ function shiftOwner(shiftId) {
 }
 
 module.exports = {
-  NOT_VOIDED, LINE_COST, LINE_NET_REVENUE,
+  NOT_VOIDED, LINE_COST, LINE_NET_REVENUE, voidsInRange,
   dailyTotals, tenderTotal, profitTotals, dailyLines, salesInRange,
   taxModesInRange, voidedCount,
   tendersByMethod, tenderStatuses, changeTotal,

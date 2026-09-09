@@ -22,6 +22,7 @@ const customerService = require('../../services/customerService');
 const creditService = require('../../services/creditService');
 const shiftService = require('../../services/shiftService');
 const saleService = require('../../services/saleService');
+const voidService = require('../../services/voidService');
 const reportService = require('../../services/reportService');
 const alertService = require('../../services/alertService');
 const settingsService = require('../../services/settingsService');
@@ -263,6 +264,7 @@ test('profit is revenue net of VAT, so the Bureau’s money is not counted as ma
 // ── TC-INT-62 — voids (RPT-106) ─────────────────────────────────────────────
 
 test('TC-INT-62: a voided sale is out of net in every report and still in the ledger', () => {
+  const stockBeforeDoomed = require('../../repositories/inventoryRepository').qtyOnHand(vet.id);
   const doomed = saleService.complete({
     lines: [{ productId: vet.id, qtyMilli: 1000 }],
     tenders: [{ method: 'CASH', amountCentavos: 25000 }],
@@ -271,10 +273,17 @@ test('TC-INT-62: a voided sale is out of net in every report and still in the le
   const withIt = reportService.daily({ from: today }, owner);
   const paidWithIt = reportService.payments({ from: today }, owner);
 
-  // POS-401 is v1.1, so nothing writes this status yet. The reports handle it now
-  // because a report taught to notice a void later is a report that is wrong until then.
-  db.get().prepare("UPDATE sales SET status = 'VOIDED', voided_at = ? WHERE id = ?")
-    .run(clock.nowUtc(), doomed.sale.id);
+  // A real void (TASK-021), not a hand-forced status. This case was written at
+  // TASK-016 against `UPDATE sales SET status = 'VOIDED'` because POS-401 did not
+  // exist, and 07_TEST_PLAN.md §6.3 named it as one of two cases that must be
+  // re-pointed when the placeholder became real: a test written against a fake is a
+  // test that stops proving anything the day the real thing arrives, and would have
+  // gone on passing here against a void that reversed nothing.
+  voidService.post({
+    saleId: doomed.sale.id,
+    reason: 'Rang up the wrong customer',
+    approver: { username: 'owner' },
+  }, cashier);
 
   const without = reportService.daily({ from: today }, owner);
   const paidWithout = reportService.payments({ from: today }, owner);
@@ -290,8 +299,21 @@ test('TC-INT-62: a voided sale is out of net in every report and still in the le
   assert.equal(listed.excluded_from_net, true);
   assert.equal(listed.status, 'VOIDED');
 
-  // And still a row, because POS-107 makes a sale immutable.
-  assert.ok(db.get().prepare('SELECT id FROM sales WHERE id = ?').get(doomed.sale.id));
+  // And still a row, because POS-107 makes a sale immutable — with POS-401's four
+  // columns on it rather than a bare status, which is the difference between the void
+  // this case now drives and the one it used to fake.
+  const row = db.get().prepare('SELECT * FROM sales WHERE id = ?').get(doomed.sale.id);
+  assert.ok(row, 'POS-404: the sale is still in the ledger');
+  assert.ok(row.voided_at && row.voided_by, 'and says who voided it, and when');
+  assert.equal(row.void_reason, 'Rang up the wrong customer');
+  assert.equal(row.sale_no, doomed.sale.sale_no, 'POS-108: keeping its number');
+
+  // POS-401: and the stock it took came back, which the hand-forced status never did.
+  assert.equal(
+    require('../../repositories/inventoryRepository').qtyOnHand(vet.id),
+    stockBeforeDoomed,
+    'the sale and its reversal leave the shelf where it started'
+  );
 
   // The header says so out loud (RPT-106).
   assert.equal(without.header.includes_voided, false);

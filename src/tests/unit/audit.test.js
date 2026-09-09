@@ -58,6 +58,9 @@ const AUD_603_OVERRIDES = {
   // row of its own: it is the one that says a medicine went back on the shelf.
   'restock against default': 'OVERRIDE_RESTOCK_AGAINST_DEFAULT',
   'late return': 'OVERRIDE_LATE_RETURN',
+  // POS-403, added by TASK-021. The only one on this list that is required on *every*
+  // occurrence rather than on an exception — a cashier may never void unaided.
+  'sale void': 'OVERRIDE_SALE_VOID',
 };
 
 /**

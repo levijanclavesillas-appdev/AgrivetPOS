@@ -845,6 +845,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `PUT` `DELETE` | `/goods-receipts/:id` | `TX-409` | Always 409 — `PO-206`, and the refusal names the adjustment or return that is the correction |
 | `GET` | `/products/:id/purchase-history` | `TX-409` | What this product has cost, from whom, and when |
 | `GET` | `/sales?q=&from=&to=&customerId=&status=&returnable=` | `TX-401` | `SCR-305`'s lookup. `returnable=true` is `POS-301`'s two statuses, named server-side so the screen keeps no copy |
+| `GET` | `/sales/:id/voidable` | `TX-401` | `POS-402`'s window and `POS-403`'s authority, answered before `SCR-304` draws the button. Read-only |
+| `POST` | `/sales/:id/void` | `TX-401` | `POS-401`–`POS-404`. One transaction. **Not `TX-405`** — see the note below the table |
+| `GET` | `/reports/voids?from=&to=&shiftId=` | `TX-421` | `POS-404`'s second half: the one report that looks *for* voids rather than past them |
 | `GET` | `/sales/:id/returnable` | `TX-406` | What is left to give back per line, `POS-304`'s default and the sentence for it, and `POS-307`'s window — every one of them a rule, so none is computed in the renderer |
 | `POST` | `/sales/:id/returns` | `TX-406` | `POS-301`–`POS-307`. One transaction. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |
 | `GET` | `/sales/:id/returns` `/returns` `/returns/:id` | `TX-406` | The returns against one sale, the list, and one return with its lines |
@@ -870,6 +873,17 @@ unauthenticated endpoint reporting row counts and the database path would go wit
 for a `CASHIER`, so `requirePermission` admits them and `reportService` decides which shift they
 may read — refusing with `403` and writing an audit row, never narrowing the answer silently. A
 cashier handed their own till's figures under a store-wide heading has been told something false.
+
+**The void sits under `TX-401`, not `TX-405`, and that is deliberate.** §10 grants `TX-405` to a
+manager and an owner only, so a route behind it would be a route a cashier cannot call — and
+`POS-403` says a cashier may never void *unaided*, which is a rule about authorisation, not about
+who may ask. The cashier is the person who notices the mis-scan. So the counter's own grant opens
+the door and `voidService` enforces `TX-405` inside, where the refusal can name `POS-403` and open
+the inline authorisation panel rather than answering `403` at the edge with nothing to do next.
+The same reasoning, from the other side, is why `POS-402`'s window is checked on the **sale's**
+shift and not the actor's: a manager with no drawer of their own may still void a cashier's
+mis-scan, and `TX-419` — "close another user's shift" — is the grant that already governs acting
+on a drawer you did not count.
 
 All of purchasing is behind `TX-409` — §10's "receive goods" — because §10 has no separate
 grant for raising an order and `TX-409`'s roles are exactly the right set: owner, manager and

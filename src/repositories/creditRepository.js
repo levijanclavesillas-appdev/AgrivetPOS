@@ -171,6 +171,21 @@ function allocationsForCollection(collectionTxnId) {
   `).all(collectionTxnId);
 }
 
+/**
+ * The ledger rows one sale created, so a void can reverse exactly what it wrote.
+ *
+ * `sale_id` is a soft reference (004's own note explains why it is not a foreign key),
+ * which changes nothing here: it is still the only column that says which credit rows
+ * belong to which sale, and a void that guessed from the amount would reverse the
+ * wrong row the first time a farm bought twice for the same money.
+ */
+function transactionsForSale(saleId) {
+  return db.get().prepare(`
+    SELECT ${TXN_COLUMNS} FROM customer_credit_transactions
+     WHERE sale_id = ? ORDER BY occurred_at, id
+  `).all(saleId);
+}
+
 function allocationsForSale(saleTxnId) {
   return db.get().prepare(`
     SELECT id, collection_txn_id, amount_centavos, created_at
@@ -192,7 +207,7 @@ function accountsWithBalance() {
 
 module.exports = {
   findAccount, findAccountByCustomer, insertAccount, updateAccountFields,
-  insertTransaction, findTransaction, transactionsFor, countTransactionsFor,
+  insertTransaction, findTransaction, transactionsFor, countTransactionsFor, transactionsForSale,
   ledgerSum, reconciliationBreaks, openDebits,
   insertAllocation, allocationsForCollection, allocationsForSale, accountsWithBalance,
 };

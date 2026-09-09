@@ -143,6 +143,9 @@ const ACTIONS = Object.freeze({
   // row that says a medicine went back on the shelf, and who said it could.
   OVERRIDE_RESTOCK_AGAINST_DEFAULT: { what: 'Restock against the write-off default authorised', rule: 'AUD-603', override: true },
   OVERRIDE_LATE_RETURN: { what: 'Return beyond the window authorised', rule: 'AUD-603', override: true },
+  // POS-403. The only override in this list that is required on *every* occurrence
+  // rather than on an exception — a cashier may never void unaided.
+  OVERRIDE_SALE_VOID: { what: 'Sale void authorised', rule: 'AUD-603', override: true },
 });
 
 const ACTION_NAMES = Object.freeze(Object.keys(ACTIONS));

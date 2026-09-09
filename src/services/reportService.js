@@ -279,6 +279,51 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
   };
 }
 
+// ── POS-404 — the void report ───────────────────────────────────────────────
+
+/**
+ * The voids of a range, which is the one report that looks *for* them.
+ *
+ * Every other report in this file filters voids out of a total. POS-404 draws the
+ * distinction in its own sentence — a voided sale is "excluded from net sales **and**
+ * included in a void report" — and this is the second half. Without it, "excluded"
+ * quietly becomes "invisible", and a void nobody can list is a void nobody can audit.
+ *
+ * There is no reconciliation block, because there is nothing to reconcile: these
+ * figures are in no total anywhere. What the report carries instead is the pair a
+ * reader is actually checking — who rang it and who authorised undoing it (AUD-603) —
+ * and the cash that went back out of the drawer.
+ */
+function voids({ from, to = null, shiftId = null, limit = 500 } = {}, actor = null) {
+  const scope = range({ from, to });
+  const shift = actor ? assertShiftScope(actor, shiftId, { what: 'the void report' }) : shiftId;
+
+  const rows = voidService().listFor({ ...scope, fromAt: scope.fromAt, toAt: scope.toAt, shiftId: shift, limit });
+
+  return {
+    header: header({ scope, shiftId: shift, actor, extra: { report: 'VOIDS', rule_id: 'POS-404' } }),
+    totals: {
+      void_count: rows.length,
+      voided_centavos: rows.reduce((sum, row) => sum + row.total_centavos, 0),
+      cash_returned_centavos: rows.reduce((sum, row) => sum + row.cash_returned_centavos, 0),
+      // POS-403 has no ordinary case, so this is not "how many needed a manager" but
+      // "how many were done by somebody who was not already one" — which is the figure
+      // an owner reading this report is looking for.
+      authorised_by_another_count: rows.filter((row) => row.approved_by || row.voided_by !== row.cashier_username).length,
+    },
+    // POS-404, said rather than left to be inferred from a report that happens to
+    // exist: the numbers below are still in the sequence, and none of them is missing.
+    sequence_note: 'A voided sale keeps its receipt number (POS-108). These numbers are '
+      + 'not reissued and the sequence has no gap where they sit.',
+    voids: rows,
+  };
+}
+
+// Required lazily: voidService reads reportRepository for this very query, and a
+// top-level require in both directions is a cycle that resolves to an empty object in
+// whichever file node happens to load second.
+const voidService = () => require('./voidService');
+
 // ── SCR-603 — payments (RPT-102) ────────────────────────────────────────────
 
 /** POS-206: what the column says, printed as the column says it. */
@@ -529,6 +574,26 @@ function exportCsv(report, params, actor) {
     ]));
   }
 
+  if (report === 'voids') {
+    lines.push(csvRow(['Voids', built.totals.void_count]));
+    lines.push(csvRow(['Value voided', pesos(built.totals.voided_centavos)]));
+    lines.push(csvRow(['Cash returned', pesos(built.totals.cash_returned_centavos)]));
+    lines.push(csvRow(['Sequence', built.sequence_note]));
+    lines.push('');
+    lines.push(csvRow([
+      'Receipt', 'Rung up', 'Voided', 'Cashier', 'Voided by', 'Authorised by',
+      'Customer', 'Total', 'Cash returned', 'Reason',
+    ]));
+    for (const row of built.voids) {
+      lines.push(csvRow([
+        row.sale_no, row.occurred_at_manila, row.voided_at_manila,
+        row.cashier_username, row.voided_by, row.approved_by || '',
+        row.customer_name || '', pesos(row.total_centavos),
+        pesos(row.cash_returned_centavos), row.reason || '',
+      ]));
+    }
+  }
+
   if (report === 'valuation') {
     lines.push(csvRow(['As of', built.header.as_of_manila]));
     lines.push('');
@@ -564,7 +629,7 @@ function exportCsv(report, params, actor) {
   };
 }
 
-const REPORTS = Object.freeze({ daily, payments, valuation: (p, a) => valuation(a) });
+const REPORTS = Object.freeze({ daily, payments, voids, valuation: (p, a) => valuation(a) });
 
 function build(report, params, actor) {
   const fn = REPORTS[report];
@@ -575,7 +640,7 @@ function build(report, params, actor) {
 module.exports = {
   NON_CASH,
   range, assertShiftScope, header,
-  daily, payments, valuation, dashboard, build, exportCsv,
+  daily, payments, voids, valuation, dashboard, build, exportCsv,
   // Named for the tests that drive one piece at a time.
   csvCell, pesos,
 };

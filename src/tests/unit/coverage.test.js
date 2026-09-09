@@ -59,11 +59,14 @@ const BUILT_AT_1_1 = Object.freeze(['PO']);
 /**
  * And the individual v1.1 rules built by a task that did **not** land a whole section.
  *
- * TASK-020 built `POS-301`–`POS-307` and `CR-108`; `POS-401`–`POS-404` are TASK-021's
- * void and are not written yet. A prefix is too coarse to say that, so the obligation
- * is expressed per rule — the alternative was either demanding a citation for the void
- * (a fake) or letting seven built rules go uncovered (a gap), and both are worse than
- * a list somebody has to add two lines to.
+ * TASK-020 built `POS-301`–`POS-307` and `CR-108`; TASK-021 built `POS-401`–`POS-404`.
+ * Between them that is the whole of §6's v1.1 rules, but the two landed separately and
+ * a prefix is too coarse to say so mid-way — the alternative at TASK-020 was either
+ * demanding a citation for a void nobody had written (a fake) or letting seven built
+ * rules go uncovered (a gap), and both are worse than a list somebody adds two lines
+ * to. `POS` is not folded into the prefix list above even now: `INV` and `CR` still
+ * have v1.1 rules outstanding, and the per-rule list is where a partial section says
+ * honestly which of its rules are real.
  *
  * A task that lands part of a section adds its rules here; one that lands a whole
  * section adds its prefix above.
@@ -72,6 +75,8 @@ const BUILT_RULES_AT_1_1 = Object.freeze([
   // TASK-020 — sales returns
   'POS-301', 'POS-302', 'POS-303', 'POS-304', 'POS-305', 'POS-306', 'POS-307',
   'CR-108',
+  // TASK-021 — sale voiding
+  'POS-401', 'POS-402', 'POS-403', 'POS-404',
 ]);
 
 /**

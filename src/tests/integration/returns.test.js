@@ -625,7 +625,13 @@ test('POS-301: a voided sale has nothing to return against', () => {
   const product = stocked();
   const sale = cashSale({ product, qtyMilli: 1000 });
   const item = saleRepository.itemsFor(sale.sale.id)[0];
-  saleRepository.setStatus(sale.sale.id, 'VOIDED');
+
+  // A real void (TASK-021). This forced the status by hand while POS-401 was unbuilt;
+  // driving the real thing is what makes the refusal below mean "a void already
+  // reversed this" rather than "a column says VOIDED".
+  require('../../services/voidService').post({
+    saleId: sale.sale.id, reason: 'Voided at the counter',
+  }, sessions.MANAGER);
 
   assert.throws(
     () => returnService.post({

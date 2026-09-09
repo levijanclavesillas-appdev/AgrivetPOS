@@ -3,7 +3,8 @@
 Work items, closed and open. Each task is self-contained: an implementer should need this file,
 plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**v1.0 is code-complete; v1.1 is under way** — `TASK-019` and `TASK-020` are closed.
+**v1.0 is code-complete; v1.1 is under way** — `TASK-019` to `TASK-021` are closed, and with
+them both of `POS-107`'s corrections: a sale can now be unsold either way round.
 `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
 screens the original backlog never assigned to anybody — see [the screen gap](#the-screen-gap--found-and-closed),
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
@@ -92,6 +93,7 @@ again quietly.
 | :--- | :--- | :--- | :--- |
 | [TASK-019](TASK-019-suppliers-and-purchasing.md) | Suppliers, purchase orders, goods receipt | `372b2ba` | `010_purchasing.sql`; `supplierService`, `purchaseOrderService`, `goodsReceiptService` and their repositories; `SCR-801`–`SCR-804`; `TC-INT-76`–`TC-INT-80`, `TC-E2E-16`. The v1.1 gate in `07_TEST_PLAN.md` §10 |
 | [TASK-020](TASK-020-sales-returns.md) | Sales returns with the restock/write-off decision | `3ea6fd1` | `011_returns.sql`; `returnService` and its repository; `SCR-305`; `TC-INT-81`–`TC-INT-84`, `TC-E2E-17`. `RPT-101`'s fourth term stopped being zero |
+| [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | *this commit* | No schema — `006_sales.sql`'s four unused columns finally used. `voidService`; the void on `SCR-304`; `POS-404`'s void report; `TC-INT-85`–`TC-INT-87`, `TC-E2E-18`, and `TC-INT-62` re-pointed at a real void |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
@@ -118,6 +120,20 @@ two assertions started checking a product they were never about. The walk now fi
 by name — a harness that reads its fixture by position is a harness that fails for a reason
 nobody can see.
 
+**What `TASK-021` found, and only a browser could.** `SCR-304`'s void submit computes its
+`disabled` state when the panel is built. The reason field updated the variable and nothing
+re-evaluated it, so the button stayed dead however much the cashier typed — a screen on which
+the feature simply could not be used. Every unit guard passed: they asserted the *expression*,
+which was correct, and never that anything re-ran it. The guard now asserts both, and the fix is
+the same targeted refresh `SCR-803` and `SCR-305` already use to avoid moving the cursor.
+
+**And the two refusals `TASK-021` added that its brief did not name.** A sale with goods already
+returned is not voided, because a void says the sale never happened and part of it demonstrably
+did; and a credit sale a collection has been allocated against is not voided either, because
+unpicking it would make money the customer actually paid disappear. Both name the return. The
+`sales.approved_by` column turned out not to be the void's approver — it records who released a
+discount at the time of *sale* — so the void report reads `AUD-603`'s own audit row instead.
+
 ## Open — v1.1 "Supply"
 
 Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
@@ -129,7 +145,6 @@ already written and tested by it.
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
-| [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `FT-308` | — |
 | [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `FT-209` | — |
 | [TASK-023](TASK-023-discount-rules-engine.md) | Discount rules engine and category ceilings | `FT-306` | — |
 | [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `FT-211`, `FT-212` | `TASK-023` |

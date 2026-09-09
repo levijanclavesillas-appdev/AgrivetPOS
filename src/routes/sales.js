@@ -5,15 +5,26 @@
 //   POST /sales             TX-401   **the transaction** — FR_3.5
 //   GET  /sales             TX-401   the lookup SCR-305 opens with
 //   GET  /sales/:id         TX-401   the receipt view
+//   GET  /sales/:id/voidable TX-401  POS-402/POS-403, answered before the button shows
+//   POST /sales/:id/void    TX-401   POS-401 – POS-404, and TX-405 inside the service
 //
 // POST /sales/price-check lives in routes/pricing.js with the engine it calls.
 //
 // There is no PUT and no DELETE. POS-107 makes a completed sale immutable, and the
 // absence of the route is how that is enforced at the edge — the corrections are a
-// void (TASK-021) and a return (TASK-020), both of which write new rows.
+// void and a return, both of which write new rows and neither of which edits this one.
+//
+// **The void sits under TX-401, not TX-405, and that is deliberate.** §10 grants
+// TX-405 to a manager and an owner only, so a route behind it would be a route a
+// cashier cannot call — and POS-403 says "a cashier may never void *unaided*", which
+// is a rule about authorisation, not about who may ask. The cashier is the person who
+// notices the mis-scan. So the counter's own grant opens the door, and `voidService`
+// enforces TX-405 inside, where the refusal can name POS-403 and open the inline
+// authorisation panel rather than answering 403 at the edge with nothing to do next.
 
 const express = require('express');
 const saleService = require('../services/saleService');
+const voidService = require('../services/voidService');
 const sequenceService = require('../services/sequenceService');
 const errors = require('../services/errors');
 const { authenticate, requirePermission } = require('../middleware/auth');
@@ -115,6 +126,44 @@ router.get('/sales', atTheCounter, (req, res, next) => {
 router.get('/sales/:id', atTheCounter, (req, res, next) => {
   try {
     res.json(saleService.get(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POS-402 and POS-403, answered before SCR-304 shows the button.
+ *
+ * Whether the originating shift is still open is the server's fact, and a screen that
+ * decided it for itself would offer a void after a close and explain the refusal
+ * afterwards — by which time the cashier has already told the customer it can be
+ * undone. Read-only; it writes nothing.
+ */
+router.get('/sales/:id/voidable', atTheCounter, (req, res, next) => {
+  try {
+    res.json(voidService.eligibility(req.params.id, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POS-401 — the reversal.
+ *
+ * One transaction in voidService: the compensating movements, the credit reversal, the
+ * sale's four stamped columns and both audit rows. This route parses, authorises,
+ * delegates and serialises, and holds no rule of its own (05_TECH_SPEC.md §8.2).
+ */
+router.post('/sales/:id/void', atTheCounter, (req, res, next) => {
+  try {
+    const body = req.body || {};
+    res.status(201).json(voidService.post({
+      saleId: req.params.id,
+      reason: body.reason,
+      // POS-403's authoriser, as a username. Resolved against the users table
+      // server-side, because a body carrying `{ role: 'MANAGER' }` is a claim (SEC-6).
+      approver: body.approver || null,
+    }, req.session));
   } catch (err) {
     next(err);
   }

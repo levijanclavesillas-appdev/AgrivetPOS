@@ -768,7 +768,7 @@ test('the sale snapshots the tax mode in force (RPT-106)', () => {
 
 // ── POS-107 — immutability ──────────────────────────────────────────────────
 
-test('POS-107: the only writes to a sale are the two narrow setters a return needs', () => {
+test('POS-107: the only writes to a sale are the three narrow setters its corrections need', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'repositories', 'saleRepository.js'), 'utf8');
@@ -778,25 +778,38 @@ test('POS-107: the only writes to a sale are the two narrow setters a return nee
   const templates = source.match(/`[\s\S]*?`/g) || [];
 
   /**
-   * The two statements TASK-020 added, verbatim.
+   * The three statements the two corrections added, verbatim.
    *
-   * POS-107 says a completed sale is immutable, and 006_sales.sql put
-   * `sales.status` and `sale_items.returned_qty_milli` there for a return to move.
-   * Those two columns are the exception, and the way it stays an exception is that
-   * this guard lists the exact statements rather than being relaxed to "no general
-   * update": the next column somebody wants to write has to be added here first,
-   * in front of whoever reviews it.
+   * POS-107 says a completed sale is immutable, and 006_sales.sql put `sales.status`,
+   * `sale_items.returned_qty_milli` and the three `voided_*` columns there for a
+   * return and a void to move. Those are the exception, and the way it stays an
+   * exception is that this guard lists the exact statements rather than being relaxed
+   * to "no general update": the next column somebody wants to write has to be added
+   * here first, in front of whoever reviews it.
+   *
+   * The void statement writes four columns in one go on purpose (POS-401). There is no
+   * moment in which the ledger holds a voided sale that nobody voided, and no way to
+   * reach the status without the actor, the time and the reason.
    */
   const PERMITTED = [
     'UP' + 'DATE sales SET status = ? WHERE id = ?',
     'UP' + 'DATE sale_items SET returned_qty_milli = ? WHERE id = ?',
+    'UP' + "DATE sales SET status = 'VOIDED', voided_at = ?, voided_by = ?, void_reason = ? WHERE id = ?",
   ];
+
+  // Compared with whitespace collapsed and the quoting stripped. A template literal
+  // carries its own backticks and indentation into the match, and an allow-list that
+  // had to reproduce those byte for byte would be one nobody could reformat the
+  // repository without breaking — which is how a guard ends up deleted rather than
+  // maintained.
+  const normalise = (literal) => literal.replace(/^[`'"]|[`'"]$/g, '').replace(/\s+/g, ' ').trim();
+  const permitted = new Set(PERMITTED.map(normalise));
 
   for (const verb of ['UP' + 'DATE', 'DEL' + 'ETE', 'DR' + 'OP', 'TRUN' + 'CATE']) {
     for (const table of ['sales', 'sale_items', 'sale_tenders']) {
       const pattern = new RegExp(`${verb}[\\s\\S]{0,40}\\b${table}\\b`, 'i');
       const offender = [...literals, ...templates]
-        .filter((text) => !PERMITTED.includes(text.trim()))
+        .filter((text) => !permitted.has(normalise(text)))
         .find((text) => pattern.test(text));
       assert.equal(offender, undefined, `${verb} path on ${table}`);
     }
@@ -804,15 +817,26 @@ test('POS-107: the only writes to a sale are the two narrow setters a return nee
 
   // And both of the permitted two are actually there — a guard whose allow-list has
   // gone stale passes by describing code that no longer exists.
+  const present = new Set([...literals, ...templates].map(normalise));
   for (const statement of PERMITTED) {
-    assert.ok(source.includes(statement), `${statement} is the statement POS-301 needs`);
+    assert.ok(present.has(normalise(statement)),
+      `${statement} is one of the statements POS-301 and POS-401 need`);
   }
 
   // The status setter refuses anything outside POS-107's machine, so the CHECK
   // constraint is not the only thing between the ledger and a typo.
   assert.throws(() => saleRepository.setStatus('any-sale', 'COMPLETED'), RangeError);
   assert.deepEqual([...saleRepository.SETTABLE_STATUSES].sort(),
-    ['PARTIALLY_RETURNED', 'RETURNED', 'VOIDED']);
+    ['PARTIALLY_RETURNED', 'RETURNED']);
+
+  // VOIDED is deliberately not settable through `setStatus`: POS-401 gives it three
+  // companion columns, and `setVoided` is the only door. A sale marked voided with
+  // nobody's name against it is the shape a shrinkage tool takes.
+  assert.throws(() => saleRepository.setStatus('any-sale', 'VOIDED'), RangeError);
+  assert.throws(
+    () => saleRepository.setVoided('any-sale', { voidedAt: '2026-01-01T00:00:00.000Z', voidedBy: 'u', reason: '' }),
+    TypeError
+  );
 });
 
 // ── Over HTTP ───────────────────────────────────────────────────────────────

@@ -8,17 +8,23 @@
 // editing these. TC-INT-34's sibling reads this source to prove the absence, as
 // TC-INT-24 does for the inventory ledger.
 //
-// Two narrowly named exceptions live at the bottom of this file, added by TASK-020:
-// `setStatus` and `setReturnedQty`. Between them they touch three columns —
-// `sales.status`, `sale_items.returned_qty_milli` — and nothing else. They exist
-// because POS-301 needs the sale to say how much of it has come back, and 006_sales.sql
-// put both columns there for exactly that. What they are deliberately *not* is a
-// general `updateFields`: the difference between "the sale records that goods came
-// back" and "the sale can be edited" is the whole of POS-107, and it is kept as the
-// difference between two named methods and one open one.
+// Three narrowly named exceptions live at the bottom of this file. Between them they
+// touch five columns and nothing else:
 //
-// The remaining exception, still not written here: voiding sets the voided_* columns.
-// That is TASK-021's, in the same shape.
+//   `setStatus`      (TASK-020)  sales.status, for the two return statuses
+//   `setReturnedQty` (TASK-020)  sale_items.returned_qty_milli
+//   `setVoided`      (TASK-021)  sales.status, voided_at, voided_by, void_reason
+//
+// 006_sales.sql put every one of those columns there for exactly this. What they are
+// deliberately *not* is a general `updateFields`: the difference between "the sale
+// records what happened to it" and "the sale can be edited" is the whole of POS-107,
+// and it is kept as the difference between three named methods and one open one.
+//
+// `setVoided` writes the status **and** the actor, timestamp and reason in one
+// statement, and `setStatus` refuses `VOIDED` outright. POS-404 is why: a sale marked
+// voided with nobody's name against it is the shape a shrinkage tool takes, and the
+// way to keep the four columns together is to make it impossible to write one of them
+// alone.
 
 const db = require('../config/database');
 
@@ -202,14 +208,36 @@ function countAll() {
  * The status list is repeated here rather than imported, because this is the layer
  * that writes it and a repository that would accept any string is a repository that
  * makes the CHECK constraint the only thing standing between the ledger and a typo.
+ *
+ * `VOIDED` is deliberately **not** on it. It has three companion columns that POS-401
+ * requires to be written with it, and `setVoided` below is the only way to reach it.
  */
-const SETTABLE_STATUSES = Object.freeze(['PARTIALLY_RETURNED', 'RETURNED', 'VOIDED']);
+const SETTABLE_STATUSES = Object.freeze(['PARTIALLY_RETURNED', 'RETURNED']);
 
 function setStatus(saleId, status) {
   if (!SETTABLE_STATUSES.includes(status)) {
     throw new RangeError(`a sale is not moved to ${status} from here (POS-107)`);
   }
   db.get().prepare('UPDATE sales SET status = ? WHERE id = ?').run(status, saleId);
+  return findById(saleId);
+}
+
+/**
+ * POS-401's four columns, written together or not at all.
+ *
+ * One statement rather than a status change followed by three stamps: there is no
+ * moment in which the ledger holds a voided sale that nobody voided. The reason is
+ * required here rather than defaulted, because POS-401 names it alongside the actor
+ * and the timestamp, and a void with no reason is the row an auditor cannot use.
+ */
+function setVoided(saleId, { voidedAt, voidedBy, reason }) {
+  if (!voidedAt || !voidedBy || !reason) {
+    throw new TypeError('a void records the actor, the time and the reason (POS-401)');
+  }
+  db.get().prepare(`
+    UPDATE sales SET status = 'VOIDED', voided_at = ?, voided_by = ?, void_reason = ?
+     WHERE id = ?
+  `).run(voidedAt, voidedBy, reason, saleId);
   return findById(saleId);
 }
 
@@ -238,5 +266,5 @@ module.exports = {
   insertSale, insertItem, insertTender, insertDiscount,
   findById, findByNo, itemsFor, findItem, tendersFor, discountsFor,
   referenceUsedToday, listForShift, search, countSearch, countAll,
-  setStatus, setReturnedQty,
+  setStatus, setVoided, setReturnedQty,
 };

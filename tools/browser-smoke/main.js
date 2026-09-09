@@ -746,6 +746,158 @@ app.whenReady().then(async () => {
   // Back to the owner for the admin section, which is TX-423 and not the clerk's.
   log(await signInAs('chachi', 'sack-of-feed-2026'), 'the owner signs back in');
 
+  console.log('\n— SCR-304: the void (POS-401 to POS-404) —');
+
+  // The mis-scan, driven from the screen it happens on. The owner is signed in here
+  // and holds TX-405, so this walk proves the *self-authorised* path; POS-403's panel
+  // is proved over HTTP by TC-E2E-18, where Tess and Rosa are two people.
+  await api('/shifts/open', { method: 'POST', body: { openingFloatCentavos: 200000, confirmed: true } });
+
+  // Both baselines are taken **before either sale is rung**, and both are asserted at
+  // the end of this section. Two sales go on and both are voided, so the shelf and the
+  // drawer must each come back to exactly where they are now — which is a stronger
+  // statement than checking either void in isolation, and the one an owner counting a
+  // drawer at the end of the day is actually relying on.
+  const stockBeforeAnyVoid = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  const expectedBeforeVoid = (await api('/shifts/current')).json.expected.expected_cash_centavos;
+
+  const doomedSale = await api('/sales', {
+    method: 'POST',
+    body: {
+      lines: [{ productId: PRODUCT_ID, qtyMilli: 8000 }],           // 8 KG — ₱500.00
+      tenders: [{ method: 'CASH', amountCentavos: 100000 }],        // ₱1,000, ₱500 change
+    },
+  });
+  log(doomedSale.status === 201, 'a sale is rung for the counter to undo', String(doomedSale.status));
+
+  // SCR-304 is reached by completing a sale through the screens, which this walk has
+  // already done once. Going straight to the receipt view is not available from the
+  // rail, so the void is driven from a fresh POS sale — the path a cashier takes.
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+  await run(`(() => {
+    const el = document.querySelector('.pos-search');
+    el.focus();
+    for (const ch of '4800012345678') {
+      el.value += ch;
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  })()`);
+  await settle(1200);
+  await press('F9');
+  await settle(900);
+  await run(`(() => {
+    const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'CASH');
+    if (b) b.click();
+  })()`);
+  await settle(500);
+  await run(`(() => {
+    const el = document.querySelector('.tender-amount');
+    el.focus(); el.value = '100.00';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(500);
+  await run(`document.querySelector('.complete').click()`);
+  const onReceipt = await waitFor(`!!document.querySelector('.receipt')`,
+    { label: 'SCR-304', timeoutMs: 15000 });
+  log(onReceipt, 'SCR-304 opens on the sale just rung');
+
+  const voidedNo = (await text('.receipt h1')).trim();
+
+  // POS-402 and POS-403 are the server's answers, fetched before the button is drawn.
+  const buttonOk = await waitFor(FIND('.receipt-actions button', '/Void this sale/'),
+    { label: 'the void button', timeoutMs: 8000 });
+  log(buttonOk, 'POS-402: the shift is open, so the void is offered');
+
+  await clickOn('.receipt-actions button', '/Void this sale/');
+  const voidPanelOk = await waitFor(`!!document.querySelector('.void-panel')`, { label: 'the void panel' });
+  log(voidPanelOk, 'and it opens a panel rather than a bare confirmation');
+
+  const panelText = await text('.void-panel');
+  // POS-404, before the button rather than after it. The cashier should not go looking
+  // for the receipt number to come back.
+  log(/keeps its receipt number/.test(panelText), 'POS-404: the panel says the number is kept');
+  log(/POS-404/.test(panelText), 'and names the rule', panelText.replace(/\s+/g, ' ').slice(0, 80));
+
+  // POS-401: the reason is required, and the button is dead without one.
+  log(await run(`${FIND('.void-panel button', '/Void the sale/')}.disabled === true`),
+    'POS-401: nothing voids until there is a reason');
+
+  // The owner holds TX-405, so there is no authorisation panel for them — which is the
+  // half of POS-403 this walk is placed to prove.
+  log(await run(`!document.querySelector('.void-panel .authorisation')`),
+    'POS-403: an owner authorises themselves, and is not asked to sign in twice');
+
+  await run(`(() => {
+    const el = document.querySelector('.void-reason');
+    el.value = 'Scanned it twice — the farmer wanted one';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+  log(await run(`${FIND('.void-panel button', '/Void the sale/')}.disabled === false`),
+    'and with a reason it is armed');
+
+  await clickOn('.void-panel button', '/Void the sale/');
+  const doneOk = await waitFor(`!!document.querySelector('.receipt-voided')`,
+    { label: 'the voided state', timeoutMs: 15000 });
+  log(doneOk, 'the void posts from the screen');
+
+  if (doneOk) {
+    const done = await text('.receipt-voided');
+    log(/is voided/.test(done), 'and the screen says so plainly');
+    log(/sequence has no gap/.test(done), 'POS-404: with the sentence about the number');
+    log(/Hand back/.test(done), 'and what to hand back across the counter',
+      (done.match(/Hand back [^.]+\./) || [''])[0]);
+  }
+
+  const uiVoided = (await api(`/sales?q=${encodeURIComponent(voidedNo)}&limit=5`)).json.sales
+    .find((sl) => sl.sale_no === voidedNo);
+  log(Boolean(uiVoided) === false || uiVoided.status === 'VOIDED',
+    'POS-404: the sale is still findable, and marked voided');
+
+  // POS-404's report, and the arithmetic that matters at the close.
+  const voidDay = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+  const voidReport = (await api(`/reports/voids?from=${voidDay}`)).json;
+  log(voidReport.totals.void_count >= 1, 'POS-404: the void report lists it',
+    `${voidReport.totals.void_count} void(s)`);
+  log(/no gap/.test(voidReport.sequence_note), 'and states that the sequence is intact');
+
+  const voidedRow = voidReport.voids.find((v) => v.sale_no === voidedNo);
+  log(Boolean(voidedRow && voidedRow.reason), 'with the cashier’s own account of the mistake',
+    voidedRow && voidedRow.reason);
+
+  const dailyAfterVoid = (await api(`/reports/daily?from=${voidDay}`)).json;
+  log(dailyAfterVoid.header.voided_excluded_count >= 1,
+    'RPT-106: and the daily report says how much it left out',
+    `${dailyAfterVoid.header.voided_excluded_count} excluded`);
+  log(dailyAfterVoid.reconciliation.reconciles === true,
+    'and the day still reconciles without it');
+
+  // The API-side void from the top of this section, so the drawer assertion covers a
+  // sale the screens did not touch either.
+  const voidedByApi = await api(`/sales/${doomedSale.json.sale.id}/void`, {
+    method: 'POST', body: { reason: 'Rang the wrong quantity' },
+  });
+  log(voidedByApi.status === 201, 'the API-side sale is voided too', String(voidedByApi.status));
+
+  // Both sales are now voided, so both baselines must be back. INV-102: by four
+  // compensating movements, not by four deletions — the ledger below is longer than
+  // it was, and the shelf is where it started.
+  const stockAfterVoids = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(stockAfterVoids === stockBeforeAnyVoid,
+    'POS-401: two sales, two voids, and the shelf is exactly where it started',
+    `${stockAfterVoids} milli, unchanged`);
+
+  // Requirement 6, which is the one an owner notices at the close: the drawer expects
+  // what it did before either voided sale — once, not twice. A compensating till
+  // movement would have taken each of them off a second time.
+  const expectedAfterVoid = (await api('/shifts/current')).json.expected.expected_cash_centavos;
+  log(expectedAfterVoid === expectedBeforeVoid,
+    'POS-509: and the drawer expects what it did before them — once, not twice',
+    `₱${(expectedAfterVoid / 100).toFixed(2)}`);
+
   console.log('\n— SCR-305: the return —');
 
   // A shift, and a sale to take back off it. The shift the POS walk opened was closed

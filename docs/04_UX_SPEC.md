@@ -133,11 +133,31 @@ over limit (`CR-104`). Complete is disabled until `SUM(tenders) ≥ due` (`POS-2
 Non-cash rows carry the word **RECORDED** next to the amount (`POS-206`) — in the UI, on the
 receipt, and in reports.
 
-### `SCR-304` — Receipt · `FT-304`
+### `SCR-304` — Receipt · `FT-304`, and the void · `FT-308` — v1.1
 
 Preview of the internal transaction record, print and reprint. Reprints are stamped `REPRINT`
 and audited (`POS-208`). The document always carries "This is not an official receipt"
 (`TAX-006`); in `VAT` mode it adds the tax summary block (`TAX-007`).
+
+**The void lives here**, because this is the screen the cashier is looking at in the moment
+`POS-401` exists for: the customer is still standing there and the mis-scan has just printed.
+Whether it is offered at all is the server's answer, from `GET /sales/:id/voidable` — a screen
+that worked out for itself whether the shift was still open would offer the button after a close
+and explain the refusal afterwards, by which time the cashier has already told the customer it
+can be undone. Where it is refused, **the refusal is shown in the button's place** (`POS-402`:
+"that shift has been closed, so the correction is a return"), because a control that is simply
+absent is the one thing worse than a refusal.
+
+Pressing it opens a panel, not a confirmation: `POS-401`'s reason is a field, and for a cashier
+§4's inline authorisation sits under it (`POS-403` — a cashier may never void unaided). A
+manager or owner sees only the reason, and the trail records `self_authorised` so that "a
+manager did this himself" and "no authorisation was needed" stay distinguishable. Submit is dead
+until both are answered. Enter is bound to "new sale" on this screen and is **suspended while the
+panel is open**, or it would fire a destructive action mid-sentence.
+
+Afterwards the screen states `POS-404` rather than leaving it to be noticed: the sale keeps its
+receipt number, the sequence has no gap, it is out of the day's takings, and here is what to hand
+back.
 
 ### `SCR-305` — Return · `FT-307` — v1.1
 

@@ -5,6 +5,7 @@
 //   GET /reports/dashboard             TX-421   SCR-601 — FR_6.1
 //   GET /reports/daily?from=&to=       TX-421   SCR-602 — FR_6.2, RPT-101
 //   GET /reports/payments?from=&to=    TX-421   SCR-603 — RPT-102
+//   GET /reports/voids?from=&to=       TX-421   POS-404 — the one report that looks for them
 //   GET /reports/inventory/valuation   TX-422   SCR-604 — RPT-103
 //   GET /reports/:report/export.csv    TX-426   the same figures, as a file
 //
@@ -63,6 +64,25 @@ router.get('/reports/daily', readSales, (req, res, next) => {
 router.get('/reports/payments', readSales, (req, res, next) => {
   try {
     res.json(reportService.payments({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      shiftId: shiftParam(req.query.shiftId),
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POS-404's second half.
+ *
+ * Every other report here filters voids out of a total; this one lists them, because
+ * "excluded from net sales" and "invisible" are different things and the rule says so
+ * in the same sentence.
+ */
+router.get('/reports/voids', readSales, (req, res, next) => {
+  try {
+    res.json(reportService.voids({
       from: dateParam(req.query.from) || dateParam(req.query.date),
       to: dateParam(req.query.to),
       shiftId: shiftParam(req.query.shiftId),

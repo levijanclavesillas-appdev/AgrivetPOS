@@ -379,7 +379,7 @@ test('with no driver installed the pulse is recorded and reported undelivered', 
   assert.match(record.error, /TASK-014/);
   assert.equal(record.reason_label, 'Till cash in or out');
   assert.deepEqual(Object.keys(drawerService.REASONS),
-    ['CASH_TENDER', 'CASH_COLLECTION', 'CASH_REFUND', 'TILL_MOVEMENT']);
+    ['CASH_TENDER', 'CASH_COLLECTION', 'CASH_REFUND', 'CASH_VOID', 'TILL_MOVEMENT']);
 });
 
 // ── TC-INT-51 / POS-509 — the expected-cash arithmetic ──────────────────────

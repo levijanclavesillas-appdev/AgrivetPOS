@@ -1006,6 +1006,88 @@ test('NFR_4.3: the audit filters are touchable', () => {
   }
 });
 
+// ── SCR-304's void (TASK-021) ───────────────────────────────────────────────
+
+test('POS-402 / POS-403: the receipt asks the server whether a void is possible, and never decides', () => {
+  const source = codeOf('js/receipt/view.js');
+
+  // Both conditions are fetched. A screen that worked out for itself whether a shift
+  // was still open would offer the button after a close and explain the refusal
+  // afterwards — by which time the cashier has told the customer it can be undone.
+  assert.match(source, /\/sales\/\$\{[a-zA-Z.]+\}\/voidable/);
+  assert.match(source, /voidable\.can_void/);
+  assert.match(source, /voidable\.self_authorised/);
+  assert.equal(/status === 'VOIDED'|shift\.status/.test(source), false,
+    'the screen keeps no copy of what makes a sale voidable');
+
+  // POS-402's refusal is shown where the button would have been. A control that is
+  // simply absent is the one thing worse than a refusal.
+  assert.match(source, /voidable\.refusal\.message/);
+  assert.match(source, /voidable\.refusal\.rule_id/);
+});
+
+test('POS-401: the void asks for a reason, and will not submit without one', () => {
+  const source = codeOf('js/receipt/view.js');
+
+  // The reason is what survives on the row, and the button stays dead until there is
+  // one. Four characters is the same floor the service applies — the screen agrees
+  // with the refusal rather than pre-empting a different one.
+  assert.match(source, /reason\.trim\(\)\.length >= 4/);
+  assert.match(source, /aria-label': 'Reason for voiding this sale'/);
+
+  // And the state is **re-evaluated as it is typed**. `disabled` is computed when the
+  // panel is built, so a field that only assigns to `reason` leaves the button dead
+  // however much the cashier types — which is exactly what the browser smoke found,
+  // and what asserting the expression alone would never have caught.
+  assert.match(source, /oninput: \(event\) => \{ reason = event\.target\.value; refreshVoidSubmit\(\); \}/);
+  assert.match(source, /button\.disabled = !voidReady\(\)/);
+});
+
+test('POS-403: a cashier gets the panel, a manager does not, and the submit waits for it', () => {
+  const source = codeOf('js/receipt/view.js');
+
+  assert.match(source, /ui\.authorisationPanel/);
+  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /voidable\.self_authorised \|\| Boolean\(approver\)/,
+    'the submit is disabled until somebody with the authority has signed in');
+  assert.match(source, /err\.ruleId === 'POS-403'/, 'and a refusal reopens the panel');
+});
+
+test('POS-404: the screen says the number is kept, rather than leaving it to be noticed', () => {
+  const prose = proseOf('js/receipt/view.js');
+  const source = codeOf('js/receipt/view.js');
+
+  // The cashier should not go looking for the receipt number to come back, and the
+  // customer should not be told the sale "disappeared".
+  assert.match(source, /keeps its receipt/);
+  assert.match(source, /sequence has no gap \(POS-404\)/);
+  assert.match(source, /out of the day/);
+  assert.match(prose, /the customer is still standing there/);
+});
+
+test('POS-507: Enter starts the next sale, except while the void panel is open', () => {
+  const source = codeOf('js/receipt/view.js');
+
+  // The receipt screen binds Enter to "new sale". Leaving that live under a panel the
+  // cashier is typing a reason into would fire a destructive action mid-sentence.
+  assert.match(source, /event\.key === 'Enter' && !voiding/);
+});
+
+test('NFR_4.3: the void controls are touchable, and read as destructive', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'pos.css'), 'utf8');
+  for (const selector of ['.void-panel .void-reason', '.void-panel .editor-actions button']) {
+    const rule = cssRule(css, selector);
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)/);
+  }
+  assert.match(cssRule(css, '.void-panel'), /var\(--error\)/);
+
+  // `.danger` itself is defined once, beside OPS-004's restore — the two destructive
+  // controls in this product read alike because they share the rule.
+  const reports = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
+  assert.match(cssRule(reports, '.danger'), /background:\s*var\(--error\)/);
+});
+
 // ── SCR-305 (TASK-020) ──────────────────────────────────────────────────────
 
 test('POS-304: the screen shows the rule’s own sentence, and warns only on the exception', () => {
