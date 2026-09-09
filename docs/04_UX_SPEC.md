@@ -40,6 +40,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-403 Collection                         │
 │  STOCK        SCR-201 Products       SCR-202 Product     │
 │               SCR-203 Adjustment     SCR-204 Low stock   │
+│               SCR-205 Stock count                        │
 │  SHIFT        SCR-501 Open           SCR-502 Till cash   │
 │               SCR-503 Close                              │
 │  BUYING       SCR-801 Orders         SCR-802 Order       │
@@ -93,6 +94,40 @@ locked once movements exist per `UOM-003`, with the reason shown — and the pac
 Product, current on-hand, counted or new quantity, computed variance, reason from the configured
 list (`INV-108`), notes. Above the value threshold the screen shows an authorisation panel before
 the submit button is enabled (`AUD-603`).
+
+### `SCR-205` — Stock count · `FT-209` — v1.1
+
+Behind `TX-407`, reached from `SCR-201` beside the valuation — the two answer the halves of one
+question: what the system thinks is here, and what actually is.
+
+Two views. **The list** of counts, where somebody comes back to one they left open, with the
+frozen instant, how many of the scope have a figure, and how many differ. **The sheet** for one
+count: every product in scope, its expected quantity *at the freeze*, a field for what was on the
+shelf, and the variance.
+
+Three things on this screen are stated rather than left to be worked out, and each of them
+prevents a specific expensive misunderstanding.
+
+**`INV-110`, twice.** The variance is measured against what the system held when the count was
+**opened**, not against stock now, and posting adjusts by the difference — so anything sold while
+the counting went on stays sold. A shopkeeper who expects a count to *set* the shelf figure will
+look at the ledger afterwards and report a lost sale as a bug. The column is labelled "expected
+at freeze", never "expected".
+
+**A blank is not a zero.** An empty field is "nobody reached this shelf" and writes nothing; a
+shelf that is genuinely empty is counted as `0` and writes the whole quantity off. Uncounted rows
+are hatched and their field reads *not counted*, matched rows are quiet, and varying rows are
+coloured by direction. A sheet that rendered a blank like a match is a sheet on which somebody
+posts a half-finished count — so the footer says how many are still blank while there is time to
+go and count them, and the posted summary says it again.
+
+**`INV-112` before it refuses.** The counter is told on opening the sheet that somebody else will
+have to approve it, because fetching that person is a thing to plan for rather than discover.
+Where the store has one active account the rule is waived and the screen says so in those words.
+`INV-113`'s staleness is flagged on the list row and at the head of the sheet, and posting a
+stale count opens §4's authorisation panel for an owner.
+
+Posted, it is immutable and offers no edit — the correction is an adjustment citing the count.
 
 ### `SCR-301` — Point of sale · `FT-301` — **the critical screen**
 

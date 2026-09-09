@@ -67,12 +67,63 @@ and one person counting and approving their own count is the shape of the proble
 
 ## Acceptance Criteria
 
-- [ ] A session opened at 09:00 measures variance against 09:00, whatever trades at 11:00
-- [ ] Posting writes a movement only for products that differ
-- [ ] The same user cannot approve their own count where another active user exists
-- [ ] A single-user store can post, and is told the second pair of eyes was not available
-- [ ] A stale session cannot be posted without owner authorisation
-- [ ] The ledger reconciles after posting, and the variance report values it at average cost
+- [x] A session opened at 09:00 measures variance against 09:00, whatever trades at 11:00
+- [x] Posting writes a movement only for products that differ
+- [x] The same user cannot approve their own count where another active user exists
+- [x] A single-user store can post, and is told the second pair of eyes was not available
+- [x] A stale session cannot be posted without owner authorisation
+- [x] The ledger reconciles after posting, and the variance report values it at average cost
+
+## What it decided
+
+**The variance posted is `counted − expected`, and the consequence needs saying on the screen.**
+Both wrong subtractions are one character away. A shelf holds 10 at the freeze, the counter finds
+9 at 09:30, the shop sells 2 at 11:00. `counted − expected` is −1, and posting it leaves 8 − 1 =
+7 — right, because nine really were there and two have since been sold. `counted − live` is +1:
+it would *add* a sack, erase one of the two sales and report a surplus where there was a
+shortage. **So after posting, on hand is not the counted figure**, and a store that does not know
+that will report the ledger as broken. `SCR-205` prints the sentence on the sheet and again after
+posting, and `TC-INT-88` asserts both the reported variance and the resulting on-hand — because
+each wrong implementation gets exactly one of those two right.
+
+**A blank is not a zero, and this is not in the rule document.** `counted_milli` is nullable with
+no default. An uncounted line writes nothing; a line counted as `0` writes the whole quantity off.
+A schema that defaulted the column to zero would write off the entire unreached remainder of a
+shop as shrinkage the moment somebody posted a half-finished session, which is the most expensive
+mistake this feature could make and is one keystroke away. `INV-111` is therefore read as "one
+movement per **counted** product that varies", the posting reports how many were never reached,
+the sheet hatches those rows and their field reads *not counted*, and clearing a line back to
+blank is supported — without it there would be no way back from a mis-key and "blank means zero"
+would become the only available reading.
+
+**The freeze is one transaction, not a loop.** `snapshotLines` reads the products and writes
+every line under one `BEGIN`. Inserting them one at a time would leave a window in which a sale
+could commit between the first product and the last, and the session would then hold two
+different ideas of "now" — the corruption `INV-110` exists to prevent, reintroduced by the code
+meant to implement it.
+
+**`INV-112` is enforced twice, on purpose.** §10 already keeps `TX-408` away from the inventory
+clerk, so the approval route refuses them at the door; the service then refuses on **identity**,
+because a manager who counted the shelves themselves is still the counter. The permission is the
+coarse control and the identity check is the real one.
+
+**Inactive products are counted.** `INV-105` keeps their stock reportable, and a shelf does not
+stop holding twelve sacks because somebody deactivated the product. Skipping them would leave
+that stock permanently unverifiable.
+
+**Two deviations from this file's own technical requirements, both deliberate.** The screen is
+`public/js/catalogue/count.js`, not `public/js/inventory/count.js` — there is no `inventory/`
+directory and the catalogue screens (`SCR-201`–`SCR-204`) live where this one belongs. And the
+child table is `stock_count_lines` rather than `_items`, against §3.3's convention for a
+document's children: every product in scope gets a row whether or not anybody counts it, which is
+a worksheet rather than a set of lines somebody entered — and `INV-111`'s whole point is that
+most of them do nothing.
+
+**What it did not do.** Nothing prevents two open sessions covering the same product. The
+repository has `openSessionsForProduct` ready for the check, but refusing it would stop a store
+recounting one aisle while another session sits abandoned, and `INV-110` says nothing about it —
+each session measures against its own freeze and posts its own variance, so two of them are
+arithmetically sound even if organisationally odd. Worth a rule before it is worth code.
 
 ## Tests
 

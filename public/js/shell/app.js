@@ -21,6 +21,7 @@ import { createAudit } from '../admin/audit.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
+import { createStockCount } from '../catalogue/count.js';
 import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
 import { createCollection } from '../customers/collection.js';
@@ -250,6 +251,7 @@ export function createApp({ root }) {
       onOpen: (id) => showProductEditor(id),
       onAdjust: (id) => showAdjustment(id),
       onValuation: () => showReport('valuation'),
+      onCount: () => showStockCount(),
     });
     current.mount();
     return current;
@@ -407,6 +409,25 @@ export function createApp({ root }) {
     current = createSuppliers({
       root: host(),
       onBack: () => showPurchaseOrders(),
+    });
+    current.mount();
+    return current;
+  }
+
+  /**
+   * SCR-205 — the stocktake, reached from the products list.
+   *
+   * Under Products rather than a rail item of its own: a count is a thing done *to* the
+   * catalogue, and TX-407's roles are the ones already on that section.
+   */
+  function showStockCount(id = null) {
+    if (current?.unmount) current.unmount();
+    renderRail('products');
+    current = createStockCount({
+      root: host(),
+      session,
+      countId: id,
+      onBack: () => showProducts(),
     });
     current.mount();
     return current;

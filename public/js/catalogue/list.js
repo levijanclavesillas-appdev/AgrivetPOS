@@ -19,7 +19,7 @@ import { money, quantity } from '../shell/format.js';
 
 const PAGE = 50;
 
-export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValuation }) {
+export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValuation, onCount }) {
   let query = '';
   let categoryId = '';
   let includeInactive = false;
@@ -104,6 +104,9 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValu
       // tile is a count of products and now opens this list, which left the valuation
       // report with nothing pointing at it.
       h('button', { class: 'row-action', text: 'Valuation', onclick: () => onValuation() }),
+      // SCR-205. Beside the valuation because they answer the two halves of the same
+      // question: what the system thinks is here, and what actually is.
+      onCount ? h('button', { class: 'row-action', text: 'Stock count', onclick: () => onCount() }) : null,
       lowStockOnly()
         ? null
         : h('button', {

@@ -1006,6 +1006,95 @@ test('NFR_4.3: the audit filters are touchable', () => {
   }
 });
 
+// ── SCR-205 (TASK-022) ──────────────────────────────────────────────────────
+
+test('INV-110: the sheet labels the frozen figure as frozen, and says what that means', () => {
+  const source = codeOf('js/catalogue/count.js');
+
+  // "Expected" on its own is the word that makes a shopkeeper think the count sets the
+  // shelf. The column says what the figure actually is.
+  assert.match(source, /text: 'Expected at freeze'/);
+  assert.equal(/text: 'Expected'/.test(source), false, 'never the bare word');
+
+  // And the sentence itself is the server's, shown on the sheet and again after
+  // posting — the two moments a store would otherwise report a lost sale as a bug.
+  assert.match(source, /s\.variance_basis/);
+  assert.match(source, /result\.session\.variance_basis/);
+  assert.equal(/counted_milli - .*expected|expected_milli/.test(source.replace(/expected_display/g, '')), false,
+    'the screen computes no variance of its own');
+});
+
+test('INV-111: a blank is not a zero, and the screen cannot be made to confuse them', () => {
+  const source = codeOf('js/catalogue/count.js');
+
+  // An empty field clears the line rather than storing 0 — which is also the only way
+  // back from a mis-key, and therefore the only reason the two can stay distinct.
+  assert.match(source, /text === '' \? null : Math\.round/);
+  assert.match(source, /placeholder: 'not counted'/);
+
+  // Three row treatments, and the uncounted one is visually distinct from the matched
+  // one. A sheet that rendered them alike is a sheet somebody posts half-finished.
+  assert.match(source, /if \(!line\.is_counted\) return 'is-uncounted'/);
+  assert.match(source, /return 'is-matched'/);
+
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'catalogue.css'), 'utf8');
+  const uncounted = cssRule(css, '.count-sheet tr.is-uncounted');
+  assert.ok(uncounted, 'the uncounted row has a rule of its own');
+  assert.match(uncounted, /repeating-linear-gradient/, 'and does not merely differ in colour');
+  assert.ok(cssRule(css, '.count-sheet tr.is-matched'));
+});
+
+test('INV-111: the counter is told how many are still blank, before and after posting', () => {
+  const source = codeOf('js/catalogue/count.js');
+
+  // While there is still time to go and count them...
+  assert.match(source, /uncounted_count > 0/);
+  assert.match(source, /not counted — those write nothing/);
+
+  // ...and again on the summary, where "nothing happened to 320 products" is the half
+  // a reader has to be able to check.
+  assert.match(source, /p\.uncounted_products > 0/);
+  assert.match(source, /counted and correct — no movement written/);
+});
+
+test('INV-112 / INV-113: the rules are explained before they refuse, and the panel is shared', () => {
+  const source = codeOf('js/catalogue/count.js');
+
+  // INV-112 is a person somebody has to fetch, so the sheet says so while the counting
+  // is still going on rather than at the end.
+  assert.match(source, /one person doing both is the shape/);
+  assert.match(source, /approval_waived/, 'and a one-user store is told the rule was waived');
+
+  // INV-113 arrives as a refusal naming the rule, and opens §4's panel — the same one
+  // SCR-803, SCR-305 and SCR-304 use. A second panel would drift from the first.
+  assert.match(source, /err\.ruleId === 'INV-113'/);
+  assert.match(source, /ui\.authorisationPanel/);
+  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /disabled: posting \|\| \(Boolean\(refusal\) && !approver\)/);
+});
+
+test('NFR_4.3: the count sheet is touchable, and wide enough to scroll on its own', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'catalogue.css'), 'utf8');
+  for (const selector of ['.count-sheet .count-input', '.count-actions .editor-actions button',
+    '.count-controls input, .count-controls select']) {
+    const rule = cssRule(css, selector) ?? cssRule(css, selector.split(',')[0].trim());
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule, /min-height:\s*var\(--touch\)/);
+  }
+  assert.match(cssRule(css, '.stock-count .count-sheet'), /min-width/);
+});
+
+test('TX-407: the stocktake hangs off the products list, not off a rail item of its own', () => {
+  const shell = codeOf('js/shell/app.js');
+  const list = codeOf('js/catalogue/list.js');
+
+  // A count is a thing done *to* the catalogue, and TX-407's roles are the ones
+  // already on that section — so it needs no new grant and no new rail entry.
+  assert.match(list, /text: 'Stock count', onclick: \(\) => onCount\(\)/);
+  assert.match(shell, /onCount: \(\) => showStockCount\(\)/);
+  assert.match(shell, /renderRail\('products'\)/);
+});
+
 // ── SCR-304's void (TASK-021) ───────────────────────────────────────────────
 
 test('POS-402 / POS-403: the receipt asks the server whether a void is possible, and never decides', () => {

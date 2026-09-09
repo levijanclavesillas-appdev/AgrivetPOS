@@ -68,3 +68,39 @@
   .catalogue-controls { flex-direction: column; align-items: stretch; }
   .editor-form { max-width: none; }
 }
+
+/* SCR-205 — the stocktake (TASK-022).
+   Three row treatments, and the third is the one that matters: a line nobody counted
+   must not look like a line that matched, or somebody posts a half-finished count. */
+.stock-count .count-sheet { min-width: 46rem; }
+.count-list { min-width: 44rem; }
+.count-sheet .count-input { width: 6.5rem; min-height: var(--touch); padding: 0 .4rem;
+  text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+.count-sheet .variance { font-variant-numeric: tabular-nums; }
+
+.count-sheet tr.is-uncounted { background: repeating-linear-gradient(
+  135deg, transparent, transparent 6px, var(--rule) 6px, var(--rule) 7px); }
+.count-sheet tr.is-uncounted .count-input::placeholder { color: var(--muted); font-style: italic; }
+.count-sheet tr.is-matched { color: var(--muted); }
+.count-sheet tr.is-short .variance { color: var(--error); font-weight: 600; }
+.count-sheet tr.is-over .variance { color: var(--warn-ink); font-weight: 600; }
+
+.count-list tr.is-stale { border-left: 3px solid var(--warn-ink); }
+.count-list small.warn { display: block; font-size: .75rem; color: var(--warn-ink); background: none; padding: 0; }
+
+.count-controls { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0 .5rem; }
+.count-controls .editor-field { flex: 1 1 14rem; }
+.count-controls input, .count-controls select { min-height: var(--touch); width: 100%; padding: 0 .6rem; }
+
+.count-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+.count-progress { display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: baseline; margin-bottom: 1rem; }
+.count-progress .warn { color: var(--warn-ink); background: none; padding: 0; }
+.count-actions .editor-actions { display: flex; gap: .5rem; margin-top: 1rem; }
+.count-actions .editor-actions button { min-height: var(--touch); padding: 0 1.25rem; }
+
+.count-outcome { list-style: none; margin: 1rem 0; padding: 0; }
+.count-outcome li { padding: .4rem 0; border-bottom: 1px solid var(--rule); }
+.count-outcome li:last-child { border-bottom: 0; }
+.count-outcome li.warn { color: var(--warn-ink); background: none; }
+
+@media (max-width: 900px) { .count-controls { flex-direction: column; } }

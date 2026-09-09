@@ -29,6 +29,7 @@ const SEQUENCES = Object.freeze({
   PURCHASE_ORDER: { prefix: 'PO', table: 'purchase_orders', column: 'po_no', rule: 'PO-101' },
   GOODS_RECEIPT: { prefix: 'GR', table: 'goods_receipts', column: 'gr_no', rule: 'PO-201' },
   RETURN: { prefix: 'RET', table: 'sale_returns', column: 'return_no', rule: 'POS-301' },
+  STOCK_COUNT: { prefix: 'SC', table: 'stock_count_sessions', column: 'count_no', rule: 'INV-110' },
 });
 
 const WIDTH = 6;

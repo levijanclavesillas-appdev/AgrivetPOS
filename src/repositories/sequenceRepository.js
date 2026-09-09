@@ -15,6 +15,7 @@ const ALLOWED = Object.freeze({
   purchase_orders: ['po_no'],
   goods_receipts: ['gr_no'],
   sale_returns: ['return_no'],
+  stock_count_sessions: ['count_no'],
 });
 
 function assertTarget(table, column) {

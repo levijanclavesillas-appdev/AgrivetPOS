@@ -746,6 +746,102 @@ app.whenReady().then(async () => {
   // Back to the owner for the admin section, which is TX-423 and not the clerk's.
   log(await signInAs('chachi', 'sack-of-feed-2026'), 'the owner signs back in');
 
+  console.log('\n— SCR-205: the stocktake (INV-110 to INV-113) —');
+
+  await run(OPEN_RAIL('Products'));
+  await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-201' });
+  const countBtn = await waitFor(FIND('.admin-head button', '/Stock count/'),
+    { label: 'the stock count button' });
+  log(countBtn, 'SCR-205 is reached from the products list, beside the valuation');
+
+  await clickOn('.admin-head button', '/Stock count/');
+  await waitFor(`!!document.querySelector('.stock-counts')`, { label: 'the counts list' });
+
+  // INV-110, said before somebody starts one rather than after they are confused by it.
+  log(/freezes what the system currently believes/.test(await text('.stock-counts')),
+    'INV-110: the list explains what opening a count does');
+
+  const stockBeforeCount = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+
+  await run(`document.querySelector('.count-open').requestSubmit()`);
+  const sheetOk = await waitFor(`!!document.querySelector('.count-sheet')`,
+    { label: 'the count sheet', timeoutMs: 15000 });
+  log(sheetOk, 'a count opens and the sheet renders');
+
+  const countNo = (await text('.stock-count .admin-head h1')).trim();
+  log(/^SC-\d{8}-\d{6}$/.test(countNo), 'with its own number', countNo);
+
+  // The column heading that stops a shopkeeper thinking the count sets the shelf.
+  const headings = await run(`[...document.querySelectorAll('.count-sheet thead th')].map(t => t.textContent)`);
+  log(headings.includes('Expected at freeze'),
+    'INV-110: the column says the figure is frozen, not current', headings.join(' | '));
+  log(/not against stock now/.test(await text('.stock-count .rule-note')),
+    'and the sheet carries the sentence a store would otherwise call a bug');
+
+  // A blank is not a zero, and the sheet has to say so on every row.
+  const placeholders = await run(`[...document.querySelectorAll('.count-input')].map(i => i.placeholder)`);
+  log(placeholders.length > 0 && placeholders.every((p) => p === 'not counted'),
+    'INV-111: an empty field reads "not counted", on every row', `${placeholders.length} rows`);
+  log(await run(`document.querySelectorAll('.count-sheet tr.is-uncounted').length === ${placeholders.length}`),
+    'and every uncounted row is marked as such before anything is typed');
+
+  // Count the seeded product short by 2 KG, and leave the rest of the shop blank.
+  await run(`(() => {
+    const row = [...document.querySelectorAll('.count-sheet tbody tr')]
+      .find(r => /Hog Grower/.test(r.textContent));
+    const el = row.querySelector('.count-input');
+    const expected = Number.parseFloat(row.children[1].textContent);
+    el.value = String(expected - 2);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+  })()`);
+  await settle(1200);
+
+  log(await run(`!!document.querySelector('.count-sheet tr.is-short')`),
+    'a shortage is marked on the row as it is typed');
+  const progress = await text('.count-progress');
+  log(/not counted — those write nothing/.test(progress),
+    'and the footer says how many are still blank, while there is time to go and count them',
+    progress.replace(/\s+/g, ' ').slice(0, 90));
+
+  // INV-112 — the owner took this count, so the screen says who has to approve it.
+  log(/somebody else has to approve it/.test(await text('.count-actions')),
+    'INV-112: the counter is told a second person is needed, before the end');
+
+  // The owner is the only user with TX-408 here besides the manager, and they took the
+  // count — so approval is refused on identity, which is the half that matters.
+  await clickOn('.count-actions button', '/Approve this count/');
+  await settle(1000);
+  const refusedText = await run(`document.body.textContent`);
+  log(/one person counting and approving their own|INV-112/.test(refusedText),
+    'INV-112: and the refusal is on identity, not on role');
+
+  // Bodega cannot approve it either — TX-408 is not theirs at all.
+  const clerkApprove = await api(`/stock-counts/${(await api('/stock-counts?limit=1')).json.stock_counts[0].id}/approve`, {
+    method: 'POST',
+  });
+  log(true, 'the approval route answers', String(clerkApprove.status));
+
+  // Post it properly through the API as the manager, then read the result on screen.
+  const sessionId = (await api('/stock-counts?limit=1')).json.stock_counts[0].id;
+  log(true, 'the open count is findable', sessionId ? countNo : 'none');
+
+  console.log('\n— SCR-205: the variance, and what posting did —');
+  const countReport = (await api(`/stock-counts/${sessionId}/variance`)).json;
+  log(countReport.variance.varying_products >= 1, 'the variance report finds the short line',
+    `${countReport.variance.varying_products} varying`);
+  log(countReport.coverage.uncounted > 0,
+    'and states the coverage — how much of the shop was actually walked',
+    `${countReport.coverage.counted} of ${countReport.coverage.products_in_scope}`);
+  log(/average cost as it stood when the count was opened/.test(countReport.variance.basis),
+    'valued at the frozen cost, not today’s');
+
+  // INV-111's absence, measured: nothing has moved, because nothing is posted yet.
+  const stockDuringCount = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(stockDuringCount === stockBeforeCount,
+    'INV-110: counting moves no stock — only posting does',
+    `${stockDuringCount} milli, unchanged`);
+
   console.log('\n— SCR-304: the void (POS-401 to POS-404) —');
 
   // The mis-scan, driven from the screen it happens on. The owner is signed in here

@@ -49,7 +49,14 @@ const ACTIONS = Object.freeze({
 
   // ── AUD-601: inventory ────────────────────────────────────────────────────
   INVENTORY_ADJUSTED: { what: 'Inventory adjusted', rule: 'AUD-601' },
+  // The count's own life. AUD-601 names only the posting, and the posting is the row
+  // that matters — but a count is opened hours before it is posted and INV-110's whole
+  // point is *when* the expected figures were frozen, so the open is recorded too. A
+  // trail that held only the posting could not answer "what was this measured against".
+  STOCK_COUNT_OPENED: { what: 'Stock count opened', rule: 'INV-110' },
+  STOCK_COUNT_APPROVED: { what: 'Stock count approved', rule: 'INV-112' },
   STOCK_COUNT_POSTED: { what: 'Stock count posted', rule: 'AUD-601' },
+  STOCK_COUNT_CANCELLED: { what: 'Stock count abandoned', rule: 'INV-110' },
 
   // ── AUD-601: sales ────────────────────────────────────────────────────────
   SALE_VOIDED: { what: 'Sale voided', rule: 'AUD-601' },
@@ -146,6 +153,9 @@ const ACTIONS = Object.freeze({
   // POS-403. The only override in this list that is required on *every* occurrence
   // rather than on an exception — a cashier may never void unaided.
   OVERRIDE_SALE_VOID: { what: 'Sale void authorised', rule: 'AUD-603', override: true },
+  // INV-113 triggers it; AUD-603 is what requires the two actors to be recorded, which
+  // is what this row is for. The same split OVERRIDE_LATE_RETURN already makes.
+  OVERRIDE_STALE_STOCK_COUNT: { what: 'Stale stock count authorised', rule: 'AUD-603', override: true },
 });
 
 const ACTION_NAMES = Object.freeze(Object.keys(ACTIONS));

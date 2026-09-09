@@ -61,6 +61,9 @@ const AUD_603_OVERRIDES = {
   // POS-403, added by TASK-021. The only one on this list that is required on *every*
   // occurrence rather than on an exception — a cashier may never void unaided.
   'sale void': 'OVERRIDE_SALE_VOID',
+  // INV-113, added by TASK-022. Triggered by a rule outside §12, recorded under
+  // AUD-603 like the rest because the thing being recorded is the two actors.
+  'stale stock count': 'OVERRIDE_STALE_STOCK_COUNT',
 };
 
 /**
@@ -113,7 +116,11 @@ test('every registered action carries a label and the rule that requires it', ()
   for (const [name, declared] of Object.entries(auditService.ACTIONS)) {
     assert.match(name, /^[A-Z][A-Z0-9_]*$/, `${name}: actions are SCREAMING_SNAKE_CASE`);
     assert.ok(declared.what && declared.what.length > 5, `${name}: SCR-703 lists this label`);
-    assert.match(declared.rule, /^(AUD-60[1-6]|SEC-\d+|VR-\d+|CR-\d+|POS-\d+|PO-\d+|OPS-\d+|FR_[\d.]+)$/, `${name}: name the rule requiring it`);
+    // `INV-` joined the list with TASK-022: the stock count's own lifecycle actions are
+    // required by INV-110 and INV-112 rather than by AUD-601, which names only the
+    // posting. The omission was accidental — no action had cited an INV rule before —
+    // and a pattern that silently excludes a whole prefix is a guard with a hole in it.
+    assert.match(declared.rule, /^(AUD-60[1-6]|SEC-\d+|VR-\d+|CR-\d+|POS-\d+|PO-\d+|INV-\d+|OPS-\d+|FR_[\d.]+)$/, `${name}: name the rule requiring it`);
   }
 });
 

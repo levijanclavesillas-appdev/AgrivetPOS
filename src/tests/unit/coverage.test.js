@@ -59,14 +59,16 @@ const BUILT_AT_1_1 = Object.freeze(['PO']);
 /**
  * And the individual v1.1 rules built by a task that did **not** land a whole section.
  *
- * TASK-020 built `POS-301`–`POS-307` and `CR-108`; TASK-021 built `POS-401`–`POS-404`.
- * Between them that is the whole of §6's v1.1 rules, but the two landed separately and
- * a prefix is too coarse to say so mid-way — the alternative at TASK-020 was either
- * demanding a citation for a void nobody had written (a fake) or letting seven built
- * rules go uncovered (a gap), and both are worse than a list somebody adds two lines
- * to. `POS` is not folded into the prefix list above even now: `INV` and `CR` still
- * have v1.1 rules outstanding, and the per-rule list is where a partial section says
- * honestly which of its rules are real.
+ * TASK-020 built `POS-301`–`POS-307` and `CR-108`; TASK-021 built `POS-401`–`POS-404`;
+ * TASK-022 built `INV-110`–`INV-113`. Each landed separately and a prefix is too coarse
+ * to say so mid-way — the alternative at TASK-020 was either demanding a citation for a
+ * void nobody had written (a fake) or letting seven built rules go uncovered (a gap),
+ * and both are worse than a list somebody adds two lines to.
+ *
+ * Prefixes are still not folded in even where a section now looks complete: `CR` has
+ * v1.1 rules outstanding, and the per-rule list is where a partial section says
+ * honestly which of its rules are real. A prefix moved up here on the strength of
+ * "that looks like all of them" is how a gap gets counted as coverage.
  *
  * A task that lands part of a section adds its rules here; one that lands a whole
  * section adds its prefix above.
@@ -77,6 +79,8 @@ const BUILT_RULES_AT_1_1 = Object.freeze([
   'CR-108',
   // TASK-021 — sale voiding
   'POS-401', 'POS-402', 'POS-403', 'POS-404',
+  // TASK-022 — stock counting
+  'INV-110', 'INV-111', 'INV-112', 'INV-113',
 ]);
 
 /**

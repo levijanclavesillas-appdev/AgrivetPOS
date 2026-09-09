@@ -776,6 +776,81 @@ figure every screen reads — `INV-101`'s reasoning applied to a fourth table, w
 asserting the two agree after repeated partial returns, because a materialised counter nobody
 reconciles is a counter that drifts.
 
+### 3.4.3 v1.1 schema — stock counting (`TASK-022`)
+
+Two tables, in `012_stock_counts.sql`, and the whole design is one column:
+`stock_count_lines.expected_milli`, **written when the session opens and never
+re-read**. Without it a store that counts for three hours while trading measures its
+variance against a figure that moved while somebody walked the aisle, and finds
+discrepancies it created by counting slowly. `avg_cost_centavos` is frozen beside it
+for the same reason (`MON-004`, `MON-005`): the variance report values the difference
+at the cost that applied when it was found, not at whatever a delivery has since moved
+the average to.
+
+**The freeze is one `INSERT` per product inside one transaction**, not a read in
+JavaScript followed by inserts. Writing the rows one at a time would leave a window in
+which a sale could commit between the first product and the last, and the session would
+then hold two different ideas of "now" — the corruption `INV-110` exists to prevent,
+reintroduced by the code meant to implement it.
+
+**`counted_milli` is nullable, has no default, and NULL is not zero.** A store counting
+four hundred products may genuinely not reach them all, and a column defaulting to 0
+would write off the entire uncounted remainder of the shop as shrinkage the moment
+somebody posted a half-finished session. `INV-111`'s "one movement per varying product"
+is therefore read as "per **counted** product that varies", and the posting reports how
+many were never reached.
+
+```sql
+CREATE TABLE stock_count_sessions (
+  id TEXT PRIMARY KEY,
+  count_no TEXT NOT NULL UNIQUE,                   -- SC-YYYYMMDD-NNNNNN (VR-103)
+  scope TEXT NOT NULL DEFAULT 'ALL' CHECK (scope IN ('ALL','CATEGORY')),
+  category_id TEXT REFERENCES categories(id),
+  status TEXT NOT NULL DEFAULT 'OPEN'
+    CHECK (status IN ('OPEN','APPROVED','POSTED','CANCELLED')),
+  notes TEXT,
+  opened_at TEXT NOT NULL,                         -- INV-110's instant; INV-113 measures from it
+  opened_by TEXT NOT NULL REFERENCES users(id),
+  approved_at TEXT, approved_by TEXT REFERENCES users(id),
+  approval_waived INTEGER NOT NULL DEFAULT 0,      -- INV-112, where there is no second user
+  posted_at TEXT, posted_by TEXT REFERENCES users(id),
+  was_stale INTEGER NOT NULL DEFAULT 0,            -- INV-113, recorded not inferred
+  stale_approved_by TEXT REFERENCES users(id),
+  cancelled_at TEXT, cancelled_by TEXT REFERENCES users(id), cancel_reason TEXT,
+  counted_products INTEGER, varying_products INTEGER, variance_value_centavos INTEGER,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE stock_count_lines (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES stock_count_sessions(id),
+  product_id TEXT NOT NULL REFERENCES products(id),
+  product_name_snapshot TEXT NOT NULL,             -- MON-005
+  expected_milli INTEGER NOT NULL,                 -- INV-110's freeze
+  avg_cost_centavos INTEGER NOT NULL,              -- MON-004 at the freeze
+  counted_milli INTEGER,                           -- NULL until counted; NULL is not zero
+  counted_at TEXT, counted_by TEXT REFERENCES users(id),
+  note TEXT,
+  movement_id TEXT REFERENCES inventory_movements(id),   -- INV-111: NULL where it matched
+  UNIQUE (session_id, product_id)
+);
+```
+
+**The variance posted is `counted − expected`, never `counted − live`**, and the
+difference is worth a worked example because both mistakes are one character away. A
+shelf holds 10 sacks at the freeze, the counter finds 9 at 09:30, and the shop sells 2
+at 11:00 before anybody posts. `counted − expected` is −1: posting it leaves 8 − 1 = 7,
+which is right — nine really were there and two have since been sold. `counted − live`
+is +1: it would *add* a sack, erase one of the two sales and report a surplus where
+there was a shortage. **So after posting, on hand is not the counted figure** — it is
+the counted figure plus whatever traded since the freeze, and `SCR-205` prints that
+sentence because a store that does not know it will report the ledger as broken.
+
+`stock_count_lines` is not `_items` (§3.3's convention for a document's children)
+because these are not a document's contents: every product in scope gets a row whether
+or not anybody counts it, which is a worksheet rather than a set of lines somebody
+entered. `INV-111`'s whole point is that most of them do nothing.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -794,6 +869,7 @@ migrations/008_report_indexes.sql   indexes only — no table
 migrations/009_backups_alerts.sql   backups, alert_dismissals, system_events
 migrations/010_purchasing.sql       suppliers, purchase orders and items, goods receipts and items
 migrations/011_returns.sql          sale returns and items (POS-301 – POS-307)
+migrations/012_stock_counts.sql     stock count sessions and lines (INV-110 – INV-113)
 ```
 
 ## 4. API
@@ -844,6 +920,14 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/goods-receipts` | `TX-409` | `PO-201`–`PO-207`. `poId` absent is the counter purchase and still needs a `supplierId`. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |
 | `PUT` `DELETE` | `/goods-receipts/:id` | `TX-409` | Always 409 — `PO-206`, and the refusal names the adjustment or return that is the correction |
 | `GET` | `/products/:id/purchase-history` | `TX-409` | What this product has cost, from whom, and when |
+| `GET` `POST` | `/stock-counts` | `TX-407` | `INV-110` — the `POST` opens a session and **freezes** the expected quantity of every product in scope, in one transaction |
+| `GET` | `/stock-counts/:id?varyingOnly=&uncountedOnly=` | `TX-407` | The session and its worksheet. A line's `counted_milli` is `null` until somebody counts it, and `null` is not `0` |
+| `PUT` | `/stock-counts/:id/lines` | `TX-407` | Counted quantities, in batches and repeatedly — a stocktake spans a lunch break. `countedMilli: null` clears a line back to uncounted |
+| `POST` | `/stock-counts/:id/approve` | `TX-408` | `INV-112` — refused to the person who took the count, on identity rather than role. Waived and **stated** where the store has one active user |
+| `POST` | `/stock-counts/:id/post` | `TX-407` | `INV-111`, `INV-113`. One transaction. A stale session needs an owner in the `approver` |
+| `POST` | `/stock-counts/:id/cancel` | `TX-407` | Abandoned with a reason — three abandoned counts in a row is itself a fact worth keeping |
+| `GET` | `/stock-counts/:id/variance` | `TX-422` | Requirement 8's report: shortage and surplus separately, valued at the frozen cost |
+| `DELETE` `PATCH` | `/stock-counts/:id` | `TX-407` | Always 409 — `INV-102` |
 | `GET` | `/sales?q=&from=&to=&customerId=&status=&returnable=` | `TX-401` | `SCR-305`'s lookup. `returnable=true` is `POS-301`'s two statuses, named server-side so the screen keeps no copy |
 | `GET` | `/sales/:id/voidable` | `TX-401` | `POS-402`'s window and `POS-403`'s authority, answered before `SCR-304` draws the button. Read-only |
 | `POST` | `/sales/:id/void` | `TX-401` | `POS-401`–`POS-404`. One transaction. **Not `TX-405`** — see the note below the table |
@@ -873,6 +957,15 @@ unauthenticated endpoint reporting row counts and the database path would go wit
 for a `CASHIER`, so `requirePermission` admits them and `reportService` decides which shift they
 may read — refusing with `403` and writing an audit row, never narrowing the answer silently. A
 cashier handed their own till's figures under a store-wide heading has been told something false.
+
+**Counting is `TX-407` and approving is `TX-408`, and the split is the control.** §10 grants
+`TX-407` — "post an inventory adjustment" — to the owner, the manager and the inventory clerk,
+which is exactly the set who walk the aisles with a clipboard; `TX-408` — "approve a stock
+count" — is the owner and the manager alone. A clerk may therefore count and may not release
+what they counted, which is `INV-112` expressed in the permission matrix rather than only in a
+service. Posting stays on `TX-407`: by then a second person has already approved it, and
+requiring the approver to press the button as well would mean a manager walking back to the
+terminal for a clerk's stocktake.
 
 **The void sits under `TX-401`, not `TX-405`, and that is deliberate.** §10 grants `TX-405` to a
 manager and an owner only, so a route behind it would be a route a cashier cannot call — and
