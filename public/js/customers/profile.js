@@ -26,6 +26,7 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
   let statement = { rows: [] };
   let collections = { collections: [] };
   let editingLimit = false;
+  let agreedPrices = null;    // PR-103, GET /customers/:id/prices
 
   async function load() {
     ui.loading(root, { rows: 5 });
@@ -42,6 +43,10 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
       collections = credit
         ? await api.get(`/customers/${customerId}/collections`).catch(() => ({ collections: [] }))
         : { collections: [] };
+
+      // PR-103. Failing quietly: a profile that will not render because the price list
+      // is unreachable is worse than a profile with no price block on it.
+      agreedPrices = await api.get(`/customers/${customerId}/prices`).catch(() => null);
 
       render();
     } catch (err) {
@@ -63,6 +68,7 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
 
       creditBlock(),
       detailsBlock(),
+      agreedPricesBlock(),
       openSalesBlock(),
       statementBlock(),
       collectionsBlock(),
@@ -197,6 +203,49 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
   }
 
   /** What is actually unpaid, oldest first — what a collection will settle. */
+  /**
+   * PR-103 — what this customer has negotiated.
+   *
+   * The note under the heading is the **server's**, and it is the sentence somebody
+   * setting one of these has to understand: an agreed price overrides every other
+   * level for that product, including a quantity break, however much they buy. A
+   * screen that phrased it itself would be a second place PR-103 lives.
+   *
+   * Shown even when empty, because "this customer has no agreed prices" is an answer
+   * somebody comes to this page for.
+   */
+  function agreedPricesBlock() {
+    if (!agreedPrices) return null;
+
+    return h('div', { class: 'agreed-prices' }, [
+      h('h2', { text: 'Agreed prices' }),
+      h('p', { class: 'muted', text: agreedPrices.note }),
+
+      agreedPrices.prices.length === 0
+        ? h('p', { class: 'muted', text: 'None — this customer pays the '
+          + `${customer.price_level.toLowerCase()} price.` })
+        : h('div', { class: 'table-scroll' }, [
+          h('table', { class: 'catalogue-list' }, [
+            h('thead', {}, [h('tr', {}, [
+              h('th', { text: 'Product' }),
+              h('th', { class: 'money', text: 'Agreed' }),
+              h('th', { text: 'Since' }),
+              h('th', { text: 'Note' }),
+            ])]),
+            h('tbody', {}, agreedPrices.prices.map((row) => h('tr', {}, [
+              h('td', {}, [
+                h('span', { text: row.product_name }),
+                h('small', { class: 'muted', text: row.sku }),
+              ]),
+              h('td', { class: 'money', text: `${money(row.price_centavos)} / ${row.base_unit_code}` }),
+              h('td', { text: manila(row.effective_from) }),
+              h('td', { text: row.note || '' }),
+            ]))),
+          ]),
+        ]),
+    ]);
+  }
+
   function openSalesBlock() {
     if (openSales.length === 0) return null;
 

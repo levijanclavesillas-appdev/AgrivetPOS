@@ -1071,6 +1071,68 @@ test('requirement 7: the counter reads the discount rules from the policy endpoi
   assert.match(cssRule(css, '.cart-line-discount .discount-why'), /color:\s*var\(--muted\)/);
 });
 
+// ── PR-103 and PR-104 on the screens (TASK-024) ─────────────────────────────
+
+test('PR-101: the counter names the resolved level in words a cashier can repeat', () => {
+  const source = codeOf('js/pos/view.js');
+
+  // "QUANTITY_BREAK" is a column value, not a reason somebody can give a customer
+  // standing at the counter. The label is the screen's — presentation, not policy —
+  // and every fact in it is the server's.
+  assert.match(source, /price_level === 'CUSTOMER_SPECIFIC'/);
+  assert.match(source, /price_level === 'QUANTITY_BREAK'/);
+  assert.match(source, /pricedLine\.quantity_band/);
+  assert.match(source, /pricedLine\.customer_price_note/);
+
+  // And the screen resolves no price of its own: it renders which level won, never
+  // works out which should have.
+  assert.equal(/customerPriceAt|quantityBreaksAt|min_qty_milli\s*<=/.test(source), false);
+});
+
+test('PR-104: bands are edited as a set, and the rule is the server’s sentence', () => {
+  const source = codeOf('js/catalogue/editor.js');
+
+  // A whole set per level, saved with one PUT. A band added on its own is a set nobody
+  // validated — which is the only level at which PR-104's rules exist.
+  assert.match(source, /api\.put\(`\/products\/\$\{product\.id\}\/quantity-breaks`/);
+  assert.match(source, /priceLevel: breakLevel, bands/);
+  assert.match(source, /Saving replaces every band at this level/);
+
+  // The explanation comes from GET /products/:id/quantity-breaks. "To the whole line,
+  // not marginally" is the half somebody setting one gets wrong, and it is not the
+  // screen's to phrase.
+  assert.match(source, /text: breaks\.note/);
+  assert.equal(source.includes('not marginally'), false, 'the note is fetched, not written here');
+
+  // The rows being typed survive a render. Rebuilding them from the server's copy on
+  // every render made "Add a band" appear and vanish in the same frame — which every
+  // unit guard here would have passed, and the browser found in one click.
+  assert.match(source, /if \(bandDraft === null\)/);
+  assert.match(source, /bandDraft\.push\(\{ qty: '', price: '' \}\)/);
+  assert.match(source, /breakLevel = event\.target\.value; bandDraft = null/,
+    'a different level is a different set');
+
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'catalogue.css'), 'utf8');
+  assert.match(cssRule(css, '.breaks-table input'), /min-height:\s*var\(--touch\)/);
+});
+
+test('PR-103: the customer profile shows what was agreed, in the server’s own words', () => {
+  const source = codeOf('js/customers/profile.js');
+
+  assert.match(source, /api\.get\(`\/customers\/\$\{customerId\}\/prices`\)/);
+  assert.match(source, /text: agreedPrices\.note/);
+  assert.equal(source.includes('overrides every other level'), false,
+    'the sentence about PR-103 is the server’s');
+
+  // Shown even when empty: "this customer has no agreed prices" is an answer somebody
+  // comes to the page for.
+  assert.match(source, /agreedPrices\.prices\.length === 0/);
+
+  // And it fails quietly — a profile that will not render because the price list is
+  // unreachable is worse than a profile without the block.
+  assert.match(source, /\/prices`\)\.catch\(\(\) => null\)/);
+});
+
 // ── SCR-205 (TASK-022) ──────────────────────────────────────────────────────
 
 test('INV-110: the sheet labels the frozen figure as frozen, and says what that means', () => {

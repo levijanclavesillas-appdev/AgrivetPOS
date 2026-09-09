@@ -227,6 +227,99 @@ function priceAt(productId, level, at) {
 }
 
 /** Every level's current price in one statement, for the editor and the list. */
+// ── PR-101 levels 1 and 2 (TASK-024) ────────────────────────────────────────
+
+/**
+ * PR-103 — the price this customer has negotiated for this product, as at a moment.
+ *
+ * The same shape `priceAt` takes for a level price, for the same reason: a customer
+ * price is superseded by a later row, never updated, so "the price now" is the newest
+ * row not in the future.
+ */
+function customerPriceAt(customerId, productId, at) {
+  return db.get().prepare(`
+    SELECT id, customer_id, product_id, price_centavos, effective_from, note, created_at, created_by
+      FROM customer_prices
+     WHERE customer_id = ? AND product_id = ? AND effective_from <= ?
+     ORDER BY effective_from DESC, created_at DESC
+     LIMIT 1
+  `).get(customerId, productId, at) || null;
+}
+
+/** Every customer price standing against one customer, newest per product. */
+function customerPricesFor(customerId, at) {
+  return db.get().prepare(`
+    SELECT cp.product_id, p.sku, p.name AS product_name, cp.price_centavos,
+           cp.effective_from, cp.note, u.code AS base_unit_code
+      FROM customer_prices cp
+      JOIN products p ON p.id = cp.product_id
+      JOIN units u ON u.id = p.base_unit_id
+     WHERE cp.customer_id = @customerId
+       AND cp.effective_from <= @at
+       AND cp.effective_from = (
+         SELECT MAX(x.effective_from) FROM customer_prices x
+          WHERE x.customer_id = cp.customer_id AND x.product_id = cp.product_id
+            AND x.effective_from <= @at)
+     ORDER BY p.name COLLATE NOCASE
+  `).all({ customerId, at });
+}
+
+function insertCustomerPrice(row) {
+  const keys = Object.keys(row);
+  db.get().prepare(`
+    INSERT INTO customer_prices (${keys.join(', ')}) VALUES (${keys.map((k) => `@${k}`).join(', ')})
+  `).run(row);
+  return row;
+}
+
+/**
+ * PR-104 — the band set in force for one product and level, ascending.
+ *
+ * The **set**, not a band: PR-104's rules are properties of the set — ascending,
+ * non-overlapping, each cheaper than the one below — and a caller handed one band at a
+ * time cannot check any of them.
+ *
+ * The table holds the current set only. `setQuantityBreaks` clears the level and
+ * writes the new one in a transaction, because an append-only band table cannot
+ * express "no bands at all" — writing an empty generation writes no rows, and the old
+ * set would stay in force. 013's own header explains the asymmetry with
+ * `customer_prices`, which does not have that problem because a price always exists.
+ */
+function quantityBreaksAt(productId, priceLevel) {
+  return db.get().prepare(`
+    SELECT id, product_id, price_level, min_qty_milli, price_centavos, defined_at
+      FROM product_quantity_breaks
+     WHERE product_id = ? AND price_level = ?
+     ORDER BY min_qty_milli
+  `).all(productId, priceLevel);
+}
+
+/** Every level's current band set, for the product editor. */
+function allQuantityBreaks(productId) {
+  return db.get().prepare(`
+    SELECT id, product_id, price_level, min_qty_milli, price_centavos, defined_at
+      FROM product_quantity_breaks
+     WHERE product_id = ?
+     ORDER BY price_level, min_qty_milli
+  `).all(productId);
+}
+
+/** Clear one level's set, so the replacement is the whole of it. */
+function deleteQuantityBreaks(productId, priceLevel) {
+  return db.get()
+    .prepare('DELETE FROM product_quantity_breaks WHERE product_id = ? AND price_level = ?')
+    .run(productId, priceLevel).changes;
+}
+
+function insertQuantityBreak(row) {
+  const keys = Object.keys(row);
+  db.get().prepare(`
+    INSERT INTO product_quantity_breaks (${keys.join(', ')})
+    VALUES (${keys.map((k) => `@${k}`).join(', ')})
+  `).run(row);
+  return row;
+}
+
 function currentPrices(productId, at) {
   const prices = {};
   for (const level of ['RETAIL', 'WHOLESALE', 'DEALER']) {
@@ -282,5 +375,7 @@ module.exports = {
   barcodesFor, findByBarcode, findBarcode, insertBarcode, deleteBarcode,
   packsFor, insertPack, clearDefaultPack, deletePack,
   insertPrice, priceAt, currentPrices, priceHistory,
+  customerPriceAt, customerPricesFor, insertCustomerPrice,
+  quantityBreaksAt, allQuantityBreaks, insertQuantityBreak, deleteQuantityBreaks,
   countMovements, countReferences, tableExists,
 };

@@ -851,6 +851,80 @@ because these are not a document's contents: every product in scope gets a row w
 or not anybody counts it, which is a worksheet rather than a set of lines somebody
 entered. `INV-111`'s whole point is that most of them do nothing.
 
+### 3.4.4 v1.1 schema — negotiated pricing (`TASK-024`)
+
+Two tables, in `013_negotiated_pricing.sql`, filling `PR-101`'s top two levels.
+`002_catalog.sql` built the bottom two and said so in its own comment — "PR-101 levels
+3-4 in v1.0" — and the resolver has been walking past levels 1 and 2 returning null
+since `TASK-009`.
+
+**They differ in one way, deliberately.** `customer_prices` is an append-only history
+like `product_prices`: a row with a later `effective_from` supersedes it and the old one
+stays, so a receipt from March remains explicable.
+
+`product_quantity_breaks` holds the **current set** and is replaced when it changes,
+because an append-only band table cannot express the one state a band set reaches and a
+price never does: **no bands at all**. An empty generation writes no rows, so "remove
+the breaks" would leave the previous set standing — the feature not working rather than
+a subtle bug, and exactly what driving the editor in a browser turned up. A revision
+therefore clears the level and writes the new set in one transaction, and the history
+lives where it is more useful: `AUD-601`'s trail already records the whole set both
+ways on every change. Nothing depends on the old rows, because `MON-005` snapshots the
+resolved price onto the sale line at the moment of sale.
+
+**`PR-104`'s guarantees are properties of the *set*, not of a row.** Ascending,
+non-overlapping, each band cheaper than the one below: none of the three can be
+expressed as a `CHECK`, because a single band always satisfies all of them. So a band
+set is written whole — the only way "non-overlapping" survives an edit — and
+`productService.validateBandSet` refuses a contradictory set where somebody types it,
+naming the offending pair.
+
+```sql
+CREATE TABLE customer_prices (           -- PR-101 level 1 · PR-103
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  product_id  TEXT NOT NULL REFERENCES products(id),
+  price_centavos INTEGER NOT NULL CHECK (price_centavos >= 0),      -- VR-203
+  effective_from TEXT NOT NULL,
+  note TEXT,                             -- what was agreed, in the words of whoever agreed it
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id),
+  UNIQUE (customer_id, product_id, effective_from)
+);
+
+CREATE TABLE product_quantity_breaks (   -- PR-101 level 2 · PR-104
+  id TEXT PRIMARY KEY,
+  product_id  TEXT NOT NULL REFERENCES products(id),
+  price_level TEXT NOT NULL CHECK (price_level IN ('RETAIL','WHOLESALE','DEALER')),
+  min_qty_milli  INTEGER NOT NULL CHECK (min_qty_milli > 0),        -- MON-002, base units
+  price_centavos INTEGER NOT NULL CHECK (price_centavos >= 0),
+  defined_at TEXT NOT NULL,              -- metadata, not a generation key
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id),
+  UNIQUE (product_id, price_level, min_qty_milli)
+);
+```
+
+**A quantity break is a price to `PR-101` and an automatic discount to `PR-206`, and
+both readings are honoured.** The break resolves a price (level 2). What it *saves* —
+the gap between the level price the customer would otherwise have paid and the band
+price — is the automatic discount `PR-206` weighs against anything the cashier typed.
+Exactly one of them applies:
+
+* the break saves more → the line is charged **at the band price**, with no discount,
+  and its resolved level says `QUANTITY_BREAK`;
+* the manual discount is larger → **the break does not apply at all**. The line is
+  charged at the ordinary level price less the manual discount, and its resolved level
+  says so.
+
+Charging the band price outright rather than the level price less the saving is
+deliberate: the two differ by a centavo whenever `mulQty` rounds, and the figure the
+customer was quoted is the band price, not an arithmetic reconstruction of it.
+
+`PR-103` needs no column to be absolute. A customer price is level 1, the chain stops
+at the first level that answers, and the precedence *is* the implementation — there is
+no comparison with the break and no cheaper-of. A farm that negotiated ₱58 a kilo pays
+₱58 at forty sacks even where the break would have been ₱50, which is the store's own
+deal to have made badly.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -870,6 +944,7 @@ migrations/009_backups_alerts.sql   backups, alert_dismissals, system_events
 migrations/010_purchasing.sql       suppliers, purchase orders and items, goods receipts and items
 migrations/011_returns.sql          sale returns and items (POS-301 – POS-307)
 migrations/012_stock_counts.sql     stock count sessions and lines (INV-110 – INV-113)
+migrations/013_negotiated_pricing.sql customer prices and quantity breaks (PR-103, PR-104)
 ```
 
 ## 4. API
@@ -896,6 +971,8 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/shifts/:id/expected` | `TX-418` | `POS-509` |
 | `POST` | `/shifts/:id/close` | `TX-418` | `POS-510`, triggers `OPS-001` |
 | `POST` | `/sales/price-check` | `TX-401` | resolves `PR-101` for a cart without committing. Since `TASK-023` it also applies `PR-106`'s tier and `PR-202`'s category ceiling, and reports `PR-206`'s choice per line |
+| `GET` `PUT` | `/products/:id/quantity-breaks` | `TX-422` / `TX-411` | `PR-104`. The `PUT` takes a **whole set** for one price level — a band added on its own is a set nobody validated. An empty list removes them |
+| `GET` `PUT` | `/customers/:id/prices` | `TX-413` / `TX-411` | `PR-103`. Behind `TX-411`, not `TX-413`: a negotiated price is a selling price that happens to be attached to a customer, and `TX-413` reaches a cashier |
 | `GET` | `/sales/pricing-policy` | `TX-401` | The acting user's ceiling, who may approve above it, and — since `TASK-023` — the configured tiers and capped categories, so no screen holds a copy (`OPS-005`) |
 | `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5` |
 | `POST` | `/sales/:id/reprint` | `TX-430` | `POS-208` |

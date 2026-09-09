@@ -746,6 +746,105 @@ app.whenReady().then(async () => {
   // Back to the owner for the admin section, which is TX-423 and not the clerk's.
   log(await signInAs('chachi', 'sack-of-feed-2026'), 'the owner signs back in');
 
+  console.log('\n— SCR-202 and SCR-402: negotiated pricing (PR-103, PR-104) —');
+
+  // PR-104's band set, defined through the product editor's Pricing tab.
+  await run(OPEN_RAIL('Products'));
+  await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-201' });
+  log(await run(OPEN_HOG_GROWER), 'the seeded product opens for its bands');
+  await waitFor(`!!document.querySelector('.editor')`, { label: 'SCR-202' });
+  await run(`[...document.querySelectorAll('.admin-tab')].find(t => t.textContent === 'Pricing').click()`);
+  await settle(600);
+
+  const breaksOk = await waitFor(`!!document.querySelector('.breaks-block')`,
+    { label: 'the quantity-break editor' });
+  log(breaksOk, 'PR-104: the Pricing tab carries a quantity-break editor');
+  log(/whole line, not marginally/.test(await text('.breaks-block')),
+    'and states the rule that is easiest to get wrong — in the server’s words');
+
+  // An overlapping set, refused at definition and naming the pair.
+  await run(`(() => {
+    const add = [...document.querySelectorAll('.breaks-block button')].find(b => /Add a band/.test(b.textContent));
+    add.click();
+  })()`);
+  await settle(400);
+  await run(`(() => {
+    const rows = [...document.querySelectorAll('.breaks-table tbody tr')];
+    const set = (row, qty, price) => {
+      const [q, p] = row.querySelectorAll('input');
+      q.value = qty; q.dispatchEvent(new Event('input', { bubbles: true }));
+      p.value = price; p.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    set(rows[0], '10', '60.00');
+    set(rows[1], '10', '58.00');
+  })()`);
+  await settle(300);
+  await run(`document.querySelectorAll('.breaks-block form')[0].requestSubmit()`);
+  await settle(1000);
+  log(/may not overlap|PR-104/.test(await run(`document.body.textContent`)),
+    'PR-104: an overlapping set is refused where it is typed, naming the rule');
+
+  // A valid set, saved whole.
+  await run(`(() => {
+    const rows = [...document.querySelectorAll('.breaks-table tbody tr')];
+    const [q, p] = rows[1].querySelectorAll('input');
+    q.value = '50'; q.dispatchEvent(new Event('input', { bubbles: true }));
+    p.value = '55.00'; p.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(300);
+  await run(`document.querySelectorAll('.breaks-block form')[0].requestSubmit()`);
+  await settle(1200);
+
+  const saved = (await api(`/products/${PRODUCT_ID}/quantity-breaks`)).json;
+  log(saved.levels.RETAIL.length === 2, 'PR-104: and a valid set saves whole',
+    `${saved.levels.RETAIL.length} bands`);
+
+  // The counter resolves it, and names the band rather than the enum.
+  const banded = await api('/sales/price-check', {
+    method: 'POST', body: { lines: [{ productId: PRODUCT_ID, qtyMilli: 60000 }] },
+  });
+  log(banded.json.lines[0].unit_price_centavos === 5500,
+    'PR-104: 60 KG resolves at the 50 KG band',
+    `₱${(banded.json.lines[0].unit_price_centavos / 100).toFixed(2)}`);
+  log(banded.json.lines[0].gross_centavos === 330000,
+    'and the band applies to the whole line, not marginally',
+    `₱${(banded.json.lines[0].gross_centavos / 100).toFixed(2)}`);
+
+  // PR-103: a customer price beats the break, however much they buy.
+  const agreed = await api(`/customers/${CUSTOMER_ID}/prices`, {
+    method: 'PUT',
+    body: { prices: [{ productId: PRODUCT_ID, priceCentavos: 5800, note: 'Agreed on the phone' }] },
+  });
+  log(agreed.status === 200, 'PR-103: a price is agreed with the farm', String(agreed.status));
+
+  const withDeal = await api('/sales/price-check', {
+    method: 'POST',
+    body: { customerId: CUSTOMER_ID, lines: [{ productId: PRODUCT_ID, qtyMilli: 60000 }] },
+  });
+  log(withDeal.json.lines[0].unit_price_centavos === 5800,
+    'PR-103: the agreed ₱58 beats the ₱55 band — "overrides all others", not "the cheaper of"',
+    `₱${(withDeal.json.lines[0].unit_price_centavos / 100).toFixed(2)}`);
+  log(withDeal.json.lines[0].price_level === 'CUSTOMER_SPECIFIC',
+    'and the line says which level resolved it');
+
+  // SCR-402 shows what was agreed, in the server's own sentence.
+  await run(OPEN_RAIL('Customers'));
+  await waitFor(`!!document.querySelector('.customers')`, { label: 'SCR-401' });
+  await run(`document.querySelector('.customer-list tbody tr').click()`);
+  await waitFor(`!!document.querySelector('.agreed-prices')`, { label: 'the agreed prices block' });
+  const agreedText = await text('.agreed-prices');
+  log(/overrides every other level/.test(agreedText),
+    'PR-103: SCR-402 states what an agreed price does');
+  log(/Agreed on the phone/.test(agreedText), 'and carries the note somebody wrote',
+    agreedText.replace(/\s+/g, ' ').slice(0, 80));
+
+  // Put the shop back: later sections price against the plain retail figure.
+  await api(`/products/${PRODUCT_ID}/quantity-breaks`, {
+    method: 'PUT', body: { priceLevel: 'RETAIL', bands: [] },
+  });
+  log((await api(`/products/${PRODUCT_ID}/quantity-breaks`)).json.levels.RETAIL.length === 0,
+    'the bands are cleared for the walks that follow');
+
   console.log('\n— SCR-301: the discount rules (PR-106, PR-202, PR-206) —');
 
   // A basket tier and a category cap, configured through the registry as an owner

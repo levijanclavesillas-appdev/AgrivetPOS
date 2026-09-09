@@ -35,6 +35,14 @@ export function createProductEditor({ root, productId, onClose }) {
   let product = null;
   let reference = { categories: [], brands: [], units: [] };
   let tab = 'Identity';
+  // PR-104's band set is per price level, so the Pricing tab edits one level at a time.
+  let breaks = null;
+  let breakLevel = 'RETAIL';
+  // The rows being typed, held across renders. Rebuilding them from `breaks` on every
+  // render would discard whatever "Add a band" had just added — the row would appear
+  // and vanish in the same frame, which is what the browser smoke caught. Null means
+  // "not seeded yet"; a save or a level change sets it back.
+  let bandDraft = null;
   const isNew = !productId;
 
   async function load() {
@@ -49,6 +57,9 @@ export function createProductEditor({ root, productId, onClose }) {
         units: units.units || [],
       };
       product = isNew ? blank() : (await api.get(`/products/${productId}`)).product;
+      // A product that does not exist yet has no bands, and the endpoint would 404.
+      breaks = isNew ? null : await api.get(`/products/${productId}/quantity-breaks`);
+      bandDraft = null;
       render();
     } catch (err) {
       if (err.isRefusal) ui.refused(root, err);
@@ -370,6 +381,104 @@ export function createProductEditor({ root, productId, onClose }) {
         h('div', { class: 'editor-actions' }, [
           h('button', { type: 'submit', class: 'primary', text: 'Save prices' }),
         ]),
+      ]),
+
+      breaksBlock(),
+    ]);
+  }
+
+  /**
+   * PR-104 — the quantity breaks, edited as a **set** per price level.
+   *
+   * Saved whole, never a band at a time. PR-104's rules — ascending, non-overlapping,
+   * each cheaper than the one below — are properties of the set, and a band added on
+   * its own is a set nobody validated. The refusals come back naming the offending
+   * pair, so the screen states none of the rules itself.
+   */
+  function breaksBlock() {
+    if (bandDraft === null) {
+      const rows = (breaks && breaks.levels[breakLevel]) || [];
+      bandDraft = rows.map((band) => ({
+        qty: quantity(band.min_qty_milli),
+        price: (band.price_centavos / 100).toFixed(2),
+      }));
+      if (bandDraft.length === 0) bandDraft.push({ qty: '', price: '' });
+    }
+    const draft = bandDraft;
+
+    const body = h('tbody', {}, draft.map((band, index) => h('tr', {}, [
+      h('td', {}, [h('input', {
+        type: 'text', inputmode: 'decimal', class: 'qty', value: band.qty,
+        'aria-label': `Band ${index + 1} starts at, in ${product.base_unit.code}`,
+        oninput: (event) => { draft[index].qty = event.target.value; },
+      })]),
+      h('td', {}, [h('input', {
+        type: 'text', inputmode: 'decimal', class: 'money', value: band.price,
+        'aria-label': `Band ${index + 1} price in pesos`,
+        oninput: (event) => { draft[index].price = event.target.value; },
+      })]),
+    ])));
+
+    return h('div', { class: 'breaks-block' }, [
+      h('h2', { text: 'Quantity breaks' }),
+      // The note is the server's, from GET /products/:id/quantity-breaks — PR-104's
+      // "to the whole line, not marginally" is the half somebody setting one gets
+      // wrong, and it is not the screen's to phrase.
+      breaks ? h('p', { class: 'muted', text: breaks.note }) : null,
+
+      h('div', { class: 'editor-field' }, [
+        h('label', { text: 'Price level' }),
+        h('select', {
+          // A different level is a different set, so the rows in hand are not it.
+          onchange: (event) => { breakLevel = event.target.value; bandDraft = null; render(); },
+        }, PRICE_LEVELS.map((level) => h('option', {
+          value: level, text: level, selected: level === breakLevel,
+        }))),
+      ]),
+
+      h('form', {
+        class: 'editor-form',
+        onsubmit: async (event) => {
+          event.preventDefault();
+          const bands = draft
+            .filter((band) => band.qty.trim() !== '' || band.price.trim() !== '')
+            .map((band) => ({
+              minQtyMilli: Math.round(Number.parseFloat(band.qty) * 1000),
+              priceCentavos: Math.round(Number.parseFloat(band.price) * 100),
+            }));
+          try {
+            breaks = await api.put(`/products/${product.id}/quantity-breaks`, {
+              priceLevel: breakLevel, bands,
+            });
+            // Reseed from what the server actually stored — sorted, and with anything
+            // it normalised. The rows in hand were the request, not the answer.
+            bandDraft = null;
+            ui.toast(bands.length === 0
+              ? `${breakLevel} quantity breaks removed`
+              : `${bands.length} ${breakLevel.toLowerCase()} band(s) saved`, { kind: 'success' });
+            render();
+          } catch (err) {
+            // PR-104's refusals name the offending pair. Shown as they arrive.
+            ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+          }
+        },
+      }, [
+        h('table', { class: 'catalogue-list breaks-table' }, [
+          h('thead', {}, [h('tr', {}, [
+            h('th', { text: `From (${product.base_unit.code})` }),
+            h('th', { text: 'Price (₱)' }),
+          ])]),
+          body,
+        ]),
+        h('div', { class: 'editor-actions' }, [
+          h('button', {
+            type: 'button', text: 'Add a band',
+            onclick: () => { bandDraft.push({ qty: '', price: '' }); render(); },
+          }),
+          h('button', { type: 'submit', class: 'primary', text: `Save ${breakLevel.toLowerCase()} bands` }),
+        ]),
+        h('p', { class: 'muted', text: 'Saving replaces every band at this level. Leave the '
+          + 'table empty to remove them.' }),
       ]),
     ]);
   }

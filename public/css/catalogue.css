@@ -104,3 +104,11 @@
 .count-outcome li.warn { color: var(--warn-ink); background: none; }
 
 @media (max-width: 900px) { .count-controls { flex-direction: column; } }
+
+/* PR-104's band editor (TASK-024). A set is edited and saved whole, so the table is
+   plain — there is no per-row save to hang a control off. */
+.breaks-block { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--rule); }
+.breaks-block h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.breaks-table { max-width: 32rem; }
+.breaks-table input { width: 8rem; min-height: var(--touch); padding: 0 .4rem;
+  text-align: right; font: inherit; font-variant-numeric: tabular-nums; }

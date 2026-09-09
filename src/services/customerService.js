@@ -14,6 +14,7 @@ const clock = require('../config/clock');
 const errors = require('./errors');
 const money = require('./money');
 const auditService = require('./auditService');
+const permissions = require('./permissions');
 const customerRepository = require('../repositories/customerRepository');
 const creditRepository = require('../repositories/creditRepository');
 
@@ -288,6 +289,142 @@ function update(id, changes, actor) {
  * Either direction: an outstanding debt would disappear from every screen that filters
  * to active customers, and a store credit the customer is owed (CR-108) would too.
  */
+// ── PR-103 — the negotiated price (TASK-024) ────────────────────────────────
+
+/**
+ * Set what this customer pays for these products.
+ *
+ * `PR-103` is absolute: a customer price overrides every other level for that pair,
+ * including a quantity break, so a farm that negotiated ₱58 a kilo pays ₱58 whether
+ * they buy one sack or forty. That absoluteness is why this needs `TX-411` — it is a
+ * selling price, not a customer detail, and `TX-413`'s "create or edit a customer"
+ * reaches a cashier who should not be agreeing prices.
+ *
+ * Appended, never updated: a new row with today's stamp supersedes yesterday's, and
+ * the old one stays so a receipt from March remains explicable. Setting a price to
+ * null removes it — a new row cannot say "no price", so removal is a deletion of the
+ * agreement rather than a price of zero, which would give the product away.
+ */
+function setPrices(customerId, prices, actor, session = actor, { reason = null } = {}) {
+  if (!permissions.can(session, 'TX-411')) {
+    throw errors.forbidden(
+      'You do not have permission to agree a customer price.',
+      { ruleId: 'TX-411', requiresRole: permissions.rolesHolding('TX-411').join(' or ') }
+    );
+  }
+
+  const customer = customerRepository.findById(customerId);
+  if (!customer) throw errors.notFound('No such customer');
+
+  const wanted = Array.isArray(prices) ? prices : [];
+  if (wanted.length === 0) {
+    throw errors.badRequest('Send at least one product and price', { ruleId: 'PR-103' });
+  }
+
+  const at = clock.nowUtc();
+  const productRepository = require('../repositories/productRepository');
+
+  const resolved = wanted.map((entry, index) => {
+    const product = productRepository.findById(entry.productId);
+    if (!product) throw errors.notFound(`No such product on line ${index + 1}`);
+
+    const raw = entry.priceCentavos;
+    const price = typeof raw === 'number' ? raw : Number.parseInt(String(raw ?? '').trim(), 10);
+    if (!Number.isInteger(price) || price < 0) {
+      throw errors.badRequest(
+        `${product.name} needs a whole number of centavos (MON-001).`,
+        { ruleId: 'VR-203' }
+      );
+    }
+
+    // PR-105 is not enforced here — a negotiated price below cost is a decision an
+    // owner may make, and the rule places the authorisation *at the sale*, where the
+    // cost of the day applies. What this does is say so, so nobody agrees one by
+    // accident and discovers it at the counter with a queue behind them.
+    const belowCost = product.avg_cost_centavos > 0 && price < product.avg_cost_centavos;
+
+    return {
+      product,
+      price_centavos: price,
+      note: text(entry.note, { max: 200 }) || null,
+      below_cost: belowCost,
+      before: (productRepository.customerPriceAt(customerId, product.id, at) || {}).price_centavos ?? null,
+    };
+  });
+
+  return db.transaction(() => {
+    for (const entry of resolved) {
+      productRepository.insertCustomerPrice({
+        id: ids.uuidv7(),
+        customer_id: customerId,
+        product_id: entry.product.id,
+        price_centavos: entry.price_centavos,
+        effective_from: at,
+        note: entry.note,
+        created_at: at,
+        created_by: actor.id,
+      });
+
+      // AUD-601 names a price change without exception, and both values.
+      auditService.write({
+        actor,
+        action: 'PRICE_CHANGED',
+        entityType: 'customers',
+        entityId: customerId,
+        before: { product: entry.product.name, price_centavos: entry.before },
+        after: {
+          product: entry.product.name,
+          price_centavos: entry.price_centavos,
+          // PR-103's own consequence, recorded: this price beats the quantity break.
+          overrides_quantity_break: true,
+          below_average_cost: entry.below_cost,
+        },
+        reason: reason || entry.note || `Customer price agreed for ${entry.product.name}`,
+      });
+    }
+
+    return {
+      ...priceList(customerId),
+      // Said back to the caller so the screen can warn at the moment of agreeing
+      // rather than at the moment of selling.
+      below_cost: resolved.filter((e) => e.below_cost).map((e) => ({
+        product: e.product.name,
+        price_centavos: e.price_centavos,
+        avg_cost_centavos: e.product.avg_cost_centavos,
+        message: `${money.toDisplay(e.price_centavos)} is below the `
+          + `${money.toDisplay(e.product.avg_cost_centavos)} average cost. Selling at it will need `
+          + 'a manager or owner every time (PR-105).',
+      })),
+    };
+  });
+}
+
+/** What this customer has negotiated, newest per product (`SCR-402`'s block). */
+function priceList(customerId, { at = null } = {}) {
+  const customer = customerRepository.findById(customerId);
+  if (!customer) throw errors.notFound('No such customer');
+  const productRepository = require('../repositories/productRepository');
+  const when = at || clock.nowUtc();
+
+  return {
+    customer: { id: customer.id, name: customer.name, price_level: customer.price_level },
+    rule_id: 'PR-103',
+    // PR-103 stated where the list is shown, because "overrides everything" is the
+    // part somebody setting one has to understand.
+    note: 'A customer price overrides every other level for that product, including a '
+      + 'quantity break, however much they buy.',
+    prices: productRepository.customerPricesFor(customerId, when).map((row) => ({
+      product_id: row.product_id,
+      sku: row.sku,
+      product_name: row.product_name,
+      base_unit_code: row.base_unit_code,
+      price_centavos: row.price_centavos,
+      effective_from: row.effective_from,
+      note: row.note,
+    })),
+  };
+}
+
 function assertNoBalance(customerId, verb) {
   const account = creditRepository.findAccountByCustomer(customerId);
   if (!account || account.balance_centavos === 0) return;
@@ -320,6 +457,7 @@ function assertDeletable(id) {
 }
 
 module.exports = {
+  setPrices, priceList,
   TYPES, PRICE_LEVELS,
   validateName, validateContact, validateType, validatePriceLevel,
   toPublic, get, find, search, create, update, deactivate,

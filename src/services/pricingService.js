@@ -31,15 +31,14 @@ const PRICE_LEVELS = Object.freeze(['RETAIL', 'WHOLESALE', 'DEALER']);
 /**
  * PR-101's precedence, as data rather than as an if-chain.
  *
- * All four levels exist now and the two v1.1 ones return null. That is deliberate and
- * is the task's own instruction: retrofitting a precedence order into a shipped
- * pricing engine is how the wrong price reaches a customer. When TASK-024 builds
- * customer-specific prices and quantity breaks, it fills in a resolver here and
- * changes nothing else.
+ * All four levels resolve since TASK-024. The chain was built whole at TASK-009 with
+ * the top two returning null, precisely so that filling them in would be four lines
+ * here and nothing anywhere else — retrofitting a precedence order into a shipped
+ * pricing engine is how the wrong price reaches a customer.
  */
 const PRECEDENCE = Object.freeze([
-  { level: 'CUSTOMER_SPECIFIC', rule: 'PR-103', release: '1.1', resolve: () => null },
-  { level: 'QUANTITY_BREAK', rule: 'PR-104', release: '1.1', resolve: () => null },
+  { level: 'CUSTOMER_SPECIFIC', rule: 'PR-103', release: '1.1', resolve: resolveCustomerPrice },
+  { level: 'QUANTITY_BREAK', rule: 'PR-104', release: '1.1', resolve: resolveQuantityBreak },
   { level: 'PRICE_LEVEL', rule: 'PR-101', release: '1.0', resolve: resolveCustomerLevel },
   { level: 'RETAIL', rule: 'PR-102', release: '1.0', resolve: resolveRetail },
 ]);
@@ -52,6 +51,60 @@ const CEILING_KEYS = Object.freeze({
 });
 
 // ── PR-101 / PR-102 — resolution ────────────────────────────────────────────
+
+/**
+ * PR-103 — level 1. A customer-specific price overrides all others for that customer
+ * and product, **including quantity breaks**.
+ *
+ * A farm that has negotiated ₱58 a kilo pays ₱58 a kilo, whether they buy one sack or
+ * forty. The rule says "overrides all others" and it means it: no comparison with the
+ * break, no cheaper-of. Which is why this sits first in the chain and the chain stops
+ * at the first level that answers — the precedence *is* the implementation.
+ *
+ * What it is still subject to is PR-202's ceiling and PR-105's below-cost check, both
+ * of which happen downstream of resolution. A negotiated price is not a licence to
+ * sell below cost unnoticed.
+ */
+function resolveCustomerPrice({ productId, customer, at }) {
+  if (!customer || !customer.id) return null;
+  const row = productRepository.customerPriceAt(customer.id, productId, at);
+  return row
+    ? { price_centavos: row.price_centavos, effective_from: row.effective_from, note: row.note }
+    : null;
+}
+
+/**
+ * PR-104 — level 2. The band containing the line quantity applies **to the whole
+ * line**, not marginally.
+ *
+ * Marginal would be the other obvious reading and is the wrong one: 40 sacks with a
+ * band at 20 is 40 sacks at the band price, not 20 at one price and 20 at another.
+ * PR-104 says "the whole line" in its own words, and a marginal implementation is
+ * invisible until somebody adds up a large order by hand.
+ *
+ * The band set is stored ascending and validated as a set when written, so this takes
+ * the last band whose threshold the quantity reaches and needs no tie-break — an
+ * overlap is a definition-time refusal, never a counter-time coin toss.
+ */
+function resolveQuantityBreak({ productId, customer, qtyMilli, at }) {
+  if (!qtyMilli || qtyMilli <= 0) return null;
+
+  const level = (customer && customer.price_level) || 'RETAIL';
+  const bands = productRepository.quantityBreaksAt(productId, level);
+  if (bands.length === 0) return null;
+
+  let chosen = null;
+  for (const band of bands) {
+    if (qtyMilli >= band.min_qty_milli) chosen = band;
+  }
+  if (!chosen) return null;
+
+  return {
+    price_centavos: chosen.price_centavos,
+    effective_from: chosen.effective_from,
+    band: { min_qty_milli: chosen.min_qty_milli, price_centavos: chosen.price_centavos },
+  };
+}
 
 function resolveCustomerLevel({ productId, customer, at }) {
   const wanted = (customer && customer.price_level) || 'RETAIL';
@@ -101,6 +154,11 @@ function resolvePrice({ product, productId = null, customer = null, qtyMilli = n
       rule_id: step.rule,
       effective_from: hit.effective_from,
       fell_through: step.level === 'RETAIL' && requestedLevel !== 'RETAIL',
+      // PR-104's band, so a line can say *which* break it got — "40 sacks or more" is
+      // the sentence a customer queries, not "a discount".
+      band: hit.band || null,
+      // PR-103's note, which is the store's own account of what was agreed.
+      note: hit.note || null,
     };
   }
 
@@ -113,22 +171,71 @@ function resolvePrice({ product, productId = null, customer = null, qtyMilli = n
 }
 
 /**
- * PR-104's quantity break, as an automatic line discount — TASK-024's to fill in.
+ * PR-104's quantity break, seen as PR-206 sees it: an automatic discount.
  *
- * Requirement 4 asks that this task define the precedence quantity breaks slot into
- * and not need reworking when they arrive. This is that seam, and it is a call rather
- * than a comment on purpose: `priceCart` already asks the question and already feeds
- * the answer through PR-206's chooser, so TASK-024 returns a figure here and changes
- * nothing else.
+ * ## Two rules describe the same thing, and both are honoured
  *
- * A break is modelled as a **discount off the resolved price**, not as a second price.
- * PR-101 resolves the price and PR-206 governs discounts, and a quantity break that
- * arrived as a price would be an automatic discount that escaped the rule saying
- * automatic discounts do not compound with manual ones.
+ * `PR-101` calls a quantity break a **price level** — level 2 of the precedence chain,
+ * resolved by `resolveQuantityBreak` above. `PR-206` calls it an **automatic discount**
+ * that must not compound with a manual one. Both are true, and reconciling them is the
+ * whole of this function.
+ *
+ * The break resolves a price. What it *saves* — the gap between the level price the
+ * customer would otherwise have paid and the band price — is the automatic discount
+ * PR-206 weighs against anything the cashier typed. So:
+ *
+ *   • the break saves more than the manual discount → the band price applies, and the
+ *     manual discount does not. The line is charged at the break, and its resolved
+ *     level says `QUANTITY_BREAK`.
+ *   • the manual discount is larger → **the break does not apply**. The line is charged
+ *     at the ordinary level price less the manual discount, and its resolved level says
+ *     so. That is PR-206's "the larger applies" read strictly: exactly one of them.
+ *
+ * Charging the band price outright, rather than the level price less the saving, is
+ * deliberate. The two differ by a centavo whenever `mulQty` rounds, and the figure a
+ * customer was quoted is the band price — not an arithmetic reconstruction of it.
+ *
+ * Returns null where there is no break to consider, which is every line of a store
+ * that defines none.
  */
-function automaticLineDiscount() {
-  return { centavos: 0, rule_id: 'PR-104', release: '1.1', why: null };
+function quantityBreakSaving({ productId, customer, qtyMilli, at }) {
+  const brk = resolveQuantityBreak({ productId, customer, qtyMilli, at });
+  if (!brk) return null;
+
+  // What the line would have cost at the level below the break — PR-101 levels 3–4.
+  // Resolved through the same chain, minus the two levels above it, so a fall-through
+  // to retail is handled by the code that already handles it.
+  const base = resolveCustomerLevel({ productId, customer, at })
+    || resolveRetail({ productId, at });
+  if (!base) return null;
+
+  const saving = money.mulQty(base.price_centavos, qtyMilli) - money.mulQty(brk.price_centavos, qtyMilli);
+  if (saving <= 0) {
+    // A band priced at or above the level price saves nothing. It is not an error —
+    // a store may set one while a level price moves under it — and it is not a
+    // discount either, so PR-206 has nothing to weigh.
+    return null;
+  }
+
+  return {
+    centavos: saving,
+    rule_id: 'PR-104',
+    band: brk.band,
+    base_price_centavos: base.price_centavos,
+    break_price_centavos: brk.price_centavos,
+    why: `${quantityLabel(brk.band.min_qty_milli)} or more at `
+      + `${money.toDisplay(brk.price_centavos)} (PR-104).`,
+  };
 }
+
+/** The seam TASK-023 left, now filled. Kept for callers that want the shape alone. */
+function automaticLineDiscount(context = {}) {
+  return quantityBreakSaving(context) || { centavos: 0, rule_id: 'PR-104', why: null };
+}
+
+const quantityLabel = (milli) => (milli % 1000 === 0
+  ? String(milli / 1000)
+  : (milli / 1000).toFixed(3).replace(/0+$/, '').replace(/\.$/, ''));
 
 /** The v1.1 levels, named so a caller can see what is not yet resolving. */
 function precedenceLevels() {
@@ -405,28 +512,49 @@ function priceCart({
       throw errors.conflict(`${product.name} is withdrawn and cannot be sold.`, { ruleId: 'INV-105' });
     }
 
-    const price = resolvePrice({ product, customer, qtyMilli: line.qtyMilli, at: when });
+    const listed = resolvePrice({ product, customer, qtyMilli: line.qtyMilli, at: when });
 
     // PR-202's ceiling for this line, joined onto the product rather than looked up
     // per line: twenty cart lines would otherwise be twenty round trips.
     const categoryMaxDiscountBp = product.category_max_discount_bp ?? null;
 
-    const gross = money.mulQty(price.price_centavos, line.qtyMilli);
-
     // ── PR-206, at the line level ──
     //
-    // The automatic line discount is a quantity break, which is TASK-024's. It resolves
-    // to nothing today and the choice is made anyway, so that when PR-104 lands it
-    // fills in `automaticCentavos` and changes nothing else here — requirement 4's
-    // "must not need reworking when they arrive", as a call rather than as a promise.
-    const automatic = automaticLineDiscount({ product, price, qtyMilli: line.qtyMilli, customer });
+    // A quantity break is a price to PR-101 and an automatic discount to PR-206, and
+    // `quantityBreakSaving` is where those two readings meet — see its own note. A
+    // customer-specific price is neither: PR-103 overrode the break, so there is no
+    // automatic discount left to weigh, and a manual one applies as it always did.
+    const brokeOnQuantity = listed.precedence === 'QUANTITY_BREAK';
+    const automatic = brokeOnQuantity
+      ? quantityBreakSaving({ productId: product.id, customer, qtyMilli: line.qtyMilli, at: when })
+      : null;
+
     const chosen = discountRuleService.chooseDiscount({
-      automaticCentavos: automatic.centavos,
+      automaticCentavos: automatic ? automatic.centavos : 0,
       manualCentavos: line.discountCentavos || 0,
-      automaticReason: automatic.why,
+      automaticReason: automatic ? automatic.why : null,
       manualReason: line.discountReason || null,
     });
-    const discount = chosen.applied_centavos;
+
+    // **Exactly one of them applies.** Where the manual discount is larger, the break
+    // does not apply at all: the line is charged at the level price the customer would
+    // otherwise have paid, less what was typed. Where the break wins, it is charged at
+    // the band price with no discount — not at the level price less the saving, which
+    // differs by a centavo whenever mulQty rounds and is not the figure the customer
+    // was quoted.
+    const manualBeatTheBreak = automatic !== null && chosen.source === 'MANUAL';
+    const price = manualBeatTheBreak
+      ? {
+        ...listed,
+        price_centavos: automatic.base_price_centavos,
+        resolved_level: listed.requested_level,
+        precedence: 'PRICE_LEVEL',
+        rule_id: 'PR-206',
+        band: null,
+      }
+      : listed;
+
+    const discount = brokeOnQuantity && !manualBeatTheBreak ? 0 : chosen.applied_centavos;
 
     const totals = money.computeLineTotal({
       unitPrice: price.price_centavos, qtyMilli: line.qtyMilli, lineDiscount: discount,
@@ -437,7 +565,7 @@ function priceCart({
     // discount *authority*, and nobody exercised any.
     const discountDecision = discount === 0 || chosen.source === 'AUTOMATIC'
       ? {
-        allowed: true, requested_bp: basisPoints(discount, gross),
+        allowed: true, requested_bp: basisPoints(discount, totals.gross),
         ceiling_bp: effectiveCeilingBp(actorRole, { categoryMaxDiscountBp }),
         rule_id: chosen.source === 'AUTOMATIC' ? 'PR-106' : 'PR-201',
       }
@@ -472,6 +600,11 @@ function priceCart({
       unit_price_centavos: price.price_centavos,
       price_level: price.resolved_level,
       price_fell_through: price.fell_through,
+      // PR-101's last sentence, with the detail behind it: which band, or what was
+      // agreed and noted. "40 or more at ₱58" is the sentence a customer queries.
+      price_rule_id: price.rule_id,
+      quantity_band: price.band || null,
+      customer_price_note: price.precedence === 'CUSTOMER_SPECIFIC' ? price.note : null,
       gross_centavos: totals.gross,
       line_discount_centavos: totals.discount,
       net_centavos: totals.net,
@@ -615,7 +748,8 @@ function priceCart({
 
 module.exports = {
   PRICE_LEVELS, PRECEDENCE, CEILING_KEYS,
-  resolvePrice, precedenceLevels, automaticLineDiscount,
+  resolvePrice, precedenceLevels, automaticLineDiscount, quantityBreakSaving,
+  resolveCustomerPrice, resolveQuantityBreak,
   roleCeilingBp, effectiveCeilingBp, evaluateDiscount, assertDiscountAllowed,
   basisPoints, maxDiscountCentavos, rolesAbove,
   evaluateBelowCost, assertNotBelowCost,

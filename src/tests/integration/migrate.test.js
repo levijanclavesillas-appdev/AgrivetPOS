@@ -142,6 +142,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'sale_returns', 'sale_return_items',
     // 012_stock_counts
     'stock_count_sessions', 'stock_count_lines',
+    // 013_negotiated_pricing
+    'customer_prices', 'product_quantity_breaks',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',

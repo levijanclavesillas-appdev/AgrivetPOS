@@ -66,7 +66,7 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-UT-18` | `VAT` mode: inclusive ₱1,120 VATable → net ₱1,000, VAT ₱120 | `TAX-003` |
 | `TC-UT-19` | A basket of VATable + exempt lines decomposes per line, not in aggregate | `TAX-003` |
 | `TC-UT-20` | Statutory and voluntary discounts do not compound; larger wins | `TAX-005` |
-| `TC-UT-31` | Price precedence: customer → qty break → level → retail | `PR-101` |
+| `TC-UT-31` | Price precedence: customer → qty break → level → retail. **Updated by `TASK-024`** — it asserted the top two levels were stubbed, and now asserts all four resolve against real data | `PR-101` |
 | `TC-UT-32` | Missing wholesale price falls through to retail, never to zero | `PR-102` |
 | `TC-UT-33` | GCash tender with empty reference rejected | `POS-205` |
 | `TC-UT-34` | Discount above role ceiling refused without an approver | `PR-201`, `PR-203` |
@@ -75,6 +75,8 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-UT-44` | Ageing derives from due date at read time across a date boundary | `CR-107` |
 | `TC-UT-45` | `PR-106`: the highest band the basket reaches and **only one** — a ₱10,000 basket over three bands earns 8%, not 2 + 5 + 8. Thresholds are inclusive; overlapping and descending bands are refused where they are typed | `PR-106`, `OPS-005` |
 | `TC-UT-46` | `PR-202`: the effective ceiling is the **lower** of role and category, so an owner's 100% is still capped at the category's 5%. The refusal names which bound, and offers no approver where the category did | `PR-202`, `PR-201` |
+| `TC-UT-48` | `PR-104`: exactly one band contains a quantity and boundaries land in the band they start; the band applies to the **whole line**, not marginally; and a set that overlaps, descends or could never lower a price is refused where it is defined | `PR-104`, `VR-203` |
+| `TC-UT-49` | `PR-103`: the customer price beats a **cheaper** quantity break at every quantity — "overrides all others", not "the cheaper of" — and is still bound by `PR-202` and checked by `PR-105` | `PR-103`, `PR-202`, `PR-105` |
 | `TC-UT-47` | `PR-206`: the larger applies and never the sum — asserted with both figures non-zero and equal, which is the input an additive implementation fails and the only one it fails | `PR-206` |
 | `TC-UT-90` | Timestamps stored UTC, rendered `Asia/Manila` | `VR-102`, `NFR_4.2` |
 | `TC-UT-98` | Every rule in the covered sections is cited by ≥ 1 test | `NFR_5.2` |
@@ -141,6 +143,7 @@ one marked 1.2 is reported and not asserted, exactly as the other sections work.
 | `TC-INT-90` | `INV-112`: self-approval refused on **identity**, not role — a manager who took the count is still the counter. Waived, stated and recorded on the row for a single-user store, in a database of its own | `INV-112`, `AUD-601` |
 | `TC-INT-91` | `INV-113`: a stale session is refused, a manager is not enough, an owner releases it, and the release is an `AUD-603`-shaped row with two distinct actors. An owner posting their own stale count needs nobody else | `INV-113`, `AUD-603` |
 | `TC-INT-92` | The whole precedence in one pass: `PR-202` binds an owner whose role ceiling is 100% and the refusal names the category with **no approver to fetch**; the same discount keyed by a cashier reports `PR-203` *and* `PR-105` together rather than one at a time; `PR-106`'s tier applies to the basket and exercises nobody's ceiling; `PR-206` resolves the tier against a hand-typed figure both ways round; `PR-205` still caps the lot | `PR-106`, `PR-202`, `PR-203`, `PR-205`, `PR-206`, `PR-105` |
+| `TC-INT-93` | `PR-104`: an overlapping band set is refused over HTTP naming the offending pair, and **nothing is written** — a set is refused whole. A cashier may define neither a band nor a customer price (`TX-411`), and a customer price is superseded rather than updated, with both values on the trail | `PR-104`, `PR-103`, `TX-411`, `AUD-601` |
 | `TC-API-01` | Every route refuses an actor lacking its `TX-*`, with 403, and audits it | `SEC-6` |
 | `TC-API-02` | No endpoint returns `password_hash`, `pin_hash` or `recovery_code_hash` | `SEC-1` |
 
@@ -224,20 +227,21 @@ two `TC-INT-84`s that assert different things.
 | ~~`TC-INT-81` – `TC-INT-84`~~ | `TASK-020` | **Written** — see §4. Returns: the quantity ceiling, write-off defaults, refund precedence, both movements |
 | ~~`TC-INT-85` – `TC-INT-87`~~ | `TASK-021` | **Written** — see §4. Voids: full reversal, the shift window, the authorisation |
 | ~~`TC-INT-88` – `TC-INT-91`~~ | `TASK-022` | **Written** — see §4. Stock counts: the freeze, no movement when matched, self-approval, staleness |
-| ~~`TC-INT-92`, `TC-UT-45` – `TC-UT-47`~~, `TC-INT-93`, `TC-UT-48` – `TC-UT-49` | `TASK-023`, `TASK-024` | **`TASK-023`'s are written** — see §3 and §4. Discount tiers, category ceilings, non-compounding; `TASK-024`'s four precedence levels remain |
+| ~~`TC-INT-92` – `TC-INT-93`, `TC-UT-45` – `TC-UT-49`~~ | `TASK-023`, `TASK-024` | **Written** — see §3 and §4. Discount tiers, category ceilings, non-compounding, and all four precedence levels |
 | `TC-INT-94` – `TC-INT-100` | `TASK-025`, `TASK-026` | Import validation before writing, determinism, collisions, the opening load |
 | `TC-INT-101` – `TC-INT-102`, `TC-UT-50` – `TC-UT-51` | `TASK-027` | Statutory discount: off by default, no compounding, VAT exemption |
 | `TC-INT-103` – `TC-INT-106` | `TASK-028` | Store credit: both sources, spending it, reconciliation, never aged overdue |
 | ~~`TC-E2E-16`~~ – ~~`TC-E2E-19`~~, `TC-E2E-20` – `TC-E2E-22` | one per task | The journey each task exists for. `TC-E2E-16` to `TC-E2E-19` are written — see §5 |
 
-**Two existing cases are re-pointed rather than replaced**, and both are named in their tasks.
-`TC-INT-62` forced a `VOIDED` status by hand because no void path existed; **`TASK-021` has now
-pointed it at a real void**, and it asserts the stock came back and `POS-401`'s four columns are
-on the row — neither of which the hand-forced status ever did, and both of which it would have
-gone on passing without. `TC-UT-31` still asserts that two of `PR-101`'s four precedence levels
-are stubbed, and `TASK-024` makes it assert that all four resolve. A case that was written
-against a placeholder is a case that must change when the placeholder does — and noticing that
-at v1.1 close is cheaper than noticing it in review.
+**Two existing cases were re-pointed rather than replaced, and both are now done.**
+`TC-INT-62` forced a `VOIDED` status by hand because no void path existed; **`TASK-021` pointed
+it at a real void**, and it asserts the stock came back and `POS-401`'s four columns are on the
+row — neither of which the hand-forced status ever did, and both of which it would have gone on
+passing without. `TC-UT-31` asserted that two of `PR-101`'s four precedence levels were stubbed;
+**`TASK-024` makes it assert that all four resolve**, against real data rather than against an
+empty context, because "returns null on an empty call" could not tell a stub from a resolver
+that simply declined. A case written against a placeholder must change when the placeholder
+does — and noticing that at v1.1 close is cheaper than noticing it in review.
 
 A third was re-pointed unannounced, for the same reason: `TASK-020`'s "a voided sale has nothing
 to return against" forced the status the same way, and now drives the real void. Anything that
@@ -325,11 +329,13 @@ none of them is a question a suite can answer.
 | 8 | `TC-INT-88`–`TC-INT-91`, `TC-E2E-19` green | ☑ green |
 | 9 | `FT-306` built, tested and reachable | ☑ **done** (`TASK-023`). Tiers are in the registry; `PR-202` binds on `SCR-301`; the counter holds no copy |
 | 10 | `TC-UT-45`–`TC-UT-47`, `TC-INT-92` green | ☑ green |
-| 11 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-024` – `TASK-028` outstanding |
-| 12 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
-| 13 | A return taken at the counter on the store's own stock | ☐ **not started.** `POS-304`'s default is the one rule in this release whose value is decided by whether a cashier reads the sentence beside it, and that is not a thing a test can answer |
-| 14 | A void taken at the counter, and the drawer counted after it | ☐ **not started.** `TC-E2E-18` proves the arithmetic; what it cannot prove is that a cashier under pressure finds the button and a manager is willing to walk over. `POS-403` is a workflow before it is a rule |
-| 15 | A stocktake walked in the store, on the store's own shelves | ☐ **not started.** `TC-E2E-19` proves 200 products. What it cannot prove is that somebody counting an aisle understands that a blank field and a `0` are different answers — which is the one misunderstanding on `SCR-205` that costs real money |
+| 11 | `FT-211`, `FT-212` built, tested and reachable | ☑ **done** (`TASK-024`). All four of `PR-101`'s levels resolve; the bands and the agreed prices have editors |
+| 12 | `TC-UT-31`, `TC-UT-48`–`TC-UT-49`, `TC-INT-93` green | ☑ green |
+| 13 | `FT-505`, `FT-6xx` and the rest of the v1.1 backlog | ☐ `TASK-025` – `TASK-028` outstanding |
+| 14 | Purchasing exercised on the store's own supplier data | ☐ **not started.** A delivery keyed by the person who unloads the van is the only test of `SCR-803` that counts |
+| 15 | A return taken at the counter on the store's own stock | ☐ **not started.** `POS-304`'s default is the one rule in this release whose value is decided by whether a cashier reads the sentence beside it, and that is not a thing a test can answer |
+| 16 | A void taken at the counter, and the drawer counted after it | ☐ **not started.** `TC-E2E-18` proves the arithmetic; what it cannot prove is that a cashier under pressure finds the button and a manager is willing to walk over. `POS-403` is a workflow before it is a rule |
+| 17 | A stocktake walked in the store, on the store's own shelves | ☐ **not started.** `TC-E2E-19` proves 200 products. What it cannot prove is that somebody counting an aisle understands that a blank field and a `0` are different answers — which is the one misunderstanding on `SCR-205` that costs real money |
 
 Measured on a build machine, reported for regression purposes and for nothing else:
 

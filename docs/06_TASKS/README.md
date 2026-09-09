@@ -3,7 +3,8 @@
 Work items, closed and open. Each task is self-contained: an implementer should need this file,
 plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**v1.0 is code-complete; v1.1 is under way** — `TASK-019` to `TASK-023` are closed. With them
+**v1.0 is code-complete; v1.1 is under way** — `TASK-019` to `TASK-024` are closed, and with
+`TASK-024` the last of `PR-101`'s stubs: every price the rules describe now resolves. With them
 come both of `POS-107`'s corrections, so a sale can be unsold either way round, and the
 stocktake, so the shelf figure can be checked against the shelf.
 `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
@@ -97,6 +98,7 @@ again quietly.
 | [TASK-021](TASK-021-sale-voiding.md) | Sale voiding with full reversal | `5cc8370` | No schema — `006_sales.sql`'s four unused columns finally used. `voidService`; the void on `SCR-304`; `POS-404`'s void report; `TC-INT-85`–`TC-INT-87`, `TC-E2E-18`, and `TC-INT-62` re-pointed at a real void |
 | [TASK-022](TASK-022-stock-counting.md) | Stock counting with frozen expected quantities | `b5b34a3` | `012_stock_counts.sql`; `stockCountService` and its repository; `SCR-205`; `TC-INT-88`–`TC-INT-91`, `TC-E2E-19`. The `INV-` prefix joined the audit guard's rule pattern |
 | [TASK-023](TASK-023-discount-rules-engine.md) | Discount rules engine and category ceilings | `c9ad009` | No schema — `categories.max_discount_bp` finally read. `discountRuleService`; `PR-106` tiers in the registry; `TC-UT-45`–`TC-UT-47`, `TC-INT-92`. `settingsService`'s JSON coercion learned structured entries |
+| [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | *this commit* | `013_negotiated_pricing.sql`; `PR-101`'s top two levels, stubbed since `TASK-009`, now resolve; band and agreed-price editors; `TC-UT-48`–`TC-UT-49`, `TC-INT-93`, and `TC-UT-31` updated |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
@@ -130,6 +132,12 @@ the feature simply could not be used. Every unit guard passed: they asserted the
 which was correct, and never that anything re-ran it. The guard now asserts both, and the fix is
 the same targeted refresh `SCR-803` and `SCR-305` already use to avoid moving the cursor.
 
+**What `TASK-024` found: `TC-UT-31` would have gone on passing against stubs.** The case
+asserted `step.resolve({}) === null` for the two unbuilt levels — which a *real* resolver also
+satisfies when handed an empty context. Inverting the assertion was not enough; it now walks the
+chain with real data at each of the four levels. A placeholder test is only as good as the thing
+that distinguishes the placeholder.
+
 **What `TASK-023` decided that its rule did not settle: what "on the same line" means.**
 `PR-206` names a per-line rule and a per-transaction one together and says neither compounds with
 a manual discount "on the same line" — which cannot be read literally for the transaction one.
@@ -155,16 +163,16 @@ discount at the time of *sale* — so the void report reads `AUD-603`'s own audi
 ## Open — v1.1 "Supply"
 
 Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
-`TASK-024` because the second slots into the precedence the first defines — which it now does
-literally: `pricingService.automaticLineDiscount` is the seam `TASK-023` left, and `TASK-024`
-fills in one function. And `TASK-025` before `TASK-026` because the opening load reuses its
-validation pass rather than growing a second one. `TASK-020` came before `TASK-028` for the same kind of reason and has now landed —
+`TASK-024` because the second slots into the precedence the first defines — which it did:
+`pricingService.automaticLineDiscount` was the seam `TASK-023` left, and `TASK-024` filled it
+without changing its shape, though a break turned out to be a price *and* a discount rather than
+only the latter. And `TASK-025` before `TASK-026` because the opening load reuses its validation
+pass rather than growing a second one. `TASK-020` came before `TASK-028` for the same kind of reason and has now landed —
 a return is the other thing that creates store credit, and `CR-108`'s negative balance is
 already written and tested by it.
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
-| [TASK-024](TASK-024-customer-and-quantity-pricing.md) | Customer-specific and quantity-break pricing | `FT-211`, `FT-212` | `TASK-023` |
 | [TASK-025](TASK-025-json-export-and-import.md) | JSON export and validated import | `FT-705`, `FT-706` | — |
 | [TASK-026](TASK-026-opening-data-load.md) | **Opening-data load from CSV** — products, opening stock, opening credit balances | `FT-707` | `TASK-025` |
 | [TASK-027](TASK-027-statutory-discount.md) | Senior citizen / PWD statutory discount | `FT-309` | — |

@@ -144,6 +144,33 @@ router.put('/products/:id/prices', changePrice, (req, res, next) => {
   }
 });
 
+/**
+ * PR-104 — the quantity-break set for one price level.
+ *
+ * `PUT` and a whole set, not `POST` and a band. PR-104's guarantees — ascending,
+ * non-overlapping, each cheaper than the one below — are properties of the *set*, and
+ * a band added one at a time is a set nobody ever validated. An empty list removes the
+ * breaks for that level.
+ */
+router.get('/products/:id/quantity-breaks', readCatalog, (req, res, next) => {
+  try {
+    res.json(productService.quantityBreaks(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/products/:id/quantity-breaks', changePrice, (req, res, next) => {
+  try {
+    const { priceLevel, bands, reason = null } = req.body || {};
+    res.json(productService.setQuantityBreaks(
+      req.params.id, priceLevel, bands, req.session, req.session, { reason }
+    ));
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.put('/products/:id/cost', changeCost, (req, res, next) => {
   try {
     const { avgCostCentavos, reason = null } = req.body || {};

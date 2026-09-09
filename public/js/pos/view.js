@@ -79,13 +79,14 @@ export function createPos({ root, session, onPay }) {
             text: pricedLine ? `${money(pricedLine.unit_price_centavos)}/${line.baseUnit}` : '—',
           }),
           // PR-101: the resolved level is named, so "why is this ₱58" is answerable.
+          // Since TASK-024 the top two levels can win, and neither reads as an English
+          // answer in its raw form — "QUANTITY_BREAK" is a column value, not a reason
+          // a cashier can give a customer standing at the counter.
           pricedLine
             ? h('span', {
               class: `price-level${pricedLine.price_fell_through ? ' fell-through' : ''}`,
-              text: pricedLine.price_level,
-              title: pricedLine.price_fell_through
-                ? 'No price at the customer’s level, so retail applies (PR-102)'
-                : null,
+              text: priceLevelLabel(pricedLine),
+              title: priceLevelTitle(pricedLine),
             })
             : null,
           h('span', { class: 'line-total', text: pricedLine ? money(pricedLine.amount_centavos) : '—' }),
@@ -105,6 +106,36 @@ export function createPos({ root, session, onPay }) {
           : null,
       ]));
     });
+  }
+
+  /**
+   * PR-101's resolved level, in words a cashier can repeat to a customer.
+   *
+   * The label is the screen's — this is presentation, not policy — but every fact in
+   * it is the server's: which level won, which band, and what was agreed. A screen
+   * that worked out *why* a price was what it is would be a second resolver.
+   */
+  function priceLevelLabel(pricedLine) {
+    if (pricedLine.price_level === 'CUSTOMER_SPECIFIC') return 'AGREED';
+    if (pricedLine.price_level === 'QUANTITY_BREAK') {
+      const band = pricedLine.quantity_band;
+      return band ? `${quantity(band.min_qty_milli)}+` : 'BULK';
+    }
+    return pricedLine.price_level;
+  }
+
+  function priceLevelTitle(pricedLine) {
+    if (pricedLine.price_level === 'CUSTOMER_SPECIFIC') {
+      return pricedLine.customer_price_note
+        ? `Agreed with this customer — ${pricedLine.customer_price_note} (PR-103)`
+        : 'A price agreed with this customer, which beats any quantity break (PR-103)';
+    }
+    if (pricedLine.price_level === 'QUANTITY_BREAK') {
+      return 'A quantity break, applied to the whole line (PR-104)';
+    }
+    return pricedLine.price_fell_through
+      ? 'No price at the customer’s level, so retail applies (PR-102)'
+      : null;
   }
 
   /**

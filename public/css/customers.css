@@ -50,3 +50,9 @@
 
 /* A payment on the statement is a subtraction — the column is read down the balance. */
 .statement .money.credit { color: var(--accent); }
+
+/* PR-103's agreed prices on SCR-402 (TASK-024). */
+.agreed-prices { margin-top: 2rem; }
+.agreed-prices h2 { font-size: 1rem; margin: 0 0 .35rem; }
+.agreed-prices .muted { max-width: 46rem; }
+.agreed-prices .catalogue-list { margin-top: .75rem; }

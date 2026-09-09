@@ -17,6 +17,7 @@ const ids = require('../config/ids');
 const clock = require('../config/clock');
 const errors = require('./errors');
 const quantity = require('./quantity');
+const money = require('./money');
 const auditService = require('./auditService');
 const permissions = require('./permissions');
 const productRepository = require('../repositories/productRepository');
@@ -632,6 +633,175 @@ function writePrice(productId, level, priceCentavos, { at, actor, effectiveFrom 
  * Set one or more price levels. TX-411, which a manager holds and an inventory clerk
  * does not — TX-410 lets them create the product, not decide what it sells for.
  */
+// ── PR-104 — quantity breaks (TASK-024) ─────────────────────────────────────
+
+/**
+ * Validate a band set **as a set**, which is the only level at which PR-104's rules
+ * exist.
+ *
+ * Ascending, non-overlapping, and each band cheaper than the one below it. None of the
+ * three is a property of a row: a single band is always valid, and a schema constraint
+ * checking rows one at a time would accept a set that contradicted itself. So the set
+ * is the unit of writing — a revision replaces the whole generation rather than
+ * merging into it — and this is where it is refused.
+ *
+ * The refusal **names the offending pair**, because "these bands overlap" against a
+ * list of six is a message somebody has to work with by hand.
+ */
+function validateBandSet(bands, { level, baseLevelPriceCentavos = null }) {
+  const parsed = bands.map((band, index) => {
+    const minQty = Number.parseInt(band.minQtyMilli, 10);
+    const price = validateCentavos(band.priceCentavos, `Band ${index + 1}'s price`, 'VR-203');
+
+    if (!Number.isInteger(minQty) || minQty <= 0) {
+      throw errors.badRequest(
+        `Band ${index + 1} needs the quantity it starts at, in whole thousandths and above zero. `
+        + 'A band starting at nothing is the level price wearing another name.',
+        { ruleId: 'PR-104' }
+      );
+    }
+    return { min_qty_milli: minQty, price_centavos: price };
+  });
+
+  const sorted = [...parsed].sort((a, b) => a.min_qty_milli - b.min_qty_milli);
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const lower = sorted[i - 1];
+    const upper = sorted[i];
+
+    if (upper.min_qty_milli === lower.min_qty_milli) {
+      throw errors.badRequest(
+        `Two ${level.toLowerCase()} bands start at ${quantity.toDecimalString(upper.min_qty_milli)}. `
+        + 'Bands may not overlap — exactly one band contains a quantity (PR-104).',
+        { ruleId: 'PR-104' }
+      );
+    }
+    if (upper.price_centavos > lower.price_centavos) {
+      throw errors.badRequest(
+        `The ${level.toLowerCase()} band starting at ${quantity.toDecimalString(upper.min_qty_milli)} `
+        + `costs more than the one starting at ${quantity.toDecimalString(lower.min_qty_milli)}. `
+        + 'Buying more may not cost more per unit, and the dearer band would never be chosen.',
+        { ruleId: 'PR-104' }
+      );
+    }
+  }
+
+  // A band at or above the level price saves nothing and would never be reached in a
+  // way anybody notices. Refused where it is typed rather than left to be discovered
+  // as a break that does not break.
+  if (baseLevelPriceCentavos !== null && sorted.length > 0
+      && sorted[0].price_centavos >= baseLevelPriceCentavos) {
+    throw errors.badRequest(
+      `Every ${level.toLowerCase()} band is at or above the ${level.toLowerCase()} price of `
+      + `${money.toDisplay(baseLevelPriceCentavos)}, so none of them would ever lower a price.`,
+      { ruleId: 'PR-104' }
+    );
+  }
+
+  return sorted;
+}
+
+/**
+ * Replace the quantity-break set for one product and price level.
+ *
+ * A **replacement**, not a merge: PR-104's guarantees are about the set, and merging a
+ * new band into an old set is how two of them come to overlap. The old generation stays
+ * in the table under its own `effective_from`, so a price on an old receipt is still
+ * explicable (`MON-005`'s reasoning applied to the definition rather than the sale).
+ *
+ * An empty list is meaningful and removes the breaks: a new generation with no bands.
+ */
+function setQuantityBreaks(productId, level, bands, actor, session = actor, { reason = null } = {}) {
+  if (!permissions.can(session, 'TX-411')) {
+    throw errors.forbidden(
+      'You do not have permission to change a selling price.',
+      { ruleId: 'TX-411', requiresRole: permissions.rolesHolding('TX-411').join(' or ') }
+    );
+  }
+
+  const product = productRepository.findById(productId);
+  if (!product) throw errors.notFound('No such product');
+
+  const priceLevel = text(level, { max: 20 }).toUpperCase();
+  if (!PRICE_LEVELS.includes(priceLevel)) {
+    throw errors.badRequest(`Price level must be one of ${PRICE_LEVELS.join(', ')}`, { ruleId: 'PR-104' });
+  }
+
+  const at = clock.nowUtc();
+  const levelPrice = productRepository.priceAt(productId, priceLevel, at)
+    || (priceLevel === 'RETAIL' ? null : productRepository.priceAt(productId, 'RETAIL', at));
+
+  const wanted = Array.isArray(bands) ? bands : [];
+  const validated = validateBandSet(wanted, {
+    level: priceLevel,
+    baseLevelPriceCentavos: levelPrice ? levelPrice.price_centavos : null,
+  });
+
+  const before = productRepository.quantityBreaksAt(productId, priceLevel)
+    .map((b) => ({ min_qty_milli: b.min_qty_milli, price_centavos: b.price_centavos }));
+
+  return db.transaction(() => {
+    // Cleared then written, in one transaction. An append-only band table cannot
+    // express "no bands at all" — an empty set would write no rows and leave the old
+    // one standing, which is the feature not working rather than a subtle bug. The
+    // history is AUD-601's row below, which carries the whole set both ways.
+    productRepository.deleteQuantityBreaks(productId, priceLevel);
+
+    for (const band of validated) {
+      productRepository.insertQuantityBreak({
+        id: ids.uuidv7(),
+        product_id: productId,
+        price_level: priceLevel,
+        min_qty_milli: band.min_qty_milli,
+        price_centavos: band.price_centavos,
+        defined_at: at,
+        created_at: at,
+        created_by: actor.id,
+      });
+    }
+
+    // AUD-601 names "discount rule change", and a quantity break is one — it is the
+    // automatic discount PR-206 weighs. Both values, so the change is legible after.
+    auditService.write({
+      actor,
+      action: 'DISCOUNT_RULE_CHANGED',
+      entityType: 'products',
+      entityId: productId,
+      before: { price_level: priceLevel, quantity_breaks: before },
+      after: { price_level: priceLevel, quantity_breaks: validated },
+      reason: reason || `${priceLevel} quantity breaks changed`,
+    });
+
+    return quantityBreaks(productId);
+  });
+}
+
+/** Every level's current band set, for the product editor. */
+function quantityBreaks(productId) {
+  const product = productRepository.findById(productId);
+  if (!product) throw errors.notFound('No such product');
+
+  const rows = productRepository.allQuantityBreaks(productId);
+  const byLevel = Object.fromEntries(PRICE_LEVELS.map((level) => [level, []]));
+  for (const row of rows) {
+    byLevel[row.price_level].push({
+      min_qty_milli: row.min_qty_milli,
+      min_qty_display: quantity.format(row.min_qty_milli, product.base_unit_code),
+      price_centavos: row.price_centavos,
+      defined_at: row.defined_at,
+    });
+  }
+
+  return {
+    product: { id: product.id, sku: product.sku, name: product.name, base_unit_code: product.base_unit_code },
+    rule_id: 'PR-104',
+    // PR-104 in the payload, so the editor states it rather than knowing it.
+    note: 'Bands ascend and may not overlap. The band containing the line quantity '
+      + 'applies to the whole line, not marginally.',
+    levels: byLevel,
+  };
+}
+
 function setPrices(productId, levels, actor, session = actor, { effectiveFrom = null, reason = null } = {}) {
   const product = productRepository.findById(productId);
   if (!product) throw errors.notFound('No such product');
@@ -724,5 +894,5 @@ module.exports = {
   get, search, findByBarcode,
   create, update, deactivate, assertBaseUnitChangeable,
   attachBarcode, detachBarcode, addPack, removePack, normalisePack,
-  setPrices, setCost, assertMayChangeCost,
+  setPrices, setQuantityBreaks, quantityBreaks, validateBandSet, setCost, assertMayChangeCost,
 };

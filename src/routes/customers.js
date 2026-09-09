@@ -128,6 +128,31 @@ router.delete('/customers/:id', editCustomers, (req, res, next) => {
  * its own: folding it in would let a TX-413 holder raise a credit limit as a side
  * effect of correcting a phone number.
  */
+/**
+ * PR-103 — what this customer pays for these products.
+ *
+ * Behind `TX-411` — "change a selling price" — rather than `TX-413`'s "create or edit a
+ * customer", which reaches a cashier. A negotiated price is a selling price that
+ * happens to be attached to a customer, and it overrides every other level for that
+ * pair, so it is not a customer detail.
+ */
+router.get('/customers/:id/prices', readCustomers, (req, res, next) => {
+  try {
+    res.json(customerService.priceList(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/customers/:id/prices', [authenticate, requirePermission('TX-411')], (req, res, next) => {
+  try {
+    const { prices, reason = null } = req.body || {};
+    res.json(customerService.setPrices(req.params.id, prices, req.session, req.session, { reason }));
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.put('/customers/:id/credit-limit', setCreditLimit, (req, res, next) => {
   try {
     const { creditLimitCentavos, termsDays, reason = null } = req.body || {};
