@@ -39,7 +39,7 @@ export function createStockCount({ root, session: user, countId = null, onBack }
   let posting = false;
   let result = null;
 
-  const pending = new Map();  // productId -> the value being typed, before it is saved
+  const pending = new Map();  // line id -> the value being typed, before it is saved
 
   async function mount() {
     if (countId) return openCount(countId);
@@ -188,9 +188,56 @@ export function createStockCount({ root, session: user, countId = null, onBack }
       if (showOnly === 'UNCOUNTED' && line.is_counted) return false;
       if (showOnly === 'VARYING' && !(line.is_counted && line.variance_milli !== 0)) return false;
       if (!term) return true;
-      return `${line.sku} ${line.product_name}`.toLowerCase().includes(term);
+      return `${line.sku} ${line.product_name} ${line.batch_no || ''}`.toLowerCase().includes(term);
     });
   };
+
+  /**
+   * The visible sheet, with a heading row above each batch-tracked product's batches.
+   *
+   * TASK-042: the counter needs to see that the four boxes add up to what the system
+   * expected before posting, and four rows that each look right individually can still
+   * be wrong together. The heading carries the product's frozen total and what has been
+   * counted against it so far, from **all** of its lines rather than only the visible
+   * ones — a filtered view that quietly re-totalled would be the more dangerous of the
+   * two figures.
+   */
+  const visibleRows = () => {
+    const rows = [];
+    let group = null;
+    for (const line of visibleLines()) {
+      if (line.batch_no && line.product_id !== group) {
+        group = line.product_id;
+        rows.push({ heading: line.product_id });
+      }
+      if (!line.batch_no) group = null;
+      rows.push({ line });
+    }
+    return rows;
+  };
+
+  /**
+   * The heading over one product's batch lines, from the server's own totals.
+   *
+   * Every figure on it is the server's, as every figure on this screen is: the sheet
+   * adds nothing up itself, because two routes to one number is one of them being
+   * wrong eventually.
+   */
+  function groupRow(productId) {
+    const group = (view.groups || []).find((g) => g.product_id === productId);
+    if (!group) return null;
+
+    return h('tr', { class: 'count-group' }, [
+      h('td', {}, [
+        h('span', { text: group.product_name }),
+        h('small', { class: 'muted', text: `${group.batch_count} batch${group.batch_count === 1 ? '' : 'es'}`
+          + `${group.uncounted_count > 0 ? ` · ${group.uncounted_count} not counted yet` : ''}` }),
+      ]),
+      h('td', { class: 'qty', text: group.expected_display }),
+      h('td', { class: 'qty', text: group.counted_display || '' }),
+      h('td', {}), h('td', {}),
+    ]);
+  }
 
   function render() {
     if (result) return renderPosted();
@@ -260,17 +307,30 @@ export function createStockCount({ root, session: user, countId = null, onBack }
           h('th', { class: 'qty', text: 'Variance' }),
           h('th', { class: 'money', text: 'Value' }),
         ])]),
-        h('tbody', { id: 'count-rows' }, visibleLines().map((line) => lineRow(line))),
+        h('tbody', { id: 'count-rows' },
+          visibleRows().map((row) => (row.heading ? groupRow(row.heading) : lineRow(row.line)))),
       ]),
     ]);
   }
 
   function lineRow(line) {
     const editable = view.session.is_editable;
-    return h('tr', { class: rowClass(line), 'data-product': line.product_id }, [
-      h('td', {}, [
+    return h('tr', { class: rowClass(line), 'data-line': line.id }, [
+      h('td', { class: line.batch_no ? 'is-batch-line' : null }, [
         h('span', { text: line.product_name }),
-        h('small', { class: 'muted', text: line.sku }),
+        // TASK-042: a batch-tracked product is one line per batch, because that is what
+        // is printed on the box in the counter's hand. The batch and its date are the
+        // whole difference between this row and the one above it, so they are what the
+        // cell says — the SKU is the same on both.
+        h('small', { class: 'muted', text: line.batch_no
+          ? `Batch ${line.batch_no} · expires ${line.expiry_date}`
+          : line.sku }),
+        // INV-203: an expired box is still stock until it is written off, so it is
+        // still counted — but the counter should be told which carton is the one that
+        // may not be sold, while they are standing in front of it.
+        line.expiry_status && line.expiry_status !== 'NORMAL'
+          ? h('span', { class: 'tag warn', text: line.expiry_status === 'EXPIRED' ? 'expired' : 'near expiry' })
+          : null,
       ]),
       h('td', { class: 'qty', text: line.expected_display }),
       h('td', { class: 'qty' }, editable
@@ -281,8 +341,10 @@ export function createStockCount({ root, session: user, countId = null, onBack }
             // A blank is not a zero, and the placeholder is where that is said on
             // every single row rather than once at the top where it is read once.
             placeholder: 'not counted',
-            'aria-label': `Counted quantity of ${line.product_name}`,
-            oninput: (event) => { pending.set(line.product_id, event.target.value); },
+            'aria-label': line.batch_no
+              ? `Counted quantity of ${line.product_name}, batch ${line.batch_no}`
+              : `Counted quantity of ${line.product_name}`,
+            oninput: (event) => { pending.set(line.id, event.target.value); },
             onblur: (event) => save(line, event.target.value),
           }),
           h('span', { class: 'unit', text: line.base_unit_code }),
@@ -318,7 +380,8 @@ export function createStockCount({ root, session: user, countId = null, onBack }
     const countedMilli = text === '' ? null : Math.round(Number.parseFloat(text) * 1000);
 
     if (text !== '' && !Number.isFinite(countedMilli)) {
-      ui.toast(`${line.product_name}: that is not a quantity.`, { kind: 'error' });
+      ui.toast(`${line.product_name}${line.batch_no ? ` batch ${line.batch_no}` : ''}: `
+        + 'that is not a quantity.', { kind: 'error' });
       return;
     }
     if (countedMilli !== null && countedMilli < 0) {
@@ -330,14 +393,22 @@ export function createStockCount({ root, session: user, countId = null, onBack }
         && line.counted_milli === countedMilli) return;
 
     try {
+      // By line id, not by product: a batch-tracked product has several lines and
+      // naming the product would write the same figure onto all of them.
       const updated = await api.put(`/stock-counts/${view.session.id}/lines`, {
-        lines: [{ productId: line.product_id, countedMilli }],
+        lines: [{ lineId: line.id, countedMilli }],
       });
       view.session = updated.session;
       const fresh = await api.get(`/stock-counts/${view.session.id}?limit=5000`);
       view.lines = fresh.lines;
-      pending.delete(line.product_id);
-      refreshRow(line.product_id);
+      view.groups = fresh.groups;
+      pending.delete(line.id);
+      // A batch line's saving changes its product's heading totals as well as its own
+      // row, so the whole sheet is repainted rather than the one row. A heading that
+      // still read "3 not counted yet" after the third was counted is the kind of
+      // wrong that gets a count posted half done.
+      if (line.batch_no) renderRows();
+      else refreshRow(line.id);
       refreshFooter();
     } catch (err) {
       ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
@@ -345,9 +416,9 @@ export function createStockCount({ root, session: user, countId = null, onBack }
   }
 
   /** Repaint one row's derived cells without rebuilding the field under the cursor. */
-  function refreshRow(productId) {
-    const line = view.lines.find((l) => l.product_id === productId);
-    const row = root.querySelector(`#count-rows tr[data-product="${productId}"]`);
+  function refreshRow(lineId) {
+    const line = view.lines.find((l) => l.id === lineId);
+    const row = root.querySelector(`#count-rows tr[data-line="${lineId}"]`);
     if (!line || !row) return;
 
     row.className = rowClass(line);
@@ -358,7 +429,10 @@ export function createStockCount({ root, session: user, countId = null, onBack }
 
   function renderRows() {
     const host = root.querySelector('#count-rows');
-    if (host) clear(host).append(...visibleLines().map((line) => lineRow(line)));
+    if (host) {
+      clear(host).append(...visibleRows()
+        .map((row) => (row.heading ? groupRow(row.heading) : lineRow(row.line))));
+    }
   }
 
   function refreshFooter() {

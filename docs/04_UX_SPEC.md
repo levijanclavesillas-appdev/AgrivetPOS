@@ -136,10 +136,16 @@ frozen instant, how many of the scope have a figure, and how many differ. **The 
 count: every product in scope, its expected quantity *at the freeze*, a field for what was on the
 shelf, and the variance.
 
-Since `TASK-029`, **batch-tracked products are not on the sheet**, and the sheet says how many it
-left off. `INV-201` makes a batch's quantity the ledger's own sum, so a variance movement has to
-name a batch — and which batch is short is not something one counted figure can say. Counting
-them one line per batch, which is how the person holding the boxes counts them, is `TASK-042`.
+Since `TASK-042`, **a batch-tracked product is counted one line per batch** — which is how the
+person holding the boxes counts it — under a heading carrying the product's own frozen total,
+because four rows that each look right can still be wrong together. Each batch line names its
+batch and the date printed on it: two cartons of one product look identical, and the date is the
+only thing that says which row is which. A batch the system believes is empty is still on the
+sheet, because that is exactly the box that turns up at the back of the fridge.
+
+The variance posts against the batch it was found in (`INV-201`). Posting it against the
+earliest-expiring one would give the same product total and the wrong batch balance — and the
+batch balance is what a recall reads.
 
 Three things on this screen are stated rather than left to be worked out, and each of them
 prevents a specific expensive misunderstanding.

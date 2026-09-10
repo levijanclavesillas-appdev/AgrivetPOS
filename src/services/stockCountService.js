@@ -49,6 +49,7 @@ const settingsService = require('./settingsService');
 const sequenceService = require('./sequenceService');
 const inventoryService = require('./inventoryService');
 const stockCountRepository = require('../repositories/stockCountRepository');
+const batchService = require('./batchService');
 const productRepository = require('../repositories/productRepository');
 const referenceRepository = require('../repositories/referenceRepository');
 const userRepository = require('../repositories/userRepository');
@@ -174,17 +175,6 @@ function open({ scope = 'ALL', categoryId = null, notes = null }, actor) {
     });
 
     if (frozen.lines === 0) {
-      // A scope that holds only batch-tracked products is a different problem from an
-      // empty one, and saying "there is nothing to count" about a fridge full of
-      // vaccines would be a lie the counter can see through the door.
-      if (frozen.batch_tracked_excluded > 0) {
-        throw errors.conflict(
-          `Everything in ${category ? category.name : 'the catalogue'} is batch-tracked, and `
-          + 'batch-tracked stock is counted by batch rather than by product (INV-201). '
-          + 'There is nothing on a product-level sheet to count.',
-          { ruleId: 'INV-201' }
-        );
-      }
       throw errors.conflict(
         category
           ? `There are no products in ${category.name} to count.`
@@ -203,8 +193,10 @@ function open({ scope = 'ALL', categoryId = null, notes = null }, actor) {
         scope: wanted,
         category: category ? category.name : null,
         products_frozen: frozen.lines,
-        // INV-201: what the sheet does not cover, on the row that says what it does.
-        batch_tracked_excluded: frozen.batch_tracked_excluded,
+        // TASK-042: how many of those lines are batches rather than products. A count
+        // of a fridge is mostly batch lines and a count of the feed shed is none, and
+        // the trail should say which this was.
+        batch_lines_frozen: frozen.batch_lines,
         // INV-110: the instant the expected figures were taken. Everything this count
         // ever says about a variance is relative to this moment.
         frozen_at: at,
@@ -257,8 +249,27 @@ function record(sessionId, { lines = [] }, actor) {
     const written = [];
 
     for (const [index, entry] of lines.entries()) {
-      const line = stockCountRepository.findLine(sessionId, entry.productId);
+      // By line id where the caller has one, and by product — with the batch, where
+      // there is one — where it does not. A batch-tracked product has a line per batch
+      // since TASK-042, so `productId` alone no longer names a row on the sheet.
+      const line = entry.lineId
+        ? stockCountRepository.findLineById(sessionId, entry.lineId)
+        : stockCountRepository.findLine(sessionId, entry.productId, entry.batchId || null);
+
       if (!line) {
+        // INV-202: a batch found on the shelf that the system has no record of is a
+        // delivery nobody recorded, and it cannot be invented here — a batch carries a
+        // supplier and a cost that a count sheet has no way to supply. The refusal
+        // names the path rather than only refusing.
+        if (entry.batchId || entry.batchNo) {
+          throw errors.badRequest(
+            `Line ${index + 1} names a batch that is not on ${session.count_no}. A batch that `
+            + 'is on the shelf and not in the system arrived on a delivery nobody recorded — '
+            + 'receive it under Buying → Receive, which is where a batch gets its supplier and '
+            + 'its cost (INV-202). It cannot be created from a count sheet.',
+            { ruleId: 'INV-202' }
+          );
+        }
         throw errors.badRequest(
           `Line ${index + 1} is not a product in ${session.count_no}'s scope. `
           + 'A count measures what it froze at the start, and nothing else (INV-110).',
@@ -283,7 +294,7 @@ function record(sessionId, { lines = [] }, actor) {
 
       written.push(stockCountRepository.setCounted({
         sessionId,
-        productId: entry.productId,
+        lineId: line.id,
         countedMilli: counted,
         countedAt: at,
         countedBy: actor.id,
@@ -510,8 +521,14 @@ function post(sessionId, { approver = null, reason = null } = {}, actor) {
         productId: line.product_id,
         type: 'COUNT_VARIANCE',
         qtyMilli: varianceMilli,
+        // INV-201, and the whole of TASK-042 in one argument: the variance lands on the
+        // batch that was counted, so the batch balances and the product's on-hand stay
+        // the same sum. Null for a product counted as a product, which is every line
+        // written before this task.
+        batchId: line.batch_id || null,
         actor,
-        reason: `${why} — counted ${quantity.format(line.counted_milli, line.base_unit_code)} `
+        reason: `${why} — ${line.batch_no_snapshot ? `batch ${line.batch_no_snapshot}, ` : ''}`
+          + `counted ${quantity.format(line.counted_milli, line.base_unit_code)} `
           + `against ${quantity.format(line.expected_milli, line.base_unit_code)} expected`,
         referenceType: 'stock_count',
         referenceId: session.id,
@@ -527,6 +544,7 @@ function post(sessionId, { approver = null, reason = null } = {}, actor) {
 
       posted.push({
         product: line.product_name_snapshot,
+        batch_no: line.batch_no_snapshot,
         expected_milli: line.expected_milli,
         counted_milli: line.counted_milli,
         variance_milli: varianceMilli,
@@ -660,6 +678,16 @@ function presentLine(row) {
     product_id: row.product_id,
     sku: row.sku,
     product_name: row.product_name_snapshot,
+    // TASK-042: which box on the shelf this line is, and what its date says. A batch
+    // line without its expiry would make the counter check the stock list to find out
+    // which of three identical-looking cartons the row means.
+    batch_id: row.batch_id || null,
+    batch_no: row.batch_no_snapshot || null,
+    expiry_date: row.expiry_date || null,
+    // INV-203, derived here as everywhere else: an expired box is still stock until it
+    // is written off, so it is still counted — but the counter should be told which of
+    // the four cartons in front of them is the one that may not be sold.
+    expiry_status: row.expiry_date ? batchService.statusOf(row.expiry_date) : null,
     base_unit_code: row.base_unit_code,
     // INV-110's frozen figure, labelled as frozen wherever it is shown.
     expected_milli: row.expected_milli,
@@ -683,18 +711,6 @@ function presentLine(row) {
     // never having been counted, and both look like "no movement" on their own.
     matched: counted && varianceMilli === 0,
   };
-}
-
-/**
- * Products in a count's scope whose stock is held as batches (`INV-201`).
- *
- * They are not on a product-level sheet: which batch is short is not something one
- * counted figure can say, and the variance movement would be refused at posting —
- * after the shelf had been counted and the count approved. Counting them by batch is
- * `TASK-042`; until it lands they are named as absent rather than quietly missing.
- */
-function batchTrackedInScope(categoryId = null) {
-  return productRepository.countBatchTracked({ categoryId });
 }
 
 function present(session, { lines = null } = {}) {
@@ -728,12 +744,6 @@ function present(session, { lines = null } = {}) {
       is_editable: EDITABLE_STATUSES.includes(session.status),
       is_immutable: session.status === 'POSTED',
       line_count: session.line_count,
-      // TASK-029: how many products in this scope are **not** on the sheet because
-      // their stock is held as batches. Stated rather than silently left off — a sheet
-      // that claims to cover the whole shop and quietly omits the vaccine fridge is a
-      // sheet somebody signs off believing they counted everything. Derived, not
-      // stored, so it stays true if a product is switched to batch tracking later.
-      batch_tracked_excluded: batchTrackedInScope(session.category_id),
       counted_count: session.counted_count,
       uncounted_count: session.line_count - session.counted_count,
       varying_count: session.varying_count,
@@ -754,7 +764,52 @@ function present(session, { lines = null } = {}) {
         + 'Posting adjusts by the difference, so anything sold since the count began stays sold.',
     },
     ...(lines ? { lines: lines.map(presentLine) } : {}),
+    ...(lines ? { groups: batchGroups(lines) } : {}),
   };
+}
+
+/**
+ * A batch-tracked product's own totals across its batch lines (`TASK-042`).
+ *
+ * Computed here rather than on the sheet for the reason the whole of this file's
+ * arithmetic lives on the server: two routes to one number is one of them being wrong
+ * eventually, and `TC-UI` asserts that the count screen derives nothing of its own.
+ *
+ * The counter needs it because four rows that each look right can still be wrong
+ * together — the shelf holds four boxes and the system expected sixty; whether the four
+ * add up to sixty is the question a product-level count used to answer for free and a
+ * batch-level one has to be asked.
+ */
+function batchGroups(lines) {
+  const groups = new Map();
+  for (const row of lines) {
+    if (!row.batch_id) continue;
+    const group = groups.get(row.product_id) || {
+      product_id: row.product_id,
+      product_name: row.product_name_snapshot,
+      base_unit_code: row.base_unit_code,
+      batch_count: 0,
+      uncounted_count: 0,
+      expected_milli: 0,
+      counted_milli: 0,
+      any_counted: false,
+    };
+    group.batch_count += 1;
+    group.expected_milli += row.expected_milli;
+    if (row.counted_milli === null) group.uncounted_count += 1;
+    else { group.counted_milli += row.counted_milli; group.any_counted = true; }
+    groups.set(row.product_id, group);
+  }
+
+  return [...groups.values()].map((group) => ({
+    ...group,
+    expected_display: quantity.format(group.expected_milli, group.base_unit_code),
+    // Null rather than "0 PC" where nothing has been counted yet: a zero here would
+    // read as a shelf found empty, which is the distinction INV-111 turns on.
+    counted_display: group.any_counted
+      ? quantity.format(group.counted_milli, group.base_unit_code)
+      : null,
+  }));
 }
 
 function get(id, { varyingOnly = false, uncountedOnly = false, limit = 1000, offset = 0 } = {}) {

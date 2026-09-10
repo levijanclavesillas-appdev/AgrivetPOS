@@ -34,6 +34,9 @@ const permissions = require('../../services/permissions');
 const inventoryRepository = require('../../repositories/inventoryRepository');
 const productRepository = require('../../repositories/productRepository');
 const stockCountRepository = require('../../repositories/stockCountRepository');
+// Required lazily inside the cases: batchService reads settings that this file's own
+// before-hook has not written when the module list is evaluated.
+const batchService = () => require('../../services/batchService');
 const temp = require('../helpers/tempdb');
 
 let BASE = null;
@@ -577,71 +580,181 @@ function ageSession(sessionId, days) {
   db.get().prepare('UPDATE stock_count_sessions SET opened_at = ? WHERE id = ?').run(at, sessionId);
 }
 
-// ── TASK-029 — INV-201, the stock a product-level sheet cannot count ────────
+// ── TASK-042 — INV-201, counting batch-tracked stock by batch ───────────────
+//
+// `TC-INT-114` to `TC-INT-116`. The three of them are one argument: a batch-tracked
+// product is counted one line per batch, a variance lands on the batch it was found
+// in, and INV-201 still holds afterwards without anything having been repaired.
+//
+// TASK-029 left these products off the sheet entirely, because a product-level count
+// has no batch to name and posting the variance FEFO would have invented which box was
+// short. The two tests that pinned that exclusion are gone, replaced by these.
 
-test('INV-201: batch-tracked products are left off the sheet, and the sheet says how many', () => {
-  const supplier = temp.seedSupplier({ name: 'Count Vet Supply', code: 'CVS' }, sessions.OWNER);
-  const plain = stocked({ qtyMilli: 10000 });
-
-  const tracked = productService.create({
-    sku: 'CNT-BATCH-1',
-    name: 'Counted Vaccine',
+/** A batch-tracked product with two batches on the shelf. */
+function trackedWithBatches({ first = 6000, second = 4000 } = {}) {
+  // The tag is captured here rather than read from `seq` afterwards: `stocked()` shares
+  // the counter, so a test that created a plain product in between would look up batch
+  // numbers that belong to a different fixture.
+  seq += 1;
+  const tag = seq;
+  const supplier = temp.seedSupplier({ name: `Count Supply ${seq}`, code: `CS${seq}` }, sessions.OWNER);
+  const product = productService.create({
+    sku: `CNT-B-${String(seq).padStart(3, '0')}`,
+    name: `Counted Vaccine ${seq}`,
     categoryId: ref.category.id,
     baseUnitId: ref.piece.id,
     retailPriceCentavos: 32000,
     isBatchTracked: true,
   }, sessions.OWNER);
-  temp.seedBatch({
-    product: tracked, supplier, qtyMilli: 10000, unitCostCentavos: 21000,
-    batchNo: 'CNT-B-1', actor: sessions.OWNER,
-  });
+
+  const batchService = require('../../services/batchService');
+  const batches = [
+    temp.seedBatch({
+      product, supplier, qtyMilli: first, unitCostCentavos: 21000,
+      batchNo: `${tag}-EARLY`, expiryDate: batchService.addDays(batchService.today(), 60),
+      actor: sessions.OWNER,
+    }).batch,
+    temp.seedBatch({
+      product, supplier, qtyMilli: second, unitCostCentavos: 23000,
+      batchNo: `${tag}-LATE`, expiryDate: batchService.addDays(batchService.today(), 400),
+      actor: sessions.OWNER,
+    }).batch,
+  ];
+  return { product, batches, tag };
+}
+
+const lineOf = (opened, batchNo) => stockCountService.get(opened.session.id).lines
+  .find((l) => l.batch_no === batchNo);
+
+test('TC-INT-114: a batch-tracked product is on the sheet once per batch, expiry first', () => {
+  const { product, tag } = trackedWithBatches();
+  const plain = stocked({ qtyMilli: 10000 });
 
   const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
-  const lines = stockCountService.get(opened.session.id).lines;
+  const lines = stockCountService.get(opened.session.id).lines
+    .filter((l) => l.product_id === product.id);
 
-  // Which batch is short is not something one counted figure can say, so the vaccine
-  // is not on a product-level sheet at all. Left on it, INV-201 would refuse the
-  // variance movement at posting — after the shelf had been counted and approved,
-  // which is the worst moment to discover it.
-  assert.equal(lines.some((l) => l.product_id === tracked.id), false, 'the vaccine is not on the sheet');
-  assert.ok(lines.some((l) => l.product_id === plain.id), 'and the feed still is');
+  // One line per box on the shelf, earliest expiry first — the order a counter works a
+  // shelf in, and the order FEFO would take them in (INV-204).
+  assert.deepEqual(
+    lines.map((l) => [l.batch_no, l.expected_milli]),
+    [[`${tag}-EARLY`, 6000], [`${tag}-LATE`, 4000]]
+  );
+  // Each carries its own date, or the counter has to look up which of two identical
+  // cartons the row means.
+  assert.ok(lines.every((l) => /^\d{4}-\d{2}-\d{2}$/.test(l.expiry_date)));
+  // MON-004: the frozen cost is the batch's own, not the product's moving average —
+  // valuing a batch variance at the average prices the loss at stock still on the shelf.
+  assert.deepEqual(lines.map((l) => l.avg_cost_centavos), [21000, 23000]);
 
-  // Stated rather than silently omitted: a sheet that claims the whole shop and quietly
-  // skips the vaccine fridge is a sheet somebody signs off believing they counted it all.
-  assert.ok(opened.session.batch_tracked_excluded >= 1);
-  const trail = auditService.browse({ action: 'STOCK_COUNT_OPENED', entityId: opened.session.id });
-  assert.equal(trail.rows[0].after.batch_tracked_excluded, opened.session.batch_tracked_excluded);
+  // And a product that is not batch-tracked is counted exactly as it was before.
+  const plainLines = stockCountService.get(opened.session.id).lines
+    .filter((l) => l.product_id === plain.id);
+  assert.equal(plainLines.length, 1);
+  assert.equal(plainLines[0].batch_id, null);
+  assert.equal(plainLines[0].batch_no, null);
 
   stockCountService.cancel(opened.session.id, { reason: 'Abandoned by the test' }, sessions.INVENTORY);
 });
 
-test('INV-201: a category of nothing but batch-tracked stock says so, rather than "nothing to count"', () => {
-  const supplier = temp.seedSupplier({ name: 'Fridge Supply', code: 'FRS' }, sessions.OWNER);
-  const referenceService = require('../../services/referenceService');
-  const fridge = referenceService.create('categories', { name: 'Cold chain' }, sessions.OWNER);
+test('TC-INT-114: a variance on one batch posts against that batch and leaves the other alone', () => {
+  const { product, batches, tag: mine } = trackedWithBatches();
+  const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
 
-  const tracked = productService.create({
-    sku: 'CNT-BATCH-2',
-    name: 'Fridge Vaccine',
-    categoryId: fridge.id,
-    baseUnitId: ref.piece.id,
-    retailPriceCentavos: 32000,
-    isBatchTracked: true,
-  }, sessions.OWNER);
-  temp.seedBatch({
-    product: tracked, supplier, qtyMilli: 5000, unitCostCentavos: 21000,
-    batchNo: 'CNT-B-2', actor: sessions.OWNER,
+  // Two boxes short of the early batch; the late one counts exactly right.
+  stockCountService.record(opened.session.id, {
+    lines: [
+      { lineId: lineOf(opened, `${mine}-EARLY`).id, countedMilli: 4000 },
+      { lineId: lineOf(opened, `${mine}-LATE`).id, countedMilli: 4000 },
+    ],
+  }, sessions.INVENTORY);
+
+  stockCountService.approve(opened.session.id, {}, sessions.MANAGER);
+  const posted = stockCountService.post(opened.session.id, {}, sessions.INVENTORY);
+
+  const mineMovements = posted.posting.movements.filter((m) => m.product === product.name);
+  assert.equal(mineMovements.length, 1, 'INV-111: one movement, for the one batch that varied');
+  assert.equal(mineMovements[0].batch_no, `${mine}-EARLY`);
+  assert.equal(mineMovements[0].variance_milli, -2000);
+
+  // The shrinkage came out of the box it was found missing from. Posting it FEFO would
+  // have produced the same product total and the wrong batch balance — which is what
+  // INV-206's recall would then have read.
+  const balances = batchService().listForProduct(product.id, { includeEmpty: true })
+    .map((b) => [b.batch_no, b.qty_milli]);
+  assert.deepEqual(balances, [[`${mine}-EARLY`, 4000], [`${mine}-LATE`, 4000]]);
+  assert.equal(batches.length, 2);
+});
+
+test('TC-INT-115: INV-201 holds after a posted count, with no repair job', () => {
+  const { product, tag: mine } = trackedWithBatches({ first: 8000, second: 5000 });
+  const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
+
+  // Both batches wrong, in opposite directions — the case where a product-level count
+  // would have found no variance at all and written nothing.
+  stockCountService.record(opened.session.id, {
+    lines: [
+      { lineId: lineOf(opened, `${mine}-EARLY`).id, countedMilli: 7000 },
+      { lineId: lineOf(opened, `${mine}-LATE`).id, countedMilli: 6000 },
+    ],
+  }, sessions.INVENTORY);
+  stockCountService.approve(opened.session.id, {}, sessions.MANAGER);
+  stockCountService.post(opened.session.id, {}, sessions.INVENTORY);
+
+  const batched = batchService().listForProduct(product.id, { includeEmpty: true })
+    .reduce((sum, b) => sum + b.qty_milli, 0);
+  assert.equal(batched, inventoryRepository.qtyOnHand(product.id), 'INV-201, by construction');
+  assert.equal(batched, 13000, 'and the product total is unchanged, which is the trap');
+  assert.deepEqual(inventoryService.reconcile().batch_breaks, []);
+});
+
+test('TC-INT-116: a batch the system thinks is empty is on the sheet, and can be counted up', () => {
+  const { product, tag: mine } = trackedWithBatches({ first: 5000, second: 3000 });
+
+  // The early batch is sold out. The system believes there is none of it left, which is
+  // exactly the batch that turns up at the back of the fridge.
+  const batches = batchService().listForProduct(product.id, {});
+  const early = batches.find((b) => b.batch_no === `${mine}-EARLY`);
+  inventoryService.postStandalone({
+    productId: product.id, type: 'SALE', qtyMilli: 5000, batchId: early.id, actor: sessions.CASHIER,
   });
+  assert.equal(batchService().listForProduct(product.id, {}).some((b) => b.batch_no === `${mine}-EARLY`), false);
 
-  // "There is nothing to count" would be a lie the counter can see through the door.
+  const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
+  const line = lineOf(opened, `${mine}-EARLY`);
+  assert.ok(line, 'the exhausted batch is still on the sheet — a sheet without it has nowhere to write the discovery');
+  assert.equal(line.expected_milli, 0);
+
+  stockCountService.record(opened.session.id, {
+    lines: [{ lineId: line.id, countedMilli: 1000 }],
+  }, sessions.INVENTORY);
+  stockCountService.approve(opened.session.id, {}, sessions.MANAGER);
+  stockCountService.post(opened.session.id, {}, sessions.INVENTORY);
+
+  const found = batchService().listForProduct(product.id, {}).find((b) => b.batch_no === `${mine}-EARLY`);
+  assert.ok(found, 'and it is back on the shelf, in the batch it was found in');
+  assert.equal(found.qty_milli, 1000);
+  assert.deepEqual(inventoryService.reconcile().batch_breaks, []);
+});
+
+test('INV-202: a batch on the shelf that the system does not know cannot be created from a count', () => {
+  const { product } = trackedWithBatches();
+  const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
+
+  // A count sheet has no supplier and no cost to give a batch, and INV-202 makes both
+  // part of its identity. The refusal names the path rather than only refusing.
   assert.throws(
-    () => stockCountService.open({ scope: 'CATEGORY', categoryId: fridge.id }, sessions.INVENTORY),
+    () => stockCountService.record(opened.session.id, {
+      lines: [{ productId: product.id, batchId: 'not-a-batch-we-know', countedMilli: 1000 }],
+    }, sessions.INVENTORY),
     (err) => {
-      assert.equal(err.ruleId, 'INV-201');
-      assert.match(err.message, /counted by batch rather than by product/);
+      assert.equal(err.ruleId, 'INV-202');
+      assert.match(err.message, /Buying → Receive/);
       return true;
     }
   );
+
+  stockCountService.cancel(opened.session.id, { reason: 'Abandoned by the test' }, sessions.INVENTORY);
 });
 
 // ── Last, deliberately ──────────────────────────────────────────────────────

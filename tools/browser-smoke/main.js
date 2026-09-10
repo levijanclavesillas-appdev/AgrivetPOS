@@ -131,8 +131,12 @@ app.whenReady().then(async () => {
   await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
   log(await run(`!!document.querySelector('.pos')`), 'SCR-301 renders with a shift open');
   log(await run(`!!document.querySelector('.pos-search')`), 'the search field is there');
-  log(await run(`document.activeElement === document.querySelector('.pos-search')`),
-    'the cursor is in the search field, so a scan lands (04_UX_SPEC §3)');
+  // Waited for rather than sampled: focus lands in a microtask after the screen is
+  // built, and on a loaded machine the sample beat it — a flake that read as the POS
+  // having lost its cursor.
+  log(await waitFor(`document.activeElement === document.querySelector('.pos-search')`,
+    { label: 'the cursor in the search field', timeoutMs: 4000 }),
+  'the cursor is in the search field, so a scan lands (04_UX_SPEC §3)');
 
   console.log('\n— a scan builds a cart —');
   await run(`(() => {
@@ -1141,8 +1145,11 @@ app.whenReady().then(async () => {
   await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-201' });
   await run(OPEN_POS);
   await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
-  log(await run(`/SC\\/PWD/.test((document.querySelector('.pos-help') || {}).textContent || '')`),
-    'once the owner switches it on, F8 appears in the foot bar');
+  // Same again: the foot bar is repainted from the policy the screen fetches after it
+  // mounts, so the assertion waits for the state rather than for a length of time.
+  log(await waitFor(`/SC\\/PWD/.test((document.querySelector('.pos-help') || {}).textContent || '')`,
+    { label: 'F8 in the foot bar', timeoutMs: 4000 }),
+  'once the owner switches it on, F8 appears in the foot bar');
 
   await run(`(() => {
     const el = document.querySelector('.pos-search');
@@ -1233,6 +1240,23 @@ app.whenReady().then(async () => {
     'INV-111: an empty field reads "not counted", on every row', `${placeholders.length} rows`);
   log(await run(`document.querySelectorAll('.count-sheet tr.is-uncounted').length === ${placeholders.length}`),
     'and every uncounted row is marked as such before anything is typed');
+
+  // TASK-042: the vaccine is counted box by box, under a heading carrying the product's
+  // own frozen total — four rows that each look right can still be wrong together.
+  const batchRows = await run(`(() => {
+    const rows = [...document.querySelectorAll('.count-sheet tbody tr')];
+    const heading = rows.find(r => r.classList.contains('count-group'));
+    return JSON.stringify({
+      lines: rows.filter(r => /Batch AMX-/.test(r.textContent)).length,
+      heading: heading ? heading.textContent.replace(/\\s+/g, ' ').trim() : null,
+      dated: rows.filter(r => /expires \\d{4}-\\d{2}-\\d{2}/.test(r.textContent)).length,
+    });
+  })()`);
+  const batchSheet = JSON.parse(batchRows);
+  log(batchSheet.lines === 3, 'INV-201: the vaccine is on the sheet once per batch', `${batchSheet.lines} lines`);
+  log(batchSheet.dated === 3, 'each with the date printed on its own box');
+  log(Boolean(batchSheet.heading) && /3 batches/.test(batchSheet.heading),
+    'under a heading with the product’s own frozen total', batchSheet.heading);
 
   // Count the seeded product short by 2 KG, and leave the rest of the shop blank.
   await run(`(() => {

@@ -1253,6 +1253,30 @@ test('INV-110: the sheet labels the frozen figure as frozen, and says what that 
     'the screen computes no variance of its own');
 });
 
+test('TC-UT-55: the sheet counts a batch-tracked product per batch, and adds nothing up itself', () => {
+  const source = codeOf('js/catalogue/count.js');
+
+  // TASK-042: one row per box on the shelf, addressed by the line rather than by the
+  // product — a save keyed on the product would have written one figure onto every
+  // batch of it.
+  assert.match(source, /lines: \[\{ lineId: line\.id, countedMilli \}\]/);
+  assert.equal(/lines: \[\{ productId/.test(source), false, 'never by product');
+  assert.match(source, /data-line/);
+  assert.equal(/data-product/.test(source), false);
+
+  // The batch and its date are on the row, because two cartons of the same product look
+  // identical and the date is the only thing that tells the counter which row is which.
+  assert.match(source, /Batch \$\{line\.batch_no\}/);
+  assert.match(source, /expires \$\{line\.expiry_date\}/);
+
+  // The heading over a product's batches carries **the server's** totals. Four rows that
+  // each look right can still be wrong together, and that is what the heading answers —
+  // but the sheet does no arithmetic of its own, here or anywhere.
+  assert.match(source, /view\.groups/);
+  assert.match(source, /group\.expected_display/);
+  assert.equal(/reduce\(/.test(source), false, 'the screen sums nothing');
+});
+
 test('INV-111: a blank is not a zero, and the screen cannot be made to confuse them', () => {
   const source = codeOf('js/catalogue/count.js');
 

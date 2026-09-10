@@ -27,13 +27,13 @@ is not FEFO — a box knocked behind the fridge is whichever box was knocked beh
 and a count that invented the answer would produce a batch balance that reconciles perfectly and
 is wrong, which is worse than one that refuses. `INV-206`'s recall reads those balances.
 
-**What `TASK-029` shipped instead, and what it costs.** Batch-tracked products are left off the
-product-level sheet: `stockCountRepository.snapshotLines` excludes them, the session reports
-`batch_tracked_excluded` so the sheet states what it does not cover, and a scope containing
-nothing else refuses at `open` with `INV-201` rather than at `post` — after the shelf has been
-counted and the count approved, which is the worst moment to discover it. That is honest and it
-is not enough: a store that cannot count its vaccines does not know what it has, and `INV-113`'s
-staleness rule is measured against counts that never happen.
+**What `TASK-029` shipped instead, and what it cost.** Batch-tracked products were left off the
+product-level sheet: `snapshotLines` excluded them, the session reported `batch_tracked_excluded`
+so the sheet stated what it did not cover, and a scope containing nothing else refused at `open`
+with `INV-201` rather than at `post` — after the shelf had been counted and the count approved,
+which is the worst moment to discover it. That was honest and it was not enough: a store that
+cannot count its vaccines does not know what it has, and `INV-113`'s staleness rule is measured
+against counts that never happen. This task removed all of it.
 
 **The counting unit is the batch, not the product.** A sheet line is `(product, batch)` with
 the batch number, its expiry date and its frozen quantity, because that is what is printed on
@@ -79,13 +79,13 @@ the box in the counter's hand. `UOM-005` still applies: every quantity carries i
 
 ## Acceptance Criteria
 
-- [ ] A batch-tracked product appears on the sheet once per batch, with batch number and expiry
-- [ ] A non-batch product's sheet line is unchanged, and its `batch_id` is `NULL`
-- [ ] A variance on one batch posts against that batch and leaves the others alone
-- [ ] `INV-201` reconciles after posting a count that varied two batches of one product
-- [ ] A batch holding zero is on the sheet, so stock the system thinks is gone can be found
-- [ ] A batch on the shelf that the system does not know is refused, naming goods receipt
-- [ ] `batch_tracked_excluded` and the scope-time refusal `TASK-029` added are both gone
+- [x] A batch-tracked product appears on the sheet once per batch, with batch number and expiry
+- [x] A non-batch product's sheet line is unchanged, and its `batch_id` is `NULL`
+- [x] A variance on one batch posts against that batch and leaves the others alone
+- [x] `INV-201` reconciles after posting a count that varied two batches of one product
+- [x] A batch holding zero is on the sheet, so stock the system thinks is gone can be found
+- [x] A batch on the shelf that the system does not know is refused, naming goods receipt
+- [x] `batch_tracked_excluded` and the scope-time refusal `TASK-029` added are both gone
 
 ## Tests
 
@@ -96,6 +96,17 @@ the box in the counter's hand. `UOM-005` still applies: every quantity carries i
 | `TC-INT-115` | `INV-201`: batches reconcile to on-hand after a posted count |
 | `TC-INT-116` | A batch at zero is counted, and counting it up is a variance like any other |
 | `TC-E2E-25` | Count a fridge of three vaccine batches, find one box short, post it, and recall the batch afterwards to confirm the quantity it now reports |
+
+`TC-E2E-25` stops short of the recall, which is `TASK-030` and does not exist yet; it asks the
+batch list the same question instead — what the store now holds, batch by batch — which is the
+figure the recall will read. The clause returns when `TASK-030` lands.
+
+**Two things this task changed that were not in the plan.** The line addressing moved from
+`productId` to the line's own id: a batch-tracked product has several lines, and a save keyed on
+the product would have written one figure onto every batch of it. And the sheet's per-product
+totals are computed on the **server** rather than in the screen — `TC-UT-55` and the count
+screen's own guards assert that the sheet derives nothing of its own, which is the rule that
+keeps one number from having two sources.
 
 ---
 

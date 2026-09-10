@@ -21,7 +21,7 @@ which is worth reading before writing the next backlog. What code-complete does 
 shippable: nothing has run in the store. [Status](#status) has the detail.
 
 **The v1.2 backlog is now written** — `TASK-029` to `TASK-035`, plus `TASK-042` and `TASK-043`
-raised while `TASK-029` was built, nine files, of which `TASK-029` and `TASK-043` are in. See
+raised while `TASK-029` was built, nine files, of which three are in. See
 [Open — v1.2 "Trace"](#open--v12-trace). Writing it is not the same as starting it: the next
 thing that moves this product is a Windows build and a visit to the counter, not another task.
 
@@ -281,27 +281,22 @@ instant it exists, so it has no due date and nothing to age.
 | ID | Task | Commit | What it left behind |
 | :--- | :--- | :--- | :--- |
 | [TASK-029](TASK-029-batches-and-fefo.md) | Batches, expiry status, FEFO allocation | `74a29ab` | `014_batches.sql` — `product_batches`, `sale_item_batches`, `inventory_movements.batch_id`; `batchService` and `batchRepository`; FEFO inside the sale transaction; `MON-004`'s second costing path; `OPS-007`'s two expiry alerts; `GET /products/:id/batches`, `POST /batches/:id/expire`; the opening load's batch columns; `TC-UT-52`–`54`, `TC-INT-107`–`111`, `TC-E2E-23`. And `INV-201` joined `/inventory/reconciliation`, so one page answers whether the ledger is telling the truth |
-| [TASK-043](TASK-043-batch-screen.md) | `SCR-206`, the batch list and the write-off | *this commit* | `public/js/catalogue/batches.js`; `SCR-206` in `04_UX_SPEC.md` §3; the row action on `SCR-201` and the action on `SCR-601`'s expiry alerts; `TC-UI-11` and the browser smoke's fourteen. It also found that the smoke had been seeding its batch-tracked medicine with a bare adjustment `INV-201` refuses — the fixture had silently held no stock since `TASK-029` |
+| [TASK-042](TASK-042-count-by-batch.md) | Counting batch-tracked stock, by batch | *this commit* | `015_count_by_batch.sql` — `stock_count_lines.batch_id`, and the only table rebuild in this schema's history; the sheet's line per batch, with the product's own totals computed server-side; `TC-UT-55`, `TC-INT-114`–`116`, `TC-E2E-25`. It removed the exclusion `TASK-029` added, along with the two tests that pinned it — the count sheet has one way of treating batch-tracked stock again |
+| [TASK-043](TASK-043-batch-screen.md) | `SCR-206`, the batch list and the write-off | `044fb57` | `public/js/catalogue/batches.js`; `SCR-206` in `04_UX_SPEC.md` §3; the row action on `SCR-201` and the action on `SCR-601`'s expiry alerts; `TC-UI-11` and the browser smoke's fourteen. It also found that the smoke had been seeding its batch-tracked medicine with a bare adjustment `INV-201` refuses — the fixture had silently held no stock since `TASK-029` |
 
-**What `TASK-029` handed on.** Two tasks that were not in the backlog when it started: `TASK-042`,
-because a product-level stock count has no batch to name and inventing one would produce a balance
-that reconciles perfectly and is wrong; and `TASK-043`, above, because the API and the alert
-shipped without anywhere to act on them.
+**What `TASK-029` handed on, and what came back.** Two tasks that were not in the backlog when it
+started — `TASK-042`, because a product-level stock count has no batch to name and inventing one
+would produce a balance that reconciles perfectly and is wrong; and `TASK-043`, because the API
+and the alert shipped without anywhere to act on them. Both are now in, and the exclusion
+`TASK-029` left behind is gone with them.
 
 ## Open — v1.2 "Trace"
 
-**The files are written, and two of the nine are built.** All nine are in the established format,
+**The files are written, and three of the nine are built.** All nine are in the established format,
 each self-contained enough that an implementer needs it plus the specs it cites and nothing else. Every one of the ten v1.2
 rules in `03_BUSINESS_RULES.md` is claimed by exactly one task, checked mechanically rather than
 by eye, and `07_TEST_PLAN.md` §6.4 reserves the case ids so no two tasks reach for the same
 number.
-
-`TASK-042` was written during `TASK-029` rather than planned with the rest, and exists because
-`INV-201` refuses a
-movement of a batch-tracked product that does not name a batch, a product-level stock count has
-no batch to name, and which batch is short is not something one counted figure can say. `TASK-029`
-leaves batch-tracked products off the count sheet and says so; `TASK-042` counts them by batch,
-which is how the person holding the boxes counts them anyway.
 
 **In dependency order, which is not numeric order.** `TASK-029` was first and alone at the front —
 batches are the substrate, and `TASK-030` was unbuildable without the decision it makes about how
@@ -315,7 +310,6 @@ section gives.
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
 | [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | `FT-205`, `INV-206` | `TASK-029` ✅, `TASK-043` ✅ |
-| [TASK-042](TASK-042-count-by-batch.md) | Counting batch-tracked stock, by batch | `FT-205`, `INV-201` | `TASK-029` ✅ |
 | [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | `FT-406`, `FT-407` | — |
 | [TASK-032](TASK-032-payment-reconciliation.md) | Payment reconciliation | `FT-606` | — |
 | [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | `FT-602`, `FT-605` | — |

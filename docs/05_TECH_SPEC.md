@@ -1038,6 +1038,47 @@ the date and `near_expiry_days`, so a batch becomes `NEAR_EXPIRY` at midnight in
 with nothing having run — the reasoning `CR-107` already applies to ageing, for the same
 reason: a stored status is a column a missed job leaves stale.
 
+### 3.4.7 v1.2 schema — counting by batch (`TASK-042`)
+
+`015_count_by_batch.sql`, and it is the second half of a sentence `TASK-029` started.
+`INV-201` makes a batch's quantity the ledger's own sum, so `inventoryService.post` refuses a
+movement of a batch-tracked product that does not name a batch — and a product-level stock count
+has nothing to name. **Which batch is short is not something one counted figure can say.** Three
+vials missing from a shelf holding two batches is a fact about one of the two boxes, and only the
+person at the shelf knows which.
+
+Posting the variance against the earliest-expiring batch was considered and rejected: shrinkage
+is not FEFO, and a count that invented the answer would produce a batch balance that reconciles
+perfectly and is wrong — which `INV-206`'s recall then reads to decide who to telephone. So the
+counting unit becomes the **batch**, because that is what is printed on the box in the counter's
+hand.
+
+`stock_count_lines` gains `batch_id` (nullable — a product that is not batch-tracked is counted
+exactly as it was) and `batch_no_snapshot` (`MON-005` one level down: what this count counted is
+what it says, whatever happens to the batch row later). `expected_milli` is that batch's balance
+at the freeze, and `avg_cost_centavos` **the batch's own cost** — valuing a batch variance at the
+product's moving average would price the loss at stock the store still has.
+
+**The table is rebuilt rather than altered**, the only rebuild in this schema's history, because
+`UNIQUE (session_id, product_id)` is exactly the constraint that makes two lines for one product
+impossible and SQLite cannot drop a table constraint. It is safe here for a reason worth stating:
+nothing references `stock_count_lines` — it is a child of sessions, products and movements and a
+parent of nothing.
+
+Uniqueness returns as an expression index rather than a constraint, because SQLite treats NULLs
+as distinct in `UNIQUE`: `(session, product, NULL)` twice would not collide and every non-batch
+product would quietly lose the guarantee it had before.
+
+```sql
+ALTER TABLE stock_count_lines ADD batch_id TEXT REFERENCES product_batches(id);  -- via rebuild
+CREATE UNIQUE INDEX idx_countlines_unique
+  ON stock_count_lines (session_id, product_id, COALESCE(batch_id, ''));
+```
+
+A batch holding **zero** is on the sheet, deliberately: a batch the system believes is exhausted
+is exactly the one that turns up at the back of the fridge, and a sheet that omitted it would
+have no line to write the discovery on.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -1059,6 +1100,7 @@ migrations/011_returns.sql          sale returns and items (POS-301 – POS-307)
 migrations/012_stock_counts.sql     stock count sessions and lines (INV-110 – INV-113)
 migrations/013_negotiated_pricing.sql customer prices and quantity breaks (PR-103, PR-104)
 migrations/014_batches.sql          batches, ledger batch_id, sale_item_batches (INV-201 – INV-206)
+migrations/015_count_by_batch.sql   stock_count_lines.batch_id — counting by batch (INV-110, INV-201)
 ```
 
 

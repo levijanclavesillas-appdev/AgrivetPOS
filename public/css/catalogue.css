@@ -81,6 +81,13 @@
 .batches .check { display: flex; align-items: center; gap: .4rem; margin: 0 0 .5rem; }
 .batches .admin-meta { margin-bottom: .75rem; }
 
+/* TASK-042: a batch-tracked product's batches, under a heading that carries the
+   product's own frozen total — four rows that each look right can still be wrong
+   together, and the heading is where that shows. */
+.count-sheet tr.count-group td { background: #f4f7f5; font-weight: 600; border-top: 2px solid var(--rule); }
+.count-sheet tr.count-group small { font-weight: 400; }
+.count-sheet td.is-batch-line { padding-left: 1.5rem; }
+
 /* SCR-205 — the stocktake (TASK-022).
    Three row treatments, and the third is the one that matters: a line nobody counted
    must not look like a line that matched, or somebody posts a half-finished count. */

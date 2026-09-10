@@ -118,76 +118,116 @@ function countSearch({ status = null, openOnly = false, categoryId = null, from 
  * — a stocktake that skipped them would leave that stock permanently unverifiable.
  */
 function snapshotLines({ sessionId, categoryId = null, at, idFor }) {
-  const rows = db.get().prepare(`
+  // Both reads happen before either write and inside the caller's transaction, so the
+  // whole sheet is frozen at one instant (INV-110). A count whose first half was
+  // measured at 09:00 and whose second half at 09:04 is the defect this shape exists
+  // to prevent, and two SELECTs against one snapshot are still one instant.
+  const products = db.get().prepare(`
     SELECT p.id AS product_id, p.name, p.avg_cost_centavos,
            COALESCE(i.qty_on_hand_milli, 0) AS qty_on_hand_milli
       FROM products p
       LEFT JOIN inventory i ON i.product_id = p.id
      WHERE (@categoryId IS NULL OR p.category_id = @categoryId)
-       -- TASK-029: a batch-tracked product is not on a product-level sheet. Its stock
-       -- is held as batches with dates printed on the boxes, and which batch is short
-       -- is not something a single counted figure can say — so INV-201 would refuse
-       -- the variance movement at posting, after the shelf had been counted. It is
-       -- left off here instead, and the service says how many and why.
        AND p.is_batch_tracked = 0
      ORDER BY p.name COLLATE NOCASE
   `).all({ categoryId });
 
-  // Counted separately so the sheet can state its own scope honestly rather than
-  // quietly being short of the shelf it claims to cover.
-  const excluded = db.get().prepare(`
-    SELECT COUNT(*) AS n FROM products p
+  /**
+   * TASK-042: a batch-tracked product is counted one line per batch, because that is
+   * what is printed on the box in the counter's hand.
+   *
+   * **Including batches holding nothing**, which is not an oversight: a batch the
+   * system believes is exhausted is exactly the batch that turns up at the back of the
+   * fridge, and a sheet that omitted it would have no line to write the discovery on.
+   * The balance is the ledger's own sum (INV-201), so this is the same figure the
+   * batch list shows, frozen.
+   */
+  const batches = db.get().prepare(`
+    SELECT p.id AS product_id, p.name, b.id AS batch_id, b.batch_no,
+           b.unit_cost_centavos,
+           COALESCE(q.qty_milli, 0) AS qty_milli
+      FROM product_batches b
+      JOIN products p ON p.id = b.product_id
+      LEFT JOIN (
+        SELECT batch_id, SUM(qty_milli) AS qty_milli
+          FROM inventory_movements
+         WHERE batch_id IS NOT NULL
+         GROUP BY batch_id
+      ) q ON q.batch_id = b.id
      WHERE (@categoryId IS NULL OR p.category_id = @categoryId)
        AND p.is_batch_tracked = 1
-  `).get({ categoryId }).n;
+     ORDER BY p.name COLLATE NOCASE, b.expiry_date, b.batch_no
+  `).all({ categoryId });
 
   const insertLine = db.get().prepare(`
     INSERT INTO stock_count_lines
-      (id, session_id, product_id, product_name_snapshot, expected_milli, avg_cost_centavos,
-       counted_milli, counted_at, counted_by, note, movement_id)
-    VALUES (@id, @session_id, @product_id, @product_name_snapshot, @expected_milli,
-            @avg_cost_centavos, NULL, NULL, NULL, NULL, NULL)
+      (id, session_id, product_id, batch_id, product_name_snapshot, batch_no_snapshot,
+       expected_milli, avg_cost_centavos, counted_milli, counted_at, counted_by, note, movement_id)
+    VALUES (@id, @session_id, @product_id, @batch_id, @product_name_snapshot, @batch_no_snapshot,
+            @expected_milli, @avg_cost_centavos, NULL, NULL, NULL, NULL, NULL)
   `);
 
   // Wrapped so every line is written under one BEGIN even when the caller has not
   // opened a transaction of its own. The service always has; this makes the guarantee
   // a property of the method rather than of its callers.
   const writeAll = db.get().transaction(() => {
-    for (const row of rows) {
+    for (const row of products) {
       insertLine.run({
         id: idFor(),
         session_id: sessionId,
         product_id: row.product_id,
+        batch_id: null,
         product_name_snapshot: row.name,
+        batch_no_snapshot: null,
         expected_milli: row.qty_on_hand_milli,
         avg_cost_centavos: row.avg_cost_centavos,
+      });
+    }
+    for (const row of batches) {
+      insertLine.run({
+        id: idFor(),
+        session_id: sessionId,
+        product_id: row.product_id,
+        batch_id: row.batch_id,
+        product_name_snapshot: row.name,
+        batch_no_snapshot: row.batch_no,
+        expected_milli: row.qty_milli,
+        // MON-004: the batch's own cost, not the product's moving average. Valuing a
+        // batch variance at the average would price the loss at stock the store still
+        // has.
+        avg_cost_centavos: row.unit_cost_centavos,
       });
     }
   });
   writeAll();
 
-  return { lines: rows.length, batch_tracked_excluded: excluded, at };
+  return { lines: products.length + batches.length, batch_lines: batches.length, at };
 }
 
 // ── Lines ───────────────────────────────────────────────────────────────────
 
 const LINE_COLUMNS = `
-  l.id, l.session_id, l.product_id, l.product_name_snapshot, l.expected_milli,
+  l.id, l.session_id, l.product_id, l.batch_id, l.product_name_snapshot,
+  l.batch_no_snapshot, l.expected_milli,
   l.avg_cost_centavos, l.counted_milli, l.counted_at, l.counted_by, l.note, l.movement_id
 `;
 
 function linesFor(sessionId, { limit = 1000, offset = 0, varyingOnly = false, uncountedOnly = false } = {}) {
   return db.get().prepare(`
-    SELECT ${LINE_COLUMNS}, p.sku, u.code AS base_unit_code, cu.username AS counted_by_username
+    SELECT ${LINE_COLUMNS}, p.sku, u.code AS base_unit_code, cu.username AS counted_by_username,
+           b.expiry_date
       FROM stock_count_lines l
       JOIN products p ON p.id = l.product_id
       JOIN units u ON u.id = p.base_unit_id
       LEFT JOIN users cu ON cu.id = l.counted_by
+      LEFT JOIN product_batches b ON b.id = l.batch_id
      WHERE l.session_id = @sessionId
        AND (@varyingOnly = 0
             OR (l.counted_milli IS NOT NULL AND l.counted_milli <> l.expected_milli))
        AND (@uncountedOnly = 0 OR l.counted_milli IS NULL)
-     ORDER BY p.name COLLATE NOCASE
+     -- A product's batch lines sit under their product, earliest expiry first — the
+     -- order a counter works a shelf in, and FEFO's own order (INV-204).
+     ORDER BY p.name COLLATE NOCASE, b.expiry_date, l.batch_no_snapshot
      LIMIT @limit OFFSET @offset
   `).all({
     sessionId, limit, offset,
@@ -210,11 +250,27 @@ function countLines(sessionId, { varyingOnly = false, uncountedOnly = false } = 
   }).n;
 }
 
-function findLine(sessionId, productId) {
+/**
+ * One line of a sheet, by the product it counts and — since TASK-042 — the batch.
+ *
+ * `batchId` of null means the product's own line, which is the only line a product
+ * that is not batch-tracked has. `COALESCE` rather than `IS NULL` because SQLite
+ * compares NULL to nothing, including to itself: `batch_id = NULL` matches no row and
+ * would have made every non-batch line unfindable.
+ */
+function findLine(sessionId, productId, batchId = null) {
   return db.get().prepare(`
     SELECT ${LINE_COLUMNS} FROM stock_count_lines l
-     WHERE l.session_id = ? AND l.product_id = ?
-  `).get(sessionId, productId) || null;
+     WHERE l.session_id = ? AND l.product_id = ? AND COALESCE(l.batch_id, '') = COALESCE(?, '')
+  `).get(sessionId, productId, batchId) || null;
+}
+
+/** By its own id, which is how a sheet with several lines per product addresses one. */
+function findLineById(sessionId, lineId) {
+  return db.get().prepare(`
+    SELECT ${LINE_COLUMNS} FROM stock_count_lines l
+     WHERE l.session_id = ? AND l.id = ?
+  `).get(sessionId, lineId) || null;
 }
 
 /**
@@ -224,23 +280,25 @@ function findLine(sessionId, productId) {
  * different answers and the schema keeps them apart, so the repository must too. A
  * counter who typed into the wrong row needs a way back to "not counted".
  */
-function setCounted({ sessionId, productId, countedMilli, countedAt, countedBy, note = null }) {
+function setCounted({ sessionId, lineId, countedMilli, countedAt, countedBy, note = null }) {
+  // By line id since TASK-042: a batch-tracked product has one line per batch, and an
+  // update keyed on the product would have written the same figure onto all of them.
   db.get().prepare(`
     UPDATE stock_count_lines
        SET counted_milli = @countedMilli,
            counted_at = @countedAt,
            counted_by = @countedBy,
            note = @note
-     WHERE session_id = @sessionId AND product_id = @productId
+     WHERE session_id = @sessionId AND id = @lineId
   `).run({
     sessionId,
-    productId,
+    lineId,
     countedMilli: countedMilli === null || countedMilli === undefined ? null : countedMilli,
     countedAt: countedMilli === null || countedMilli === undefined ? null : countedAt,
     countedBy: countedMilli === null || countedMilli === undefined ? null : countedBy,
     note,
   });
-  return findLine(sessionId, productId);
+  return findLineById(sessionId, lineId);
 }
 
 /** INV-111's movement, written onto the line that produced it. */
@@ -324,6 +382,6 @@ function varianceTotals(sessionId) {
 
 module.exports = {
   insert, findById, findByNo, search, countSearch,
-  snapshotLines, linesFor, countLines, findLine, setCounted, setMovement,
+  snapshotLines, linesFor, countLines, findLine, findLineById, setCounted, setMovement,
   approve, post, cancel, openSessionsForProduct, varianceTotals,
 };
