@@ -40,7 +40,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-403 Collection                         │
 │  STOCK        SCR-201 Products       SCR-202 Product     │
 │               SCR-203 Adjustment     SCR-204 Low stock   │
-│               SCR-205 Stock count                        │
+│               SCR-205 Stock count    SCR-206 Batches     │
 │  SHIFT        SCR-501 Open           SCR-502 Till cash   │
 │               SCR-503 Close                              │
 │  BUYING       SCR-801 Orders         SCR-802 Order       │
@@ -96,6 +96,35 @@ locked once movements exist per `UOM-003`, with the reason shown — and the pac
 Product, current on-hand, counted or new quantity, computed variance, reason from the configured
 list (`INV-108`), notes. Above the value threshold the screen shows an authorisation panel before
 the submit button is enabled (`AUD-603`).
+
+### `SCR-206` — Batches · `FT-205` — v1.2
+
+Behind `TX-422`, reached from `SCR-201`'s row for a batch-tracked product — and, more often, in
+one step from the near-expiry and expired-stock alerts on `SCR-601`, because the alert is what
+told anybody there was something to look at.
+
+One product's batches, earliest expiry first: the supplier's own batch number, who it came from,
+the date printed on the box, `INV-203`'s derived status with the days in words ("in 12 days",
+"3 days ago"), and what the batch still holds with its unit (`UOM-005`). An expired row carries
+the refusal's colour and a near-expiry row the amber left border `SCR-201`'s low-stock row
+already uses — one visual language across the catalogue, so "this needs attention" reads the same
+everywhere.
+
+Exhausted batches are hidden until asked for, and the checkbox says why they are worth asking
+for: *a recall still names them*.
+
+**Two absences are the design, not an omission.**
+
+**There is no quantity field anywhere on this screen.** `INV-201` makes a batch's quantity the
+stock ledger's own sum — the same sum `INV-101` derives per product, grouped one column finer —
+so a box that set it would be a box that makes the two figures disagree. The screen shows both
+totals side by side for exactly that reason.
+
+**There is no way to sell an expired batch, from here or from anywhere.** `INV-205` permits an
+owner override only where the store's own policy allows it, and this store's does not. The one
+write on the screen is the write-off (`TX-407`), which posts the `EXPIRY` movement `INV-103`
+declared — so the store can total what expiry cost it, which an adjustment of the same quantity
+would not say. A cashier sees the list and no button.
 
 ### `SCR-205` — Stock count · `FT-209` — v1.1
 

@@ -60,9 +60,17 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
     body: { productId: product.id, type: 'RECEIPT', qtyMilli: 500000, unitCostCentavos: 4000, reason: 'Received but not recorded' },
   });
 
+  // A supplier, so SCR-801 to SCR-804 have somebody to buy from (VR-401) — and so the
+  // batch-tracked medicine below has somebody to have come from, which INV-202 makes
+  // part of a batch's identity.
+  const mill = (await api('/suppliers', {
+    method: 'POST', token,
+    body: { name: 'B-MEG Feeds', code: 'BMEG', contactNo: '09171234567', termsDays: 30 },
+  })).json.supplier;
+
   // A batch-tracked line, so SCR-305 has something POS-304 actually defaults to
-  // write-off. Without one the return screen's central rule renders in only its easy
-  // case, which is the half nobody gets wrong.
+  // write-off, and SCR-206 has batches to show. Without one the return screen's central
+  // rule renders in only its easy case, which is the half nobody gets wrong.
   const vet = (await api('/categories', { method: 'POST', token, body: { name: 'Veterinary' } })).json.category;
   const medicine = (await api('/products', {
     method: 'POST', token,
@@ -71,9 +79,49 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
       retailPriceCentavos: 32000, isBatchTracked: true,
     },
   })).json.product;
+
+  // Since TASK-029 its stock arrives as a delivery, not as a bare adjustment: INV-201
+  // refuses an unbatched movement of a batch-tracked product, and the seeding that used
+  // to work now silently left the medicine with no stock at all.
+  //
+  // Three batches, deliberately: one expired so SCR-206's write-off and OPS-007's
+  // CRITICAL alert both have something real to act on, one near expiry against the
+  // 90-day default, and one ordinary.
+  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const BATCHES = [
+    { batchNo: 'AMX-2291', qtyMilli: 12000, expiryDate: day(400) },
+    { batchNo: 'AMX-2180', qtyMilli: 6000, expiryDate: day(45) },
+    { batchNo: 'AMX-1904', qtyMilli: 4000, expiryDate: day(-6) },
+  ];
+  for (const batch of BATCHES) {
+    await api('/goods-receipts', {
+      method: 'POST', token,
+      body: {
+        supplierId: mill.id,
+        supplierDrNo: `DR-${batch.batchNo}`,
+        lines: [{
+          productId: medicine.id,
+          receivedQtyMilli: batch.qtyMilli,
+          unitCostCentavos: 21000,
+          batchNo: batch.batchNo,
+          expiryDate: batch.expiryDate,
+        }],
+      },
+    });
+  }
+
+  // A third product, not batch-tracked and deliberately left uncounted by the walk.
+  // SCR-205's coverage figure — "how much of the shop was actually walked" — needs a
+  // scope with something still blank in it, and since TASK-029 the vaccine is not on a
+  // product-level count sheet at all (INV-201), which left the sheet with one line and
+  // nothing to be uncounted.
+  const booster = (await api('/products', {
+    method: 'POST', token,
+    body: { sku: 'FEED-CB-25', name: 'Chick Booster Crumble', categoryId: cat.id, baseUnitId: kg.id, retailPriceCentavos: 7100 },
+  })).json.product;
   await api('/inventory/adjustments', {
     method: 'POST', token,
-    body: { productId: medicine.id, type: 'RECEIPT', qtyMilli: 20000, unitCostCentavos: 21000, reason: 'Received but not recorded' },
+    body: { productId: booster.id, type: 'RECEIPT', qtyMilli: 250000, unitCostCentavos: 5400, reason: 'Received but not recorded' },
   });
 
   // A credit customer, so SCR-401 to SCR-403 have something to show.
@@ -84,12 +132,6 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
       isCreditEligible: true, creditLimitCentavos: 5000000, termsDays: 30,
     },
   })).json.customer;
-
-  // A supplier, so SCR-801 to SCR-804 have somebody to buy from (VR-401).
-  const mill = (await api('/suppliers', {
-    method: 'POST', token,
-    body: { name: 'B-MEG Feeds', code: 'BMEG', contactNo: '09171234567', termsDays: 30 },
-  })).json.supplier;
 
   // A second user who may receive goods and may not authorise an exception. Without
   // one, PO-204 and PO-205 self-authorise for the owner and the panel never opens —

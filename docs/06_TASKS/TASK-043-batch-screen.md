@@ -22,10 +22,10 @@ So a store running v1.2 today gets a `CRITICAL` alert saying three batches on th
 expired and may not be sold, and has nowhere to go from it — the only way to clear one is an
 HTTP client, which is not a thing a store has.
 
-`SCR-206` is the next free id in the catalogue range. It is deliberately **not** in
-`04_UX_SPEC.md` yet: `TC-UI-10` asserts that every screen the spec names has a view, and a
-specified screen with no view would turn a guard that has been green since `TASK-036` red.
-Adding the section and the view belong in the same commit.
+`SCR-206` is the next free id in the catalogue range, and its `04_UX_SPEC.md` §3 section landed
+in the same commit as the view — deliberately, because `TC-UI-10` asserts that every screen the
+spec names has a view, and a specified screen with no view would have turned a guard that has
+been green since `TASK-036` red for however long the two were apart.
 
 **Where it lives.** A sixth tab on `SCR-202` was considered and rejected: the product editor's
 five tabs are fixed by `04_UX_SPEC.md` §3, and a batch is not a property of the product the way
@@ -72,13 +72,13 @@ is the path somebody actually arrives by.
 
 ## Acceptance Criteria
 
-- [ ] A batch-tracked product's batches are listed with quantity, expiry and status
-- [ ] An expired batch can be written off from this screen, and the list updates
-- [ ] A cashier sees the list and no write-off button (`TX-407`)
-- [ ] Exhausted batches appear only when asked for
-- [ ] The expired-stock alert reaches this screen in one step
-- [ ] There is no field anywhere on the screen that writes a quantity
-- [ ] `TC-UI-10` stays green: the spec section and the view land together
+- [x] A batch-tracked product's batches are listed with quantity, expiry and status
+- [x] An expired batch can be written off from this screen, and the list updates
+- [x] A cashier sees the list and no write-off button (`TX-407`)
+- [x] Exhausted batches appear only when asked for
+- [x] The expired-stock alert reaches this screen in one step
+- [x] There is no field anywhere on the screen that writes a quantity
+- [x] `TC-UI-10` stays green: the spec section and the view land together
 
 ## Tests
 
@@ -86,6 +86,17 @@ is the path somebody actually arrives by.
 | :--- | :--- |
 | `TC-UI-11` | The screen renders the four states and carries no quantity input |
 | `TC-E2E-26` | From the expired alert to the write-off, over HTTP, in the browser smoke |
+
+Both are written. `TC-E2E-26` lives in `tools/browser-smoke/main.js` rather than in
+`src/tests/e2e` because what it proves needs a browser: the row action, the dialog, the write-off
+and the two views of the list, driven in Chromium against a real API. The smoke's fixture gained
+three batches of the vaccine — one expired, one near, one ordinary — because a screen about
+expiry with nothing expired on it renders only its easy half.
+
+**What this task also had to fix.** The smoke seeded the batch-tracked medicine with a bare
+`RECEIPT` adjustment, which `INV-201` has refused since `TASK-029` — so the fixture had been
+silently leaving it with no stock at all, and the return case that needs a batch-tracked line was
+proving less than it claimed. It now arrives by goods receipt, as a delivery does.
 
 ---
 

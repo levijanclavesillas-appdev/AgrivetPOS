@@ -19,7 +19,7 @@ import { money, quantity } from '../shell/format.js';
 
 const PAGE = 50;
 
-export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValuation, onCount }) {
+export function createProductList({ root, mode = 'all', onOpen, onAdjust, onBatches, onValuation, onCount }) {
   let query = '';
   let categoryId = '';
   let includeInactive = false;
@@ -76,6 +76,7 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValu
       name: row.name,
       category: { name: row.category_name },
       brand: row.brand_name ? { name: row.brand_name } : null,
+      is_batch_tracked: Boolean(row.is_batch_tracked),
       base_unit: { code: row.base_unit_code },
       qty_on_hand_milli: row.qty_on_hand_milli,
       qty_on_hand_display: row.qty_on_hand_display,
@@ -222,6 +223,15 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValu
             class: 'row-action', text: 'Adjust',
             onclick: (event) => { event.stopPropagation(); onAdjust(p.id); },
           }),
+          // SCR-206, for the products that have batches at all. Absent rather than
+          // present-and-refusing on the rest: INV-201 makes the question itself invalid
+          // for a product whose stock is not held as batches.
+          p.is_batch_tracked && onBatches
+            ? h('button', {
+              class: 'row-action', text: 'Batches',
+              onclick: (event) => { event.stopPropagation(); onBatches(p.id); },
+            })
+            : null,
         ]),
       ]))),
     ]);

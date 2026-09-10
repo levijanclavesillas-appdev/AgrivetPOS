@@ -72,6 +72,15 @@
   .editor-form { max-width: none; }
 }
 
+/* ── SCR-206 the batch list (TASK-043) ───────────────────────────────────── */
+
+/* The same visual language SCR-201 already speaks: amber down the side for something
+   to deal with, and the refusal's own colour for stock that may not be sold at all. */
+.batch-list tr.is-expired { border-left-color: var(--error); background: var(--refuse-bg); }
+.batch-list td small { display: block; color: var(--muted); font-size: .75rem; }
+.batches .check { display: flex; align-items: center; gap: .4rem; margin: 0 0 .5rem; }
+.batches .admin-meta { margin-bottom: .75rem; }
+
 /* SCR-205 — the stocktake (TASK-022).
    Three row treatments, and the third is the one that matters: a line nobody counted
    must not look like a line that matched, or somebody posts a half-finished count. */

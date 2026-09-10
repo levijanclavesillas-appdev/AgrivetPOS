@@ -168,7 +168,11 @@ function lowStock({ limit = 200, offset = 0 } = {}) {
            c.name AS category_name,
            -- Left, not inner: VR-209 makes the brand optional, and an inner join here
            -- would drop every unbranded product out of the low-stock list.
-           b.name AS brand_name
+           b.name AS brand_name,
+           -- SCR-201's row action for SCR-206: the low-stock view is the same table
+           -- under a filter, and a button that vanished when the filter was applied
+           -- would read as a missing feature rather than as a filter.
+           p.is_batch_tracked
       FROM products p
       JOIN units u ON u.id = p.base_unit_id
       JOIN categories c ON c.id = p.category_id

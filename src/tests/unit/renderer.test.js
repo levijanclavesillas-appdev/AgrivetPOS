@@ -1617,6 +1617,41 @@ test('the object-URL save lives in the shell, once, and every caller uses it', (
   }
 });
 
+test('TC-UI-11: SCR-206 shows batches and cannot write a quantity (INV-201, INV-205)', () => {
+  const source = codeOf('js/catalogue/batches.js');
+  const prose = proseOf('js/catalogue/batches.js');
+
+  // INV-201: a batch's quantity is the ledger's own sum. A field that set it would be a
+  // field that makes on-hand and the batch total disagree — which is the whole thing
+  // 014_batches.sql was shaped to make impossible, undone by one input box.
+  assert.equal(/type: 'number'/.test(source), false, 'no numeric input');
+  assert.equal(/inputmode: 'decimal'/.test(source), false, 'no quantity keypad');
+  assert.equal(/qtyMilli|quantity\(/.test(source), false, 'the screen computes no quantity to send');
+  // The only POST it makes is the write-off.
+  const posts = source.match(/api\.post\(/g) || [];
+  assert.equal(posts.length, 1, 'one write on the screen');
+  assert.match(source, /\/batches\/\$\{batch\.id\}\/expire/);
+
+  // INV-205: no path here releases expired stock for sale, and the screen says so.
+  assert.equal(/allowExpired|sell/i.test(source), false, 'nothing on the screen sells a batch');
+  assert.match(prose, /policy permits no override/);
+
+  // TX-407 decides whether the one write is offered at all; TX-422 is the read, and a
+  // cashier holds it, so the list itself is not gated.
+  assert.match(source, /mayWriteOff/);
+  assert.match(prose, /TX-407/);
+
+  // 04_UX_SPEC.md §5's states, from the shared helpers rather than hand-rolled.
+  for (const state of ['ui.loading', 'ui.empty', 'ui.error', 'ui.refused']) {
+    assert.ok(source.includes(state), `${state} is not used`);
+  }
+
+  // And the path somebody actually arrives by: OPS-007's alert, in one step.
+  const dashboard = codeOf('js/reports/dashboard.js');
+  assert.match(dashboard, /EXPIRED_STOCK/);
+  assert.match(dashboard, /onOpenBatches/);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

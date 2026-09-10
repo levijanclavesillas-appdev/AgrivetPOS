@@ -635,6 +635,78 @@ app.whenReady().then(async () => {
   log(/less on the shelf/.test(variance), 'the variance is computed for the reader',
     variance.replace(/\s+/g, ' ').slice(0, 70));
 
+  // ── SCR-206: the batches, and the one thing that can be done about them ──
+  //
+  // TASK-043's screen, and the reason it exists: TASK-029 shipped the API and the alert
+  // and no way to reach either, so a store was told its stock had expired and could do
+  // nothing with that.
+
+  console.log('\n— SCR-206: batches —');
+  await run(`document.querySelector('.report-back').click()`);
+  await waitFor(`!!document.querySelector('.catalogue-list')`, { label: 'the list again' });
+
+  const openedBatches = await run(`(() => {
+    const row = [...document.querySelectorAll('.catalogue-list tbody tr')]
+      .find(r => /Amoxicillin/.test(r.textContent));
+    if (!row) return false;
+    const button = [...row.querySelectorAll('.row-action')].find(b => /Batches/.test(b.textContent));
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  log(openedBatches, 'SCR-201 offers Batches on a batch-tracked product');
+  await waitFor(`!!document.querySelector('.batches')`, { label: 'SCR-206' });
+
+  const rows = await run(`document.querySelectorAll('.batch-list tbody tr').length`);
+  log(rows === 3, 'the three batches of the vaccine are listed', `${rows} rows`);
+  log(await run(`/EXPIRED|Expired/.test(document.querySelector('.batch-list').textContent)`),
+    'INV-203: the expired one is marked expired, derived from the date alone');
+  log(await run(`!!document.querySelector('.batch-list tr.is-expired')`),
+    'and carries the refusal treatment 04_UX_SPEC.md §3 asks for');
+  log(await run(`/in \\d+ days|days ago|today/.test(document.querySelector('.batch-list').textContent)`),
+    'the days are in words beside the date');
+
+  // INV-201: the quantity is the ledger's, and there is nothing on this screen that
+  // could set it. A box here would undo the whole of 014_batches.sql.
+  log(await run(`document.querySelectorAll('.batches input:not([type=checkbox])').length === 0`),
+    'INV-201: no quantity field anywhere on the screen');
+
+  // The one write, and what it leaves behind.
+  const beforeWriteOff = (await api(`/inventory/${MEDICINE_ID}`)).json.on_hand.qty_on_hand_milli;
+  await clickOn('.batch-list .row-action', '/Write off/');
+  const askOpen = await waitFor(`!!document.querySelector('form.ask')`, { label: 'the write-off dialog' });
+  log(askOpen, 'INV-205: the expired batch offers a write-off');
+  log(await run(`/EXPIRY movement/.test(document.querySelector('form.ask').textContent)`),
+    'and says what it will record, before it records it');
+  await run(`(() => {
+    const f = document.querySelector('form.ask');
+    f.querySelector('input').value = 'Swept the vaccine fridge';
+    f.requestSubmit();
+    return true;
+  })()`);
+  await settle(700);
+
+  const afterWriteOff = (await api(`/inventory/${MEDICINE_ID}`)).json.on_hand.qty_on_hand_milli;
+  log(afterWriteOff === beforeWriteOff - 4000, 'the stock left, by the quantity the batch held',
+    `${beforeWriteOff} → ${afterWriteOff} milli`);
+  const expiryMovement = (await api(`/inventory/${MEDICINE_ID}/movements?limit=10`)).json.movements
+    .find((m) => m.type === 'EXPIRY');
+  log(Boolean(expiryMovement), 'INV-103: it left as an EXPIRY movement, so the store can total it');
+  log(Boolean(expiryMovement) && /Swept the vaccine fridge/.test(expiryMovement.reason || ''),
+    'with the note the operator typed on the row');
+
+  // INV-201 still holds afterwards, which is the only assertion that matters here.
+  const reconciliation = (await api('/inventory/reconciliation')).json;
+  log(reconciliation.ok === true && reconciliation.batch_breaks.length === 0,
+    'INV-201: batches and on-hand still reconcile after the write-off');
+
+  log(await run(`document.querySelectorAll('.batch-list tbody tr').length === 2`),
+    'the emptied batch drops off the shelf view');
+  await run(`(() => { const c = document.querySelector('.batches .check input'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+  await settle(500);
+  log(await run(`document.querySelectorAll('.batch-list tbody tr').length === 3`),
+    'and is still there for a recall when asked for');
+
   // ── SCR-801 – SCR-804: buying (TASK-019) ─────────────────────────────────
   //
   // The owner drives the order; the bodega clerk takes the delivery, because PO-204

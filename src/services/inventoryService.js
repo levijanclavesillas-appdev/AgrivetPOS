@@ -528,6 +528,7 @@ function lowStock({ limit = 200, offset = 0 } = {}) {
       name: row.name,
       category_name: row.category_name,
       brand_name: row.brand_name || null,
+      is_batch_tracked: Boolean(row.is_batch_tracked),
       qty_on_hand_milli: row.qty_on_hand_milli,
       qty_on_hand_display: quantity.format(row.qty_on_hand_milli, row.base_unit_code),
       min_stock_milli: row.min_stock_milli,

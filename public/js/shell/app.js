@@ -22,6 +22,7 @@ import { createData } from '../admin/data.js';
 import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
+import { createBatchList } from '../catalogue/batches.js';
 import { createStockCount } from '../catalogue/count.js';
 import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
@@ -264,6 +265,9 @@ export function createApp({ root }) {
       session,
       // A tile opens either a report or a screen; the low-stock one opens SCR-204.
       onOpenReport: (target, isScreen) => (isScreen ? show(target) : showReport(target)),
+      // OPS-007's expiry alerts open SCR-206 on the product they name, which is the
+      // difference between being told about expired stock and being able to clear it.
+      onOpenBatches: (productId) => { renderRail('products'); showBatches(productId); },
     });
     current.mount();
     return current;
@@ -279,6 +283,7 @@ export function createApp({ root }) {
       mode,
       onOpen: (id) => showProductEditor(id),
       onAdjust: (id) => showAdjustment(id),
+      onBatches: (id) => showBatches(id),
       onValuation: () => showReport('valuation'),
       onCount: () => showStockCount(),
     });
@@ -461,6 +466,23 @@ export function createApp({ root }) {
       session,
       countId: id,
       onBack: () => showProducts(),
+    });
+    current.mount();
+    return current;
+  }
+
+  /**
+   * SCR-206. Reached from the product list for a batch-tracked product, and in one step
+   * from the near-expiry and expired-stock alerts — which is the path somebody actually
+   * arrives by, because the alert is what told them there was anything to look at.
+   */
+  function showBatches(productId) {
+    if (current?.unmount) current.unmount();
+    current = createBatchList({
+      root: host(),
+      productId,
+      session,
+      onClose: () => showProducts(),
     });
     current.mount();
     return current;

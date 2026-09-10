@@ -22,7 +22,19 @@ const OPENS = {
 /** Tiles that open a screen rather than a report. INV-109's count opens the list. */
 const OPENS_SCREEN = { LOW_STOCK: 'low-stock' };
 
-export function createDashboard({ root, session, onOpenReport }) {
+/**
+ * Alerts that are worth acting on rather than only reading, and where they go.
+ *
+ * OPS-007's list was read-only until TASK-043: the expiry alerts carry the batch and
+ * the product they are about, and telling a store that three batches on its shelf may
+ * not be sold while leaving it to find them is most of a feature.
+ */
+const ALERT_OPENS = {
+  NEAR_EXPIRY: { screen: 'batches', label: 'See the batches' },
+  EXPIRED_STOCK: { screen: 'batches', label: 'Write it off' },
+};
+
+export function createDashboard({ root, session, onOpenReport, onOpenBatches = null }) {
   let dismissed = new Set();
 
   async function load() {
@@ -90,6 +102,7 @@ export function createDashboard({ root, session, onOpenReport }) {
     }, [
       h('span', { class: 'alert-message', text: a.message }),
       h('span', { class: 'alert-rule', text: a.rule_id }),
+      alertAction(a),
       a.dismissible
         ? h('button', {
           class: 'alert-dismiss', 'aria-label': 'Dismiss', text: '×',
@@ -97,6 +110,16 @@ export function createDashboard({ root, session, onOpenReport }) {
         })
         : null,
     ])));
+  }
+
+  /** The one step from an alert to the screen that can do something about it. */
+  function alertAction(a) {
+    const opens = ALERT_OPENS[a.kind];
+    if (!opens || !onOpenBatches || !a.product_id) return null;
+    return h('button', {
+      class: 'alert-action', text: opens.label,
+      onclick: () => onOpenBatches(a.product_id),
+    });
   }
 
   const key = (a) => `${a.kind}:${a.shift_id || ''}`;
