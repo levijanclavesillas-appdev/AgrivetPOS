@@ -203,3 +203,22 @@
 @media (max-width: 1023px) {
   .detail-grid { grid-template-columns: 1fr; }
 }
+
+/* ── SCR-605 the ageing (TASK-031) ────────────────────────────────────────── */
+/*
+   Five figures across, because CR-301 buckets a debit and not an account: one farm can
+   be in two of these columns at once, and the row has to be able to say so.
+*/
+.ageing-buckets { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+.ageing-bucket { flex: 1 1 8rem; padding: .75rem 1rem; background: #fff;
+  border: 1px solid var(--rule); border-top: 4px solid var(--rule); border-radius: 4px; }
+.ageing-bucket-value { display: block; font-size: 1.25rem; font-weight: 600;
+  font-variant-numeric: tabular-nums; }
+.ageing-bucket-label { display: block; font-size: .875rem; }
+/* The older the debt, the louder the column. */
+.ageing-d31_60 { border-top-color: var(--warn-bg); }
+.ageing-d61_90 { border-top-color: var(--warn-ink); }
+.ageing-d90_plus { border-top-color: var(--error); }
+.ageing-list td.money { font-variant-numeric: tabular-nums; }
+.ageing-list small { display: block; color: var(--muted); font-size: .75rem; }
+.report-ageing .rule-note { max-width: 52rem; line-height: 1.5; }

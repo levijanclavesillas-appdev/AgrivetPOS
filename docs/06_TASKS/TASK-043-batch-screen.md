@@ -85,9 +85,9 @@ is the path somebody actually arrives by.
 | Case | Asserts |
 | :--- | :--- |
 | `TC-UI-11` | The screen renders the four states and carries no quantity input |
-| `TC-E2E-26` | From the expired alert to the write-off, over HTTP, in the browser smoke |
+| `TC-E2E-30` | From the expired alert to the write-off, over HTTP, in the browser smoke |
 
-Both are written. `TC-E2E-26` lives in `tools/browser-smoke/main.js` rather than in
+Both are written. `TC-E2E-30` lives in `tools/browser-smoke/main.js` rather than in
 `src/tests/e2e` because what it proves needs a browser: the row action, the dialog, the write-off
 and the two views of the list, driven in Chromium against a real API. The smoke's fixture gained
 three batches of the vaccine — one expired, one near, one ordinary — because a screen about

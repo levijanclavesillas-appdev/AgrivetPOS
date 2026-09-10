@@ -582,7 +582,7 @@ function ageSession(sessionId, days) {
 
 // ── TASK-042 — INV-201, counting batch-tracked stock by batch ───────────────
 //
-// `TC-INT-114` to `TC-INT-116`. The three of them are one argument: a batch-tracked
+// `TC-INT-126` to `TC-INT-128`. The three of them are one argument: a batch-tracked
 // product is counted one line per batch, a variance lands on the batch it was found
 // in, and INV-201 still holds afterwards without anything having been repaired.
 //
@@ -626,7 +626,7 @@ function trackedWithBatches({ first = 6000, second = 4000 } = {}) {
 const lineOf = (opened, batchNo) => stockCountService.get(opened.session.id).lines
   .find((l) => l.batch_no === batchNo);
 
-test('TC-INT-114: a batch-tracked product is on the sheet once per batch, expiry first', () => {
+test('TC-INT-126: a batch-tracked product is on the sheet once per batch, expiry first', () => {
   const { product, tag } = trackedWithBatches();
   const plain = stocked({ qtyMilli: 10000 });
 
@@ -657,7 +657,7 @@ test('TC-INT-114: a batch-tracked product is on the sheet once per batch, expiry
   stockCountService.cancel(opened.session.id, { reason: 'Abandoned by the test' }, sessions.INVENTORY);
 });
 
-test('TC-INT-114: a variance on one batch posts against that batch and leaves the other alone', () => {
+test('TC-INT-126: a variance on one batch posts against that batch and leaves the other alone', () => {
   const { product, batches, tag: mine } = trackedWithBatches();
   const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
 
@@ -686,7 +686,7 @@ test('TC-INT-114: a variance on one batch posts against that batch and leaves th
   assert.equal(batches.length, 2);
 });
 
-test('TC-INT-115: INV-201 holds after a posted count, with no repair job', () => {
+test('TC-INT-127: INV-201 holds after a posted count, with no repair job', () => {
   const { product, tag: mine } = trackedWithBatches({ first: 8000, second: 5000 });
   const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
 
@@ -708,7 +708,7 @@ test('TC-INT-115: INV-201 holds after a posted count, with no repair job', () =>
   assert.deepEqual(inventoryService.reconcile().batch_breaks, []);
 });
 
-test('TC-INT-116: a batch the system thinks is empty is on the sheet, and can be counted up', () => {
+test('TC-INT-128: a batch the system thinks is empty is on the sheet, and can be counted up', () => {
   const { product, tag: mine } = trackedWithBatches({ first: 5000, second: 3000 });
 
   // The early batch is sold out. The system believes there is none of it left, which is

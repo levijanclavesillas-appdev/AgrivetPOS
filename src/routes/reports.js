@@ -19,6 +19,7 @@
 
 const express = require('express');
 const reportService = require('../services/reportService');
+const creditService = require('../services/creditService');
 const permissions = require('../services/permissions');
 const alertService = require('../services/alertService');
 const errors = require('../services/errors');
@@ -87,6 +88,46 @@ router.get('/reports/voids', readSales, (req, res, next) => {
       to: dateParam(req.query.to),
       shiftId: shiftParam(req.query.shiftId),
     }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * `FT-406` — the receivable, in `CR-301`'s four buckets.
+ *
+ * Before `/reports/:report`, or the path parameter swallows it — the same ordering the
+ * valuation route needs, for the same reason.
+ */
+router.get('/reports/ageing', readSales, (req, res, next) => {
+  try {
+    res.json(creditService.ageingReport({
+      includeZero: req.query.includeZero === 'true',
+      // The scope check the middleware cannot make: TX-421 grants a cashier OWN_SHIFT,
+      // and the receivable has no shift to scope it to.
+      actor: req.session,
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The receivable as a file. TX-426 to export, TX-421 to read what is in it. */
+router.get('/reports/ageing/export.csv', exportData, (req, res, next) => {
+  try {
+    if (!permissions.can(req.session, 'TX-421')) {
+      throw errors.forbidden(
+        `You do not have permission to ${permissions.describe('TX-421').toLowerCase()}.`,
+        { ruleId: 'TX-421' }
+      );
+    }
+    const { csv, filename } = creditService.ageingCsv({
+      includeZero: req.query.includeZero === 'true',
+      actor: req.session,
+    });
+    res.setHeader('content-type', 'text/csv; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
   } catch (err) {
     next(err);
   }

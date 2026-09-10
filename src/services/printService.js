@@ -248,6 +248,90 @@ function renderAcknowledgement({
   };
 }
 
+/**
+ * `CR-302` — the statement, on the receipt printer.
+ *
+ * A document handed to a customer who is standing there asking what they owe, so it is
+ * built to be **checked by hand**: the balance carried in, every movement in the period
+ * with a running total beside it, and the balance at the end. Somebody who disagrees
+ * with the closing figure can point at the line where the two of you part company,
+ * which is the whole reason a statement exists rather than a number read aloud.
+ *
+ * `CR-203`'s allocations are printed under a collection — which invoices this ₱3,000
+ * settled — because that is the sentence a customer is actually asking for when they
+ * query a balance.
+ *
+ * `CR-108`: an account in credit closes with the store owing *them*, said in words. A
+ * minus sign on a piece of thermal paper is a minus sign somebody will read past.
+ */
+function renderStatement({
+  profile, statement, preparedBy, columns = width(), reprint = false,
+}) {
+  escpos.assertWidth(columns);
+
+  const lines = [
+    ...header(profile, 'STATEMENT OF ACCOUNT', columns),
+    escpos.centre(statement.customer.name, columns),
+    ...(statement.customer.code ? [escpos.centre(statement.customer.code, columns)] : []),
+    escpos.centre(`${statement.from_date} to ${statement.to_date}`, columns),
+    '',
+    escpos.divider(columns),
+    // "Brought forward", not "Balance brought forward": at 32 columns the longer label
+    // is truncated to "Balance brought forwar", which reads as a typo on a document a
+    // customer is being asked to check.
+    escpos.leftRight('Brought forward',
+      money.toDisplay(statement.opening_balance_centavos, { symbol: false }), columns),
+    escpos.divider(columns),
+  ];
+
+  if (statement.lines.length === 0) {
+    // A period with no activity still states both figures. "Nothing happened" is an
+    // answer a customer came in for, and a statement that printed only a header would
+    // look like a fault.
+    lines.push('', escpos.centre('No movement in this period', columns), '');
+  }
+
+  for (const line of statement.lines) {
+    lines.push(escpos.leftRight(
+      `${line.occurred_at_manila.slice(0, 10)} ${escpos.truncate(line.type_label, 14)}`,
+      money.toDisplay(line.amount_centavos, { symbol: false }),
+      columns
+    ));
+    if (line.document_no) lines.push(`  ${escpos.truncate(line.document_no, columns - 2)}`);
+    // CR-203, under the payment it belongs to.
+    for (const settled of line.settled || []) {
+      lines.push(`    ${escpos.truncate(`settled ${settled.document_no}`, columns - 4)}`);
+    }
+    lines.push(escpos.leftRight('  balance',
+      money.toDisplay(line.running_balance_centavos, { symbol: false }), columns));
+  }
+
+  lines.push(
+    escpos.divider(columns),
+    escpos.leftRight(
+      statement.is_in_credit ? 'In credit' : 'Balance owing',
+      money.toDisplay(Math.abs(statement.closing_balance_centavos), { symbol: false }),
+      columns
+    ),
+  );
+  // CR-108 in words, under the figure, because the figure alone is a minus sign.
+  if (statement.is_in_credit) {
+    lines.push(...escpos.wrap(`The store owes this to ${statement.customer.name}.`, columns));
+  }
+  lines.push(
+    escpos.leftRight('Prepared by', escpos.truncate(preparedBy, 16), columns),
+    ...footer(columns, { reprint })
+  );
+
+  return {
+    kind: 'STATEMENT',
+    document_no: `STMT-${statement.from_date}-${statement.to_date}`,
+    reprint,
+    columns,
+    text: lines.join('\n'),
+  };
+}
+
 /** The shift closing summary the store files with the drawer count. */
 /**
  * The refund slip, in `renderAcknowledgement`'s shape because it answers the same
@@ -511,5 +595,6 @@ function clearQueue() {
 module.exports = {
   width, header, footer,
   renderSaleReceipt, renderAcknowledgement, renderReturnAcknowledgement, renderClosingSummary,
+  renderStatement,
   send, sendOverTcp, install, uninstall, enqueue, queued, clearQueue,
 };

@@ -1125,6 +1125,11 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/batches/:id/recall` | `TX-422` | `INV-206`. Every sale that took stock from the batch, with **this batch's share** of each line — voided and returned sales included and marked, walk-ins counted rather than omitted |
 | `POST` | `/batches/:id/expire` | `TX-407` | `INV-205`. The **only** way expired stock leaves. There is no route that sells it and none that edits a batch quantity — the store's policy permits no override (`TASK-029`), and `INV-201` makes the quantity the ledger's own sum |
 | `GET` | `/customers?q=` | `TX-413` | |
+| `GET` | `/customers/:id/statement?from=&to=` | `TX-421` | `CR-302`, `SCR-404`. Opening balance derived as the balance before the window, the period's movements, closing balance — and the service **refuses** to answer if the walked total and the ledger disagree. `TX-421` at store scope: a cashier's `OWN_SHIFT` grant is not a licence to read the receivable |
+| `POST` | `/customers/:id/statement/print` | `TX-421` | `CR-206`'s precedent — a document a customer takes away, with `TAX-006`'s notice on it |
+| `GET` | `/customers/:id/statement/export.csv` | `TX-426` | the same call the screen makes |
+| `GET` | `/reports/ageing` | `TX-421` | `CR-301`, `SCR-605`. Four buckets **per unsettled debit**, not per account, plus what customers hold in credit — which is never netted into a bucket, and is what makes the report tie to the ledger |
+| `GET` | `/reports/ageing/export.csv` | `TX-426` | |
 | `GET` | `/customers/:id/credit` | `TX-413` | limit, balance, available, ageing, and — since `TASK-028` — `store_credit_centavos`, the balance past zero the customer may spend (`CR-108`) |
 | `POST` | `/customers/:id/collections` | `TX-416` | `CR-201`..`CR-206` |
 | `POST` | `/shifts/open` | `TX-418` | `POS-502` |

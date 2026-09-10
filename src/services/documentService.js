@@ -42,6 +42,10 @@ const KINDS = Object.freeze({
   COLLECTION_ACKNOWLEDGEMENT: 'Collection acknowledgement',
   RETURN_ACKNOWLEDGEMENT: 'Return acknowledgement',
   SHIFT_CLOSING: 'Shift closing summary',
+  // CR-302 (TASK-031). A statement is a document handed to a customer, so it carries
+  // TAX-006's notice like every other one — it states what is owed, and it is not a
+  // receipt for anything.
+  STATEMENT: 'Statement of account',
 });
 
 const printed = [];

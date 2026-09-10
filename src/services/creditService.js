@@ -21,6 +21,11 @@ const ids = require('../config/ids');
 const clock = require('../config/clock');
 const errors = require('./errors');
 const money = require('./money');
+const csv = require('../config/csv');
+const printService = require('./printService');
+const documentService = require('./documentService');
+const storeProfileService = require('./storeProfileService');
+const permissions = require('./permissions');
 const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const creditRepository = require('../repositories/creditRepository');
@@ -617,6 +622,403 @@ function presentTransaction(row) {
   };
 }
 
+// ── CR-301 / CR-302 — ageing buckets and the statement (TASK-031) ───────────
+
+/**
+ * `TX-421` at store scope, which is not the same as holding `TX-421`.
+ *
+ * The grant gives a cashier `OWN_SHIFT` — enough for the sales figures of the till they
+ * stood at, and not a licence to read what every farm in the barangay owes. The
+ * receivable has no shift to scope it to, so the only honest reading of `OWN_SHIFT`
+ * here is "no", and the refusal says which figures they *can* see rather than stopping
+ * at the word no.
+ */
+function assertReceivableScope(actor, what) {
+  if (!actor) return;
+  const level = permissions.grant(actor.role, 'TX-421');
+  if (level === permissions.FULL) return;
+
+  throw errors.forbidden(
+    level === permissions.OWN_SHIFT
+      ? `You can see the figures for your own shift, not ${what}. Ask the owner or a manager.`
+      : `You do not have permission to read ${what}.`,
+    { ruleId: 'TX-421', requiresRole: 'MANAGER' }
+  );
+}
+
+/**
+ * `CR-301`'s buckets, and the whole of the rule that decides them.
+ *
+ * **A bucket belongs to a debit, not to an account.** One farm can be ₱2,000 in the
+ * 1–30 bucket and ₱5,000 in the 90+ at the same time; an implementation that bucketed
+ * the account by its oldest debt would report ₱7,000 as 90+ and tell the owner their
+ * problem is more than twice what it is.
+ *
+ * The boundaries are the ones the rule names — 1–30, 31–60, 61–90, 90+ — and each is
+ * inclusive of its lower edge: a debit exactly 30 days past due is in 1–30, and 31 is
+ * the first day of the next bucket. A debit not yet due is not in any of them, which is
+ * why `NOT_DUE` is a bucket here and not a special case at the call site: the totals
+ * have to add up to the whole receivable, and a debit with nowhere to go is how a
+ * reconciliation quietly loses money.
+ */
+const BUCKETS = Object.freeze(['NOT_DUE', 'D1_30', 'D31_60', 'D61_90', 'D90_PLUS']);
+
+const BUCKET_LABELS = Object.freeze({
+  NOT_DUE: 'Not yet due',
+  D1_30: '1–30 days',
+  D31_60: '31–60 days',
+  D61_90: '61–90 days',
+  D90_PLUS: 'Over 90 days',
+});
+
+function bucketFor(daysPastDue) {
+  if (daysPastDue <= 0) return 'NOT_DUE';
+  if (daysPastDue <= 30) return 'D1_30';
+  if (daysPastDue <= 60) return 'D31_60';
+  if (daysPastDue <= 90) return 'D61_90';
+  return 'D90_PLUS';
+}
+
+/**
+ * How many Manila days past due a debit is (`CR-107`'s day arithmetic, reused).
+ *
+ * A debit with no due date is treated as due on the day it was raised: `CR-105` fixes
+ * the due date at the sale, so a missing one is an opening balance from the notebook,
+ * and a notebook debt is not "not yet due".
+ */
+function daysPastDue(row, today) {
+  const due = row.due_at || row.occurred_at;
+  return daysBetween(clock.manilaDate(due), today);
+}
+
+/**
+ * `FT-406` — the debt, split into the buckets its age actually falls into.
+ *
+ * Per debit, then summed two ways — per account and per bucket — and the two agree
+ * because they are the same rows added up along different axes rather than two queries.
+ *
+ * The reconciliation at the end is `RPT-101`'s demand applied to the receivable: the
+ * buckets plus the not-yet-due have to equal what the store is owed. Where they do not,
+ * the report says so rather than printing a total somebody would act on.
+ */
+function ageingReport({ now = clock.nowUtc(), includeZero = false, actor = null } = {}) {
+  assertReceivableScope(actor, 'the store’s receivables');
+
+  const today = clock.manilaDate(now);
+  const debits = creditRepository.openDebitsForAll();
+  const credits = creditRepository.openCreditsForAll();
+  const balances = creditRepository.balancesForAll();
+
+  const totals = Object.fromEntries(BUCKETS.map((bucket) => [bucket, 0]));
+  const accounts = new Map();
+
+  for (const row of debits) {
+    const past = daysPastDue(row, today);
+    const bucket = bucketFor(past);
+    totals[bucket] += row.outstanding_centavos;
+
+    const account = accounts.get(row.account_id) || {
+      account_id: row.account_id,
+      customer_id: row.customer_id,
+      customer_name: row.customer_name,
+      customer_code: row.customer_code,
+      contact_no: row.customer_contact_no,
+      buckets: Object.fromEntries(BUCKETS.map((b) => [b, 0])),
+      outstanding_centavos: 0,
+      oldest_days_past_due: 0,
+      debits: [],
+    };
+    account.buckets[bucket] += row.outstanding_centavos;
+    account.outstanding_centavos += row.outstanding_centavos;
+    account.oldest_days_past_due = Math.max(account.oldest_days_past_due, Math.max(past, 0));
+    account.debits.push({
+      transaction_id: row.id,
+      document_no: row.document_no,
+      sale_id: row.sale_id,
+      occurred_at: row.occurred_at,
+      due_at: row.due_at,
+      days_past_due: Math.max(past, 0),
+      bucket,
+      bucket_label: BUCKET_LABELS[bucket],
+      amount_centavos: row.amount_centavos,
+      settled_centavos: row.settled_centavos,
+      outstanding_centavos: row.outstanding_centavos,
+    });
+    accounts.set(row.account_id, account);
+  }
+
+  // CR-108: an account in credit is money the store owes, not a receivable. It is
+  // reported as its own figure rather than netted off the buckets, which would hide a
+  // debt behind somebody else's credit.
+  const inCredit = balances.filter((row) => row.balance_centavos < 0);
+  const rows = [...accounts.values()];
+  const receivable = balances
+    .filter((row) => row.balance_centavos > 0)
+    .reduce((sum, row) => sum + row.balance_centavos, 0);
+  const bucketTotal = BUCKETS.reduce((sum, bucket) => sum + totals[bucket], 0);
+
+  // **Ageing sums debts gross; a balance nets them.** An account's balance is its
+  // unsettled debits *less* the credits nobody has spent yet — an overpayment, a return
+  // credit, store credit the customer is holding (CR-108). So the buckets alone cannot
+  // equal the ledger, and a report that claimed they did would be wrong the first time
+  // a farm paid ₱100 too much.
+  //
+  // Stated as its own figure, and the reconciliation made against the arithmetic that
+  // is actually true: aged debt, less unapplied credit, is what the ledger holds.
+  const unapplied = credits.reduce((sum, row) => sum + row.available_centavos, 0);
+  const ledgerTotal = balances.reduce((sum, row) => sum + row.balance_centavos, 0);
+  const netOfCredits = bucketTotal - unapplied;
+
+  // Per account too, so a store can see which farm's credit is standing against which
+  // farm's debt rather than only that the totals move together.
+  const creditsByAccount = new Map();
+  for (const row of credits) {
+    creditsByAccount.set(row.account_id, (creditsByAccount.get(row.account_id) || 0) + row.available_centavos);
+  }
+  for (const account of rows) {
+    account.unapplied_credit_centavos = creditsByAccount.get(account.account_id) || 0;
+  }
+
+  return {
+    as_of: now,
+    as_of_manila: clock.toManila(now),
+    buckets: BUCKETS.map((bucket) => ({
+      bucket,
+      label: BUCKET_LABELS[bucket],
+      total_centavos: totals[bucket],
+      accounts: rows.filter((row) => row.buckets[bucket] > 0).length,
+    })),
+    accounts: includeZero
+      ? rows
+      : rows.filter((row) => row.outstanding_centavos > 0),
+    totals: {
+      // What the store is owed by the accounts that owe it anything — the figure an
+      // owner means by "receivable".
+      receivable_centavos: receivable,
+      // The aged debt, gross of any credit standing against it.
+      bucketed_centavos: bucketTotal,
+      // CR-108: money customers are holding with the store, not yet spent.
+      unapplied_credit_centavos: unapplied,
+      net_centavos: netOfCredits,
+      in_credit_accounts: inCredit.length,
+      in_credit_centavos: inCredit.reduce((sum, row) => sum + row.balance_centavos, 0),
+      accounts_with_debt: rows.length,
+    },
+    // The check stated on the report rather than left to a test. Aged debt less
+    // unapplied credit is what the ledger holds, exactly — the settled parts cancel on
+    // both sides — so a difference here is a defect and not a rounding, and a store
+    // told so can stop trusting the figure before it acts on it.
+    reconciles: netOfCredits === ledgerTotal,
+    reconciliation_note: netOfCredits === ledgerTotal
+      ? `Aged debt of ${money.toDisplay(bucketTotal)} less ${money.toDisplay(unapplied)} of `
+        + 'credit customers are holding is exactly what the ledger says the store is owed.'
+      : `The buckets total ${money.toDisplay(bucketTotal)}, less ${money.toDisplay(unapplied)} `
+        + `unapplied, against a ledger of ${money.toDisplay(ledgerTotal)}. They should agree — `
+        + 'the difference is a defect, not a rounding.',
+    // RPT-106.
+    basis: 'Every unsettled debit, aged from its own due date on Manila days (CR-301). An '
+      + 'account can appear in more than one bucket. Credit a customer is holding — an '
+      + 'overpayment, a return credit — is shown as its own figure and never netted into a '
+      + 'bucket, because a debt three months old does not become younger for being paid '
+      + 'against later. Accounts wholly in credit are money the store owes and are counted '
+      + 'apart from the debt.',
+  };
+}
+
+/**
+ * `CR-302` — a statement a customer can check by hand.
+ *
+ * Opening balance, every movement in the period in date order, closing balance. The
+ * opening figure is **derived as the balance before the window**, never stored: there
+ * is nowhere to keep it that would not be a second answer to a question `CR-103` has
+ * already answered.
+ *
+ * **The closing balance is checked in the code path, not merely in a test.** A
+ * statement that closes at ₱6,200 while the profile says ₱6,150 is worse than no
+ * statement, because the customer will find the ₱50 and the store will not. So the
+ * walked total and the ledger's own sum at that instant are compared here, and a
+ * disagreement is raised as the defect it is rather than printed.
+ */
+function statement(customerId, { from = null, to = null, now = clock.nowUtc(), actor = null } = {}) {
+  assertReceivableScope(actor, 'a customer’s statement');
+
+  const customer = customerRepository.findById(customerId);
+  if (!customer) throw errors.notFound('No such customer');
+  const account = creditRepository.findAccountByCustomer(customerId);
+  if (!account) {
+    throw errors.badRequest(
+      `${customer.name} has no credit account, so there is nothing to state.`,
+      { ruleId: 'CR-102' }
+    );
+  }
+
+  // Manila days in, UTC instants out: a statement "for September" means the store's
+  // September, and a range compared in UTC would move its edges by eight hours.
+  const fromDate = from || clock.manilaDate(now).slice(0, 8) + '01';
+  const toDate = to || clock.manilaDate(now);
+  const fromAt = `${fromDate}T00:00:00.000+08:00`;
+  const toAt = `${toDate}T23:59:59.999+08:00`;
+
+  const opening = creditRepository.balanceBefore(account.id, new Date(fromAt).toISOString());
+  const rows = creditRepository.transactionsFor(account.id, {
+    from: new Date(fromAt).toISOString(),
+    to: new Date(toAt).toISOString(),
+    limit: 5000,
+  });
+
+  let running = opening;
+  const lines = rows.slice().reverse().map((row) => {
+    running += row.amount_centavos;
+    const line = {
+      ...presentTransaction(row),
+      // The running balance the customer follows down the page with a finger. Derived
+      // here from the opening figure rather than read from balance_after_centavos,
+      // which is the account's balance at the time and not this statement's.
+      running_balance_centavos: running,
+    };
+
+    // CR-203: which invoices this payment settled — the sentence a customer is actually
+    // asking for when they query a balance.
+    if (row.txn_type === 'COLLECTION' || row.txn_type === 'RETURN_CREDIT') {
+      line.settled = creditRepository.allocationsForCollection(row.id).map((alloc) => ({
+        document_no: alloc.sale_document_no,
+        amount_centavos: alloc.amount_centavos,
+        due_at: alloc.due_at,
+      }));
+    }
+    return line;
+  });
+
+  const closing = running;
+  const ledgerClosing = creditRepository.balanceAsOf(account.id, new Date(toAt).toISOString());
+
+  // CR-302's last clause, enforced rather than asserted about. Two derivations of one
+  // number: the window walked from its opening figure, and the ledger summed to the
+  // same instant. If they part company the statement is wrong and must not be handed
+  // to anybody.
+  if (closing !== ledgerClosing) {
+    throw errors.conflict(
+      `The statement does not agree with the account: it closes at ${money.toDisplay(closing)} `
+      + `against a ledger balance of ${money.toDisplay(ledgerClosing)}. This is a defect in the `
+      + 'statement, not a dispute with the customer — do not hand it over.',
+      { ruleId: 'CR-302' }
+    );
+  }
+
+  return {
+    customer: {
+      id: customer.id, name: customer.name, code: customer.code,
+      contact_no: customer.contact_no, address: customer.address,
+    },
+    from_date: fromDate,
+    to_date: toDate,
+    opening_balance_centavos: opening,
+    closing_balance_centavos: closing,
+    // CR-108, in SCR-401's own words rather than as a minus sign: a customer who is in
+    // credit is not in debt, and "−₱450" is a sentence somebody will read wrong.
+    closing_label: closing < 0
+      ? `${money.toDisplay(-closing)} in credit — the store owes this to ${customer.name}`
+      : `${money.toDisplay(closing)} owed to the store`,
+    is_in_credit: closing < 0,
+    lines,
+    // RPT-106: the range, and what a period with nothing in it means.
+    basis: lines.length === 0
+      ? 'Nothing was bought or paid in this period. The opening and closing balances are '
+        + 'the same, and both are the account\'s own — CR-103 derives them from the ledger.'
+      : 'Every movement on this account in the period, in date order, from the balance '
+        + 'carried in. The closing balance is the account\'s balance on the last day.',
+  };
+}
+
+/**
+ * `CR-302` on paper — the statement, printed (requirement 9).
+ *
+ * `CR-206`'s precedent: a document a customer takes away goes out on the receipt
+ * printer, through `documentService` so that `TAX-006`'s notice is on it like every
+ * other document this shop prints. A statement states what is owed; it is not a receipt
+ * for anything, and the notice says so.
+ *
+ * The rendering is `printService`'s, and the figures are `statement`'s — the same call
+ * the screen made, so the paper and the screen cannot say different things.
+ */
+function printStatement(customerId, { from = null, to = null, actor = null, reprint = false } = {}) {
+  const report = statement(customerId, { from, to, actor });
+  const document = printService.renderStatement({
+    profile: storeProfileService.profile(),
+    statement: report,
+    preparedBy: actor ? actor.username : 'the store',
+    reprint,
+  });
+
+  return { statement: report, document, printed: documentService.print(document) };
+}
+
+/**
+ * The statement as a file, and the ageing report as another.
+ *
+ * Both are the same call the screen makes, so the figures cannot drift — the lesson
+ * `TC-INT-63` already draws for the sales reports, applied to the receivable.
+ *
+ * They are built here rather than in `reportService.exportCsv` because that machinery
+ * writes a sales header — tax modes, voided sales excluded — onto everything it
+ * touches, and a receivables file that said "Voided sales excluded: 0" would be
+ * answering a question nobody asked of it.
+ */
+function statementCsv(customerId, options = {}) {
+  const report = statement(customerId, options);
+  const rows = [
+    ['Statement', report.customer.name],
+    ['Range', `${report.from_date} to ${report.to_date}`],
+    ['Brought forward', money.toDisplay(report.opening_balance_centavos, { symbol: false })],
+    [],
+    ['date', 'type', 'document', 'settled', 'amount', 'balance'],
+    ...report.lines.map((line) => [
+      line.occurred_at_manila,
+      line.type_label,
+      line.document_no || '',
+      (line.settled || []).map((s) => s.document_no).join(' '),
+      money.toDisplay(line.amount_centavos, { symbol: false }),
+      money.toDisplay(line.running_balance_centavos, { symbol: false }),
+    ]),
+    [],
+    [report.is_in_credit ? 'In credit' : 'Balance owing',
+      money.toDisplay(Math.abs(report.closing_balance_centavos), { symbol: false })],
+    ['Basis', report.basis],
+  ];
+
+  return {
+    csv: csv.stringify(rows),
+    filename: `statement_${report.customer.code || report.customer.name}_${report.from_date}.csv`
+      .replace(/[^\w.\-]/g, '_'),
+    report,
+  };
+}
+
+function ageingCsv(options = {}) {
+  const report = ageingReport(options);
+  const rows = [
+    ['Ageing', report.as_of_manila],
+    ['Basis', report.basis],
+    [],
+    ['customer', 'contact', ...BUCKETS.map((b) => BUCKET_LABELS[b]), 'unapplied credit', 'total'],
+    ...report.accounts.map((account) => [
+      account.customer_name,
+      account.contact_no || '',
+      ...BUCKETS.map((b) => money.toDisplay(account.buckets[b], { symbol: false })),
+      money.toDisplay(account.unapplied_credit_centavos, { symbol: false }),
+      money.toDisplay(account.outstanding_centavos, { symbol: false }),
+    ]),
+    [],
+    ['Totals', '', ...report.buckets.map((b) => money.toDisplay(b.total_centavos, { symbol: false })),
+      money.toDisplay(report.totals.unapplied_credit_centavos, { symbol: false }),
+      money.toDisplay(report.totals.bucketed_centavos, { symbol: false })],
+    ['Reconciles', report.reconciles ? 'YES' : 'NO'],
+    ['Reconciliation', report.reconciliation_note],
+  ];
+
+  return { csv: csv.stringify(rows), filename: `ageing_${clock.manilaDate(report.as_of)}.csv`, report };
+}
+
 /**
  * The CR-103 invariant, as a callable check — TC-INT-46, and the health panel.
  *
@@ -681,4 +1083,6 @@ module.exports = {
   post, postStandalone, setLimit,
   allocateToDebits, allocateToDebit, storeCreditFor, spendStoreCredit,
   summaryFor, creditFor, presentTransaction, reconcile, outstanding,
+  BUCKETS, BUCKET_LABELS, bucketFor, ageingReport, statement, statementCsv, ageingCsv,
+  printStatement,
 };

@@ -19,7 +19,7 @@ import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, manila } from '../shell/format.js';
 
-export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
+export function createCustomerProfile({ root, customerId, onBack, onCollect, onStatement = null }) {
   let customer = null;
   let credit = null;
   let openSales = [];
@@ -63,6 +63,12 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
         customer.is_active ? null : h('span', { class: 'tag', text: 'inactive' }),
         credit
           ? h('button', { class: 'primary', text: 'Take payment', onclick: () => onCollect(customerId) })
+          : null,
+        // CR-302: the document a customer asks for when they query the balance. Beside
+        // the payment, because "what do I owe" and "here is some of it" are the two
+        // halves of the same conversation.
+        onStatement
+          ? h('button', { class: 'row-action', text: 'Statement', onclick: () => onStatement(customerId) })
           : null,
       ]),
 

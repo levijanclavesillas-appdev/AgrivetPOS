@@ -37,7 +37,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-303 Payment        SCR-304 Receipt     │
 │               SCR-305 Return         SCR-306 Receipts    │
 │  CUSTOMERS    SCR-401 List           SCR-402 Profile     │
-│               SCR-403 Collection                         │
+│               SCR-403 Collection     SCR-404 Statement   │
 │  STOCK        SCR-201 Products       SCR-202 Product     │
 │               SCR-203 Adjustment     SCR-204 Low stock   │
 │               SCR-205 Stock count    SCR-206 Batches     │
@@ -48,6 +48,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-803 Receive        SCR-804 Suppliers   │
 │  REPORTS      SCR-601 Dashboard      SCR-602 Daily sales │
 │               SCR-603 Payments       SCR-604 Inventory   │
+│               SCR-605 Ageing                             │
 │  ADMIN        SCR-701 Users          SCR-702 Settings    │
 │               SCR-703 Audit          SCR-704 Backup      │
 │               SCR-705 Health         SCR-706 Data        │
@@ -380,6 +381,28 @@ non-cash, and a preview of the resulting balance before confirming. On confirm i
 acknowledgement (`CR-206`). Overpayment requires explicit confirmation and states that the excess
 becomes store credit (`CR-204`).
 
+### `SCR-404` — Statement · `FT-407` — v1.2
+
+Behind `TX-421`, from `SCR-402` beside the payment button — *"what do I owe"* and *"here is some
+of it"* are the two halves of one conversation.
+
+**A document handed to a customer who is standing there**, so it is built to be checked by hand:
+the balance carried in, every movement in the period with a running total beside it, and the
+closing figure large enough to read across a counter. Somebody who disagrees can point at the line
+where the two of you part company, which is the whole reason a statement exists rather than a
+number read aloud.
+
+`CR-203`'s allocations sit under the payment they belong to — *which invoices this ₱3,000
+settled*. `CR-108`: an account in credit closes with the store owing **them**, in words, because a
+minus sign is a minus sign somebody will read past.
+
+**The closing balance is the account's own** (`CR-302`), and the server refuses to build a
+statement whose walked total disagrees with the ledger. The screen therefore derives nothing: a
+figure it computed itself would be a second answer to a question already settled.
+
+Prints on the receipt printer — `CR-206`'s precedent for a document a customer takes away, with
+`TAX-006`'s notice on it like everything else this shop prints — and exports to CSV.
+
 ### `SCR-501`/`502`/`503` — Shift · `FT-701`, `FT-702`
 
 **Open**: opening float, counted and confirmed (`POS-503`). **Till cash**: direction, amount,
@@ -393,6 +416,25 @@ exceeds tolerance (`POS-510`), then a summary the cashier can print. Closing tri
 Seven tiles: today's sales, transactions, payment mix, credit outstanding, overdue accounts, low
 stock, and gross profit (`RPT-104`, see `FR_6.1`). Each tile is a link to the report behind it. Alerts (`OPS-007`) sit above the tiles as a
 dismissible-per-session list; **backup overdue and clock anomaly are not dismissible**.
+
+### `SCR-605` — Ageing · `FT-406` — v1.2
+
+Behind `TX-421` at store scope — a cashier holds `TX-421` for their own shift's figures, and the
+receivable has no shift to scope it to. Reached from the dashboard's two credit tiles, which is
+what somebody pressing "Overdue accounts" was always trying to open.
+
+Five columns — not yet due, 1–30, 31–60, 61–90, over 90 — and **a row can be in several of them
+at once**, because `CR-301` buckets a debit and not an account. One farm ₱2,000 in the 1–30 and
+₱5,000 in the 90+ is the ordinary case; a screen that put the whole account in its oldest bucket
+would tell the owner their problem is more than twice what it is.
+
+Sorted by oldest debt, with the telephone number on the row, because that is the order somebody
+works a morning in. A row opens the customer, where the statement is.
+
+**Credit a customer is holding is its own column and is never netted into a bucket** — a debt
+three months old does not become younger for a payment landing later. The reconciliation is
+stated as arithmetic rather than a tick (`FR_6.2`'s demand, applied to the debt): aged debt, less
+the credit customers hold, is exactly what the ledger says the store is owed.
 
 ### `SCR-602`/`603`/`604` — Reports
 

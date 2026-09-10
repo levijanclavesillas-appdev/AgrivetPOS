@@ -19,8 +19,16 @@ const OPENS = {
   credit: null,
 };
 
-/** Tiles that open a screen rather than a report. INV-109's count opens the list. */
-const OPENS_SCREEN = { LOW_STOCK: 'low-stock' };
+/**
+ * Tiles that open a screen rather than a report. `INV-109`'s count opens the list, and
+ * since `TASK-031` the two credit tiles open the ageing — which is the screen somebody
+ * pressing "Credit outstanding" or "Overdue accounts" was always trying to reach.
+ */
+const OPENS_SCREEN = {
+  LOW_STOCK: 'low-stock',
+  CREDIT_OUTSTANDING: 'ageing',
+  OVERDUE_ACCOUNTS: 'ageing',
+};
 
 /**
  * Alerts that are worth acting on rather than only reading, and where they go.

@@ -180,6 +180,116 @@ function openCredits(accountId) {
   `).all(accountId);
 }
 
+/**
+ * `CR-302`: the balance an account carried **before** an instant.
+ *
+ * The opening balance of a statement, derived rather than stored — there is nowhere to
+ * store it that would not be a second answer to a question `CR-103` has already
+ * answered once. A statement is the ledger read over a window, and its opening figure
+ * is the same sum with a different `WHERE`.
+ */
+function balanceBefore(accountId, at) {
+  return db.get().prepare(`
+    SELECT COALESCE(SUM(amount_centavos), 0) AS balance
+      FROM customer_credit_transactions
+     WHERE account_id = ? AND occurred_at < ?
+  `).get(accountId, at).balance;
+}
+
+/** The same sum, up to and including an instant — a statement's closing figure. */
+function balanceAsOf(accountId, at) {
+  return db.get().prepare(`
+    SELECT COALESCE(SUM(amount_centavos), 0) AS balance
+      FROM customer_credit_transactions
+     WHERE account_id = ? AND occurred_at <= ?
+  `).get(accountId, at).balance;
+}
+
+/**
+ * `CR-301` — every unsettled debit in the store, with the customer it belongs to.
+ *
+ * **One query for the whole ageing report**, not one per account: a store with two
+ * hundred credit customers would otherwise pay two hundred round trips for a report
+ * somebody reads while deciding who to telephone. The bucketing itself is not done here
+ * — that is arithmetic on a due date, and it belongs in one function that a unit test
+ * can pin, rather than in a `CASE` expression nobody can test in isolation.
+ *
+ * The outstanding figure is the debit less what `credit_allocations` has settled
+ * against it, which is the same derivation `openDebits` makes for one account. A debit
+ * with nothing left is not here at all.
+ */
+function openDebitsForAll() {
+  return db.get().prepare(`
+    SELECT t.id, t.account_id, t.amount_centavos, t.due_at, t.occurred_at, t.document_no,
+           t.sale_id,
+           COALESCE(alloc.settled_centavos, 0) AS settled_centavos,
+           t.amount_centavos - COALESCE(alloc.settled_centavos, 0) AS outstanding_centavos,
+           a.customer_id, c.name AS customer_name, c.code AS customer_code,
+           c.contact_no AS customer_contact_no, a.terms_days
+      FROM customer_credit_transactions t
+      JOIN customer_credit_accounts a ON a.id = t.account_id
+      JOIN customers c ON c.id = a.customer_id
+      LEFT JOIN (
+        SELECT sale_txn_id, SUM(amount_centavos) AS settled_centavos
+          FROM credit_allocations GROUP BY sale_txn_id
+      ) alloc ON alloc.sale_txn_id = t.id
+     WHERE t.amount_centavos > 0
+       AND t.amount_centavos - COALESCE(alloc.settled_centavos, 0) > 0
+     ORDER BY c.name COLLATE NOCASE, t.due_at, t.occurred_at
+  `).all();
+}
+
+/**
+ * Every unused credit in the store, in one query (`CR-108`).
+ *
+ * The other half of what an account's balance is made of. A balance is not "the debits"
+ * — it is unsettled debits **less** credits nobody has spent yet: an overpayment, a
+ * return credit, money the store is holding. `credit_allocations` records what has been
+ * used, so what is left is the same derivation `openCredits` makes for one account.
+ *
+ * The ageing report needs it because ageing sums debts gross and a balance nets them.
+ * Without this figure the two cannot be made to agree, and a report whose totals do not
+ * tie to the ledger is a report somebody stops believing at exactly the wrong moment.
+ */
+function openCreditsForAll() {
+  return db.get().prepare(`
+    SELECT t.id, t.account_id, t.txn_type, t.occurred_at, t.document_no,
+           -t.amount_centavos - COALESCE(alloc.used_centavos, 0) AS available_centavos,
+           a.customer_id, c.name AS customer_name
+      FROM customer_credit_transactions t
+      JOIN customer_credit_accounts a ON a.id = t.account_id
+      JOIN customers c ON c.id = a.customer_id
+      LEFT JOIN (
+        SELECT collection_txn_id, SUM(amount_centavos) AS used_centavos
+          FROM credit_allocations GROUP BY collection_txn_id
+      ) alloc ON alloc.collection_txn_id = t.id
+     WHERE t.amount_centavos < 0
+       AND -t.amount_centavos - COALESCE(alloc.used_centavos, 0) > 0
+     ORDER BY c.name COLLATE NOCASE, t.occurred_at
+  `).all();
+}
+
+/**
+ * Every account's balance, in one query, for the ageing report's reconciliation.
+ *
+ * `CR-108`: an account in credit has a negative balance and is not a receivable. It is
+ * returned here rather than filtered, because the report has to be able to say that the
+ * buckets and the not-yet-due total account for the whole of what is owed **and**
+ * nothing else — and an account quietly dropped is the sort of thing that makes two
+ * figures differ by an amount nobody can find.
+ */
+function balancesForAll() {
+  return db.get().prepare(`
+    SELECT a.id AS account_id, a.customer_id, c.name AS customer_name,
+           COALESCE(SUM(t.amount_centavos), 0) AS balance_centavos
+      FROM customer_credit_accounts a
+      JOIN customers c ON c.id = a.customer_id
+      LEFT JOIN customer_credit_transactions t ON t.account_id = a.id
+     GROUP BY a.id
+     ORDER BY c.name COLLATE NOCASE
+  `).all();
+}
+
 // ── Allocations (CR-203) ────────────────────────────────────────────────────
 
 function insertAllocation(row) {
@@ -239,5 +349,6 @@ module.exports = {
   findAccount, findAccountByCustomer, insertAccount, updateAccountFields,
   insertTransaction, findTransaction, transactionsFor, countTransactionsFor, transactionsForSale,
   ledgerSum, reconciliationBreaks, openDebits, openCredits,
+  openDebitsForAll, openCreditsForAll, balanceBefore, balanceAsOf, balancesForAll,
   insertAllocation, allocationsForCollection, allocationsForSale, accountsWithBalance,
 };

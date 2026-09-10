@@ -62,3 +62,18 @@
 .agreed-prices h2 { font-size: 1rem; margin: 0 0 .35rem; }
 .agreed-prices .muted { max-width: 46rem; }
 .agreed-prices .catalogue-list { margin-top: .75rem; }
+
+/* ── SCR-404 the statement (TASK-031) ─────────────────────────────────────── */
+/*
+   Built to be checked by hand: a running balance down the right-hand side, and the
+   closing figure large enough to be read across a counter.
+*/
+.statement-list .money { font-variant-numeric: tabular-nums; }
+.statement-list small.settled { display: block; color: var(--muted); font-size: .75rem; }
+.statement-closing { display: flex; flex-direction: column; gap: .25rem; margin: 1rem 0;
+  padding: 1rem 1.25rem; background: #fff; border: 1px solid var(--rule);
+  border-left: 4px solid var(--accent); border-radius: 4px; }
+.statement-closing.is-credit { border-left-color: var(--warn-ink); }
+.statement-closing-amount { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.statement-closing-label { color: var(--muted); }
+.statement .rule-note { max-width: 52rem; line-height: 1.5; }

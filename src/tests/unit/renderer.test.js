@@ -1319,7 +1319,7 @@ test('INV-110: the sheet labels the frozen figure as frozen, and says what that 
     'the screen computes no variance of its own');
 });
 
-test('TC-UT-55: the sheet counts a batch-tracked product per batch, and adds nothing up itself', () => {
+test('TC-UT-56: the sheet counts a batch-tracked product per batch, and adds nothing up itself', () => {
   const source = codeOf('js/catalogue/count.js');
 
   // TASK-042: one row per box on the shelf, addressed by the line rather than by the
@@ -1825,6 +1825,33 @@ test('SCR-207: a recall leads with the people, not the stock (INV-206)', () => {
   assert.match(source, /report\.basis/);
   // Reached in one step from the batch it is about.
   assert.match(codeOf('js/catalogue/batches.js'), /onRecall\(batch\.id\)/);
+});
+
+test('SCR-404 / SCR-605: the receivable is shown, never recomputed (CR-301, CR-302)', () => {
+  const statement = codeOf('js/customers/statement.js');
+  const ageing = codeOf('js/reports/ageing.js');
+
+  // CR-302: the server refuses to build a statement whose walked total disagrees with
+  // the ledger, so the screen prints the figures it was given. A balance it derived
+  // itself would be a second answer to a question already settled — the same rule the
+  // count sheet and the dashboard tiles are held to.
+  assert.equal(/reduce\(/.test(statement), false, 'the statement adds nothing up');
+  assert.match(statement, /line\.running_balance_centavos/, 'the running total is the server’s');
+  assert.equal(/reduce\(/.test(ageing), false, 'the ageing adds nothing up');
+  assert.match(ageing, /report\.reconciliation_note/, 'and the reconciliation is stated, not computed');
+
+  // CR-203: which invoices a payment settled, under the payment.
+  assert.match(statement, /settled \$\{settled\.document_no\}/);
+  // CR-108: in credit is said in words. A minus sign is one somebody reads past.
+  assert.match(statement, /closing_label/);
+  assert.equal(/-₱|minus/.test(statement), false);
+
+  // CR-301: a row carries every bucket, because an account can be in more than one.
+  assert.match(ageing, /report\.buckets\.map/);
+  assert.match(ageing, /account\.buckets\[bucket\.bucket\]/);
+  // And the telephone number, because a list of names is not a telephone list.
+  assert.match(ageing, /account\.contact_no/);
+  assert.match(proseOf('js/reports/ageing.js'), /never netted into a bucket/);
 });
 
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {

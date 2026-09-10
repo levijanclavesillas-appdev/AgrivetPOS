@@ -1,6 +1,6 @@
 'use strict';
 
-// TC-E2E-25 — the fridge, counted box by box (TASK-042).
+// TC-E2E-29 — the fridge, counted box by box (TASK-042).
 //
 // Three batches of one vaccine, one box short of the middle one, over HTTP with real
 // sessions: open the count, read the sheet, key what is on the shelf, get a second pair
@@ -115,7 +115,7 @@ test.after(async () => {
   temp.cleanup();
 });
 
-test('TC-E2E-25 · the sheet has a line per box, and the feed still has one line', async () => {
+test('TC-E2E-29 · the sheet has a line per box, and the feed still has one line', async () => {
   const opened = await json(await call('/stock-counts', {
     method: 'POST', body: { scope: 'ALL', notes: 'The vaccine fridge' },
   }));
@@ -143,7 +143,7 @@ test('TC-E2E-25 · the sheet has a line per box, and the feed still has one line
   assert.equal(group.counted_display, null, 'nothing counted yet is not a counted zero');
 });
 
-test('TC-E2E-25 · one box is missing from the middle batch, and the feed is left uncounted', async () => {
+test('TC-E2E-29 · one box is missing from the middle batch, and the feed is left uncounted', async () => {
   const sheet = await json(await call(`/stock-counts/${sessionId}?limit=100`));
   const byBatch = Object.fromEntries(sheet.lines.filter((l) => l.batch_no).map((l) => [l.batch_no, l]));
 
@@ -170,7 +170,7 @@ test('TC-E2E-25 · one box is missing from the middle batch, and the feed is lef
   assert.equal(after.session.uncounted_count, 1);
 });
 
-test('TC-E2E-25 · the variance posts against the batch it was found missing from', async () => {
+test('TC-E2E-29 · the variance posts against the batch it was found missing from', async () => {
   await json(await call(`/stock-counts/${sessionId}/approve`, { method: 'POST', who: 'boss2', body: {} }));
   const posted = await json(await call(`/stock-counts/${sessionId}/post`, { method: 'POST', body: {} }));
 

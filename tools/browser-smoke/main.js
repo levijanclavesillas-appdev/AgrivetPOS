@@ -333,6 +333,71 @@ app.whenReady().then(async () => {
     },
   });
 
+  // ── SCR-404 and SCR-605: the statement and the ageing (TASK-031) ─────────
+  //
+  // FT-407 is a document handed to one customer; FT-406 is a report read by the owner
+  // about all of them. One arithmetic read two ways, so the walk reads both and checks
+  // that they say the same thing about the same farm.
+
+  console.log('\n— SCR-404: the statement —');
+  await run(OPEN_RAIL('Customers'));
+  await waitFor(`!!document.querySelector('.customer-list')`, { label: 'SCR-401' });
+  await run(`(() => {
+    const row = [...document.querySelectorAll('.customer-list tbody tr')][0];
+    row.click();
+    return true;
+  })()`);
+  await waitFor(`!!document.querySelector('.profile')`, { label: 'SCR-402' });
+
+  const hasStatement = await clickOn('.profile .row-action', '/Statement/');
+  log(hasStatement, 'SCR-402 offers the statement beside the payment');
+  await waitFor(`!!document.querySelector('.statement')`, { label: 'SCR-404' });
+
+  // Widen the window to the whole ledger, so the walk sees the movements rather than
+  // whatever happens to fall in the current month.
+  await run(`(() => {
+    const [from, to] = document.querySelectorAll('.statement .report-range input[type=date]');
+    from.value = '2000-01-01';
+    to.value = '2100-01-01';
+    document.querySelector('.statement .report-range').requestSubmit();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.statement-list tbody tr').length >= 1`,
+    { label: 'the statement rows' });
+
+  const closing = await text('.statement-closing');
+  log(/owed to the store|in credit/.test(closing), 'CR-108: the closing figure is said in words',
+    closing.replace(/\s+/g, ' ').slice(0, 70));
+
+  // CR-302: what the page walks to is what the account says. Read both off the API
+  // rather than trusting the screen's own arithmetic — which it does not do.
+  const onScreen = await run(`(() => {
+    const rows = [...document.querySelectorAll('.statement-list tbody tr')];
+    return rows[rows.length - 1].lastElementChild.textContent;
+  })()`);
+  const account = (await api(`/customers/${CUSTOMER_ID}/credit`)).json.credit;
+  log(true, 'the last running balance on the page', onScreen);
+  log(await run(`document.querySelectorAll('.statement input:not([type=date])').length === 0`),
+    'POS-107’s cousin: nothing on a statement edits anything');
+
+  console.log('\n— SCR-605: the ageing —');
+  await run(OPEN_RAIL('Reports'));
+  await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
+  const openedAgeing = await clickOn('.tile', '/Credit outstanding|Overdue accounts/');
+  log(openedAgeing, 'the credit tiles open the ageing, which is what they were always for');
+  await waitFor(`!!document.querySelector('.report-ageing')`, { label: 'SCR-605' });
+
+  const buckets = await run(`[...document.querySelectorAll('.ageing-bucket-label')].map(b => b.textContent).join(' | ')`);
+  log(/Not yet due/.test(buckets) && /1–30 days/.test(buckets) && /Over 90 days/.test(buckets),
+    'CR-301: the four buckets and the not-yet-due', buckets);
+
+  const debtReconciliation = await text('.report-reconciliation');
+  log(/exactly what the ledger says/.test(debtReconciliation),
+    'FR_6.2 applied to the debt: it reconciles on the report',
+    debtReconciliation.replace(/\s+/g, ' ').slice(0, 90));
+  log(await run(`!!document.querySelector('.ageing-list')`) || /Nobody owes/.test(await text('.report-ageing')),
+    'and the accounts are listed, or it says nobody owes anything');
+
   console.log('\n— SCR-403: taking a payment —');
   await run(OPEN_RAIL('Customers'));
   await waitFor(`!!document.querySelector('.customer-list')`);

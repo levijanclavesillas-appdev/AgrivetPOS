@@ -85,16 +85,16 @@ waiting.
 | Case | Asserts |
 | :--- | :--- |
 | `TC-UI-12` | The list has no input of any kind, and opens the receipt by id |
-| `TC-E2E-27` | Sell, start another sale, come back through the list and void the first — in the browser smoke |
+| `TC-E2E-31` | Sell, start another sale, come back through the list and void the first — in the browser smoke |
 
-`TC-E2E-27` is in `tools/browser-smoke/main.js` because what it proves needs a browser: the
+`TC-E2E-31` is in `tools/browser-smoke/main.js` because what it proves needs a browser: the
 receipt leaving the screen when the next customer starts is the whole premise, and it cannot be
 shown from an HTTP client.
 
 **What writing it turned up.** Three assertions in the walk sampled a state instead of waiting
 for it, and failed on a loaded machine — the restore dialog's was the expensive one, because the
 step after it then threw and took the rest of the walk down. All three now wait. And the first
-draft of `TC-E2E-27` matched the receipt number with `includes('')` when the sale had not
+draft of `TC-E2E-31` matched the receipt number with `includes('')` when the sale had not
 completed, which passes against every row: the walk now asserts the number's shape before using
 it, because an assertion that cannot fail is worse than one that is missing.
 

@@ -20,6 +20,9 @@ const errors = require('../services/errors');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
+
+/** A Manila calendar day, or nothing. The service decides what "nothing" means. */
+const dateParam = (value) => (/^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : null);
 const readCustomers = [authenticate, requirePermission('TX-413')];
 const editCustomers = [authenticate, requirePermission('TX-413', { level: 'FULL' })];
 const setCreditLimit = [authenticate, requirePermission('TX-414')];
@@ -87,6 +90,63 @@ router.get('/customers/:id/credit', readCustomers, (req, res, next) => {
     next(err);
   }
 });
+
+/**
+ * `CR-302` — the statement, `SCR-404`'s document.
+ *
+ * `TX-421`, not `TX-413`: a statement is the store's receivable ledger for one
+ * customer, and a cashier who may look a customer up is not thereby somebody who reads
+ * what the shop is owed. The service checks it again (SEC-6), where the refusal can
+ * name the rule.
+ */
+router.get('/customers/:id/statement',
+  [authenticate, requirePermission('TX-421')], (req, res, next) => {
+    try {
+      res.json(creditService.statement(req.params.id, {
+        from: dateParam(req.query.from),
+        to: dateParam(req.query.to),
+        actor: req.session,
+      }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+/**
+ * `CR-302` on paper. `TX-421` to read it, and the printer does not care who asked —
+ * `CR-206`'s acknowledgement set the precedent for a document a customer takes away.
+ */
+router.post('/customers/:id/statement/print',
+  [authenticate, requirePermission('TX-421')], (req, res, next) => {
+    try {
+      const body = req.body || {};
+      res.json(creditService.printStatement(req.params.id, {
+        from: dateParam(body.from),
+        to: dateParam(body.to),
+        actor: req.session,
+        reprint: Boolean(body.reprint),
+      }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+/** The same figures as a file (TX-426 to export, TX-421 to read). */
+router.get('/customers/:id/statement/export.csv',
+  [authenticate, requirePermission('TX-426')], (req, res, next) => {
+    try {
+      const { csv, filename } = creditService.statementCsv(req.params.id, {
+        from: dateParam(req.query.from),
+        to: dateParam(req.query.to),
+        actor: req.session,
+      });
+      res.setHeader('content-type', 'text/csv; charset=utf-8');
+      res.setHeader('content-disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (err) {
+      next(err);
+    }
+  });
 
 router.post('/customers', editCustomers, (req, res, next) => {
   try {

@@ -269,8 +269,17 @@ value outright so a new one cannot be written.
 
 ## 6.4 v1.2 cases, reserved
 
-The same reservation, for `TASK-029`–`TASK-035`. `TC-UT-52` follows `TC-UT-51`; the 90s and the
-98–100 band stay where they are, holding the guards that are not numbered by task.
+The same reservation, for `TASK-029`–`TASK-035`, and for `TASK-042`–`TASK-044`, which were raised
+while `TASK-029` was being built. `TC-UT-52` follows `TC-UT-51`; the 90s and the 98–100 band stay
+where they are, holding the guards that are not numbered by task.
+
+**Three of those late tasks first took ids this table had already reserved** — `TASK-042` reached
+for `TASK-031`'s block, `TASK-043` and `TASK-044` for `TASK-032`'s and `TASK-033`'s `TC-E2E`
+numbers — because they were written against the backlog rather than against this table. They were
+renumbered into the free range before `TASK-031` was built, which is the moment the collision
+would have stopped being a bookkeeping fault and started being two cases with one name. The rule
+that catches it is the one already stated above: **an id names one case**, and this table is where
+that is decided.
 
 | Range | Task | Subject |
 | :--- | :--- | :--- |
@@ -281,6 +290,9 @@ The same reservation, for `TASK-029`–`TASK-035`. `TC-UT-52` follows `TC-UT-51`
 | `TC-INT-120` – `TC-INT-122` | `TASK-033` | Breakdowns reconciling to `RPT-101`'s net, a slow mover that sold nothing, movement analysis against the on-hand change |
 | `TC-INT-123` – `TC-INT-125` | `TASK-034` | Write-off: owner only, the debits that stop ageing, and the collections figures that must not move |
 | `TC-E2E-23` – `TC-E2E-28` | one per task | The journey each task exists for. `TASK-035` has none — it ships a decision, not a path |
+| `TC-UT-56`, `TC-INT-126` – `TC-INT-128`, `TC-E2E-29` | `TASK-042` | Counting by batch: the sheet's line shape, a variance landing on the batch it was found in, `INV-201` after a posted count, a batch at zero counted up |
+| `TC-UI-11`, `TC-E2E-30` | `TASK-043` | `SCR-206`: the batch list with no quantity field, and the alert-to-write-off walk |
+| `TC-UI-12`, `TC-E2E-31` | `TASK-044` | `SCR-306`: a list that cannot edit, and finding a receipt again after the next customer has started |
 | `TC-PERF-07` | `TASK-033` | The new reports inside `TC-PERF-05`'s budget at `TC-PERF-06`'s scale |
 | `TC-PERF-08` – `TC-PERF-09` | `TASK-035` | Encrypted against plain, across the budgets and across backup, verification and restore |
 

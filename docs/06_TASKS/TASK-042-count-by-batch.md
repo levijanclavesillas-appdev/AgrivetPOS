@@ -91,20 +91,20 @@ the box in the counter's hand. `UOM-005` still applies: every quantity carries i
 
 | Case | Asserts |
 | :--- | :--- |
-| `TC-UT-55` | The sheet's line shape: one per batch for tracked, one per product for the rest |
-| `TC-INT-114` | `INV-111`: a variance on one batch of two posts against that batch only |
-| `TC-INT-115` | `INV-201`: batches reconcile to on-hand after a posted count |
-| `TC-INT-116` | A batch at zero is counted, and counting it up is a variance like any other |
-| `TC-E2E-25` | Count a fridge of three vaccine batches, find one box short, post it, and recall the batch afterwards to confirm the quantity it now reports |
+| `TC-UT-56` | The sheet's line shape: one per batch for tracked, one per product for the rest |
+| `TC-INT-126` | `INV-111`: a variance on one batch of two posts against that batch only |
+| `TC-INT-127` | `INV-201`: batches reconcile to on-hand after a posted count |
+| `TC-INT-128` | A batch at zero is counted, and counting it up is a variance like any other |
+| `TC-E2E-29` | Count a fridge of three vaccine batches, find one box short, post it, and recall the batch afterwards to confirm the quantity it now reports |
 
-`TC-E2E-25` stops short of the recall, which is `TASK-030` and does not exist yet; it asks the
+`TC-E2E-29` stops short of the recall, which is `TASK-030` and does not exist yet; it asks the
 batch list the same question instead — what the store now holds, batch by batch — which is the
 figure the recall will read. The clause returns when `TASK-030` lands.
 
 **Two things this task changed that were not in the plan.** The line addressing moved from
 `productId` to the line's own id: a batch-tracked product has several lines, and a save keyed on
 the product would have written one figure onto every batch of it. And the sheet's per-product
-totals are computed on the **server** rather than in the screen — `TC-UT-55` and the count
+totals are computed on the **server** rather than in the screen — `TC-UT-56` and the count
 screen's own guards assert that the sheet derives nothing of its own, which is the rule that
 keeps one number from having two sources.
 

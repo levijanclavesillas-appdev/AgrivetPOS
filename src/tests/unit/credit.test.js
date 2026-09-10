@@ -143,3 +143,48 @@ test('the six ledger types are exactly the schema CHECK list', () => {
   assert.deepEqual([...creditService.METHODS], ['CASH', 'GCASH', 'QRPH', 'STORE_CREDIT']);
   assert.deepEqual([...creditService.AGEING], ['PAID', 'OVERDUE', 'DUE_SOON', 'CURRENT']);
 });
+
+// ── TC-UT-55 — CR-301's buckets (TASK-031) ──────────────────────────────────
+
+test('TC-UT-55: the bucket boundaries fall at 30, 60 and 90 days past due', () => {
+  const bucket = creditService.bucketFor;
+
+  // Not yet due is a bucket, not a special case at the call site: every unsettled debit
+  // has to land somewhere or the totals stop adding up to the receivable, and a debt
+  // with nowhere to go is how a reconciliation quietly loses money.
+  assert.equal(bucket(-14), 'NOT_DUE');
+  assert.equal(bucket(0), 'NOT_DUE', 'due today is not yet overdue');
+
+  // Each bucket is inclusive of its upper edge, so the day after is the next one. Read
+  // the other way round — 30 opening the 31–60 bucket — every figure on the report
+  // shifts by a day's worth of debt, and the store chases the wrong farms first.
+  assert.equal(bucket(1), 'D1_30', 'one day past due is the first day of the first bucket');
+  assert.equal(bucket(30), 'D1_30');
+  assert.equal(bucket(31), 'D31_60');
+  assert.equal(bucket(60), 'D31_60');
+  assert.equal(bucket(61), 'D61_90');
+  assert.equal(bucket(90), 'D61_90');
+  assert.equal(bucket(91), 'D90_PLUS');
+  assert.equal(bucket(400), 'D90_PLUS');
+
+  // Every bucket the report totals has a label somebody can read on a printed page.
+  for (const name of creditService.BUCKETS) {
+    assert.ok(creditService.BUCKET_LABELS[name], `${name} has no label`);
+  }
+});
+
+test('TC-UT-55: the buckets are the whole of the range, with no gap and no overlap', () => {
+  // A day cannot fall in two buckets and cannot fall in none. Asserted across the
+  // boundaries rather than argued: the rule is four ranges and a "not yet", and an
+  // off-by-one in either direction is invisible in any single example.
+  const seen = new Map();
+  for (let days = -5; days <= 200; days += 1) {
+    const bucket = creditService.bucketFor(days);
+    assert.ok(creditService.BUCKETS.includes(bucket), `${days} landed outside the buckets`);
+    seen.set(bucket, (seen.get(bucket) || 0) + 1);
+  }
+  assert.equal(seen.size, 5, 'every bucket is reachable');
+  assert.equal(seen.get('D1_30'), 30);
+  assert.equal(seen.get('D31_60'), 30);
+  assert.equal(seen.get('D61_90'), 30);
+});

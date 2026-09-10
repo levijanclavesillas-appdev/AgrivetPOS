@@ -84,14 +84,16 @@ the customer is actually asking for when they query a balance.
 
 ## Acceptance Criteria
 
-- [ ] A statement's closing balance equals the profile balance at that date, to the centavo
-- [ ] A collection row names the invoices it settled, oldest first
-- [ ] A customer with two debts of different ages appears in two buckets
-- [ ] Bucket totals plus not-yet-due equal total receivable
-- [ ] An account in credit closes negative and is described, not signed
-- [ ] A statement over a range with no activity still states the opening and closing balance
-- [ ] A cashier is refused both, and the refusal is the documented error code
-- [ ] Both export to CSV; the statement also prints
+- [x] A statement's closing balance equals the profile balance at that date, to the centavo —
+      and the service **refuses to build** one that disagrees, rather than leaving it to a test
+- [x] A collection row names the invoices it settled, oldest first
+- [x] A customer with two debts of different ages appears in two buckets
+- [x] Bucket totals plus not-yet-due equal total receivable — **less the credit customers
+      hold**, which the rule did not name and the arithmetic requires; see below
+- [x] An account in credit closes negative and is described, not signed
+- [x] A statement over a range with no activity still states the opening and closing balance
+- [x] A cashier is refused both, and the refusal is the documented error code
+- [x] Both export to CSV; the statement also prints
 
 ## Tests
 
@@ -102,6 +104,29 @@ the customer is actually asking for when they query a balance.
 | `TC-INT-115` | `CR-301`: one account, two debits, two buckets; totals reconcile to receivable |
 | `TC-INT-116` | `CR-203`: the statement names the invoices each collection settled |
 | `TC-E2E-25` | A year of trading on one account — sales, partial collections, a return — then a statement for one month that the customer could check by hand |
+
+**What requirement 7 turned out to mean.** "Bucket totals plus the not-yet-due balance equal
+total receivable" is *not* true as written, and the first version of this report claimed it was.
+Ageing sums debts **gross**; a balance nets them. An account's balance is its unsettled debits
+less the credits nobody has spent yet — an overpayment, a return credit, store credit the
+customer is holding (`CR-108`). So the buckets alone cannot equal the ledger, and a report that
+said they did would be wrong the first time a farm paid ₱100 too much.
+
+The report states the credit as its own figure and reconciles against the arithmetic that is
+actually true: **aged debt, less unapplied credit, is exactly what the ledger holds** — the
+settled parts cancel on both sides, so it is an equality and not an approximation. The credit is
+never netted into a bucket, because a debt three months old does not become younger for a payment
+landing against it later.
+
+The defect surfaced in a five-line probe before any test existed, because the report was written
+to check itself. That is the same reasoning `CR-302` applies to the statement, one level up.
+
+**Two other things worth recording.** `TX-421` is not enough on its own: it grants a cashier
+`OWN_SHIFT`, and the receivable has no shift to scope it to, so both screens check for store
+scope and the refusal says which figures a cashier *can* see. And the printed statement's
+"Balance brought forward" truncated to "Balance brought forwar" at 32 columns — it is "Brought
+forward" on paper now, because a typo on a page a customer is asked to check is a page they stop
+trusting.
 
 ---
 

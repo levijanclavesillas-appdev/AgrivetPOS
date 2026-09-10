@@ -28,6 +28,8 @@ import { createRecall } from '../catalogue/recall.js';
 import { createStockCount } from '../catalogue/count.js';
 import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
+import { createStatement } from '../customers/statement.js';
+import { createAgeing } from '../reports/ageing.js';
 import { createCollection } from '../customers/collection.js';
 import { createShift } from '../shift/view.js';
 import { createShiftSummary } from '../shift/summary.js';
@@ -246,13 +248,16 @@ export function createApp({ root }) {
     clear(main);
     // Low stock is a filter of the products list, not a section of its own, so the
     // rail keeps Products highlighted rather than highlighting nothing.
-    renderRail(id === 'low-stock' ? 'products' : id);
+    renderRail(id === 'low-stock' ? 'products' : (id === 'ageing' ? 'reports' : id));
 
     if (id === 'pos') return showPos();
     if (id === 'reports') return showDashboard();
     if (id === 'admin') return showAdmin();
     if (id === 'products') return showProducts();
     if (id === 'low-stock') return showProducts({ mode: 'low-stock' });
+    // SCR-605 is a report, so the rail keeps Reports highlighted rather than nothing —
+    // the same treatment low stock gets under Products.
+    if (id === 'ageing') return showAgeing();
     if (id === 'receipts') return showReceipts();
     if (id === 'shift') return showShift();
     if (id === 'customers') return showCustomers();
@@ -332,6 +337,7 @@ export function createApp({ root }) {
       customerId,
       onBack: () => showCustomers(),
       onCollect: (id) => showCollection(id),
+      onStatement: (id) => showStatement(id),
     });
     current.mount();
     return current;
@@ -562,6 +568,31 @@ export function createApp({ root }) {
   }
 
   /** SCR-602 – SCR-604, reached from the tile that carries their figure. */
+  /** SCR-404. CR-302's document, from the profile it is about. */
+  function showStatement(customerId) {
+    if (current?.unmount) current.unmount();
+    current = createStatement({
+      root: host(),
+      customerId,
+      onBack: () => showCustomer(customerId),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-605. FT-406's report, and the telephone list a store works from. */
+  function showAgeing() {
+    if (current?.unmount) current.unmount();
+    current = createAgeing({
+      root: host(),
+      onBack: () => { renderRail('reports'); showDashboard(); },
+      // A row is a customer, and the next thing an owner wants is their statement.
+      onOpenCustomer: (customerId) => { renderRail('customers'); showCustomer(customerId); },
+    });
+    current.mount();
+    return current;
+  }
+
   function showReport(report) {
     if (current?.unmount) current.unmount();
     current = createReport({
