@@ -210,23 +210,47 @@ export function createProductEditor({ root, productId, onClose }) {
     const add = h('button', {
       type: 'button', class: 'row-action', text: `New ${label.toLowerCase()}`,
       onclick: async () => {
-        const name = window.prompt(`Name of the new ${label.toLowerCase()}`);
-        if (!name) return;
-        const body = { name: name.trim() };
+        // ui.ask, not window.prompt: Electron does not implement prompt and throws on
+        // the call, so this button silently did nothing in the packaged app — which
+        // left a store with an empty catalogue unable to make the category and the
+        // base unit that creating its first product requires.
+        //
+        // A unit is asked for in one dialog rather than three, because its code and
+        // whether it divides are part of the same decision as its name.
+        const answers = await ui.ask({
+          title: `New ${label.toLowerCase()}`,
+          fields: kind === 'units'
+            ? [
+              { name: 'name', label: 'Name', maxLength: 60, hint: 'Kilogram, Sack, Piece' },
+              { name: 'code', label: 'Short code', maxLength: 12,
+                hint: 'As it appears on a receipt — KG, SACK, PC.' },
+              // UOM-004 in a sentence: a unit that cannot be halved must say so here,
+              // or a cashier keys 2.5 pieces and the store has invented half a sack.
+              { name: 'allowsFraction', label: 'This can be sold in fractions — 1.5 of them',
+                type: 'checkbox', value: false, hint: 'Kilos and litres can. Sacks and pieces cannot.' },
+            ]
+            : [{ name: 'name', label: 'Name', maxLength: 80 }],
+        });
+        if (!answers || !answers.name) return;
+
+        const body = { name: answers.name };
         if (kind === 'units') {
-          const code = window.prompt('Short code, as it appears on a receipt (KG, SACK, PC)');
-          if (!code) return;
-          body.code = code.trim().toUpperCase();
-          body.allowsFraction = window.confirm(
-            `Can ${body.code} be sold in fractions — 1.5 of them?\n\n`
-            + 'OK for yes (kilos, litres). Cancel for no (sacks, pieces).'
-          );
+          if (!answers.code) return;
+          body.code = answers.code.toUpperCase();
+          body.allowsFraction = answers.allowsFraction;
         }
         try {
           const created = await api.post(`/${kind}`, body);
           const made = created.unit || created.category || created.brand;
-          reference[kind] = [...list, made];
-          render();
+          reference[kind] = [...reference[kind], made];
+          // The new row is added to this select and chosen, rather than re-rendering
+          // the tab: somebody who stopped half way through a product to make its
+          // category should come back to the SKU and the name they had already typed,
+          // and to the category they just made already picked.
+          input.append(h('option', {
+            value: made.id, text: made.code ? `${made.name} (${made.code})` : made.name,
+          }));
+          input.value = made.id;
         } catch (err) {
           ui.toast(err.message, { kind: 'error' });
         }

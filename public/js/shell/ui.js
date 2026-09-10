@@ -129,3 +129,79 @@ export function authorisationPanel({ message, ruleId, requiresRole, onApprove, o
   queueMicrotask(() => username.focus());
   return panel;
 }
+
+/**
+ * A dialog that asks for one or more values, resolving to them or to null.
+ *
+ * This exists because `window.prompt` does not. Electron never implemented it — the
+ * call throws "prompt() is not supported." in the renderer — so every button that
+ * reached for one did nothing at all when clicked, with no error and nothing on
+ * screen. That is how a store with an empty catalogue could not create its first
+ * category, and so could not register its first product: the escape hatch built into
+ * the editor was a dialog the browser refuses to open.
+ *
+ * It is a promise rather than a callback because the callers are already `async` and
+ * were written around a blocking prompt — `const name = await ui.ask(…)` is the same
+ * shape as the line it replaces, so the code around it did not have to be turned
+ * inside out.
+ */
+export function ask({ title, message = null, fields, submitLabel = 'Save' }) {
+  return new Promise((resolve) => {
+    const inputs = fields.map((spec) => ({
+      spec,
+      input: h('input', {
+        type: spec.type || 'text',
+        value: spec.value ?? '',
+        checked: spec.type === 'checkbox' ? Boolean(spec.value) : null,
+        required: spec.type === 'checkbox' ? false : spec.required !== false,
+        autocomplete: 'off',
+        maxlength: spec.maxLength || null,
+      }),
+    }));
+
+    const overlay = h('div', { class: 'ask-overlay' });
+    const close = (value) => {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      resolve(value);
+    };
+    // Escape cancels, the same as the prompt it replaces. Captured, because the
+    // screen behind may have its own Escape (the POS field, the count sheet) and the
+    // dialog on top is the one the key belongs to.
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(null);
+    };
+    document.addEventListener('keydown', onKey, true);
+
+    overlay.append(h('form', {
+      class: 'ask', role: 'dialog', 'aria-modal': 'true', 'aria-label': title,
+      onsubmit: (event) => {
+        event.preventDefault();
+        const values = {};
+        for (const { spec, input } of inputs) {
+          values[spec.name] = spec.type === 'checkbox' ? input.checked : input.value.trim();
+        }
+        close(values);
+      },
+    }, [
+      h('h2', { text: title }),
+      message ? h('p', { class: 'ask-message', text: message }) : null,
+      ...inputs.map(({ spec, input }) => h('label', { class: spec.type === 'checkbox' ? 'ask-check' : null }, [
+        spec.type === 'checkbox' ? input : null,
+        h('span', { text: spec.label }),
+        spec.type === 'checkbox' ? null : input,
+        spec.hint ? h('small', { class: 'muted', text: spec.hint }) : null,
+      ])),
+      h('div', { class: 'ask-actions' }, [
+        h('button', { type: 'submit', class: 'primary', text: submitLabel }),
+        h('button', { type: 'button', text: 'Cancel', onclick: () => close(null) }),
+      ]),
+    ]));
+
+    document.body.append(overlay);
+    queueMicrotask(() => inputs[0]?.input.focus());
+  });
+}

@@ -500,10 +500,17 @@ export function createStockCount({ root, session: user, countId = null, onBack }
   }
 
   async function abandon() {
-    const reason = window.prompt('Why is this count being abandoned?');
-    if (!reason || !reason.trim()) return;
+    // ui.ask, not window.prompt — Electron throws on prompt, so this button did
+    // nothing at all in the packaged app and a count could not be abandoned.
+    const answers = await ui.ask({
+      title: 'Abandon this count',
+      message: 'The sheet is kept and the reason goes on the trail. Nothing is posted.',
+      fields: [{ name: 'reason', label: 'Why is this count being abandoned?', maxLength: 200 }],
+      submitLabel: 'Abandon count',
+    });
+    if (!answers || !answers.reason) return;
     try {
-      await api.post(`/stock-counts/${view.session.id}/cancel`, { reason: reason.trim() });
+      await api.post(`/stock-counts/${view.session.id}/cancel`, { reason: answers.reason });
       ui.toast('The count was abandoned, with the reason on the trail.', { kind: 'success' });
       view = null;
       loadList();

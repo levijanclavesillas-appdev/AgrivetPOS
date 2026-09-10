@@ -383,10 +383,17 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
 
   /** PO-102 wants a reason, and PO-105 refuses this outright once anything arrived. */
   async function cancel() {
-    const reason = window.prompt('Why is this order being cancelled?');
-    if (!reason || !reason.trim()) return;
+    // ui.ask, not window.prompt — Electron throws on prompt, so this button did
+    // nothing at all in the packaged app and an order could not be cancelled.
+    const answers = await ui.ask({
+      title: 'Cancel this order',
+      message: 'The reason goes on the audit trail beside the cancellation (PO-102).',
+      fields: [{ name: 'reason', label: 'Why is this order being cancelled?', maxLength: 200 }],
+      submitLabel: 'Cancel order',
+    });
+    if (!answers || !answers.reason) return;
     try {
-      await api.post(`/purchase-orders/${poId}/cancel`, { reason: reason.trim() });
+      await api.post(`/purchase-orders/${poId}/cancel`, { reason: answers.reason });
       ui.toast('Order cancelled', { kind: 'success' });
       await load();
     } catch (err) {

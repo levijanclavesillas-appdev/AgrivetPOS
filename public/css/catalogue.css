@@ -15,6 +15,9 @@
 .catalogue-list tbody tr:hover, .catalogue-list tbody tr:focus-visible { background: #f4f7f5; }
 .catalogue-list .sku { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
 .catalogue-list .qty, .catalogue-list .money { font-variant-numeric: tabular-nums; }
+/* UOM-005: the base unit is a code, and codes read as codes. */
+.catalogue-list .unit { font-size: .8125rem; letter-spacing: .04em; color: var(--muted); }
+.catalogue-list td.muted { color: var(--muted); }
 .catalogue-list .money { text-align: right; }
 
 /* 04_UX_SPEC §3: low-stock rows carry an amber left border; inactive rows are muted. */

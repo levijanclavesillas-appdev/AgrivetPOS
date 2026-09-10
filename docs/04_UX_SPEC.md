@@ -79,7 +79,9 @@ preserved behind it (`POS-105`). "Different user" returns to `SCR-101`.
 ### `SCR-201` — Products · `SCR-202` — Product editor · `FT-201`
 
 List: search across name, SKU, barcode and brand (`FR_3.1` latency budget), columns for SKU,
-name, category, base unit, on-hand with unit, retail price, status. Low-stock rows carry an amber
+name, brand, category, base unit, on-hand with unit, retail price, status. The brand is beside
+the name it qualifies, and an em dash where there is none — a shelf holds four makes of the same
+feed, and a blank cell reads as a brand that failed to load rather than one that was never set. Low-stock rows carry an amber
 left border; inactive rows are muted. Filters: category, low stock, inactive.
 
 Editor tabs: **Identity** (SKU, name, category, brand, `tax_class`) · **Units** (base unit —

@@ -75,6 +75,7 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValu
       sku: row.sku,
       name: row.name,
       category: { name: row.category_name },
+      brand: row.brand_name ? { name: row.brand_name } : null,
       base_unit: { code: row.base_unit_code },
       qty_on_hand_milli: row.qty_on_hand_milli,
       qty_on_hand_display: row.qty_on_hand_display,
@@ -173,7 +174,10 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValu
   function table(data) {
     return h('table', { class: 'catalogue-list' }, [
       h('thead', {}, [h('tr', {}, [
-        h('th', { text: 'SKU' }), h('th', { text: 'Product' }), h('th', { text: 'Category' }),
+        // 04_UX_SPEC.md §3's columns, with brand beside the name it qualifies: a shelf
+        // holds four makes of the same feed, and the name alone does not say which.
+        h('th', { text: 'SKU' }), h('th', { text: 'Product' }), h('th', { text: 'Brand' }),
+        h('th', { text: 'Category' }), h('th', { text: 'Base unit' }),
         h('th', { text: 'On hand' }),
         h('th', { text: lowStockOnly() ? 'Minimum' : 'Retail' }),
         h('th', { text: '' }),
@@ -195,7 +199,14 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onValu
             ? h('span', { class: 'tag warn', text: 'no price' })
             : null,
         ]),
+        // An em dash, not an empty cell: a product with no brand and a product whose
+        // brand failed to load look the same when the cell is blank (VR-209 makes the
+        // brand optional and the category required, so only this one can be absent).
+        h('td', { class: p.brand ? null : 'muted', text: p.brand ? p.brand.name : '—' }),
         h('td', { text: p.category.name }),
+        // UOM-005: the code, because that is what every quantity in this product is
+        // labelled with — including the one in the next column.
+        h('td', { class: 'unit', text: p.base_unit.code }),
         h('td', { class: 'qty' }, [
           h('span', { text: p.qty_on_hand_display || quantity(p.qty_on_hand_milli, p.base_unit.code) }),
           p.is_low_stock && !lowStockOnly()

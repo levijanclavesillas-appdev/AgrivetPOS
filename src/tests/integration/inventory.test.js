@@ -579,6 +579,23 @@ test('TC-INT-22: selling down to the minimum surfaces the product in low stock',
   assert.equal(row.qty_on_hand_display, '50 KG', 'UOM-005 labels it with the base unit');
 });
 
+test('the low-stock row names the brand, and says nothing when there is none', () => {
+  // SCR-201 renders one table for both the product list and low stock, so a column the
+  // list has must arrive on this payload too — otherwise the brand column is populated
+  // until somebody filters to low stock and then quietly empties.
+  const branded = makeProduct({ minStockMilli: 10000, brandId: ref.brand.id });
+  const plain = makeProduct({ minStockMilli: 10000 });
+  for (const product of [branded, plain]) {
+    inventoryService.postStandalone({ productId: product.id, type: 'RECEIPT', qtyMilli: 1000, unitCostCentavos: 100, actor: sessions.OWNER });
+  }
+
+  const rows = inventoryService.lowStock().products;
+  assert.equal(rows.find((p) => p.product_id === branded.id).brand_name, 'B-MEG');
+  // VR-209 makes the brand optional. Null, not the string "null" and not a dropped
+  // row: the left join is what keeps an unbranded product on this list at all.
+  assert.equal(rows.find((p) => p.product_id === plain.id).brand_name, null);
+});
+
 test('TC-INT-22: low stock is computed at read time, never stored', () => {
   const product = makeProduct({ minStockMilli: 10000 });
   inventoryService.postStandalone({ productId: product.id, type: 'RECEIPT', qtyMilli: 5000, unitCostCentavos: 100, actor: sessions.OWNER });

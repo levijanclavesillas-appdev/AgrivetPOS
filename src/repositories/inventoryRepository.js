@@ -164,10 +164,14 @@ function lowStock({ limit = 200, offset = 0 } = {}) {
     SELECT p.id AS product_id, p.sku, p.name, p.min_stock_milli,
            COALESCE(i.qty_on_hand_milli, 0) AS qty_on_hand_milli,
            u.code AS base_unit_code,
-           c.name AS category_name
+           c.name AS category_name,
+           -- Left, not inner: VR-209 makes the brand optional, and an inner join here
+           -- would drop every unbranded product out of the low-stock list.
+           b.name AS brand_name
       FROM products p
       JOIN units u ON u.id = p.base_unit_id
       JOIN categories c ON c.id = p.category_id
+      LEFT JOIN brands b ON b.id = p.brand_id
       LEFT JOIN inventory i ON i.product_id = p.id
      WHERE p.is_active = 1
        AND p.min_stock_milli > 0

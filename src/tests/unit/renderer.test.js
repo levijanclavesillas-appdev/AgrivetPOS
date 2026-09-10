@@ -439,6 +439,30 @@ test('there is no offline indicator anywhere in the renderer', () => {
   }
 });
 
+test('nothing in the renderer calls window.prompt — Electron does not have one', () => {
+  // Electron never implemented prompt: the call throws "prompt() is not supported."
+  // in the renderer, so a button that reached for one did nothing at all when
+  // clicked — no dialog, no error, nothing on screen. That is how a store with an
+  // empty catalogue could not create its first category and so could not register
+  // its first product. ui.ask is the replacement, and this keeps the next one out.
+  //
+  // window.confirm and window.alert are left alone: Electron does implement those.
+  for (const file of walkFiles(path.join(root, 'public', 'js')).filter((f) => f.endsWith('.js'))) {
+    const source = codeOf(path.relative(path.join(root, 'public'), file));
+    assert.equal(
+      /window\.prompt\s*\(/.test(source), false,
+      `${path.relative(root, file)} calls window.prompt, which Electron refuses — use ui.ask`
+    );
+    // A bare `prompt('…')` is the same call. The POS has a local `prompt({ … })` of
+    // its own — its own modal — and that one takes an object, which is what tells the
+    // two apart here.
+    assert.equal(
+      /(^|[^.\w])prompt\s*\(\s*['"`]/.test(source), false,
+      `${path.relative(root, file)} calls prompt(), which Electron refuses — use ui.ask`
+    );
+  }
+});
+
 test('05_TECH_SPEC.md §2: no build step, no framework, no bundler', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
@@ -658,6 +682,21 @@ test('TC-UI-02: cost is absent from the catalogue, not disabled', () => {
   const list = codeOf('js/catalogue/list.js');
   assert.equal(/avg_cost|cost_centavos/.test(list), false, 'the list carries no cost at all');
   assert.match(list, /retail_price_centavos/);
+});
+
+test('SCR-201 carries the columns 04_UX_SPEC.md §3 names, brand included', () => {
+  // The list is where somebody scanning a shelf checks what the system thinks it has,
+  // and a shelf holds four makes of the same feed. Without brand and base unit the two
+  // questions the list is opened for — which one is this, and how is it counted —
+  // cannot be answered from it.
+  const list = codeOf('js/catalogue/list.js');
+  for (const column of ['SKU', 'Product', 'Brand', 'Category', 'Base unit', 'On hand']) {
+    assert.match(list, new RegExp(`h\\('th', \\{ text: '${column}' \\}\\)`), `no ${column} column`);
+  }
+  // Low stock is the same table under a filter, so its rows are mapped into the same
+  // shape. A column added to one and not the other empties when the filter is applied.
+  assert.match(list, /brand: row\.brand_name/, 'low stock maps brand into the row shape');
+  assert.match(list, /base_unit: \{ code: row\.base_unit_code \}/);
 });
 
 test('TC-UI-03: the base unit is locked once stock has moved, and says why', () => {
