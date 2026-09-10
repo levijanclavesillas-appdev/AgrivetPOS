@@ -88,6 +88,11 @@ export function createApp({ root }) {
   const main = h('main', { class: 'screen' });
   const railHost = h('nav', { class: 'rail', 'aria-label': 'Sections' });
 
+  // What the shell last learned about this user's shift (POS-501). Null until the POS
+  // has been opened once — unknown is not the same as closed, and a lock screen that
+  // assumed closed would send somebody with a live till to the password form.
+  let shiftOpen = null;
+
   // ── Sign in (SCR-101) ─────────────────────────────────────────────────────
 
   function signIn({ prefillUsername = null, note = null } = {}) {
@@ -143,6 +148,18 @@ export function createApp({ root }) {
    * says what it is doing rather than just returning to sign-in.
    */
   function lock({ username }) {
+    // POS-501, before the keypad rather than after a failed attempt: a PIN unlocks an
+    // open shift, and offering one to somebody whose shift is closed is a dead end
+    // dressed up as a lock screen — "Your cart is kept" said over a cart that does not
+    // exist, and a way out labelled "Different user" for the same person.
+    if (shiftOpen === false) {
+      signIn({
+        prefillUsername: username,
+        note: 'A PIN unlocks an open shift. Sign in with your password to open one.',
+      });
+      return;
+    }
+
     const pin = h('input', {
       type: 'password', inputmode: 'numeric', pattern: '\\d{6}', maxlength: '6',
       class: 'pin-input', autocomplete: 'off', 'aria-label': 'Six-digit PIN',
@@ -163,6 +180,17 @@ export function createApp({ root }) {
               session = result.user;
               overlay.remove();
             } catch (err) {
+              // POS-501: a PIN unlocks an **open shift**. Somebody whose shift is
+              // closed — or who never opened one — can key a correct PIN all morning
+              // and it will never work, because the refusal is not about the PIN.
+              // Saying so and leaving them on a PIN keypad is a dead end: the only way
+              // on was a button labelled "Different user", which is the wrong words for
+              // the same person signing in with their password.
+              if (err.ruleId === 'POS-501') {
+                overlay.remove();
+                signIn({ prefillUsername: username, note: err.message });
+                return;
+              }
               problem.textContent = err.message;
               problem.hidden = false;
               pin.value = '';
@@ -312,6 +340,10 @@ export function createApp({ root }) {
 
   /** SCR-501 – SCR-503. `shiftId` opens another user's drawer, from the POS-508 alert. */
   function showShift(shiftId = null) {
+    // Whatever the shell knew about the shift is about to be acted on from this screen,
+    // so it stops knowing. A stale "closed" would send somebody who had just opened
+    // their till to the password form instead of the keypad.
+    shiftOpen = null;
     if (current?.unmount) current.unmount();
     renderRail('shift');
     current = createShift({
@@ -506,6 +538,10 @@ export function createApp({ root }) {
     let shift = null;
     try {
       shift = await api.get('/shifts/current');
+      // Remembered for the lock screen: POS-501 makes a PIN unlock an open shift, so a
+      // keypad offered to somebody whose shift is closed is a keypad that cannot work.
+      // Stale after an idle period, which is why the refusal is still handled there.
+      shiftOpen = Boolean(shift.open);
     } catch (err) {
       ui.error(main, { message: err.message, retry: () => show('pos') });
       return null;

@@ -463,6 +463,23 @@ test('nothing in the renderer calls window.prompt — Electron does not have one
   }
 });
 
+test('SCR-102: a PIN keypad is never the only way off the lock screen (POS-501)', () => {
+  // A PIN unlocks an **open shift**. Somebody whose shift is closed can key a correct
+  // PIN all morning and be refused every time, because the refusal is not about the
+  // PIN — and the only way on was a button labelled "Different user", which is the
+  // wrong words for the same person signing in with their password.
+  const shell = codeOf('js/shell/app.js');
+
+  // The refusal is turned into the next step rather than shown as an error under a
+  // keypad that cannot work.
+  assert.match(shell, /err\.ruleId === 'POS-501'/, 'the rule is recognised where it lands');
+  assert.match(shell, /shiftOpen === false/, 'and a known-closed shift skips the keypad outright');
+  // Unknown is not closed: a lock with no knowledge of the shift still offers the PIN,
+  // or somebody with a live till would be sent to the password form for nothing.
+  assert.match(shell, /let shiftOpen = null/);
+  assert.match(proseOf('js/shell/app.js'), /unknown is not the same as closed/i);
+});
+
 test('05_TECH_SPEC.md §2: no build step, no framework, no bundler', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
