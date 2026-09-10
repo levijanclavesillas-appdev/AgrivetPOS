@@ -6,3 +6,10 @@ dist/
 logs/
 .env
 tools/installer/chachi-nsh-check.exe
+
+# TC-E2E-13 configures a USB printer at the Windows share path DEPLOYMENT.md §4 tells
+# the installer to set. On a non-Windows build machine that path is not a device, it is
+# a relative filename, so printService.send writes the test page into the working
+# directory and reports delivered. The junk file was committed once and removed in
+# 8f69b4c; this keeps the next `git add -A` from putting it back.
+\\\\SHOPPC\\POS-58
