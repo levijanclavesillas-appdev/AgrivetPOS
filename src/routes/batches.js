@@ -62,4 +62,33 @@ router.post('/batches/:id/expire', writeOffStock, (req, res, next) => {
   }
 });
 
+/**
+ * INV-206 — who has this batch.
+ *
+ * `TX-422`, the same grant that reads the batch list: a recall is an inventory question
+ * whose answer happens to contain customer names, and gating it behind TX-413 would put
+ * the one report a store runs in an emergency behind the permission least likely to be
+ * held by whoever is in the shop when the notice arrives.
+ */
+router.get('/batches/:id/recall', readInventory, (req, res, next) => {
+  try {
+    res.json(batchService.recallFor(req.params.id, { actor: req.session }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The same figures as the screen, as a file (TX-426 to export, TX-422 to read). */
+router.get('/batches/:id/recall/export.csv',
+  [authenticate, requirePermission('TX-426')], (req, res, next) => {
+    try {
+      const { csv, filename } = batchService.recallCsv(req.params.id, { actor: req.session });
+      res.setHeader('content-type', 'text/csv; charset=utf-8');
+      res.setHeader('content-disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (err) {
+      next(err);
+    }
+  });
+
 module.exports = router;

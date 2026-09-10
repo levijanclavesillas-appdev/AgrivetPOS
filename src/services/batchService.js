@@ -26,6 +26,7 @@
 // `expire`, which posts INV-103's EXPIRY movement.
 
 const clock = require('../config/clock');
+const csv = require('../config/csv');
 const ids = require('../config/ids');
 const errors = require('./errors');
 const quantity = require('./quantity');
@@ -351,6 +352,152 @@ function expire(batchId, { actor, reason = null, occurredAt = null }) {
   return { batch: present(batchRepository.withQuantity(batch.id)), movement };
 }
 
+/**
+ * `INV-206` — the recall: given a batch, who has it.
+ *
+ * **A recall is not a report about stock, it is a list of people.** The output is a
+ * customer, a sale, a date and a quantity, and the figure that matters is the one still
+ * out there — what this batch gave a line, less whatever came back on it.
+ *
+ * Three things it says out loud rather than leaving to be worked out:
+ *
+ *   **What is still on the shelf**, beside the list, because half of acting on a recall
+ *   is pulling the rest of it out of the shop and the other half is the telephone.
+ *
+ *   **The walk-ins**, counted. A batch sold to eleven farms and four walk-ins is eleven
+ *   calls and four you cannot make, and a screen that omitted the second number would
+ *   let a store believe it had reached everybody.
+ *
+ *   **Voided and returned sales as themselves.** Neither is dropped: a voided sale's
+ *   goods may have left the shop with the customer, and a partially returned line has
+ *   the unreturned part still out there. `POS-301`'s `returned_qty_milli` is the line's,
+ *   so where a line spanned two batches the return is apportioned against this batch's
+ *   share — the honest reading of a figure the schema keeps per line.
+ *
+ * `RPT-106`: the report states what it includes, in words, so a printed copy is
+ * readable a year later without this comment.
+ */
+function recallFor(batchId, { actor = null } = {}) {
+  if (actor && !permissions.can(actor, 'TX-422')) {
+    throw errors.forbidden(
+      'You do not have permission to read inventory.',
+      { ruleId: 'TX-422', requiresRole: permissions.rolesHolding('TX-422').join(' or ') }
+    );
+  }
+
+  const batch = batchRepository.withQuantity(batchId);
+  if (!batch) throw errors.notFound('No such batch');
+
+  const rows = batchRepository.recall(batchId);
+  const unit = batch.base_unit_code;
+
+  const sales = rows.map((row) => {
+    // The line's return, apportioned to this batch's share of the line. A line of ten
+    // that took six from here and had two returned gives this batch 1.2 back — the
+    // schema keeps the return per line, and pretending otherwise would report more
+    // still-out-there than the store ever sold from this batch.
+    const returnedHere = row.returned_qty_milli > 0 && row.line_qty_milli > 0
+      ? Math.round((row.returned_qty_milli * row.qty_milli) / row.line_qty_milli)
+      : 0;
+    const voided = row.status === 'VOIDED';
+    const outstanding = voided ? row.qty_milli : Math.max(row.qty_milli - returnedHere, 0);
+
+    return {
+      sale_id: row.sale_id,
+      sale_no: row.sale_no,
+      status: row.status,
+      occurred_at: row.occurred_at,
+      occurred_at_manila: clock.toManila(row.occurred_at),
+      cashier: row.cashier,
+      customer_id: row.customer_id,
+      // The two fields somebody with a telephone actually needs, and the honest answer
+      // where there is nobody to ring.
+      customer_name: row.customer_name,
+      customer_contact_no: row.customer_contact_no,
+      is_walk_in: !row.customer_id,
+      product: row.product_name_snapshot,
+      sku: row.sku,
+      // What this batch gave this line — never the line's own quantity.
+      qty_milli: row.qty_milli,
+      qty_display: quantity.format(row.qty_milli, unit),
+      returned_qty_milli: returnedHere,
+      returned_display: returnedHere > 0 ? quantity.format(returnedHere, unit) : null,
+      // Voided: the sale was reversed, and the goods may still have gone out of the
+      // door. Counted as outstanding, and marked, so the store decides rather than the
+      // report deciding for it.
+      outstanding_qty_milli: outstanding,
+      outstanding_display: quantity.format(outstanding, unit),
+      is_voided: voided,
+      is_returned: returnedHere > 0,
+    };
+  });
+
+  const walkIns = sales.filter((sale) => sale.is_walk_in);
+  const reachable = sales.filter((sale) => !sale.is_walk_in);
+  const soldMilli = sales.reduce((sum, sale) => sum + sale.qty_milli, 0);
+  const outstandingMilli = sales.reduce((sum, sale) => sum + sale.outstanding_qty_milli, 0);
+
+  return {
+    batch: present(batch),
+    sales,
+    summary: {
+      sales_count: sales.length,
+      // Customers rather than sales: one farm that bought three times is one telephone
+      // call, and "eleven calls" is the figure somebody plans their morning around.
+      customers_count: new Set(reachable.map((sale) => sale.customer_id)).size,
+      walk_in_count: walkIns.length,
+      walk_in_qty_milli: walkIns.reduce((sum, sale) => sum + sale.outstanding_qty_milli, 0),
+      sold_milli: soldMilli,
+      sold_display: quantity.format(soldMilli, unit),
+      outstanding_milli: outstandingMilli,
+      outstanding_display: quantity.format(outstandingMilli, unit),
+      // What is still in the shop, which is the other half of acting on a recall.
+      on_hand_milli: batch.qty_milli,
+      on_hand_display: quantity.format(batch.qty_milli, unit),
+    },
+    // RPT-106: what this list includes, in the words a printed copy needs.
+    basis: 'Every sale that took stock from this batch, including sales later voided '
+      + '(the goods may have left the shop) and lines partly returned (what did not come '
+      + 'back is still out there). Quantities are this batch\'s share of each line, not '
+      + 'the whole line.',
+  };
+}
+
+/**
+ * The recall as a file, because the list is worked through by somebody with a telephone
+ * and not by somebody at the machine (`04_UX_SPEC.md` §3).
+ *
+ * The same call the screen makes, so the two cannot disagree — a CSV built from a
+ * second query is a CSV that eventually says something the screen does not.
+ */
+function recallCsv(batchId, { actor = null } = {}) {
+  const report = recallFor(batchId, { actor });
+  const rows = [
+    ['sale_no', 'date', 'customer', 'contact_no', 'product', 'sku',
+      'qty_from_this_batch', 'returned', 'still_out', 'status'],
+    ...report.sales.map((sale) => [
+      sale.sale_no,
+      sale.occurred_at_manila,
+      // The word, not an empty cell: a blank in a column of names reads as data that
+      // failed to load, and this is the answer.
+      sale.customer_name || 'Walk-in',
+      sale.customer_contact_no || '',
+      sale.product,
+      sale.sku,
+      sale.qty_display,
+      sale.returned_display || '',
+      sale.outstanding_display,
+      sale.is_voided ? 'VOIDED' : sale.status,
+    ]),
+  ];
+
+  return {
+    csv: csv.stringify(rows),
+    filename: `recall_${report.batch.product_sku}_${report.batch.batch_no}.csv`.replace(/[^\w.\-]/g, '_'),
+    report,
+  };
+}
+
 module.exports = {
   STATUS,
   statusOf,
@@ -363,6 +510,8 @@ module.exports = {
   nearExpiry,
   expired,
   expire,
+  recallFor,
+  recallCsv,
   addDays,
   daysBetween,
   today,

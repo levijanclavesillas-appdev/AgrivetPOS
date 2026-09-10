@@ -63,13 +63,17 @@ already join sales to customers for the daily report. There is no new schema her
 
 ## Acceptance Criteria
 
-- [ ] A batch consumed by a line that spanned two batches reports only its own share
-- [ ] Named customers and walk-ins are both accounted for, and the walk-in count is stated
-- [ ] A voided sale appears, marked voided
-- [ ] A fully returned line appears, marked returned
-- [ ] The batch's remaining on-hand is shown beside the list
-- [ ] Reachable in one step from the batch list and from a near-expiry alert
-- [ ] Exports to CSV with the same figures as the screen
+- [x] A batch consumed by a line that spanned two batches reports only its own share
+- [x] Named customers and walk-ins are both accounted for, and the walk-in count is stated
+- [x] A voided sale appears, marked voided
+- [x] A fully returned line appears, marked returned — and a **partly** returned one carries
+      both figures, which is the ordinary case and the one the rule did not name
+- [x] The batch's remaining on-hand is shown beside the list
+- [x] Reachable in one step from the batch list and from a near-expiry alert — the alert
+      lands on `SCR-206`, which is one step from the recall, rather than jumping past the
+      batch it is about
+- [x] Exports to CSV with the same figures as the screen — the same service call, so the
+      two cannot drift
 
 ## Tests
 
@@ -78,6 +82,18 @@ already join sales to customers for the daily report. There is no new schema her
 | `TC-INT-112` | `INV-206`: every consuming sale is found, with per-batch quantities |
 | `TC-INT-113` | Voided, returned and walk-in sales are all represented as themselves |
 | `TC-E2E-24` | Sell one batch across six sales — two on credit, three walk-in, one later voided — then recall it and reconcile the quantities against the batch |
+
+**The schema held.** This task added no column and no table, which was the test `TASK-029` set
+itself: "if this task needs a column, the sale-line decision was wrong". `sale_item_batches` had
+every figure the recall needed.
+
+**What the walk turned up that the rule had not named.** A voided sale is counted as *still out*
+while its stock is simultaneously back on the shelf, and both are true: `INV-201` says the ledger
+reversed it, `INV-206` says the goods may have left with the customer before anybody noticed. The
+report states both and lets the store decide, because resolving it silently would be deciding who
+gets no telephone call. And a **partial** return apportions against this batch's share of the
+line — the schema keeps `returned_qty_milli` per line, and a line that spanned two batches would
+otherwise report more still-out-there than the batch ever sold.
 
 ---
 

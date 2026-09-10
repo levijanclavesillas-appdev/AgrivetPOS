@@ -1798,6 +1798,35 @@ test('TC-UI-12: SCR-306 finds a receipt and cannot change one (POS-107)', () => 
   assert.match(codeOf('js/shell/app.js'), /from === 'receipts'/);
 });
 
+test('SCR-207: a recall leads with the people, not the stock (INV-206)', () => {
+  const source = codeOf('js/catalogue/recall.js');
+  const prose = proseOf('js/catalogue/recall.js');
+
+  // A recall is a list of people. The three figures it leads with are what somebody
+  // plans a morning around — what is still out there, how many to ring, and how many
+  // they cannot ring at all.
+  assert.match(source, /Still out there/);
+  assert.match(source, /People to ring/);
+  assert.match(source, /Cannot be reached/);
+  // The walk-in count is stated as its own figure rather than left to be counted off
+  // the rows: a store that saw eleven farms and no number would believe it had reached
+  // everybody.
+  assert.match(prose, /eleven calls and four you cannot make/);
+
+  // The contact number is on the row, because the row is what gets worked through.
+  assert.match(source, /customer_contact_no/);
+  // And the answer where there is nobody, in words rather than as a blank cell.
+  assert.match(source, /'Walk-in'/);
+  assert.match(source, /no way to reach them/);
+
+  // Nothing on it writes: a recall reads a batch's history and changes nothing.
+  assert.equal(/api\.(post|put|delete)/.test(source), false);
+  // RPT-106: the list says what it includes, from the server rather than a copy here.
+  assert.match(source, /report\.basis/);
+  // Reached in one step from the batch it is about.
+  assert.match(codeOf('js/catalogue/batches.js'), /onRecall\(batch\.id\)/);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

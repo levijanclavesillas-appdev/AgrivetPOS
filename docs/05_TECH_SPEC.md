@@ -1122,6 +1122,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/inventory/adjustments` | `TX-407` | `INV-108` |
 | `GET` | `/inventory/reconciliation` | `TX-427` | `INV-101` and, since `TASK-029`, `INV-201` — one answer per product and per batch, because two pages that can disagree are two pages nobody believes |
 | `GET` | `/products/:id/batches` | `TX-422` | `INV-201`–`INV-203`. The shelf; `?includeEmpty=true` is the recall's view, since an exhausted batch is still the batch a notice names |
+| `GET` | `/batches/:id/recall` | `TX-422` | `INV-206`. Every sale that took stock from the batch, with **this batch's share** of each line — voided and returned sales included and marked, walk-ins counted rather than omitted |
 | `POST` | `/batches/:id/expire` | `TX-407` | `INV-205`. The **only** way expired stock leaves. There is no route that sells it and none that edits a batch quantity — the store's policy permits no override (`TASK-029`), and `INV-201` makes the quantity the ledger's own sum |
 | `GET` | `/customers?q=` | `TX-413` | |
 | `GET` | `/customers/:id/credit` | `TX-413` | limit, balance, available, ageing, and — since `TASK-028` — `store_credit_centavos`, the balance past zero the customer may spend (`CR-108`) |

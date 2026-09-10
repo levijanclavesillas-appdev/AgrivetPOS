@@ -1994,6 +1994,43 @@ app.whenReady().then(async () => {
   log(await run(`!document.querySelector('.audit input[type=text][aria-label*=reason]')`),
     'there is no field that would write to it');
 
+  // ── SCR-207: the recall (TASK-030, INV-206) ──────────────────────────────
+  //
+  // The question a manufacturer's notice makes a store ask, one step from the batch it
+  // is about: who has this, and who can I not ring.
+
+  console.log('\n— SCR-207: the recall —');
+  await run(`(() => { [...document.querySelectorAll('.rail button')].find(x=>/Products/i.test(x.textContent)).click(); return true; })()`);
+  await waitFor(`!!document.querySelector('.catalogue-list')`, { label: 'the product list' });
+  await run(`(() => {
+    const row = [...document.querySelectorAll('.catalogue-list tbody tr')].find(r => /Amoxicillin/.test(r.textContent));
+    const button = [...row.querySelectorAll('.row-action')].find(b => /Batches/.test(b.textContent));
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`!!document.querySelector('.batches')`, { label: 'SCR-206' });
+
+  const recallOffered = await run(`[...document.querySelectorAll('.batch-list .row-action')].some(b => /Recall/.test(b.textContent))`);
+  log(recallOffered, 'SCR-206 offers a recall on every batch, one step from the notice');
+  await clickOn('.batch-list .row-action', '/Recall/');
+  await waitFor(`!!document.querySelector('.recall')`, { label: 'SCR-207' });
+
+  const figures = await run(`[...document.querySelectorAll('.recall-figure')].map(f => f.textContent.replace(/\\s+/g, ' ')).join(' | ')`);
+  log(/Still out there/.test(figures) && /People to ring/.test(figures) && /Cannot be reached/.test(figures),
+    'INV-206: it leads with the people, not the stock', figures.slice(0, 120));
+
+  // The walk-in count is the figure a store would otherwise never learn.
+  log(/Cannot be reached/.test(figures), 'and states how many buyers cannot be telephoned');
+  log(await run(`/including sales later voided/.test(document.querySelector('.recall .rule-note').textContent)`),
+    'RPT-106: the list says what it includes');
+  log(await run(`document.querySelectorAll('.recall input').length === 0`),
+    'and nothing on it writes — a recall reads a batch’s history');
+
+  const recallRows = await run(`document.querySelectorAll('.recall-list tbody tr').length`);
+  log(recallRows >= 1, 'the sales that took from this batch are listed', `${recallRows} row(s)`);
+  log(await run(`/Walk-in|no way to reach them/.test(document.querySelector('.recall-list').textContent)`),
+    'a buyer with no name is said in words, never left as a blank cell');
+
   // ── SCR-301: the unit at the counter (POS-102) ───────────────────────────
   //
   // The pack machinery has been complete since TASK-011 — the server takes a unit per

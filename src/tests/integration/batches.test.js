@@ -26,6 +26,7 @@ const batchService = require('../../services/batchService');
 const saleService = require('../../services/saleService');
 const returnService = require('../../services/returnService');
 const voidService = require('../../services/voidService');
+const customerService = require('../../services/customerService');
 const shiftService = require('../../services/shiftService');
 const alertService = require('../../services/alertService');
 const settingsService = require('../../services/settingsService');
@@ -545,4 +546,147 @@ test('POS-303: a return goes back to the batch it came from, not to the oldest',
   );
   assert.equal(batched(product.id), inventoryRepository.qtyOnHand(product.id));
   assert.deepEqual(inventoryService.reconcile().batch_breaks, []);
+});
+
+// ── TC-INT-112 / TC-INT-113 — INV-206, the recall ───────────────────────────
+//
+// The two cases that decide whether a recall can be trusted: it reports **this batch's
+// share** of a line that spanned two, and it represents a voided sale, a returned line
+// and a walk-in as themselves rather than dropping them. A recall that quietly omitted
+// any of the three would leave somebody holding stock nobody rang about.
+
+test('TC-INT-112: every consuming sale is found, with this batch’s share of each line', () => {
+  const product = vaccine();
+  receive({ product, qtyMilli: 6000, unitCostCentavos: 30000, batchNo: 'RC-1', expiryDate: days(120) });
+  receive({ product, qtyMilli: 20000, unitCostCentavos: 32000, batchNo: 'RC-2', expiryDate: days(400) });
+
+  const farm = customerService.create({
+    name: 'Recall Farm', customerType: 'FARM', priceLevel: 'RETAIL',
+    contactNo: '09171234567', isCreditEligible: true, creditLimitCentavos: 5000000, termsDays: 30,
+  }, sessions.OWNER);
+
+  // Ten, taken six from RC-1 and four from RC-2 — the ordinary split.
+  const spanning = saleService.complete({
+    lines: [{ productId: product.id, qtyMilli: 10000 }],
+    customerId: farm.id,
+    tenders: [{ method: 'CREDIT', amountCentavos: 320000 }],
+  }, sessions.CASHIER);
+  // And two more, entirely out of RC-2.
+  cashSale({ product, qtyMilli: 2000 });
+
+  const first = batchesOf(product.id).find((b) => b.batch_no === 'RC-1');
+  const recall = batchService.recallFor(first.id, { actor: sessions.OWNER });
+
+  assert.equal(recall.sales.length, 1, 'only the sale that took from this batch');
+  assert.equal(recall.sales[0].sale_no, spanning.sale.sale_no);
+  // Six, not ten: the line took four of its ten from the other batch, and a recall that
+  // reported the line quantity would tell the store to chase stock it never sold here.
+  assert.equal(recall.sales[0].qty_milli, 6000);
+  assert.equal(recall.sales[0].qty_display, '6 PC');
+  assert.equal(recall.sales[0].outstanding_qty_milli, 6000);
+
+  // The customer, and the number somebody actually rings.
+  assert.equal(recall.sales[0].customer_name, 'Recall Farm');
+  assert.equal(recall.sales[0].customer_contact_no, '09171234567');
+  assert.equal(recall.sales[0].is_walk_in, false);
+
+  // And the other half of acting on a recall: what is still in the shop.
+  assert.equal(recall.summary.on_hand_milli, 0, 'RC-1 was emptied by that line');
+  assert.equal(recall.summary.outstanding_milli, 6000);
+  assert.equal(recall.summary.customers_count, 1);
+  assert.equal(recall.summary.walk_in_count, 0);
+
+  // The second batch sees both sales, with its own shares.
+  const second = batchesOf(product.id).find((b) => b.batch_no === 'RC-2');
+  const rest = batchService.recallFor(second.id, { actor: sessions.OWNER });
+  assert.deepEqual(rest.sales.map((s) => s.qty_milli).sort((a, b) => a - b), [2000, 4000]);
+  assert.equal(rest.summary.walk_in_count, 1, 'the cash sale has nobody to ring');
+});
+
+test('TC-INT-113: voided, returned and walk-in sales are all represented as themselves', () => {
+  const product = vaccine();
+  receive({ product, qtyMilli: 30000, unitCostCentavos: 30000, batchNo: 'RC-3', expiryDate: days(300) });
+  const batch = batchesOf(product.id)[0];
+
+  const walkIn = cashSale({ product, qtyMilli: 3000 });
+  const returned = cashSale({ product, qtyMilli: 5000 });
+  const voided = cashSale({ product, qtyMilli: 4000 });
+
+  // Two of the five come back; three are still in somebody's shed.
+  returnService.post({
+    saleId: returned.sale.id,
+    reason: 'Customer changed their mind',
+    lines: [{ saleItemId: saleRepository.itemsFor(returned.sale.id)[0].id, qtyMilli: 2000, disposition: 'RESTOCK' }],
+  }, sessions.MANAGER);
+
+  voidService.post({
+    saleId: voided.sale.id,
+    reason: 'Rang up the wrong farm’s account',
+    approver: { username: 'manager' },
+  }, sessions.CASHIER);
+
+  const recall = batchService.recallFor(batch.id, { actor: sessions.OWNER });
+  const bySaleNo = Object.fromEntries(recall.sales.map((s) => [s.sale_no, s]));
+
+  assert.equal(recall.sales.length, 3, 'all three are on the list');
+
+  // A walk-in has nobody to ring, and that is the answer rather than a missing one.
+  assert.equal(bySaleNo[walkIn.sale.sale_no].is_walk_in, true);
+  assert.equal(bySaleNo[walkIn.sale.sale_no].customer_name, null);
+
+  // POS-301: two of the five came back, three did not — and the three are what the
+  // store is chasing.
+  const back = bySaleNo[returned.sale.sale_no];
+  assert.equal(back.qty_milli, 5000);
+  assert.equal(back.returned_qty_milli, 2000);
+  assert.equal(back.outstanding_qty_milli, 3000);
+  assert.equal(back.is_returned, true);
+
+  // POS-401: the sale was reversed and the goods may still have left with the customer.
+  // Listed, marked, and counted as outstanding — the store decides, not the report.
+  const gone = bySaleNo[voided.sale.sale_no];
+  assert.equal(gone.is_voided, true);
+  assert.equal(gone.status, 'VOIDED');
+  assert.equal(gone.outstanding_qty_milli, 4000);
+
+  // 3 + 3 + 4 still out there, by the report's reckoning.
+  assert.equal(recall.summary.outstanding_milli, 10000);
+  assert.equal(recall.summary.walk_in_count, 3, 'all three were walk-ins, and none can be rung');
+
+  // 30 received, 12 sold, 2 returned to the shelf and 4 put back by the void: 24.
+  //
+  // **The voided four are on the shelf and on the list at the same time, and that is
+  // not double counting.** INV-201 says the stock came back — the ledger has the
+  // compensating movement — while INV-206 says the goods may have gone out of the door
+  // with the customer before anybody noticed. The store is the only one who knows
+  // which, and a report that resolved it silently would decide who gets no telephone
+  // call.
+  assert.equal(recall.summary.on_hand_milli, 24000);
+  // RPT-106: the list says what it includes, in the words a printed copy needs.
+  assert.match(recall.basis, /including sales later voided/);
+});
+
+test('INV-206: the recall reads over HTTP, and exports the figures the screen shows', async () => {
+  const product = vaccine();
+  receive({ product, qtyMilli: 8000, unitCostCentavos: 30000, batchNo: 'RC-4', expiryDate: days(200) });
+  const batch = batchesOf(product.id)[0];
+  cashSale({ product, qtyMilli: 3000 });
+
+  const res = await call(`/batches/${batch.id}/recall`, { token: tokens.INVENTORY });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.sales.length, 1);
+  assert.equal(body.summary.outstanding_display, '3 PC');
+
+  // The CSV is the same call, so the two cannot say different things.
+  const csv = await call(`/batches/${batch.id}/recall/export.csv`, { token: tokens.OWNER });
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers.get('content-disposition'), /recall_.*RC-4\.csv/);
+  const text = await csv.text();
+  assert.match(text, /"sale_no","date","customer"/);
+  assert.match(text, /"Walk-in"/);
+  assert.match(text, /"3 PC"/);
+
+  // TX-426 to export: a manager holds TX-422 and reads the screen, and does not export.
+  assert.equal((await call(`/batches/${batch.id}/recall/export.csv`, { token: tokens.CASHIER })).status, 403);
 });

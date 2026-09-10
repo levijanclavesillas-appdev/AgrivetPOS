@@ -41,6 +41,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │  STOCK        SCR-201 Products       SCR-202 Product     │
 │               SCR-203 Adjustment     SCR-204 Low stock   │
 │               SCR-205 Stock count    SCR-206 Batches     │
+│               SCR-207 Recall                             │
 │  SHIFT        SCR-501 Open           SCR-502 Till cash   │
 │               SCR-503 Close                              │
 │  BUYING       SCR-801 Orders         SCR-802 Order       │
@@ -125,6 +126,30 @@ owner override only where the store's own policy allows it, and this store's doe
 write on the screen is the write-off (`TX-407`), which posts the `EXPIRY` movement `INV-103`
 declared — so the store can total what expiry cost it, which an adjustment of the same quantity
 would not say. A cashier sees the list and no button.
+
+### `SCR-207` — Recall · `FT-205`, `INV-206` — v1.2
+
+Behind `TX-422`, one step from any batch on `SCR-206` — which is where somebody holding a
+manufacturer's notice arrives. Offered for exhausted batches too: a batch with nothing left on
+the shelf is exactly the one whose stock is all in customers' sheds.
+
+**A recall is not a report about stock, it is a list of people.** A customer, a telephone number,
+a receipt, and how much of *this batch* they took. Three figures lead it, and the middle one is
+what somebody plans their morning around:
+
+- **Still out there** — this batch's share of each line, less what came back on it.
+- **People to ring** — customers, not sales: one farm that bought three times is one call.
+- **Cannot be reached** — the walk-ins, counted. A batch sold to eleven farms and four walk-ins
+  is eleven calls and four you cannot make, and a screen that listed the eleven and omitted the
+  four would let a store believe it had reached everybody.
+
+Voided and returned sales are listed and **marked**, never filtered out. A voided sale reversed
+the stock and the goods may still have left with the customer; a partly returned line has the
+unreturned part in somebody's shed. Both are the store's decision, and a report that made them
+silently would be deciding who does not get a telephone call.
+
+Exports to CSV, because the list is worked through with a telephone and not at the machine, and
+the export is the same call the screen makes rather than a second query that can drift from it.
 
 ### `SCR-205` — Stock count · `FT-209` — v1.1
 

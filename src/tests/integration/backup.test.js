@@ -654,9 +654,23 @@ test('the daily backup is due once the configured hour has passed, and once only
   freshFolder();
   const hour = settingsService.get('backup_hour');
   const today = clock.manilaDate(clock.nowUtc());
-  const before = new Date(`${today}T${String(hour).padStart(2, '0')}:00:00+08:00`);
+  // **Tomorrow's hour, not today's.**
+  //
+  // The scheduler asks whether a verified backup has been taken since the scheduled
+  // hour, and the backups earlier in this file were taken at the real clock. Simulated
+  // against *today's* hour that is a coin toss on the time of day: run in the morning
+  // those backups precede the hour and the tick is due; run any evening after 21:00
+  // Manila they follow it, the scheduler rightly answers "already verified", and a
+  // correct rule fails a test that had quietly assumed office hours.
+  //
+  // Tomorrow's hour has nothing before it but this file's own history, which is the
+  // condition the case is actually about.
+  const before = new Date(
+    new Date(`${today}T${String(hour).padStart(2, '0')}:00:00+08:00`).getTime() + 86400000
+  );
 
-  assert.equal(scheduleService.due({ now: new Date(before.getTime() - 3600000).toISOString() }).due, false);
+  assert.equal(scheduleService.due({ now: new Date(before.getTime() - 3600000).toISOString() }).due, false,
+    'an hour before the scheduled time, nothing is due');
 
   const after = new Date(before.getTime() + 60000).toISOString();
   const first = scheduleService.tick({ now: after });

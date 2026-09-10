@@ -88,6 +88,23 @@
 .count-sheet tr.count-group small { font-weight: 400; }
 .count-sheet td.is-batch-line { padding-left: 1.5rem; }
 
+/* ── SCR-207 the recall (TASK-030) ───────────────────────────────────────── */
+/*
+   Three figures, and the middle one is the morning: how many people there are to ring.
+   The third is the one a store would otherwise never learn — the buyers it cannot
+   reach — so it is given the same size as the other two rather than a footnote.
+*/
+.recall-figures { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+.recall-figure { flex: 1 1 12rem; padding: .75rem 1rem; background: #fff;
+  border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 4px; }
+.recall-figure-value { display: block; font-size: 1.5rem; font-weight: 600;
+  font-variant-numeric: tabular-nums; }
+.recall-figure-label { display: block; font-size: .875rem; }
+.recall .rule-note { line-height: 1.5; max-width: 52rem; }
+/* A walk-in is a row somebody cannot act on, and it should look like one. */
+.recall-list tr.is-walk-in td { color: var(--muted); }
+.recall-list .sku { font-size: .8125rem; }
+
 /* SCR-205 — the stocktake (TASK-022).
    Three row treatments, and the third is the one that matters: a line nobody counted
    must not look like a line that matched, or somebody posts a half-finished count. */

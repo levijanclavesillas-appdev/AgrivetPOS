@@ -189,6 +189,53 @@ function saleItemBatchesFor(saleItemId) {
 }
 
 /**
+ * `INV-206` — every sale that consumed this batch, and who bought it.
+ *
+ * **One query, not one per sale.** A recall is run in an emergency by somebody with a
+ * telephone, and a screen that fired a query per row would be a screen that takes a
+ * minute to tell them who to ring. `idx_sib_batch` is the index this reads.
+ *
+ * The quantity is `sale_item_batches.qty_milli` — **what this batch gave that line**,
+ * not the line's own quantity. A line of ten that took six from here and four from the
+ * next batch reports six, which is the whole reason `TASK-029` put a table under the
+ * line rather than a column on it.
+ *
+ * Voided and returned sales are **included and marked**, never filtered:
+ *
+ *   A voided sale (`POS-401`) reversed the stock, and the goods may still have left the
+ *   shop — a mis-scan noticed after the customer walked out is voided at the till and
+ *   the sack is in their tricycle. A recall that hid it would not ring them.
+ *
+ *   A returned line (`POS-301`) came back, and `returned_qty_milli` says how much. What
+ *   did **not** come back is still out there, and a partial return is the ordinary
+ *   case, so both figures are carried and the screen states the difference.
+ *
+ * A walk-in has no customer, and that is the answer rather than a missing one: the row
+ * is here with a null customer, and the caller counts them so the store can be told how
+ * many of its buyers it cannot reach.
+ */
+function recall(batchId) {
+  return db.get().prepare(`
+    SELECT sib.qty_milli, sib.unit_cost_centavos, sib.movement_id,
+           si.id AS sale_item_id, si.qty_milli AS line_qty_milli,
+           si.returned_qty_milli, si.product_name_snapshot,
+           s.id AS sale_id, s.sale_no, s.status, s.occurred_at, s.customer_id,
+           c.name AS customer_name, c.contact_no AS customer_contact_no,
+           u.username AS cashier,
+           p.sku, u2.code AS base_unit_code
+      FROM sale_item_batches sib
+      JOIN sale_items si ON si.id = sib.sale_item_id
+      JOIN sales s ON s.id = si.sale_id
+      JOIN products p ON p.id = si.product_id
+      JOIN units u2 ON u2.id = p.base_unit_id
+      LEFT JOIN customers c ON c.id = s.customer_id
+      LEFT JOIN users u ON u.id = s.created_by
+     WHERE sib.batch_id = ?
+     ORDER BY s.occurred_at DESC, s.sale_no DESC
+  `).all(batchId);
+}
+
+/**
  * Point a batch at the receipt line that brought it, once that line exists.
  *
  * Two writes rather than one because the three rows reference each other in a ring:
@@ -227,5 +274,6 @@ module.exports = {
   linkReceiptItem,
   insertSaleItemBatch,
   saleItemBatchesFor,
+  recall,
   deactivate,
 };

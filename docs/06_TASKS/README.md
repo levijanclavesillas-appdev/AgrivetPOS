@@ -21,7 +21,7 @@ which is worth reading before writing the next backlog. What code-complete does 
 shippable: nothing has run in the store. [Status](#status) has the detail.
 
 **The v1.2 backlog is now written** — `TASK-029` to `TASK-035`, plus `TASK-042` and `TASK-043`
-raised while `TASK-029` was built, nine files, of which three are in. See
+raised while `TASK-029` was built, nine files, of which four are in. See
 [Open — v1.2 "Trace"](#open--v12-trace). Writing it is not the same as starting it: the next
 thing that moves this product is a Windows build and a visit to the counter, not another task.
 
@@ -282,7 +282,8 @@ instant it exists, so it has no due date and nothing to age.
 | :--- | :--- | :--- | :--- |
 | [TASK-029](TASK-029-batches-and-fefo.md) | Batches, expiry status, FEFO allocation | `74a29ab` | `014_batches.sql` — `product_batches`, `sale_item_batches`, `inventory_movements.batch_id`; `batchService` and `batchRepository`; FEFO inside the sale transaction; `MON-004`'s second costing path; `OPS-007`'s two expiry alerts; `GET /products/:id/batches`, `POST /batches/:id/expire`; the opening load's batch columns; `TC-UT-52`–`54`, `TC-INT-107`–`111`, `TC-E2E-23`. And `INV-201` joined `/inventory/reconciliation`, so one page answers whether the ledger is telling the truth |
 | [TASK-042](TASK-042-count-by-batch.md) | Counting batch-tracked stock, by batch | *this commit* | `015_count_by_batch.sql` — `stock_count_lines.batch_id`, and the only table rebuild in this schema's history; the sheet's line per batch, with the product's own totals computed server-side; `TC-UT-55`, `TC-INT-114`–`116`, `TC-E2E-25`. It removed the exclusion `TASK-029` added, along with the two tests that pinned it — the count sheet has one way of treating batch-tracked stock again |
-| [TASK-044](TASK-044-shift-receipts.md) | `SCR-306`, this shift's receipts | *this commit* | `public/js/receipt/list.js`; the rail item and `SCR-306` in `04_UX_SPEC.md` §3; a way back on `SCR-304` where it was opened from a list; `TC-UI-12` and `TC-E2E-27`. It found nothing wrong with the void or the reprint — both worked, and neither could be reached once the next customer had started |
+| [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | *this commit* | No schema, which was `TASK-029`'s own test of its sale-line decision. `batchService.recallFor` and `recallCsv`; `GET /batches/:id/recall` and its CSV; `SCR-207`, one step from any batch; `TC-INT-112`, `TC-INT-113`, `TC-E2E-24`. It also fixed a test that failed every evening after 21:00 Manila, having quietly assumed office hours |
+| [TASK-044](TASK-044-shift-receipts.md) | `SCR-306`, this shift's receipts | `4eff796` | `public/js/receipt/list.js`; the rail item and `SCR-306` in `04_UX_SPEC.md` §3; a way back on `SCR-304` where it was opened from a list; `TC-UI-12` and `TC-E2E-27`. It found nothing wrong with the void or the reprint — both worked, and neither could be reached once the next customer had started |
 | [TASK-043](TASK-043-batch-screen.md) | `SCR-206`, the batch list and the write-off | `044fb57` | `public/js/catalogue/batches.js`; `SCR-206` in `04_UX_SPEC.md` §3; the row action on `SCR-201` and the action on `SCR-601`'s expiry alerts; `TC-UI-11` and the browser smoke's fourteen. It also found that the smoke had been seeding its batch-tracked medicine with a bare adjustment `INV-201` refuses — the fixture had silently held no stock since `TASK-029` |
 
 **What `TASK-029` handed on, and what came back.** Two tasks that were not in the backlog when it
@@ -293,16 +294,16 @@ and the alert shipped without anywhere to act on them. Both are now in, and the 
 
 ## Open — v1.2 "Trace"
 
-**The files are written, and three of the nine are built.** All nine are in the established format,
+**The files are written, and four of the nine are built.** All nine are in the established format,
 each self-contained enough that an implementer needs it plus the specs it cites and nothing else. Every one of the ten v1.2
 rules in `03_BUSINESS_RULES.md` is claimed by exactly one task, checked mechanically rather than
 by eye, and `07_TEST_PLAN.md` §6.4 reserves the case ids so no two tasks reach for the same
 number.
 
-**In dependency order, which is not numeric order.** `TASK-029` was first and alone at the front —
-batches are the substrate, and `TASK-030` was unbuildable without the decision it makes about how
-a sale line records the batches it consumed. `TASK-030` now waits only on itself: `TASK-043`
-built the list its recall hangs off. `TASK-031` before `TASK-034`, because a
+**In dependency order, which is not numeric order.** The batch arc is closed: `TASK-029` laid the
+substrate, `TASK-043` gave it a screen, `TASK-042` made it countable and `TASK-030` made it
+recallable — and none of the four needed a column the first had not already written. What is left
+depends on nothing in v1.2 except each other. `TASK-031` before `TASK-034`, because a
 write-off has to land on a statement and it is cheaper to have the statement first. `TASK-032`,
 `TASK-033` and `TASK-035` depend on nothing in v1.2 and can be taken in any order — though
 `TASK-035` should not be started at all until the store visit, for the reason its own first
@@ -310,7 +311,6 @@ section gives.
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
-| [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | `FT-205`, `INV-206` | `TASK-029` ✅, `TASK-043` ✅ |
 | [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | `FT-406`, `FT-407` | — |
 | [TASK-032](TASK-032-payment-reconciliation.md) | Payment reconciliation | `FT-606` | — |
 | [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | `FT-602`, `FT-605` | — |

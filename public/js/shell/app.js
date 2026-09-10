@@ -24,6 +24,7 @@ import { createProductList } from '../catalogue/list.js';
 import { createProductEditor } from '../catalogue/editor.js';
 import { createAdjustment } from '../catalogue/adjustment.js';
 import { createBatchList } from '../catalogue/batches.js';
+import { createRecall } from '../catalogue/recall.js';
 import { createStockCount } from '../catalogue/count.js';
 import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
@@ -489,6 +490,19 @@ export function createApp({ root }) {
       productId,
       session,
       onClose: () => showProducts(),
+      onRecall: (batchId) => showRecall(batchId, productId),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-207. INV-206's list of people, one step from the batch it is about. */
+  function showRecall(batchId, productId) {
+    if (current?.unmount) current.unmount();
+    current = createRecall({
+      root: host(),
+      batchId,
+      onClose: () => showBatches(productId),
     });
     current.mount();
     return current;

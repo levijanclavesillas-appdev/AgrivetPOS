@@ -30,7 +30,7 @@ const STATUS_LABEL = {
   NORMAL: 'Good',
 };
 
-export function createBatchList({ root, productId, session, onClose }) {
+export function createBatchList({ root, productId, session, onClose, onRecall = null }) {
   let product = null;
   let batches = [];
   let includeEmpty = false;
@@ -143,7 +143,19 @@ export function createBatchList({ root, productId, session, onClose }) {
           text: STATUS_LABEL[batch.expiry_status] || batch.expiry_status,
         })]),
         h('td', { class: 'qty', text: batch.qty_display }),
-        h('td', {}, [writeOff(batch)]),
+        h('td', {}, [
+          // INV-206 in one step from the batch, which is where somebody holding a
+          // manufacturer's notice arrives. A recall is offered for every batch, sold
+          // out or not — an exhausted batch is exactly the one whose stock is all in
+          // customers' sheds.
+          onRecall
+            ? h('button', {
+              class: 'row-action', text: 'Recall',
+              onclick: () => onRecall(batch.id),
+            })
+            : null,
+          writeOff(batch),
+        ]),
       ]))),
     ]);
   }
