@@ -66,9 +66,18 @@ function stocked({ retail = 6250, cost = 4800, qtyMilli = 1000000, category = nu
     isBatchTracked: batchTracked,
   }, sessions.OWNER);
 
-  inventoryService.postStandalone({
-    productId: product.id, type: 'RECEIPT', qtyMilli, unitCostCentavos: cost, actor: sessions.OWNER,
-  });
+  // INV-201, from TASK-029: a batch-tracked product's stock arrives in a batch, so the
+  // fixture that gives it stock has to be a delivery rather than a bare RECEIPT.
+  if (batchTracked) {
+    temp.seedBatch({
+      product, supplier: ref.supplier, qtyMilli, unitCostCentavos: cost,
+      batchNo: `RET-B-${seq}`, actor: sessions.OWNER,
+    });
+  } else {
+    inventoryService.postStandalone({
+      productId: product.id, type: 'RECEIPT', qtyMilli, unitCostCentavos: cost, actor: sessions.OWNER,
+    });
+  }
   return productRepository.findById(product.id);
 }
 
@@ -133,6 +142,10 @@ test.before(async () => {
     tokens[role] = signedIn.token;
     sessions[role] = authService.verifyToken(signedIn.token);
   }
+
+  // After the users exist: INV-202 makes a supplier part of a batch's identity, and
+  // suppliers.created_by is NOT NULL.
+  ref.supplier = temp.seedSupplier({}, sessions.OWNER);
 
   cashierShift = shiftService.open({
     actor: sessions.CASHIER, openingFloatCentavos: 500000, confirmed: true,

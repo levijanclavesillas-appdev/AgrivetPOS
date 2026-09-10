@@ -33,6 +33,8 @@ const pricingService = require('./pricingService');
 const taxService = require('./taxService');
 const storeProfileService = require('./storeProfileService');
 const inventoryService = require('./inventoryService');
+const batchService = require('./batchService');
+const batchRepository = require('../repositories/batchRepository');
 const creditService = require('./creditService');
 const shiftService = require('./shiftService');
 const drawerService = require('./drawerService');
@@ -170,6 +172,15 @@ function complete(input, actor) {
       acceptDuplicateReference, approver, actor,
     });
 
+    // ── 8a. FEFO, for the lines whose product is batch-tracked (INV-204) ────
+    //
+    // Before the sale is written, because the line's cost snapshot is the blended cost
+    // of the batches it consumes (MON-004) and a snapshot cannot be taken after the row
+    // exists. `allocate` reads and consumes nothing, which is what makes this safe to
+    // run before anything is committed — and INV-205's refusal lands here, where the
+    // sale has still written nothing, rather than half way through step 10.
+    const batchPlan = planBatches(priced, at);
+
     // ── 8. Allocate the sale number, after every validation (POS-108) ───────
     const saleNo = sequenceService.next('SALE', { at });
 
@@ -177,13 +188,48 @@ function complete(input, actor) {
     const saleId = ids.uuidv7();
     const written = writeSale({
       saleId, saleNo, shift, customer, priced, resolvedLines, settled, taxMode, actor, approver, at, reason,
+      batchPlan,
     });
 
     // ── 10. One inventory movement per line, and the on-hand update ─────────
     //
     // Through inventoryService.post, which joins this transaction rather than opening
     // its own — INV-101's balance and INV-107's document commit together.
-    for (const line of priced.lines) {
+    priced.lines.forEach((line, index) => {
+      const allocations = batchPlan[index];
+
+      // INV-201: a batch-tracked line posts one movement per batch it consumed, so the
+      // ledger grouped by batch and the ledger grouped by product are the same sum.
+      // Ten sacks taken six-and-four is two movements and still one sale line.
+      if (allocations) {
+        for (const allocation of allocations) {
+          const posted = inventoryService.post({
+            productId: line.product_id,
+            type: 'SALE',
+            qtyMilli: allocation.qtyMilli,
+            batchId: allocation.batchId,
+            actor,
+            referenceType: 'sale',
+            referenceId: saleId,
+            referenceNo: saleNo,
+            occurredAt: at,
+          });
+          // INV-206's half of the trail: which line took how much of which batch, at
+          // what cost. The line's own unit_cost_centavos is the weighted average of
+          // these and cannot be taken back apart afterwards.
+          batchRepository.insertSaleItemBatch({
+            id: ids.uuidv7(),
+            sale_item_id: written.items[index].id,
+            batch_id: allocation.batchId,
+            qty_milli: allocation.qtyMilli,
+            unit_cost_centavos: allocation.unitCostCentavos,
+            movement_id: posted.movement.id,
+            created_at: at,
+          });
+        }
+        return;
+      }
+
       inventoryService.post({
         productId: line.product_id,
         type: 'SALE',
@@ -194,7 +240,7 @@ function complete(input, actor) {
         referenceNo: saleNo,
         occurredAt: at,
       });
-    }
+    });
 
     // ── 11a. The store credit spent, where any was tendered (CR-108) ───────
     //
@@ -547,7 +593,34 @@ const dayEnd = (at) => auditService.dayEndUtc(clock.manilaDate(at));
 
 // ── Step 9 — writing it down ────────────────────────────────────────────────
 
-function writeSale({ saleId, saleNo, shift, customer, priced, resolvedLines, settled, taxMode, actor, approver, at, reason }) {
+/**
+ * INV-204: which batches each line will consume, keyed by the line's index.
+ *
+ * A line whose product is not batch-tracked gets no entry, so `batchPlan[i]` is
+ * `undefined` for it and step 10 posts the single movement it always posted.
+ *
+ * This runs before the sale number is drawn and before anything is written. That is
+ * deliberate: INV-205's refusal — expired stock on the shelf that may not be sold — has
+ * to reach the cashier as a refusal of the sale, not as a failure half way through
+ * posting movements, and POS-108 says a rolled-back sale consumes no number.
+ */
+function planBatches(priced, at) {
+  const plan = [];
+  const asOfDate = batchService.today(at);
+
+  priced.lines.forEach((line, index) => {
+    const product = productRepository.findById(line.product_id);
+    if (!product || !product.is_batch_tracked) return;
+    plan[index] = batchService.allocate(line.product_id, line.qty_milli, { asOfDate, product });
+  });
+
+  return plan;
+}
+
+function writeSale({
+  saleId, saleNo, shift, customer, priced, resolvedLines, settled, taxMode, actor, approver, at, reason,
+  batchPlan = [],
+}) {
   const summary = priced.tax_summary || {
     vatable_sales_centavos: 0, vat_exempt_sales_centavos: 0, zero_rated_sales_centavos: 0,
   };
@@ -600,7 +673,14 @@ function writeSale({ saleId, saleNo, shift, customer, priced, resolvedLines, set
       price_level_applied: line.price_level,
       // The cost snapshot RPT-104 reads. Changing a product's cost afterwards does not
       // change this sale's gross profit — TC-INT-35.
-      unit_cost_centavos: product.avg_cost_centavos,
+      //
+      // MON-004: a batch-tracked line costs at the batches it consumed, not at the
+      // moving average — and where it spanned two, at their quantity-weighted average.
+      // Six sacks at ₱300 and four at ₱320 is ₱308, not ₱310. Non-batch products keep
+      // the moving average permanently, which is the whole of the costing change.
+      unit_cost_centavos: batchPlan[index]
+        ? batchService.blendedCostCentavos(batchPlan[index])
+        : product.avg_cost_centavos,
       // MON-005: every discount that came off this line, statutory included. The VAT
       // an exempt line was relieved of is **not** in it — that is a tax treatment, not
       // a discount, and a line total below `unit price × quantity − discounts` by

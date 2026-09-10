@@ -81,6 +81,27 @@ place. **Decide this before writing anything**, because `TASK-030` is built on w
 11. A return that restocks a batch-tracked line returns it to the batch it came from
     (`POS-303`) — where `POS-304`'s default was overridden to allow it at all.
 
+## What this task decided, and what it handed on
+
+**`Q-2` — which goods are batch-tracked.** Per category, set per product, and settable from the
+opening load's product file (`batch_tracked`) so a cutover does not have to be corrected
+afterwards.
+
+**`INV-205`'s override — not built.** The store's policy does not permit selling expired stock,
+so there is no authorising column, no parameter and no route: `TC-INT-110` asserts that no path
+exists, in every shape one would arrive in. If the policy changes it arrives as `AUD-603`'s
+two-actor form in its own migration — adding it later costs less than removing it.
+
+**The sale line — a child table, not a column.** `sale_item_batches` carries the per-batch
+detail `INV-206` needs; `sale_items.batch_id` is **withdrawn in place**, left `NULL` for ever
+rather than dropped, because a line recording its batch in two places is a line whose two
+records can disagree.
+
+**Stock counts — handed to `TASK-042`.** `INV-201` refuses an unbatched movement of a
+batch-tracked product, and a product-level count sheet has no batch to name. Batch-tracked
+products are left off the sheet, the session says how many it left off, and a scope containing
+nothing else refuses at `open` rather than at `post`. Counting them by batch is `TASK-042`.
+
 ## Business Rules
 
 - `INV-201`, `INV-202` — what a batch is, and that it sums to on-hand.
@@ -104,15 +125,17 @@ place. **Decide this before writing anything**, because `TASK-030` is built on w
 
 ## Acceptance Criteria
 
-- [ ] A batch-tracked receipt without a batch number is refused, naming the product
-- [ ] Batch quantities sum to the product's on-hand figure after a receipt, a sale and a return
-- [ ] A line of ten where the oldest batch holds six consumes six and four, oldest first
-- [ ] An expired batch is skipped by FEFO, and selling one is refused with the expiry date
-- [ ] Where the override exists, it records a requesting and an approving user and a reason
-- [ ] A batch-tracked sale line's cost snapshot is the batch cost; a non-batch line's is unchanged
-- [ ] Expiry status changes with the clock alone, with no job having run
-- [ ] The near-expiry alert appears on `SCR-601` at the configured threshold
-- [ ] An `EXPIRY` write-off names the batch and leaves the ledger reconciling
+- [x] A batch-tracked receipt without a batch number is refused, naming the product
+- [x] Batch quantities sum to the product's on-hand figure after a receipt, a sale and a return
+- [x] A line of ten where the oldest batch holds six consumes six and four, oldest first
+- [x] An expired batch is skipped by FEFO, and selling one is refused with the expiry date
+- [x] Where the override exists, it records a requesting and an approving user and a reason —
+      **it does not exist**: the store's policy permits none, so `TC-INT-110` asserts the absence
+      of the path rather than the behaviour of one
+- [x] A batch-tracked sale line's cost snapshot is the batch cost; a non-batch line's is unchanged
+- [x] Expiry status changes with the clock alone, with no job having run
+- [x] The near-expiry alert appears on `SCR-601` at the configured threshold
+- [x] An `EXPIRY` write-off names the batch and leaves the ledger reconciling
 
 ## Tests
 

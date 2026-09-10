@@ -263,7 +263,7 @@ test('TC-E2E-06: the closed day is immutable and still reconciles', async () => 
   assert.equal((await sale.json()).error.rule_id, 'POS-501');
 
   // Both ledgers still agree after a full day and a close.
-  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [] });
+  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [], batch_breaks: [] });
   assert.deepEqual(await json(await call('/customers/credit-reconciliation')), { ok: true, breaks: [] });
 });
 

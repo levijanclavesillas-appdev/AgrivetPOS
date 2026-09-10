@@ -174,6 +174,20 @@ function deleteBarcode(id) {
 
 // ── Packs (UOM-002) ─────────────────────────────────────────────────────────
 
+/**
+ * How many products are batch-tracked, in the whole catalogue or in one category.
+ *
+ * Read by the stock count, which leaves them off its sheet (INV-201) and has to be
+ * able to say how many it left off.
+ */
+function countBatchTracked({ categoryId = null } = {}) {
+  return db.get().prepare(`
+    SELECT COUNT(*) AS n FROM products
+     WHERE is_batch_tracked = 1
+       AND (@categoryId IS NULL OR category_id = @categoryId)
+  `).get({ categoryId }).n;
+}
+
 function packsFor(productId) {
   return db.get().prepare(`
     SELECT pk.id, pk.unit_id, pk.factor_milli, pk.is_default_sell, pk.created_at,
@@ -371,6 +385,7 @@ function countReferences(productId) {
 }
 
 module.exports = {
+  countBatchTracked,
   findById, findBySku, countAll, search, countSearch, insert, updateFields,
   barcodesFor, findByBarcode, findBarcode, insertBarcode, deleteBarcode,
   packsFor, insertPack, clearDefaultPack, deletePack,

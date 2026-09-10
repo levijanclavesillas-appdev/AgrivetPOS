@@ -577,6 +577,73 @@ function ageSession(sessionId, days) {
   db.get().prepare('UPDATE stock_count_sessions SET opened_at = ? WHERE id = ?').run(at, sessionId);
 }
 
+// ── TASK-029 — INV-201, the stock a product-level sheet cannot count ────────
+
+test('INV-201: batch-tracked products are left off the sheet, and the sheet says how many', () => {
+  const supplier = temp.seedSupplier({ name: 'Count Vet Supply', code: 'CVS' }, sessions.OWNER);
+  const plain = stocked({ qtyMilli: 10000 });
+
+  const tracked = productService.create({
+    sku: 'CNT-BATCH-1',
+    name: 'Counted Vaccine',
+    categoryId: ref.category.id,
+    baseUnitId: ref.piece.id,
+    retailPriceCentavos: 32000,
+    isBatchTracked: true,
+  }, sessions.OWNER);
+  temp.seedBatch({
+    product: tracked, supplier, qtyMilli: 10000, unitCostCentavos: 21000,
+    batchNo: 'CNT-B-1', actor: sessions.OWNER,
+  });
+
+  const opened = stockCountService.open({ scope: 'ALL' }, sessions.INVENTORY);
+  const lines = stockCountService.get(opened.session.id).lines;
+
+  // Which batch is short is not something one counted figure can say, so the vaccine
+  // is not on a product-level sheet at all. Left on it, INV-201 would refuse the
+  // variance movement at posting — after the shelf had been counted and approved,
+  // which is the worst moment to discover it.
+  assert.equal(lines.some((l) => l.product_id === tracked.id), false, 'the vaccine is not on the sheet');
+  assert.ok(lines.some((l) => l.product_id === plain.id), 'and the feed still is');
+
+  // Stated rather than silently omitted: a sheet that claims the whole shop and quietly
+  // skips the vaccine fridge is a sheet somebody signs off believing they counted it all.
+  assert.ok(opened.session.batch_tracked_excluded >= 1);
+  const trail = auditService.browse({ action: 'STOCK_COUNT_OPENED', entityId: opened.session.id });
+  assert.equal(trail.rows[0].after.batch_tracked_excluded, opened.session.batch_tracked_excluded);
+
+  stockCountService.cancel(opened.session.id, { reason: 'Abandoned by the test' }, sessions.INVENTORY);
+});
+
+test('INV-201: a category of nothing but batch-tracked stock says so, rather than "nothing to count"', () => {
+  const supplier = temp.seedSupplier({ name: 'Fridge Supply', code: 'FRS' }, sessions.OWNER);
+  const referenceService = require('../../services/referenceService');
+  const fridge = referenceService.create('categories', { name: 'Cold chain' }, sessions.OWNER);
+
+  const tracked = productService.create({
+    sku: 'CNT-BATCH-2',
+    name: 'Fridge Vaccine',
+    categoryId: fridge.id,
+    baseUnitId: ref.piece.id,
+    retailPriceCentavos: 32000,
+    isBatchTracked: true,
+  }, sessions.OWNER);
+  temp.seedBatch({
+    product: tracked, supplier, qtyMilli: 5000, unitCostCentavos: 21000,
+    batchNo: 'CNT-B-2', actor: sessions.OWNER,
+  });
+
+  // "There is nothing to count" would be a lie the counter can see through the door.
+  assert.throws(
+    () => stockCountService.open({ scope: 'CATEGORY', categoryId: fridge.id }, sessions.INVENTORY),
+    (err) => {
+      assert.equal(err.ruleId, 'INV-201');
+      assert.match(err.message, /counted by batch rather than by product/);
+      return true;
+    }
+  );
+});
+
 // ── Last, deliberately ──────────────────────────────────────────────────────
 //
 // The case below opens a **different database** — one with a single active user — to

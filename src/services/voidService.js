@@ -44,6 +44,7 @@ const inventoryService = require('./inventoryService');
 const creditService = require('./creditService');
 const drawerService = require('./drawerService');
 const saleRepository = require('../repositories/saleRepository');
+const batchRepository = require('../repositories/batchRepository');
 const returnRepository = require('../repositories/returnRepository');
 const creditRepository = require('../repositories/creditRepository');
 const shiftRepository = require('../repositories/shiftRepository');
@@ -267,23 +268,41 @@ function post({ saleId, reason, approver = null }, actor) {
     // mis-signed into a second sale.
     const reversed = [];
     for (const item of items) {
-      const movement = inventoryService.post({
-        productId: item.product_id,
-        type: 'SALE_VOID',
-        qtyMilli: item.qty_milli,
-        actor,
-        reason: `${why} — ${sale.sale_no} voided (POS-401)`,
-        referenceType: 'sale_void',
-        referenceId: sale.id,
-        referenceNo: sale.sale_no,
-        occurredAt: at,
-      });
-      reversed.push({
-        product: item.product_name_snapshot,
-        qty_milli: item.qty_milli,
-        movement_id: movement.movement.id,
-        balance_after_milli: movement.movement.balance_after_milli,
-      });
+      // INV-201: a batch-tracked line goes back to the batches it took, in the
+      // quantities it took from each. `sale_item_batches` recorded them at the sale, so
+      // the reversal reads that back rather than allocating afresh — a void says the
+      // sale never happened, and FEFO'ing the stock into a different batch would leave
+      // the shelf holding boxes with dates the ledger disagrees with.
+      //
+      // A line that spanned two batches reverses as two movements, exactly as it sold
+      // as two. `taken` is empty for every non-batch product, which is every line sold
+      // before TASK-029, and those reverse as the single movement they always did.
+      const taken = batchRepository.saleItemBatchesFor(item.id);
+      const draws = taken.length > 0
+        ? taken.map((row) => ({ qtyMilli: row.qty_milli, batchId: row.batch_id }))
+        : [{ qtyMilli: item.qty_milli, batchId: null }];
+
+      for (const draw of draws) {
+        const movement = inventoryService.post({
+          productId: item.product_id,
+          type: 'SALE_VOID',
+          qtyMilli: draw.qtyMilli,
+          batchId: draw.batchId,
+          actor,
+          reason: `${why} — ${sale.sale_no} voided (POS-401)`,
+          referenceType: 'sale_void',
+          referenceId: sale.id,
+          referenceNo: sale.sale_no,
+          occurredAt: at,
+        });
+        reversed.push({
+          product: item.product_name_snapshot,
+          qty_milli: draw.qtyMilli,
+          batch_id: draw.batchId,
+          movement_id: movement.movement.id,
+          balance_after_milli: movement.movement.balance_after_milli,
+        });
+      }
     }
 
     // ── POS-401, second: any credit transaction reversed ──

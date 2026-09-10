@@ -39,6 +39,7 @@ const clock = require('../config/clock');
 const ids = require('../config/ids');
 const errors = require('./errors');
 const settingsService = require('./settingsService');
+const batchService = require('./batchService');
 const inventoryService = require('./inventoryService');
 const creditService = require('./creditService');
 const shiftService = require('./shiftService');
@@ -92,6 +93,48 @@ function lowStockAlerts() {
     `${total} product${total === 1 ? ' is' : 's are'} at or below the reorder point.`,
     { count: total }
   )];
+}
+
+/**
+ * OPS-007's near-expiry alert, which the rule has carried as "(v1.2)" since v1.0.
+ *
+ * Two lines rather than one, because they are two different jobs. **Near-expiry is a
+ * selling problem** — move it, discount it, put it at the front — and **expired is a
+ * disposal problem**: that stock may not be sold at all (INV-205) and is waiting for an
+ * EXPIRY movement. Merging them into one count would put the two in front of the owner
+ * as the same number and let the second hide inside the first.
+ *
+ * Expired is CRITICAL rather than WARNING for the same reason: it is stock on a shelf
+ * that a cashier will reach for, and every attempt to sell it is a refused sale at the
+ * counter until somebody writes it off.
+ */
+function expiryAlerts() {
+  const near = batchService.nearExpiry({ limit: 200 });
+  const gone = batchService.expired({ limit: 200 });
+  const out = [];
+
+  if (gone.length > 0) {
+    const worst = gone[0];
+    out.push(alert(
+      'EXPIRED_STOCK', 'CRITICAL', 'INV-205',
+      `${gone.length} batch${gone.length === 1 ? '' : 'es'} on the shelf ${gone.length === 1 ? 'has' : 'have'} expired `
+      + `and may not be sold — ${worst.product_name} ${worst.batch_no} on ${worst.expiry_date}.`,
+      { count: gone.length, batch_id: worst.id, product_id: worst.product_id }
+    ));
+  }
+
+  if (near.length > 0) {
+    const soonest = near[0];
+    out.push(alert(
+      'NEAR_EXPIRY', 'WARNING', 'INV-203',
+      `${near.length} batch${near.length === 1 ? '' : 'es'} expiring within `
+      + `${settingsService.get('near_expiry_days')} days — `
+      + `${soonest.product_name} ${soonest.batch_no} on ${soonest.expiry_date}.`,
+      { count: near.length, batch_id: soonest.id, product_id: soonest.product_id }
+    ));
+  }
+
+  return out;
 }
 
 /**
@@ -226,6 +269,7 @@ function lastFailedBackup() {
 
 const SOURCES = Object.freeze([
   ['low stock', lowStockAlerts],
+  ['expiry', expiryAlerts],
   ['credit', creditAlerts],
   ['shifts', shiftAlerts],
   ['cash variance', varianceAlerts],
@@ -326,5 +370,5 @@ module.exports = {
   UNDISMISSIBLE, SEVERITIES,
   install, installed, list, dismiss, undismiss, keyFor,
   // Named so the tests can drive one source at a time.
-  lowStockAlerts, creditAlerts, shiftAlerts, varianceAlerts, healthAlerts, lastFailedBackup,
+  lowStockAlerts, expiryAlerts, creditAlerts, shiftAlerts, varianceAlerts, healthAlerts, lastFailedBackup,
 };

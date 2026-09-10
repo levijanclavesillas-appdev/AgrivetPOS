@@ -15,7 +15,7 @@ const db = require('../config/database');
 const MOVEMENT_COLUMNS = `
   id, product_id, movement_type, qty_milli, balance_after_milli, unit_cost_centavos,
   reference_type, reference_id, reference_no, reason, corrects_movement_id,
-  is_negative_stock, occurred_at, created_by
+  batch_id, is_negative_stock, occurred_at, created_by
 `;
 
 // ── On hand (INV-101) ───────────────────────────────────────────────────────
@@ -59,7 +59,8 @@ function insertMovement(row) {
     INSERT INTO inventory_movements (${MOVEMENT_COLUMNS})
     VALUES (@id, @product_id, @movement_type, @qty_milli, @balance_after_milli,
             @unit_cost_centavos, @reference_type, @reference_id, @reference_no,
-            @reason, @corrects_movement_id, @is_negative_stock, @occurred_at, @created_by)
+            @reason, @corrects_movement_id, @batch_id, @is_negative_stock,
+            @occurred_at, @created_by)
   `).run(row);
   return row;
 }

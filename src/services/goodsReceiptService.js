@@ -40,8 +40,10 @@ const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const sequenceService = require('./sequenceService');
 const inventoryService = require('./inventoryService');
+const batchService = require('./batchService');
 const supplierService = require('./supplierService');
 const purchaseOrderService = require('./purchaseOrderService');
+const batchRepository = require('../repositories/batchRepository');
 const goodsReceiptRepository = require('../repositories/goodsReceiptRepository');
 const purchaseOrderRepository = require('../repositories/purchaseOrderRepository');
 const productRepository = require('../repositories/productRepository');
@@ -263,6 +265,42 @@ function resolveLines({ input, order, orderLines }) {
   });
 }
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * INV-202: a batch-tracked product cannot be received without a batch.
+ *
+ * Checked over the whole delivery before any of it is written, and reported as one
+ * message naming every line that is missing something — a clerk keying a twelve-line
+ * delivery should be told all of it at once rather than corrected twelve times.
+ *
+ * The columns have been on `goods_receipt_items` since TASK-019 and optional ever
+ * since; what changes here is that they stop being optional for the products that need
+ * them, and stay optional for every product that does not.
+ */
+function assertBatchDetails(resolved) {
+  const missing = resolved
+    .filter((line) => line.sound_qty_milli > 0 && line.product && line.product.is_batch_tracked)
+    .filter((line) => !line.batch_no || !line.expiry_date || !DATE_ONLY.test(line.expiry_date))
+    .map((line) => {
+      const wants = [];
+      if (!line.batch_no) wants.push('a batch number');
+      // The shape as well as the presence, and here rather than at the batch: an
+      // expiry typed "31/03/2027" would otherwise pass this check, reach INV-202 in
+      // the middle of the transaction, and roll back a delivery already half keyed.
+      if (!line.expiry_date) wants.push('an expiry date');
+      else if (!DATE_ONLY.test(line.expiry_date)) wants.push('its expiry date as YYYY-MM-DD');
+      return `${line.product_name_snapshot} needs ${wants.join(' and ')}`;
+    });
+
+  if (missing.length > 0) {
+    throw errors.badRequest(
+      `${missing.join('; ')}. Batch-tracked stock cannot be received without it.`,
+      { ruleId: 'INV-202' },
+    );
+  }
+}
+
 /** The exceptions on a delivery, as sentences the authorisation panel can show. */
 function exceptionsFor(resolved) {
   const out = [];
@@ -439,6 +477,10 @@ function post(input, actor) {
   const orderLines = order ? purchaseOrderRepository.itemsFor(order.id) : [];
   const resolved = resolveLines({ input: input.lines, order, orderLines });
 
+  // INV-202, before anything is written: a delivery missing a batch number is refused
+  // whole rather than half-posted.
+  assertBatchDetails(resolved);
+
   const exceptions = exceptionsFor(resolved);
   const authorisation = authorisationFor({ actor, approver: input.approver, exceptions });
   const approvalReason = textOrNull(input.approvalReason, { max: 200 });
@@ -483,6 +525,42 @@ function post(input, actor) {
       // A line that arrived entirely broken is recorded and posts nothing. There is no
       // movement of zero: INV-103 refuses one, and rightly — a movement of nothing sits
       // in the ledger looking like a lost quantity.
+      // The receipt line's id is drawn first so the batch can point at it (INV-202)
+      // without a second write to correct the link afterwards.
+      const grItemId = ids.uuidv7();
+
+      // ── INV-202 — a delivery of batch-tracked goods creates the batch ──
+      //
+      // This is the only place a batch is born in ordinary trading: the batch number
+      // and the expiry date come off the sack, and PO-203's actual cost becomes the
+      // batch's cost, which is the figure a sale of it will snapshot (MON-004).
+      //
+      // The batch is created without its `gr_item_id` and linked after the receipt line
+      // is written. The three rows reference each other in a ring — the line names its
+      // movement, the movement names its batch, the batch names the line — so one of
+      // them has to be written before its target exists, and with foreign keys on this
+      // is the only order that holds.
+      let batch = null;
+      let createdBatch = false;
+      if (line.sound_qty_milli > 0 && line.product && line.product.is_batch_tracked) {
+        // A redelivery of the same batch number is the same batch (INV-202): a second
+        // row for it would split one recall in two.
+        batch = batchService.findForReceipt(line.product_id, line.batch_no);
+        if (!batch) {
+          batch = batchService.create({
+            productId: line.product_id,
+            batchNo: line.batch_no,
+            supplierId: supplier.id,
+            expiryDate: line.expiry_date,
+            receivedDate: batchService.today(at),
+            unitCostCentavos: line.unit_cost_centavos,
+            actor,
+            occurredAt: at,
+          });
+          createdBatch = true;
+        }
+      }
+
       let movement = null;
       if (line.sound_qty_milli > 0) {
         movement = inventoryService.post({
@@ -492,6 +570,7 @@ function post(input, actor) {
           // PO-203 — the **actual** cost. This is the figure every gross-profit report
           // will read for ever, and the ordered cost is not it.
           unitCostCentavos: line.unit_cost_centavos,
+          batchId: batch ? batch.id : null,
           actor,
           referenceType: 'goods_receipt',
           referenceId: grId,
@@ -500,8 +579,10 @@ function post(input, actor) {
         });
       }
 
+      // The receipt line first, then the link back from the batch — the ring closes
+      // here, in the only order the foreign keys allow.
       goodsReceiptRepository.insertItem({
-        id: ids.uuidv7(),
+        id: grItemId,
         gr_id: grId,
         line_no: line.line_no,
         po_item_id: line.po_item_id,
@@ -524,6 +605,8 @@ function post(input, actor) {
         movement_id: movement ? movement.movement.id : null,
         damage_note: line.damage_note,
       });
+
+      if (createdBatch) batchRepository.linkReceiptItem(batch.id, grItemId);
 
       posted.push({
         product: line.product_name_snapshot,

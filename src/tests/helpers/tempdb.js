@@ -108,6 +108,55 @@ function seedCatalog(actor = SETUP_ACTOR) {
   };
 }
 
+/**
+ * A supplier, which batch-tracked stock cannot exist without.
+ *
+ * INV-202 names the supplier as part of a batch's identity, so from TASK-029 any
+ * fixture that stocks a batch-tracked product needs one. Shared rather than repeated,
+ * because a test that invents its own supplier per file makes the purchasing reports
+ * read differently in each.
+ */
+function seedSupplier({ name = 'Mindanao Feed Mill', code = 'MFM' } = {}, actor) {
+  // No SETUP_ACTOR default: its id is null and suppliers.created_by is NOT NULL, so
+  // defaulting would trade a clear message here for SQLITE_CONSTRAINT_NOTNULL raised
+  // inside a before-hook, which is what it cost the first time.
+  if (!actor || !actor.id) {
+    throw new TypeError('seedSupplier needs a real user — suppliers.created_by is NOT NULL');
+  }
+  const supplierService = require('../../services/supplierService');
+  return supplierService.create({ name, code }, actor);
+}
+
+/**
+ * Stock a batch-tracked product the way a delivery would: a batch, then a RECEIPT
+ * movement naming it (INV-201, INV-202).
+ *
+ * `expiryDate` defaults far enough out to read NORMAL against the 90-day default, so a
+ * fixture that does not care about expiry does not accidentally test it.
+ */
+function seedBatch({
+  product, supplier, qtyMilli, unitCostCentavos, batchNo = null, expiryDate = null, actor,
+}) {
+  if (!actor || !actor.id) {
+    throw new TypeError('seedBatch needs a real user — product_batches.created_by is NOT NULL');
+  }
+  const batchService = require('../../services/batchService');
+  const inventoryService = require('../../services/inventoryService');
+  const batch = batchService.create({
+    productId: product.id,
+    batchNo: batchNo || `B-${String(product.sku || 'X').slice(-4)}-1`,
+    supplierId: supplier.id,
+    expiryDate: expiryDate || batchService.addDays(batchService.today(), 400),
+    unitCostCentavos,
+    actor,
+  });
+  const posted = inventoryService.postStandalone({
+    productId: product.id, type: 'RECEIPT', qtyMilli, unitCostCentavos,
+    batchId: batch.id, actor,
+  });
+  return { batch, movement: posted.movement };
+}
+
 /** Create a user directly through the service, as an administrator would. */
 function seedUser({ username, role = 'CASHIER', password = 'correct-horse-battery', pin = null, fullName = null }) {
   const userService = require('../../services/userService');
@@ -117,4 +166,7 @@ function seedUser({ username, role = 'CASHIER', password = 'correct-horse-batter
   );
 }
 
-module.exports = { freshDir, openEmpty, openMigrated, reopen, cleanup, seedStore, seedCatalog, seedUser, SETUP_ACTOR };
+module.exports = {
+  freshDir, openEmpty, openMigrated, reopen, cleanup,
+  seedStore, seedCatalog, seedSupplier, seedBatch, seedUser, SETUP_ACTOR,
+};

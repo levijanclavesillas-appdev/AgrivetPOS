@@ -44,6 +44,7 @@ const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const sequenceService = require('./sequenceService');
 const inventoryService = require('./inventoryService');
+const batchRepository = require('../repositories/batchRepository');
 const creditService = require('./creditService');
 const shiftService = require('./shiftService');
 const drawerService = require('./drawerService');
@@ -460,6 +461,49 @@ function authorisationFor({ actor, approver, exceptions }) {
  * credit transaction, the sale's `returned_qty_milli` and the sale's new status commit
  * together or not at all.
  */
+/**
+ * INV-201: the batches a returned quantity goes back to, earliest expiry first.
+ *
+ * Reads `sale_item_batches` — what this line actually took — and draws the returned
+ * quantity back across them in the same order, capped by what each gave. Returns `[]`
+ * for a line whose product is not batch-tracked, which is every line before TASK-029.
+ *
+ * **A repeated partial return is drawn against what is left to return, not against the
+ * original consumption.** The line's `returned_qty_milli` says how much has already
+ * gone back, and skipping that would send the second return to the same batch as the
+ * first and overshoot it.
+ */
+function returnDraw(line, qtyMilli) {
+  const consumed = batchRepository.saleItemBatchesFor(line.sale_item_id);
+  if (consumed.length === 0) return [];
+
+  // What each batch has already had returned to it, oldest first — the same order the
+  // draw below runs in, so replaying it reproduces exactly the earlier draws.
+  let alreadyReturned = line.already_returned_milli || 0;
+  const draws = [];
+  let remaining = qtyMilli;
+
+  for (const row of consumed) {
+    if (remaining <= 0) break;
+    let available = row.qty_milli;
+    if (alreadyReturned > 0) {
+      const consumedByEarlier = Math.min(alreadyReturned, available);
+      available -= consumedByEarlier;
+      alreadyReturned -= consumedByEarlier;
+    }
+    if (available <= 0) continue;
+    const take = Math.min(remaining, available);
+    draws.push({ batchId: row.batch_id, qtyMilli: take });
+    remaining -= take;
+  }
+
+  // The ceiling POS-301 already enforces means this cannot happen; if it ever does,
+  // the last batch takes the remainder rather than the movements silently summing to
+  // less than the line.
+  if (remaining > 0 && draws.length > 0) draws[draws.length - 1].qtyMilli += remaining;
+  return draws;
+}
+
 function post(input, actor) {
   if (!permissions.can(actor, 'TX-406')) {
     throw errors.forbidden(
@@ -583,22 +627,49 @@ function post(input, actor) {
     const posted = [];
 
     for (const line of resolved) {
+      // ── INV-201 — a batch-tracked line goes back to the batch it came from ──
+      //
+      // Not to whichever batch is oldest. The goods in the customer's hand are from a
+      // specific batch with a specific expiry date printed on them, and returning them
+      // to a different one would put the wrong date on stock the shop then sells.
+      // `sale_item_batches` recorded which, so a return reads it back.
+      //
+      // Where the line spanned two batches, the returned quantity is drawn back in the
+      // same order it was taken — earliest expiry first — capped by what each batch
+      // actually gave. A partial return of a split line therefore lands on the batch
+      // most of it came from, which is the best available answer: nothing on a returned
+      // sack says which of two batches it was.
+      const batchDraw = returnDraw(line, line.qty_milli);
+
       // ── POS-303 — the movement that says the goods came back ──
       //
       // Posted for both dispositions. A write-off that posted only the DAMAGE out
       // would show stock leaving a shelf it never returned to, and the ledger would
       // have no row saying the customer brought anything back at all.
-      const back = inventoryService.post({
-        productId: line.product_id,
-        type: 'CUSTOMER_RETURN',
-        qtyMilli: line.qty_milli,
-        actor,
-        reason: `${reason} — ${returnNo} against ${sale.sale_no}`,
-        referenceType: 'sale_return',
-        referenceId: returnId,
-        referenceNo: returnNo,
-        occurredAt: at,
-      });
+      const back = batchDraw.length > 0
+        ? batchDraw.map((draw) => inventoryService.post({
+          productId: line.product_id,
+          type: 'CUSTOMER_RETURN',
+          qtyMilli: draw.qtyMilli,
+          batchId: draw.batchId,
+          actor,
+          reason: `${reason} — ${returnNo} against ${sale.sale_no}`,
+          referenceType: 'sale_return',
+          referenceId: returnId,
+          referenceNo: returnNo,
+          occurredAt: at,
+        }))[0]
+        : inventoryService.post({
+          productId: line.product_id,
+          type: 'CUSTOMER_RETURN',
+          qtyMilli: line.qty_milli,
+          actor,
+          reason: `${reason} — ${returnNo} against ${sale.sale_no}`,
+          referenceType: 'sale_return',
+          referenceId: returnId,
+          referenceNo: returnNo,
+          occurredAt: at,
+        });
 
       // ── POS-303 / POS-304 — and the one that says they are not saleable ──
       //
@@ -607,10 +678,11 @@ function post(input, actor) {
       // both halves of that are things somebody will later need to count.
       let writeOff = null;
       if (line.disposition === 'WRITE_OFF') {
-        writeOff = inventoryService.post({
+        const condemn = (qtyMilli, batchId = null) => inventoryService.post({
           productId: line.product_id,
           type: 'DAMAGE',
-          qtyMilli: line.qty_milli,
+          qtyMilli,
+          batchId,
           actor,
           reason: line.default_reason
             || `Returned goods not fit for resale — ${returnNo} (POS-303)`,
@@ -619,6 +691,11 @@ function post(input, actor) {
           referenceNo: returnNo,
           occurredAt: at,
         });
+        // Out of the same batches it just went back into, so the pair still nets to
+        // zero per batch and not merely per product.
+        writeOff = batchDraw.length > 0
+          ? batchDraw.map((draw) => condemn(draw.qtyMilli, draw.batchId))[0]
+          : condemn(line.qty_milli);
       }
 
       returnRepository.insertItem({

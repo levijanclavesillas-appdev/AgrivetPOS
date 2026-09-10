@@ -20,7 +20,8 @@ screens the original backlog never assigned to anybody — see [the screen gap](
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
 shippable: nothing has run in the store. [Status](#status) has the detail.
 
-**The v1.2 backlog is now written** — `TASK-029` to `TASK-035`, seven files, in
+**The v1.2 backlog is now written** — `TASK-029` to `TASK-035`, plus `TASK-042` and `TASK-043`
+raised while `TASK-029` was built, nine files, in
 [Open — v1.2 "Trace"](#open--v12-trace). Writing it is not the same as starting it: the next
 thing that moves this product is a Windows build and a visit to the counter, not another task.
 
@@ -277,11 +278,24 @@ instant it exists, so it has no due date and nothing to age.
 
 ## Open — v1.2 "Trace"
 
-**The files are written.** Seven of them, in the established format, each self-contained enough
+**The files are written.** Nine of them, in the established format, each self-contained enough
 that an implementer needs it plus the specs it cites and nothing else. Every one of the ten v1.2
 rules in `03_BUSINESS_RULES.md` is claimed by exactly one task, checked mechanically rather than
 by eye, and `07_TEST_PLAN.md` §6.4 reserves the case ids so no two tasks reach for the same
 number.
+
+`TASK-042` and `TASK-043` were written during `TASK-029` rather than planned with the rest.
+`TASK-043` is the screen gap `TASK-036` was written for, one range over: `TASK-029` shipped
+`GET /products/:id/batches` and `POST /batches/:id/expire` and nothing in `public/` calls either,
+so a store gets a `CRITICAL` alert about expired stock with nowhere to go from it. `TASK-030`
+assumed that list existed — its acceptance criteria say the recall is "reachable in one step from
+the batch list" — so it is a dependency of that task as well.
+
+`TASK-042` exists because `INV-201` refuses a
+movement of a batch-tracked product that does not name a batch, a product-level stock count has
+no batch to name, and which batch is short is not something one counted figure can say. `TASK-029`
+leaves batch-tracked products off the count sheet and says so; `TASK-042` counts them by batch,
+which is how the person holding the boxes counts them anyway.
 
 **In dependency order, which is not numeric order.** `TASK-029` first and alone at the front:
 batches are the substrate, and `TASK-030` is unbuildable without the decision `TASK-029` makes
@@ -294,7 +308,9 @@ section gives.
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
 | [TASK-029](TASK-029-batches-and-fefo.md) | Batches, expiry status, FEFO allocation | `FT-205` | — |
-| [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | `FT-205`, `INV-206` | `TASK-029` |
+| [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | `FT-205`, `INV-206` | `TASK-029`, `TASK-043` |
+| [TASK-042](TASK-042-count-by-batch.md) | Counting batch-tracked stock, by batch | `FT-205`, `INV-201` | `TASK-029` |
+| [TASK-043](TASK-043-batch-screen.md) | `SCR-206`, the batch list and the write-off | `FT-205`, `OPS-007` | `TASK-029` |
 | [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | `FT-406`, `FT-407` | — |
 | [TASK-032](TASK-032-payment-reconciliation.md) | Payment reconciliation | `FT-606` | — |
 | [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | `FT-602`, `FT-605` | — |

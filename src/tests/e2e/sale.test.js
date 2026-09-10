@@ -195,7 +195,7 @@ test('TC-E2E-01: the stock and the till both moved, and both reconcile', async (
   assert.equal(expected.change_given_centavos, 18156, 'less what was handed back');
   assert.equal(expected.expected_cash_centavos, 200000 + 100000 - 18156);
 
-  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [] });
+  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [], batch_breaks: [] });
   assert.deepEqual(await json(await call('/customers/credit-reconciliation')), { ok: true, breaks: [] });
 });
 
@@ -277,7 +277,7 @@ test('TC-E2E-05: sale numbers ran gapless across the day', async () => {
 
 test('TC-E2E-01: the day is consistent end to end', async () => {
   // The two guards that every future defect is expected to trip.
-  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [] });
+  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [], batch_breaks: [] });
   assert.deepEqual(await json(await call('/customers/credit-reconciliation')), { ok: true, breaks: [] });
 
   // And the health panel counts what was actually written. TASK-017 moved OPS-006's

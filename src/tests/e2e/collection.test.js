@@ -189,7 +189,7 @@ test('TC-E2E-02: the rest is paid, and the account clears', async () => {
 
 test('TC-E2E-02: every ledger still reconciles, and the till agrees', async () => {
   assert.deepEqual(await json(await call('/customers/credit-reconciliation')), { ok: true, breaks: [] });
-  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [] });
+  assert.deepEqual(await json(await call('/inventory/reconciliation')), { ok: true, breaks: [], batch_breaks: [] });
 
   const expected = await json(await call(`/shifts/${ids.shift}/expected`));
   assert.equal(expected.cash_collections_centavos, 800000);

@@ -57,6 +57,16 @@ const ACTIONS = Object.freeze({
   STOCK_COUNT_APPROVED: { what: 'Stock count approved', rule: 'INV-112' },
   STOCK_COUNT_POSTED: { what: 'Stock count posted', rule: 'AUD-601' },
   STOCK_COUNT_CANCELLED: { what: 'Stock count abandoned', rule: 'INV-110' },
+  // Batches (TASK-029). Not on AUD-601's list, and recorded anyway for the reason the
+  // stock count's open is: a batch fixes the cost and the expiry date every sale of it
+  // will read, and INV-206's recall is only as good as the identity behind it.
+  //
+  // There is deliberately no BATCH_EXPIRED_SALE here. INV-205 permits an owner
+  // override only where the store's own policy allows it, this store's does not, and
+  // no path can write a sale of expired stock — so an action name for one would be an
+  // action the trail could never carry.
+  BATCH_CREATE: { what: 'Batch created', rule: 'INV-202' },
+  BATCH_EXPIRE: { what: 'Batch written off as expired', rule: 'INV-205' },
 
   // ── AUD-601: sales ────────────────────────────────────────────────────────
   SALE_VOIDED: { what: 'Sale voided', rule: 'AUD-601' },

@@ -107,6 +107,11 @@ frozen instant, how many of the scope have a figure, and how many differ. **The 
 count: every product in scope, its expected quantity *at the freeze*, a field for what was on the
 shelf, and the variance.
 
+Since `TASK-029`, **batch-tracked products are not on the sheet**, and the sheet says how many it
+left off. `INV-201` makes a batch's quantity the ledger's own sum, so a variance movement has to
+name a batch — and which batch is short is not something one counted figure can say. Counting
+them one line per batch, which is how the person holding the boxes counts them, is `TASK-042`.
+
 Three things on this screen are stated rather than left to be worked out, and each of them
 prevents a specific expensive misunderstanding.
 

@@ -174,6 +174,17 @@ function open({ scope = 'ALL', categoryId = null, notes = null }, actor) {
     });
 
     if (frozen.lines === 0) {
+      // A scope that holds only batch-tracked products is a different problem from an
+      // empty one, and saying "there is nothing to count" about a fridge full of
+      // vaccines would be a lie the counter can see through the door.
+      if (frozen.batch_tracked_excluded > 0) {
+        throw errors.conflict(
+          `Everything in ${category ? category.name : 'the catalogue'} is batch-tracked, and `
+          + 'batch-tracked stock is counted by batch rather than by product (INV-201). '
+          + 'There is nothing on a product-level sheet to count.',
+          { ruleId: 'INV-201' }
+        );
+      }
       throw errors.conflict(
         category
           ? `There are no products in ${category.name} to count.`
@@ -192,6 +203,8 @@ function open({ scope = 'ALL', categoryId = null, notes = null }, actor) {
         scope: wanted,
         category: category ? category.name : null,
         products_frozen: frozen.lines,
+        // INV-201: what the sheet does not cover, on the row that says what it does.
+        batch_tracked_excluded: frozen.batch_tracked_excluded,
         // INV-110: the instant the expected figures were taken. Everything this count
         // ever says about a variance is relative to this moment.
         frozen_at: at,
@@ -672,6 +685,18 @@ function presentLine(row) {
   };
 }
 
+/**
+ * Products in a count's scope whose stock is held as batches (`INV-201`).
+ *
+ * They are not on a product-level sheet: which batch is short is not something one
+ * counted figure can say, and the variance movement would be refused at posting —
+ * after the shelf had been counted and the count approved. Counting them by batch is
+ * `TASK-042`; until it lands they are named as absent rather than quietly missing.
+ */
+function batchTrackedInScope(categoryId = null) {
+  return productRepository.countBatchTracked({ categoryId });
+}
+
 function present(session, { lines = null } = {}) {
   if (!session) return null;
   const state = session.status === 'POSTED'
@@ -703,6 +728,12 @@ function present(session, { lines = null } = {}) {
       is_editable: EDITABLE_STATUSES.includes(session.status),
       is_immutable: session.status === 'POSTED',
       line_count: session.line_count,
+      // TASK-029: how many products in this scope are **not** on the sheet because
+      // their stock is held as batches. Stated rather than silently left off — a sheet
+      // that claims to cover the whole shop and quietly omits the vaccine fridge is a
+      // sheet somebody signs off believing they counted everything. Derived, not
+      // stored, so it stays true if a product is switched to batch tracking later.
+      batch_tracked_excluded: batchTrackedInScope(session.category_id),
       counted_count: session.counted_count,
       uncounted_count: session.line_count - session.counted_count,
       varying_count: session.varying_count,

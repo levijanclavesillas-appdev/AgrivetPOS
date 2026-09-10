@@ -38,7 +38,9 @@ const creditService = require('../../services/creditService');
 const inventoryService = require('../../services/inventoryService');
 const settingsService = require('../../services/settingsService');
 const openingDataService = require('../../services/openingDataService');
+const batchService = require('../../services/batchService');
 const productRepository = require('../../repositories/productRepository');
+const inventoryRepository = require('../../repositories/inventoryRepository');
 const customerRepository = require('../../repositories/customerRepository');
 const dataRepository = require('../../repositories/dataRepository');
 const csv = require('../../config/csv');
@@ -134,6 +136,126 @@ test('TC-INT-98: a stock row with no unit cost is rejected, and never defaulted 
 
   // And it is not silently loaded at zero: the row is simply not there.
   assert.deepEqual(report.parsed.stock.accepted.map((r) => r.sku), ['COST-A']);
+});
+
+// ── TASK-029 — OPS-105 and INV-202, the shelf that arrives as batches ───────
+
+test('a batch-tracked product’s opening stock is refused without its batch, at validation', () => {
+  const products = file(
+    ['sku', 'name', 'category', 'base_unit', 'retail_price', 'batch_tracked'],
+    [
+      ['OPB-VAX', 'Opening Vaccine', 'Veterinary', 'PC', '320.00', 'yes'],
+      ['OPB-FEED', 'Opening Feed', 'Feeds', 'KG', '52.00', ''],
+    ]
+  );
+  const stock = file(
+    ['sku', 'quantity', 'unit_cost', 'batch_no', 'expiry_date', 'supplier'],
+    [
+      ['OPB-VAX', '12', '210.00', '', '', ''],                       // INV-202: needs all three
+      ['OPB-FEED', '250', '39.00', 'B-1', '2027-03-31', 'Anyone'],   // INV-201: takes none
+    ]
+  );
+
+  const report = openingDataService.validate({ products, stock });
+
+  assert.equal(report.ok, false);
+  // Caught here rather than at load, for OPS-105's reason: a validation that passed and
+  // a load that then refused half way through would leave the store with part of its
+  // shelf in the system and no way to tell which part.
+  assert.deepEqual(ruleIdsOn(report, 2), ['INV-202']);
+  assert.match(problemsOn(report, 2)[0].message,
+    /needs a batch number, an expiry date, a supplier/);
+  assert.deepEqual(ruleIdsOn(report, 3), ['INV-201']);
+  assert.match(problemsOn(report, 3)[0].message, /is not batch-tracked/);
+  assert.equal(report.summary.stock.accepted, 0);
+});
+
+test('a badly written expiry date and an unknown supplier are named before the load', () => {
+  const products = file(
+    ['sku', 'name', 'category', 'base_unit', 'retail_price', 'batch_tracked'],
+    [['OPB-VAX2', 'Opening Vaccine 2', 'Veterinary', 'PC', '320.00', 'YES']]
+  );
+  const wrongDate = openingDataService.validate({
+    products,
+    stock: file(
+      ['sku', 'quantity', 'unit_cost', 'batch_no', 'expiry_date', 'supplier'],
+      [['OPB-VAX2', '12', '210.00', 'A-1', '31/03/2027', 'Mindanao Feed Mill']]
+    ),
+  });
+  assert.deepEqual(ruleIdsOn(wrongDate, 2), ['INV-202']);
+  assert.match(problemsOn(wrongDate, 2)[0].message, /YYYY-MM-DD/);
+
+  const noSupplier = openingDataService.validate({
+    products,
+    stock: file(
+      ['sku', 'quantity', 'unit_cost', 'batch_no', 'expiry_date', 'supplier'],
+      [['OPB-VAX2', '12', '210.00', 'A-1', '2027-03-31', 'Somebody Else']]
+    ),
+  });
+  assert.deepEqual(ruleIdsOn(noSupplier, 2), ['VR-401']);
+  assert.match(problemsOn(noSupplier, 2)[0].message, /no supplier "Somebody Else"/);
+});
+
+test('the opening load creates the batch, and INV-201 holds from the first movement', () => {
+  const supplier = temp.seedSupplier({ name: 'Opening Vet Supply', code: 'OVS' }, sessions.OWNER);
+
+  const products = file(
+    ['sku', 'name', 'category', 'base_unit', 'retail_price', 'batch_tracked'],
+    [['OPB-VAX3', 'Opening Vaccine 3', 'Veterinary', 'PC', '320.00', 'yes']]
+  );
+  const stock = file(
+    ['sku', 'quantity', 'unit_cost', 'batch_no', 'expiry_date', 'supplier'],
+    [['OPB-VAX3', '12', '210.00', 'OP-2291', '2027-03-31', 'OVS']]
+  );
+
+  const report = openingDataService.validate({ products, stock });
+  assert.equal(report.ok, true, JSON.stringify(report.problems));
+
+  const result = openingDataService.run({ products, stock }, sessions.OWNER);
+  assert.equal(result.ok, true);
+
+  const loaded = productRepository.findBySku('OPB-VAX3');
+  assert.equal(loaded.is_batch_tracked, 1, 'the product file said so');
+
+  // The batch exists, carries the load's cost and its supplier, and holds the whole
+  // opening quantity — which is INV-201 holding on the very first movement.
+  const batches = batchService.listForProduct(loaded.id, { includeEmpty: true });
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].batch_no, 'OP-2291');
+  assert.equal(batches[0].qty_milli, 12000);
+  assert.equal(batches[0].unit_cost_centavos, 21000, 'MON-004 — what a sale of it will snapshot');
+  assert.equal(batches[0].supplier_name, supplier.name);
+  assert.equal(batches[0].gr_item_id, null, 'no delivery behind it — it came off a spreadsheet');
+  assert.equal(inventoryRepository.qtyOnHand(loaded.id), 12000);
+  assert.deepEqual(inventoryService.reconcile().batch_breaks, []);
+
+  // And the movement names it, which is what makes the two sums the same sum.
+  const { movements } = inventoryService.ledger(loaded.id);
+  assert.equal(movements.length, 1);
+  assert.equal(movements[0].type, 'OPENING');
+  assert.equal(inventoryRepository.movementsFor(loaded.id, { limit: 5 })[0].batch_id, batches[0].id);
+});
+
+test('opening stock that is already expired loads with a warning, not a refusal', () => {
+  temp.seedSupplier({ name: 'Expired Stock Supplier', code: 'ESS' }, sessions.OWNER);
+  const products = file(
+    ['sku', 'name', 'category', 'base_unit', 'retail_price', 'batch_tracked'],
+    [['OPB-OLD', 'Opening Expired Vaccine', 'Veterinary', 'PC', '320.00', 'yes']]
+  );
+  const stock = file(
+    ['sku', 'quantity', 'unit_cost', 'batch_no', 'expiry_date', 'supplier'],
+    [['OPB-OLD', '3', '210.00', 'OLD-1', '2020-01-31', 'ESS']]
+  );
+
+  const report = openingDataService.validate({ products, stock });
+
+  // A store does have expired stock on its shelf at cutover. Leaving it out would make
+  // the opening figure lie; loading it lets INV-205 refuse to sell it and OPS-007 say
+  // it is there.
+  assert.equal(report.ok, true, JSON.stringify(report.problems));
+  const warned = report.warnings.filter((w) => w.rule_id === 'INV-205');
+  assert.equal(warned.length, 1);
+  assert.match(warned[0].message, /expired on 2020-01-31/);
 });
 
 test('TC-INT-98: a loaded row sets the average cost to the cost in the cell', () => {

@@ -735,7 +735,9 @@ test('the reconciliation endpoint is owner-only', async () => {
 
   const res = await call('/inventory/reconciliation', { token: tokens.OWNER });
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true, breaks: [] });
+  // INV-201 joined the same answer in TASK-029: one page saying whether the ledger is
+  // telling the truth, per product and per batch, rather than two that can disagree.
+  assert.deepEqual(await res.json(), { ok: true, breaks: [], batch_breaks: [] });
 });
 
 test('valuation is computed at read time with its as-of timestamp (RPT-103)', async () => {

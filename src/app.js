@@ -18,6 +18,7 @@ const auditRoutes = require('./routes/audit');
 const productRoutes = require('./routes/products');
 const referenceRoutes = require('./routes/reference');
 const inventoryRoutes = require('./routes/inventory');
+const batchRoutes = require('./routes/batches');
 const customerRoutes = require('./routes/customers');
 const pricingRoutes = require('./routes/pricing');
 const shiftRoutes = require('./routes/shifts');
@@ -56,6 +57,7 @@ function createApp() {
   app.use(API_BASE, productRoutes);
   app.use(API_BASE, referenceRoutes);
   app.use(API_BASE, inventoryRoutes);
+  app.use(API_BASE, batchRoutes);
   app.use(API_BASE, customerRoutes);
   app.use(API_BASE, pricingRoutes);
   app.use(API_BASE, shiftRoutes);

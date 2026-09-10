@@ -52,10 +52,12 @@ const backupService = require('./backupService');
 const inventoryService = require('./inventoryService');
 const creditService = require('./creditService');
 const productService = require('./productService');
+const batchService = require('./batchService');
 const customerService = require('./customerService');
 const productRepository = require('../repositories/productRepository');
 const customerRepository = require('../repositories/customerRepository');
 const referenceRepository = require('../repositories/referenceRepository');
+const supplierRepository = require('../repositories/supplierRepository');
 
 /**
  * The three files `OPS-105` names, and the columns a store would name them by.
@@ -69,11 +71,15 @@ const KINDS = Object.freeze({
   products: {
     label: 'Products',
     required: ['sku', 'name', 'category', 'base_unit', 'retail_price'],
-    optional: ['brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode'],
+    // `batch_tracked` (TASK-029): the store's answer to Q-2 is per category, but it is
+    // stored per product, and a cutover is the one moment the whole catalogue is being
+    // typed anyway. Optional and defaulting to no, because a store that tracks nothing
+    // by batch should not have to write "no" five hundred times.
+    optional: ['brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked'],
     example: [
-      ['sku', 'name', 'category', 'base_unit', 'retail_price', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode'],
-      ['HG-50', 'Hog Grower Pellets', 'Feeds', 'KG', '52.00', 'B-MEG', '50.00', '', 'VATABLE', '100', '4800012345678'],
-      ['VET-AMOX', 'Amoxicillin 100ml', 'Veterinary', 'PC', '320.00', '', '', '', 'VATABLE', '5', ''],
+      ['sku', 'name', 'category', 'base_unit', 'retail_price', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked'],
+      ['HG-50', 'Hog Grower Pellets', 'Feeds', 'KG', '52.00', 'B-MEG', '50.00', '', 'VATABLE', '100', '4800012345678', ''],
+      ['VET-AMOX', 'Amoxicillin 100ml', 'Veterinary', 'PC', '320.00', '', '', '', 'VATABLE', '5', '', 'yes'],
     ],
   },
   stock: {
@@ -81,11 +87,15 @@ const KINDS = Object.freeze({
     // OPS-106, as one line of configuration: `unit_cost` is in `required` and not in
     // `optional`, and that is the whole rule.
     required: ['sku', 'quantity', 'unit_cost'],
-    optional: ['note'],
+    // The batch columns are optional in the header and required in the row for a
+    // batch-tracked product (INV-202, TASK-029). A store that tracks nothing by batch
+    // never fills them in; one that does cannot load a vaccine without saying which
+    // batch is on the shelf, because every sale of it will read that expiry date.
+    optional: ['note', 'batch_no', 'expiry_date', 'supplier'],
     example: [
-      ['sku', 'quantity', 'unit_cost', 'note'],
-      ['HG-50', '250', '39.00', 'Counted 1 Sep'],
-      ['VET-AMOX', '12', '210.00', ''],
+      ['sku', 'quantity', 'unit_cost', 'note', 'batch_no', 'expiry_date', 'supplier'],
+      ['HG-50', '250', '39.00', 'Counted 1 Sep', '', '', ''],
+      ['VET-AMOX', '12', '210.00', '', 'A-2291', '2027-03-31', 'Mindanao Vet Supply'],
     ],
   },
   balances: {
@@ -167,7 +177,12 @@ function validate({ products = null, stock = null, balances = null } = {}) {
   // The stock file is checked against the product file *and* the catalogue, because at
   // cutover most of its SKUs do not exist yet — they are three rows above, in the other
   // file, in the same upload.
-  const arriving = new Set(parsedProducts ? parsedProducts.accepted.map((row) => row.sku.toUpperCase()) : []);
+  // A map rather than a set (TASK-029): the stock file has to know whether a product
+  // arriving in the *same* load is batch-tracked, and that product does not exist in
+  // the catalogue yet to be asked.
+  const arriving = new Map(parsedProducts
+    ? parsedProducts.accepted.map((row) => [row.sku.toUpperCase(), row.input])
+    : []);
 
   const parsed = {
     products: parsedProducts,
@@ -293,6 +308,13 @@ function checkProducts(source, problems, warnings) {
     }
     if (priceProblem) { reject(priceProblem, 'VR-203'); continue; }
 
+    // TASK-029: what makes a product's stock arrive as identified batches. A word, not
+    // a number — "yes" and "y" and "true" are what somebody types in a spreadsheet, and
+    // anything else is no, because a typo must not silently turn batch tracking on for
+    // a sack of feed and demand an expiry date the store cannot give.
+    const batchTracked = /^(y|yes|true|1)$/i.test(text(values.batch_tracked, { max: 8 }));
+    if (batchTracked) extra.isBatchTracked = true;
+
     const taxClass = text(values.tax_class, { max: 20 }).toUpperCase() || 'VATABLE';
     if (!productService.TAX_CLASSES.includes(taxClass)) {
       reject(`${sku}: "${values.tax_class}" is not a tax class. It is one of `
@@ -338,6 +360,78 @@ function checkProducts(source, problems, warnings) {
   return { rows: table.rows, accepted };
 }
 
+/** Returned instead of a batch when the row was rejected, so the caller can `continue`. */
+const REJECTED = Symbol('rejected');
+
+/**
+ * `INV-202`'s three columns on an opening stock row, or null for a product that is not
+ * batch-tracked.
+ *
+ * The supplier is part of a batch's identity and is `NOT NULL` on `product_batches` —
+ * "who this came from" is half of what a recall notice is matched against — so it is
+ * required here too, and resolved by code or by name the way every other reference in
+ * this file is.
+ *
+ * An expiry date already in the past is a **warning and not a refusal**: a store does
+ * have expired stock on its shelf at cutover, and the honest thing is to load it and
+ * let `INV-205` refuse to sell it, rather than to make the opening figure lie by
+ * leaving it out.
+ */
+function batchDetails({ values, sku, batchTracked, reject, warnings, line }) {
+  const batchNo = text(values.batch_no, { max: 60 });
+  const expiry = text(values.expiry_date, { max: 10 });
+  const supplierName = text(values.supplier, { max: 120 });
+
+  if (!batchTracked) {
+    // The other direction of the same rule: a batch on a product that does not track
+    // them is a column somebody filled in by copying the row above, and loading it
+    // would put a batch number on stock nothing can ever match it to.
+    if (batchNo || expiry || supplierName) {
+      reject(`${sku}: this product is not batch-tracked, so it takes no batch number, `
+        + 'expiry date or supplier. Either clear those cells or mark the product '
+        + 'batch_tracked in the product file.', 'INV-201');
+      return REJECTED;
+    }
+    return null;
+  }
+
+  const missing = [];
+  if (!batchNo) missing.push('a batch number');
+  if (!expiry) missing.push('an expiry date');
+  if (!supplierName) missing.push('a supplier');
+  if (missing.length > 0) {
+    reject(`${sku} is batch-tracked, so its opening stock needs ${missing.join(', ')}. `
+      + 'Every sale of it reads that expiry date, and a recall is matched on the batch '
+      + "number and the supplier's name.", 'INV-202');
+    return REJECTED;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry) || Number.isNaN(Date.parse(`${expiry}T00:00:00Z`))) {
+    reject(`${sku}: "${values.expiry_date}" is not an expiry date. Write it as YYYY-MM-DD, `
+      + 'as 2027-03-31.', 'INV-202');
+    return REJECTED;
+  }
+
+  const supplier = supplierRepository.findByCode(supplierName.toUpperCase())
+    || supplierRepository.findByName(supplierName);
+  if (!supplier) {
+    reject(`${sku}: this store has no supplier "${supplierName}". Add it under Buying → `
+      + 'Suppliers first, or correct the spelling.', 'VR-401');
+    return REJECTED;
+  }
+
+  if (expiry < batchService.today()) {
+    warnings.push({
+      line,
+      rule_id: 'INV-205',
+      message: `${sku} batch ${batchNo} expired on ${expiry}. It will load, and it cannot be `
+        + 'sold — write it off from the batch list once the load is done.',
+    });
+  }
+
+  return { batchNo, expiryDate: expiry, supplierId: supplier.id };
+}
+
 function checkStock(source, problems, warnings, arriving) {
   const table = csv.parseWithHeader(source);
   const accepted = [];
@@ -358,10 +452,15 @@ function checkStock(source, problems, warnings, arriving) {
     }
     seenSku.set(sku.toUpperCase(), line);
 
-    if (!arriving.has(sku.toUpperCase()) && !productRepository.findBySku(sku)) {
+    const arrivingInput = arriving.get(sku.toUpperCase()) || null;
+    const existing = arrivingInput ? null : productRepository.findBySku(sku);
+    if (!arrivingInput && !existing) {
       reject(`${sku} is not in the catalogue and not in the product file.`, 'OPS-105');
       continue;
     }
+    const batchTracked = arrivingInput
+      ? Boolean(arrivingInput.isBatchTracked)
+      : Boolean(existing.is_batch_tracked);
 
     const qty = parseQuantity(values.quantity);
     if (qty === null) { reject(`${sku}: no opening quantity.`, 'OPS-105'); continue; }
@@ -401,7 +500,19 @@ function checkStock(source, problems, warnings, arriving) {
       });
     }
 
-    accepted.push({ line, sku, qtyMilli: qty, unitCostCentavos: cost, note: text(values.note) || null });
+    // ── INV-202 — batch-tracked stock arrives as a batch, or not at all ──
+    //
+    // Checked here rather than at load, for OPS-105's reason: a validation that passed
+    // and a load that then refused half way through would leave the store with part of
+    // its shelf in the system and no way to tell which part. The message names the
+    // columns, because a store filling in its first opening file has not met them.
+    const batch = batchDetails({ values, sku, batchTracked, reject, warnings, line });
+    if (batch === REJECTED) continue;
+
+    accepted.push({
+      line, sku, qtyMilli: qty, unitCostCentavos: cost, note: text(values.note) || null,
+      batch,
+    });
   }
 
   return { rows: table.rows, accepted };
@@ -567,10 +678,36 @@ function run({ products = null, stock = null, balances = null, cutoverAt = null,
     for (const row of stockRows) {
       const productId = bySku.get(row.sku.toUpperCase()) || productRepository.findBySku(row.sku).id;
 
+      // ── INV-202 — the store's existing shelf becomes identified batches ──
+      //
+      // The only other place a batch is born (goods receipt is the first). Without this
+      // a store that tracks vaccines by batch could not load its opening stock at all:
+      // INV-201 refuses an unbatched movement of a batch-tracked product, and rightly.
+      //
+      // `findForReceipt` first, for the same reason the receipt uses it: a batch number
+      // that already exists is the same batch, and a second row for it would split one
+      // recall in two.
+      let batchId = null;
+      if (row.batch) {
+        const existingBatch = batchService.findForReceipt(productId, row.batch.batchNo);
+        batchId = existingBatch ? existingBatch.id : batchService.create({
+          productId,
+          batchNo: row.batch.batchNo,
+          supplierId: row.batch.supplierId,
+          expiryDate: row.batch.expiryDate,
+          receivedDate: batchService.today(cutover),
+          unitCostCentavos: row.unitCostCentavos,
+          notes: 'Opening load at cutover',
+          actor,
+          occurredAt: cutover,
+        }).id;
+      }
+
       inventoryService.post({
         productId,
         type: 'OPENING',
         qtyMilli: row.qtyMilli,
+        batchId,
         // The figure the whole rule is about. `INV-106` moves the average on the way
         // in, so on a product with nothing on hand this *is* what `avg_cost_centavos`
         // becomes.

@@ -87,11 +87,25 @@ test.before(async () => {
 
   const owner = sessions.boss;
 
+  // INV-202: a batch is part of a supplier's identity, so batch-tracked stock needs one.
+  const supplier = temp.seedSupplier({}, owner);
+
   const stock = (input, qtyMilli, costCentavos) => {
     const made = productService.create({ baseUnitId: ref.kg.id, ...input }, owner);
-    inventoryService.postStandalone({
-      productId: made.id, type: 'OPENING', qtyMilli, unitCostCentavos: costCentavos, actor: owner,
-    });
+    // INV-201, from TASK-029: a batch-tracked product's stock arrives in a batch, so
+    // even the opening shelf has to be one. The antibiotic below is the only product
+    // in this walk that is batch-tracked, and it is batch-tracked precisely because
+    // POS-304 turns on it.
+    if (input.isBatchTracked) {
+      temp.seedBatch({
+        product: made, supplier, qtyMilli, unitCostCentavos: costCentavos,
+        batchNo: `${input.sku}-A`, actor: owner,
+      });
+    } else {
+      inventoryService.postStandalone({
+        productId: made.id, type: 'OPENING', qtyMilli, unitCostCentavos: costCentavos, actor: owner,
+      });
+    }
     return made;
   };
 

@@ -127,8 +127,9 @@ suppliers ──< purchase_orders ──< purchase_order_items
 sales_returns ──< sales_return_items
 stock_counts ──< stock_count_items
 inventory_adjustments
--- v1.2
-inventory_batches
+-- v1.2 (TASK-029)
+products ──< product_batches ──< inventory_movements.batch_id
+                   └──────────< sale_item_batches >── sale_items
 ```
 
 `legacy/PRD_v1.1.md` §79 omitted `stock_counts`, `stock_count_items`, `inventory_adjustments`,
@@ -952,6 +953,91 @@ hash so an imported account cannot be signed into until somebody sets one.
 binary — and so is `carts`, because a parked cart is a moment in a shift rather than
 data anybody archives.
 
+### 3.4.6 v1.2 schema — batches, expiry and FEFO (`TASK-029`)
+
+`014_batches.sql`. Two tables and one column, filling four seams left open since v1.0:
+`products.is_batch_tracked` (`002_catalog.sql`, marked "v1.2"),
+`goods_receipt_items.batch_no` and `expiry_date` (`010_purchasing.sql`, nullable so that
+batch-tracked receiving would be a service change rather than a migration against a live
+table), and `sale_items.batch_id` (`006_sales.sql`, written `NULL` on every line ever sold).
+
+**`INV-201` is one ledger, not two.** "The sum of batch quantities equals the product
+on-hand figure" is either true by construction or false eventually, so `product_batches`
+has **no quantity column**. `inventory_movements` gains `batch_id`, and a batch's balance
+is the same `SUM(qty_milli)` that `INV-101` already derives, grouped one column finer.
+The two figures cannot disagree because they are the same sum. The `inventory` projection
+is unchanged: a per-batch projection beside it would be a second thing to drift.
+
+Because a `CHECK` here cannot read `products.is_batch_tracked` from another table,
+`inventoryService.post` enforces it instead — the one function through which stock moves
+refuses an unbatched movement of a batch-tracked product, and refuses a batch on one that
+is not.
+
+**One sale line, many batches.** Ten sacks where the oldest batch holds six is the
+ordinary case: `INV-204` takes six from one and four from the next. That is two movements
+— each row carries one `batch_id` — but still **one sale line**, because the cashier sold
+ten sacks, the receipt says ten sacks and `POS-301`'s return ceiling is ten. So
+`sale_item_batches` carries the per-batch detail `INV-206`'s recall needs, the line's
+`unit_cost_centavos` becomes the quantity-weighted average of the batches it consumed
+(`MON-004`), and **`sale_items.batch_id` is withdrawn in place** — left `NULL` for ever,
+the way a withdrawn rule is marked withdrawn rather than deleted. It cannot be dropped
+(forward-only, live rows) and it must not be populated: a line recording its batch in two
+places is a line whose two records can disagree, which is the reasoning `POS-206` applies
+to `sale_tenders.status`.
+
+**`INV-205` is a refusal, and there is no override.** The rule permits one "only where the
+store's own policy allows it"; this store's does not, so there is no authorising column,
+no approver and no path that can record a sale of expired stock. Expired stock leaves by
+the `EXPIRY` movement `INV-103` has declared since `003_inventory.sql`. If the policy
+changes, the override arrives as `AUD-603`'s two-actor form in its own migration and its
+own task — adding it later costs less than removing it.
+
+```sql
+CREATE TABLE product_batches (           -- INV-202
+  id TEXT PRIMARY KEY,
+  product_id  TEXT NOT NULL REFERENCES products(id),
+  batch_no    TEXT NOT NULL,             -- the supplier's own label, never generated
+  supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+  expiry_date TEXT NOT NULL,             -- date-only, Manila days (INV-203)
+  received_date TEXT NOT NULL,
+  unit_cost_centavos INTEGER NOT NULL CHECK (unit_cost_centavos >= 0),   -- MON-004
+  gr_item_id  TEXT REFERENCES goods_receipt_items(id),   -- NULL for the opening load
+  notes       TEXT,
+  is_active   INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL REFERENCES users(id),
+  updated_at TEXT, updated_by TEXT REFERENCES users(id),
+  UNIQUE (product_id, batch_no)          -- per product: two makers reuse "A-2291"
+);
+
+ALTER TABLE inventory_movements ADD COLUMN batch_id TEXT REFERENCES product_batches(id);
+
+CREATE TABLE sale_item_batches (         -- INV-206
+  id TEXT PRIMARY KEY,
+  sale_item_id TEXT NOT NULL REFERENCES sale_items(id),
+  batch_id     TEXT NOT NULL REFERENCES product_batches(id),
+  qty_milli    INTEGER NOT NULL CHECK (qty_milli > 0),
+  unit_cost_centavos INTEGER NOT NULL CHECK (unit_cost_centavos >= 0),   -- MON-005
+  movement_id  TEXT REFERENCES inventory_movements(id),
+  created_at   TEXT NOT NULL,
+  UNIQUE (sale_item_id, batch_id)
+);
+```
+
+**The opening load learns two sets of columns** (`TASK-029`). The products file takes an
+optional `batch_tracked`, because a cutover is the one moment the whole catalogue is being
+typed anyway; the opening stock file takes `batch_no`, `expiry_date` and `supplier`,
+optional in the header and **required in the row** for a batch-tracked product. Both are
+checked during the rehearsal rather than at the load, for `OPS-105`'s reason: a validation
+that passed and a load that then refused half way through would leave a store with part of
+its shelf in the system and no way to tell which part. An expiry date already past is a
+warning and not a refusal — a store does have expired stock at cutover, and the honest
+thing is to load it and let `INV-205` refuse to sell it.
+
+**There is no `expiry_status` column, on purpose.** `INV-203` derives it at read time from
+the date and `near_expiry_days`, so a batch becomes `NEAR_EXPIRY` at midnight in Manila
+with nothing having run — the reasoning `CR-107` already applies to ageing, for the same
+reason: a stored status is a column a missed job leaves stale.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -972,7 +1058,9 @@ migrations/010_purchasing.sql       suppliers, purchase orders and items, goods 
 migrations/011_returns.sql          sale returns and items (POS-301 – POS-307)
 migrations/012_stock_counts.sql     stock count sessions and lines (INV-110 – INV-113)
 migrations/013_negotiated_pricing.sql customer prices and quantity breaks (PR-103, PR-104)
+migrations/014_batches.sql          batches, ledger batch_id, sale_item_batches (INV-201 – INV-206)
 ```
+
 
 ## 4. API
 
@@ -990,6 +1078,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` `PUT` | `/products` `/products/:id` | `TX-410` | cost only under `TX-412` |
 | `GET` | `/inventory/:productId/movements` | `TX-422` | the ledger view |
 | `POST` | `/inventory/adjustments` | `TX-407` | `INV-108` |
+| `GET` | `/inventory/reconciliation` | `TX-427` | `INV-101` and, since `TASK-029`, `INV-201` — one answer per product and per batch, because two pages that can disagree are two pages nobody believes |
+| `GET` | `/products/:id/batches` | `TX-422` | `INV-201`–`INV-203`. The shelf; `?includeEmpty=true` is the recall's view, since an exhausted batch is still the batch a notice names |
+| `POST` | `/batches/:id/expire` | `TX-407` | `INV-205`. The **only** way expired stock leaves. There is no route that sells it and none that edits a batch quantity — the store's policy permits no override (`TASK-029`), and `INV-201` makes the quantity the ledger's own sum |
 | `GET` | `/customers?q=` | `TX-413` | |
 | `GET` | `/customers/:id/credit` | `TX-413` | limit, balance, available, ageing, and — since `TASK-028` — `store_credit_centavos`, the balance past zero the customer may spend (`CR-108`) |
 | `POST` | `/customers/:id/collections` | `TX-416` | `CR-201`..`CR-206` |

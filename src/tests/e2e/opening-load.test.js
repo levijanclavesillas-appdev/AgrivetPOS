@@ -324,7 +324,7 @@ test('TC-E2E-21: both ledgers reconcile after the load and the trading on top of
   const creditService = require('../../services/creditService');
 
   // INV-101 and CR-103, on a store whose entire history is a spreadsheet and one sale.
-  assert.deepEqual(inventoryService.reconcile(), { ok: true, breaks: [] });
+  assert.deepEqual(inventoryService.reconcile(), { ok: true, breaks: [], batch_breaks: [] });
   assert.deepEqual(creditService.reconcile().breaks, []);
   assert.equal(creditService.reconcile().ok, true);
 });

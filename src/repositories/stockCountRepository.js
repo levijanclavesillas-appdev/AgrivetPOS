@@ -124,8 +124,22 @@ function snapshotLines({ sessionId, categoryId = null, at, idFor }) {
       FROM products p
       LEFT JOIN inventory i ON i.product_id = p.id
      WHERE (@categoryId IS NULL OR p.category_id = @categoryId)
+       -- TASK-029: a batch-tracked product is not on a product-level sheet. Its stock
+       -- is held as batches with dates printed on the boxes, and which batch is short
+       -- is not something a single counted figure can say — so INV-201 would refuse
+       -- the variance movement at posting, after the shelf had been counted. It is
+       -- left off here instead, and the service says how many and why.
+       AND p.is_batch_tracked = 0
      ORDER BY p.name COLLATE NOCASE
   `).all({ categoryId });
+
+  // Counted separately so the sheet can state its own scope honestly rather than
+  // quietly being short of the shelf it claims to cover.
+  const excluded = db.get().prepare(`
+    SELECT COUNT(*) AS n FROM products p
+     WHERE (@categoryId IS NULL OR p.category_id = @categoryId)
+       AND p.is_batch_tracked = 1
+  `).get({ categoryId }).n;
 
   const insertLine = db.get().prepare(`
     INSERT INTO stock_count_lines
@@ -152,7 +166,7 @@ function snapshotLines({ sessionId, categoryId = null, at, idFor }) {
   });
   writeAll();
 
-  return { lines: rows.length, at };
+  return { lines: rows.length, batch_tracked_excluded: excluded, at };
 }
 
 // ── Lines ───────────────────────────────────────────────────────────────────

@@ -25,6 +25,7 @@ const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const permissions = require('./permissions');
 const inventoryRepository = require('../repositories/inventoryRepository');
+const batchRepository = require('../repositories/batchRepository');
 const productRepository = require('../repositories/productRepository');
 
 /**
@@ -86,7 +87,7 @@ function describe(type) {
 function post({
   productId, type, qtyMilli, unitCostCentavos = null,
   actor, reason = null, referenceType = null, referenceId = null, referenceNo = null,
-  correctsMovementId = null, occurredAt = null, allowNegative = null,
+  correctsMovementId = null, occurredAt = null, allowNegative = null, batchId = null,
 }) {
   assertType(type);
   const declared = TYPES[type];
@@ -99,6 +100,31 @@ function post({
   }
 
   const qty = normaliseQuantity(type, qtyMilli);
+
+  // INV-201, enforced here because here is the only way stock moves.
+  //
+  // "The sum of batch quantities equals the product on-hand figure" holds only if every
+  // movement of a batch-tracked product names a batch. A CHECK constraint cannot say
+  // this — it would have to read products.is_batch_tracked from another table — so the
+  // one function that writes movements says it instead.
+  //
+  // A path that cannot yet name a batch is refused rather than allowed to write an
+  // unbatched movement. That refusal is the honest failure: the alternative is a
+  // product whose batches total 47 while its on-hand says 50, discovered by a
+  // reconciliation report weeks later with no way to work out which movement did it.
+  if (product.is_batch_tracked && !batchId) {
+    throw errors.badRequest(
+      `${product.name} is batch-tracked, so a ${describe(type).toLowerCase()} movement must name its batch.`,
+      { ruleId: 'INV-201' },
+    );
+  }
+  if (batchId && !product.is_batch_tracked) {
+    throw errors.badRequest(
+      `${product.name} is not batch-tracked, so its movements carry no batch.`,
+      { ruleId: 'INV-201' },
+    );
+  }
+
   if (declared.requiresReason && !textOrNull(reason)) {
     throw errors.badRequest(`A ${declared.what.toLowerCase()} movement needs a reason`, { ruleId: 'INV-103' });
   }
@@ -150,6 +176,7 @@ function post({
     reference_no: referenceNo,
     reason: textOrNull(reason),
     corrects_movement_id: correctsMovementId,
+    batch_id: batchId,
     is_negative_stock: goesNegative ? 1 : 0,
     occurred_at: at,
     created_by: actor.id,
@@ -544,7 +571,17 @@ function valuation() {
  */
 function reconcile() {
   const breaks = inventoryRepository.reconciliationBreaks();
-  return { ok: breaks.length === 0, breaks };
+  // INV-201's half of the same question (TASK-029): a batch-tracked product whose
+  // batch quantities do not sum to its on-hand figure. It is asked here rather than
+  // from its own endpoint because it has the same answer and the same audience — one
+  // page that says whether the ledger is telling the truth, not two that can be read
+  // separately and disagree. Empty for a store that tracks nothing by batch.
+  const batchBreaks = batchRepository.reconciliationBreaks();
+  return {
+    ok: breaks.length === 0 && batchBreaks.length === 0,
+    breaks,
+    batch_breaks: batchBreaks,
+  };
 }
 
 module.exports = {
