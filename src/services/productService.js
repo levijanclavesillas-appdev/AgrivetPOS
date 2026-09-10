@@ -183,18 +183,28 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
   }
 
   if (barcodes) product.barcodes = barcodes.map((b) => ({ id: b.id, barcode: b.barcode }));
-  if (packs) {
-    product.packs = packs.map((p) => ({
-      id: p.id,
-      unit: { id: p.unit_id, code: p.unit_code, name: p.unit_name },
-      factor_milli: p.factor_milli,
-      is_default_sell: Boolean(p.is_default_sell),
-    }));
-  }
+  if (packs) product.packs = packs.map(presentPack);
   if (prices) product.prices = prices;
 
   return product;
 }
+
+/**
+ * A pack, in the one shape the API speaks.
+ *
+ * Shared by the product detail and by the pack routes because they were not shared
+ * before: `GET /products/:id` nested the unit and `POST /products/:id/packs` returned
+ * the repository's flat row, so a screen that re-rendered from the reply of the call it
+ * had just made read `pack.unit.id` off `undefined` and threw. The pack had been
+ * written; only the answer was the wrong shape, which is the kind of defect that
+ * survives a passing API test and a working reload.
+ */
+const presentPack = (p) => ({
+  id: p.id,
+  unit: { id: p.unit_id, code: p.unit_code, name: p.unit_name },
+  factor_milli: p.factor_milli,
+  is_default_sell: Boolean(p.is_default_sell),
+});
 
 /** The whole product, as SCR-202's five tabs need it. */
 function detail(row, session, { at = clock.nowUtc() } = {}) {
@@ -597,7 +607,7 @@ function addPack(productId, input, actor) {
       after: { pack_unit: pack.unitCode, factor_milli: pack.factorMilli },
       reason: `Pack added: 1 ${pack.unitCode} = ${quantity.format(pack.factorMilli, baseUnit.code)}`,
     });
-    return productRepository.packsFor(productId);
+    return productRepository.packsFor(productId).map(presentPack);
   });
 }
 
@@ -616,7 +626,7 @@ function removePack(productId, packId, actor) {
       before: { pack_unit: pack.unit_code, factor_milli: pack.factor_milli },
       reason: 'Pack removed',
     });
-    return productRepository.packsFor(productId);
+    return productRepository.packsFor(productId).map(presentPack);
   });
 }
 

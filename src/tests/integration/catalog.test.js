@@ -249,6 +249,29 @@ test('a weight-embedded barcode is refused at the counter rather than offered', 
 
 // ── UOM-002 / VR-207 — packs ────────────────────────────────────────────────
 
+test('adding or removing a pack answers in the same shape the product detail speaks', () => {
+  // The two used to differ: the detail nested the unit and the pack routes returned the
+  // repository's flat row. A screen that re-rendered from the reply of the call it had
+  // just made read `pack.unit.id` off `undefined` and threw — the pack was written, and
+  // only the answer was the wrong shape, which is why an API test and a reload both
+  // looked fine.
+  const product = productService.create(productInput({ sku: 'FEED-SHAPE', name: 'Shaped Feed' }), sessions.OWNER);
+
+  const added = productService.addPack(
+    product.id, { unitId: ref.sack.id, factorMilli: 50000 }, sessions.OWNER
+  );
+  const fromDetail = productService.get(product.id, sessions.OWNER).packs;
+
+  assert.deepEqual(added, fromDetail, 'the same rows, said the same way');
+  assert.deepEqual(Object.keys(added[0]).sort(), ['factor_milli', 'id', 'is_default_sell', 'unit']);
+  assert.equal(added[0].unit.id, ref.sack.id);
+  assert.equal(added[0].unit.code, 'SACK');
+  assert.equal(added[0].is_default_sell, false, 'a boolean, not a 0');
+
+  const afterRemoval = productService.removePack(product.id, added[0].id, sessions.OWNER);
+  assert.deepEqual(afterRemoval, productService.get(product.id, sessions.OWNER).packs);
+});
+
 test('a pack converts against the base unit, and a zero or negative factor is refused', () => {
   const product = productService.create(productInput({ sku: 'FEED-007', name: 'Sacked Feed' }), sessions.OWNER);
 

@@ -192,6 +192,59 @@ export function createProductEditor({ root, productId, onClose }) {
   };
 
   /**
+   * Make a category, a brand or a unit from inside this editor, and return it.
+   *
+   * Lifted out of `referenceSelect` because the Units tab needs it as much as the
+   * Identity tab does and had no way to reach it. A pack needs a unit that is not the
+   * base unit (UOM-002), a store that has only made one unit therefore has an empty
+   * pack picker, and the only button that could make a second one lives on a field
+   * UOM-003 replaces with prose the moment stock moves — so for any product that had
+   * ever traded there was no way to add a pack at all.
+   *
+   * ui.ask, not window.prompt: Electron does not implement prompt and throws on the
+   * call, so a button built on one does nothing when clicked.
+   */
+  async function createReference(kind, label) {
+    // A unit is asked for in one dialog rather than three, because its code and
+    // whether it divides are part of the same decision as its name.
+    const answers = await ui.ask({
+      title: `New ${label.toLowerCase()}`,
+      fields: kind === 'units'
+        ? [
+          { name: 'name', label: 'Name', maxLength: 60, hint: 'Kilogram, Sack, Piece' },
+          { name: 'code', label: 'Short code', maxLength: 12,
+            hint: 'As it appears on a receipt — KG, SACK, PC.' },
+          // UOM-004 in a sentence: a unit that cannot be halved must say so here, or a
+          // cashier keys 2.5 pieces and the store has invented half a sack of feed.
+          { name: 'allowsFraction', label: 'This can be sold in fractions — 1.5 of them',
+            type: 'checkbox', value: false, hint: 'Kilos and litres can. Sacks and pieces cannot.' },
+        ]
+        : [{ name: 'name', label: 'Name', maxLength: 80 }],
+    });
+    if (!answers || !answers.name) return null;
+
+    const body = { name: answers.name };
+    if (kind === 'units') {
+      if (!answers.code) return null;
+      body.code = answers.code.toUpperCase();
+      body.allowsFraction = answers.allowsFraction;
+    }
+    try {
+      const created = await api.post(`/${kind}`, body);
+      const made = created.unit || created.category || created.brand;
+      reference[kind] = [...reference[kind], made];
+      return made;
+    } catch (err) {
+      ui.toast(err.message, { kind: 'error' });
+      return null;
+    }
+  }
+
+  const optionFor = (row) => h('option', {
+    value: row.id, text: row.code ? `${row.name} (${row.code})` : row.name,
+  });
+
+  /**
    * A select over a reference list, with "add one" built in.
    *
    * Requirement 3: a store with an empty catalogue has no categories and no units, and
@@ -210,50 +263,14 @@ export function createProductEditor({ root, productId, onClose }) {
     const add = h('button', {
       type: 'button', class: 'row-action', text: `New ${label.toLowerCase()}`,
       onclick: async () => {
-        // ui.ask, not window.prompt: Electron does not implement prompt and throws on
-        // the call, so this button silently did nothing in the packaged app — which
-        // left a store with an empty catalogue unable to make the category and the
-        // base unit that creating its first product requires.
-        //
-        // A unit is asked for in one dialog rather than three, because its code and
-        // whether it divides are part of the same decision as its name.
-        const answers = await ui.ask({
-          title: `New ${label.toLowerCase()}`,
-          fields: kind === 'units'
-            ? [
-              { name: 'name', label: 'Name', maxLength: 60, hint: 'Kilogram, Sack, Piece' },
-              { name: 'code', label: 'Short code', maxLength: 12,
-                hint: 'As it appears on a receipt — KG, SACK, PC.' },
-              // UOM-004 in a sentence: a unit that cannot be halved must say so here,
-              // or a cashier keys 2.5 pieces and the store has invented half a sack.
-              { name: 'allowsFraction', label: 'This can be sold in fractions — 1.5 of them',
-                type: 'checkbox', value: false, hint: 'Kilos and litres can. Sacks and pieces cannot.' },
-            ]
-            : [{ name: 'name', label: 'Name', maxLength: 80 }],
-        });
-        if (!answers || !answers.name) return;
-
-        const body = { name: answers.name };
-        if (kind === 'units') {
-          if (!answers.code) return;
-          body.code = answers.code.toUpperCase();
-          body.allowsFraction = answers.allowsFraction;
-        }
-        try {
-          const created = await api.post(`/${kind}`, body);
-          const made = created.unit || created.category || created.brand;
-          reference[kind] = [...reference[kind], made];
-          // The new row is added to this select and chosen, rather than re-rendering
-          // the tab: somebody who stopped half way through a product to make its
-          // category should come back to the SKU and the name they had already typed,
-          // and to the category they just made already picked.
-          input.append(h('option', {
-            value: made.id, text: made.code ? `${made.name} (${made.code})` : made.name,
-          }));
-          input.value = made.id;
-        } catch (err) {
-          ui.toast(err.message, { kind: 'error' });
-        }
+        const made = await createReference(kind, label);
+        if (!made) return;
+        // Added to this select and chosen, rather than re-rendering the tab: somebody
+        // who stopped half way through a product to make its category should come back
+        // to the SKU and the name they had already typed, and to the category they
+        // just made already picked.
+        input.append(optionFor(made));
+        input.value = made.id;
       },
     });
 
@@ -268,13 +285,38 @@ export function createProductEditor({ root, productId, onClose }) {
   // ── Units — the pack table (UOM-002) ──────────────────────────────────────
 
   function unitsTab() {
+    // Every unit that is not already this product's base unit or one of its packs.
+    // UOM-002: a pack has to be a different unit from the base, or "1 KG = 50 KG".
+    const available = () => reference.units.filter((u) => u.id !== product.base_unit.id
+      && !product.packs.some((pack) => pack.unit.id === u.id));
+
     const unitId = h('select', {}, [
       h('option', { value: '', text: 'Choose a unit…' }),
-      ...reference.units
-        .filter((u) => u.id !== product.base_unit.id
-          && !product.packs.some((pack) => pack.unit.id === u.id))
-        .map((u) => h('option', { value: u.id, text: `${u.name} (${u.code})` })),
+      ...available().map(optionFor),
     ]);
+
+    // The button this tab was missing. A store that has made one unit has an empty
+    // picker here, and until now the only place to make a second one was the base-unit
+    // field on Identity — which UOM-003 replaces with prose once stock has moved, so a
+    // product that had traded could never be given a pack.
+    const newUnit = h('button', {
+      type: 'button', class: 'row-action', text: 'New unit',
+      onclick: async () => {
+        const made = await createReference('units', 'Unit');
+        if (!made) return;
+        unitId.append(optionFor(made));
+        unitId.value = made.id;
+        // The factor is whatever was already typed: making the unit is a detour, not
+        // a restart.
+        emptyNote.hidden = true;
+      },
+    });
+
+    const emptyNote = h('p', {
+      class: 'muted', hidden: available().length > 0,
+      text: 'Every unit this store has is already this product’s base unit or one of '
+        + 'its packs. Make a new one to sell it by the sack, the box or the bottle.',
+    });
     const factor = h('input', {
       type: 'text', inputmode: 'decimal', placeholder: 'How many base units',
       'aria-label': 'Conversion factor',
@@ -326,7 +368,9 @@ export function createProductEditor({ root, productId, onClose }) {
         h('div', { class: 'field-row' }, [
           unitId, factor,
           h('button', { type: 'submit', class: 'row-action', text: 'Add pack' }),
+          newUnit,
         ]),
+        emptyNote,
       ]),
     ]);
   }
