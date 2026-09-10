@@ -66,3 +66,23 @@
   .editor-row { flex-direction: column; }
   .po-total, .gr-total { margin-left: 0; }
 }
+
+/* ── The shared product picker (SCR-802, SCR-803) ─────────────────────────── */
+/*
+   The POS's search list, in the buying screens. A datalist was a hint and this is a
+   choice: nothing binds a line until a row is clicked, so a buyer who typed "feed"
+   cannot walk away with the wrong feed.
+*/
+.picker { position: relative; }
+.picker-input { width: 100%; min-height: var(--touch); padding: 0 .6rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.picker-results { position: absolute; z-index: 5; left: 0; right: 0; top: 100%;
+  max-height: 16rem; overflow-y: auto; background: #fff; border: 1px solid var(--rule);
+  border-radius: 0 0 6px 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
+.picker-result { display: grid; grid-template-columns: 8rem 1fr auto auto; gap: .5rem;
+  align-items: baseline; width: 100%; padding: .5rem .6rem; border: 0; background: none;
+  font: inherit; text-align: left; cursor: pointer; }
+.picker-result:hover, .picker-result.is-cursor { background: #f4f7f5; }
+.picker-sku { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
+.picker-unit, .picker-stock { color: var(--muted); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.picker-results .no-results { margin: 0; padding: .6rem; color: var(--muted); }

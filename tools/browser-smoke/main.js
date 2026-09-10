@@ -780,19 +780,35 @@ app.whenReady().then(async () => {
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
 
-  // Type enough of the product for the line to resolve against /products.
+  // Type, then **choose**. The picker binds a line on a click and on nothing else: a
+  // datalist used to resolve on an exact string match or a lone result, which is how a
+  // buyer typing "feed" ordered a feed they had not picked.
   await run(`(() => {
     const el = document.querySelector('.line-product');
-    el.value = 'Hog Grower';
+    el.value = 'Hog';
     el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
   })()`);
-  await settle(700);
-  // The field keeps what was typed — rebuilding it would move the cursor — so the
-  // confirmation is the resolved label beneath it, which is also the only thing that
-  // tells the buyer the line is bound to a product at all.
+  const offered = await waitFor(`document.querySelectorAll('.picker-result').length >= 1`,
+    { label: 'the picker to offer matches', timeoutMs: 6000 });
+  log(offered, 'SCR-802: typing offers a list to choose from, as the POS does',
+    await run(`document.querySelectorAll('.picker-result').length + ' matches'`));
+  log(await run(`/FEED-HG-50/.test(document.querySelector('.picker-result').textContent)`),
+    'each row carries the SKU, the unit and what is on the shelf',
+    (await text('.picker-result')).replace(/\s+/g, ' '));
+
+  // Nothing is bound yet — the line resolves when a row is chosen.
+  log(await run(`!${TEXT('.catalogue-list .resolved')}.trim()`),
+    'and until one is chosen the line is bound to nothing, which the row says');
+
+  await run(`(() => {
+    const row = [...document.querySelectorAll('.picker-result')].find(r => /FEED-HG-50/.test(r.textContent));
+    row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    return true;
+  })()`);
   const resolved = await waitFor(`/FEED-HG-50/.test(${TEXT('.catalogue-list .resolved')})`,
     { label: 'the product to resolve', timeoutMs: 6000 });
-  log(resolved, 'a typed product resolves, and the row says what to',
+  log(resolved, 'choosing one binds the line, and the row says what to',
     await text('.catalogue-list .resolved'));
 
   await run(`(() => {
@@ -1659,8 +1675,11 @@ app.whenReady().then(async () => {
   log(await run(`[...document.querySelectorAll('input[type=password]')].every(i => i.value === '')`),
     'the fields were cleared rather than re-rendered');
 
-  const pinColumn = await run(`(document.querySelector('.users-list') || {}).textContent || ''`);
-  log(/set/.test(pinColumn), 'the list says who has a PIN — what an owner checks here');
+  // Waited for, not sampled: the list repaints from the reply of the create, and on a
+  // loaded machine the sample beat it.
+  log(await waitFor(`/set/.test((document.querySelector('.users-list') || {}).textContent || '')`,
+    { label: 'the PIN column', timeoutMs: 4000 }),
+  'the list says who has a PIN — what an owner checks here');
 
   console.log('\n— SCR-702: settings —');
   const tabNames = await run(`[...document.querySelectorAll('.admin-tab')].map(t => t.textContent)`);

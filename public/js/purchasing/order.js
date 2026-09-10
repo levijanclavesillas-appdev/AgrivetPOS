@@ -12,6 +12,7 @@
 // sides which one they are looking at.
 
 import * as api from '../shell/api.js';
+import { createProductPicker } from '../shell/picker.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, quantity, manila } from '../shell/format.js';
@@ -201,18 +202,14 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
   function lineRow(line, index) {
     return h('tr', {}, [
       h('td', {}, [
-        h('input', {
-          type: 'search', class: 'line-product', value: line.label,
-          placeholder: 'Name, SKU or barcode', 'aria-label': `Product on line ${index + 1}`,
-          list: `po-products-${index}`,
-          oninput: (event) => findProduct(index, event.target),
-        }),
-        h('datalist', { id: `po-products-${index}` }, (line.matches || []).map((p) => h('option', {
-          value: `${p.sku} — ${p.name}`,
-        }))),
-        // What the typed text resolved to. Without it the field says "Hog Grower" and
-        // the buyer has no way to tell whether the line is bound to a product at all —
-        // which they find out when the save is refused, one screen too late.
+        // The shell's picker, the same one the POS search uses: the matches are a list
+        // you choose from, and nothing is bound until you choose. The datalist this
+        // replaces resolved a line only on an exact string match, so a buyer typing
+        // "feed" at a shop with four feeds had a line bound to nothing and found out at
+        // save — one screen too late.
+        productPicker(line, index).el,
+        // What the field resolved to, kept: the picker fills the field with the label,
+        // and this line is what says the row is *bound* rather than merely typed.
         h('small', { class: 'resolved', text: line.productId ? line.label : '' }),
       ]),
       h('td', { class: 'qty' }, [
@@ -240,34 +237,29 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
     ]);
   }
 
-  /** Resolve what was typed to a product, without rebuilding the row under the cursor. */
-  async function findProduct(index, input) {
-    const line = lines[index];
-    line.label = input.value;
-    const term = input.value.trim();
-    if (term.length < 2) return;
-
-    try {
-      const data = await api.get(`/products?q=${encodeURIComponent(term)}&limit=8`);
-      line.matches = data.products;
-      const exact = data.products.find((p) => `${p.sku} — ${p.name}` === term)
-        || (data.products.length === 1 ? data.products[0] : null);
-      if (exact) {
-        line.productId = exact.id;
-        line.unitCode = exact.base_unit.code;
-        line.label = `${exact.sku} — ${exact.name}`;
-      } else {
+  /** One line's picker. Bound on a choice, unbound the moment the field is edited. */
+  function productPicker(line, index) {
+    return createProductPicker({
+      value: line.label,
+      ariaLabel: `Product on line ${index + 1}`,
+      // INV-105: a withdrawn product cannot be *sold*, and can still be bought — a
+      // store that stopped selling something may still be receiving the last delivery
+      // of it. The POS asks for active products only; this screen does not.
+      includeInactive: true,
+      onPick: (product) => {
+        line.productId = product.id;
+        line.unitCode = product.base_unit.code;
+        line.label = `${product.sku} — ${product.name}`;
+        refreshTotals();
+      },
+      onClear: () => {
+        if (!line.productId) return;
         line.productId = '';
-      }
-      const list = root.querySelector(`#po-products-${index}`);
-      if (list) {
-        clear(list).append(...data.products.map((p) => h('option', { value: `${p.sku} — ${p.name}` })));
-      }
-      refreshTotals();
-    } catch {
-      // A failed lookup leaves the row as typed; the save below refuses an unresolved
-      // line with a sentence rather than the search failing silently under the cursor.
-    }
+        line.label = '';
+        line.unitCode = '';
+        refreshTotals();
+      },
+    });
   }
 
   function refreshTotals() {

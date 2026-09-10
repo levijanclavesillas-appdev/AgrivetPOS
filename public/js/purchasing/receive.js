@@ -17,6 +17,7 @@
 // decided for itself would be a screen that disagreed with the refusal it then got.
 
 import * as api from '../shell/api.js';
+import { createProductPicker } from '../shell/picker.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, quantity } from '../shell/format.js';
@@ -216,13 +217,10 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
     return h('tr', {}, [
       h('td', {}, direct()
         ? [
-          h('input', {
-            type: 'search', class: 'line-product', value: line.label,
-            placeholder: 'Name, SKU or barcode', 'aria-label': `Product on line ${index + 1}`,
-            list: `gr-products-${index}`,
-            oninput: (event) => findProduct(index, event.target),
-          }),
-          h('datalist', { id: `gr-products-${index}` }, []),
+          // SCR-802's picker, the same one, for the same reason: a delivery keyed
+          // against a line bound to nothing is a delivery refused at post, after the
+          // clerk has keyed every quantity on the van's docket.
+          productPicker(line, index).el,
           // The same confirmation SCR-802 shows: the buyer needs to see that the line
           // is bound to a product before they post a delivery against it.
           h('small', { class: 'resolved', text: line.productId ? line.label : '' }),
@@ -294,31 +292,27 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
     if (totals) totals.textContent = `Into stock: ${money(total())}`;
   }
 
-  async function findProduct(index, input) {
-    const line = lines[index];
-    line.label = input.value;
-    const term = input.value.trim();
-    if (term.length < 2) return;
-
-    try {
-      const data = await api.get(`/products?q=${encodeURIComponent(term)}&limit=8`);
-      const exact = data.products.find((p) => `${p.sku} — ${p.name}` === term)
-        || (data.products.length === 1 ? data.products[0] : null);
-      if (exact) {
-        line.productId = exact.id;
-        line.unitCode = exact.base_unit.code;
-        line.label = `${exact.sku} — ${exact.name}`;
-      } else {
+  /** One line's picker (SCR-802's, shared). Bound on a choice, never on a guess. */
+  function productPicker(line, index) {
+    return createProductPicker({
+      value: line.label,
+      ariaLabel: `Product on line ${index + 1}`,
+      // INV-105: a withdrawn product still arrives on the last delivery of it.
+      includeInactive: true,
+      onPick: (product) => {
+        line.productId = product.id;
+        line.unitCode = product.base_unit.code;
+        line.label = `${product.sku} — ${product.name}`;
+        refreshLine(index);
+      },
+      onClear: () => {
+        if (!line.productId) return;
         line.productId = '';
-      }
-      const list = root.querySelector(`#gr-products-${index}`);
-      if (list) {
-        clear(list).append(...data.products.map((p) => h('option', { value: `${p.sku} — ${p.name}` })));
-      }
-      refreshLine(index);
-    } catch {
-      // Left as typed; the post below refuses an unresolved line with a sentence.
-    }
+        line.label = '';
+        line.unitCode = '';
+        refreshLine(index);
+      },
+    });
   }
 
   /**

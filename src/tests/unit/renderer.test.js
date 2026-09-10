@@ -1742,6 +1742,36 @@ test('TC-UI-11: SCR-206 shows batches and cannot write a quantity (INV-201, INV-
   assert.match(dashboard, /onOpenBatches/);
 });
 
+test('the buying screens pick a product from a list, and never guess one', () => {
+  // A `<datalist>` is a hint, not a choice: the line resolved only when the typed text
+  // matched a product's label exactly, or when the search happened to return one row.
+  // A buyer typing "feed" at a shop with four feeds had a line bound to nothing — and
+  // found out at save, after keying the whole order. Worse, the one-result case bound a
+  // line to a product nobody had chosen.
+  for (const file of ['js/purchasing/order.js', 'js/purchasing/receive.js']) {
+    const source = codeOf(file);
+    assert.match(source, /createProductPicker/, `${file} does not use the shared picker`);
+    assert.equal(/datalist/.test(source), false, `${file} still has a datalist`);
+    assert.equal(/products\.length === 1 \? data\.products\[0\]/.test(source), false,
+      `${file} still guesses from a single result`);
+    // Editing after a choice unbinds the line: the field and what it resolved to must
+    // not be allowed to say different things.
+    assert.match(source, /onClear/, `${file} does not unbind an edited line`);
+  }
+
+  const picker = codeOf('js/shell/picker.js');
+  // INV-105: a withdrawn product cannot be sold and can still be received.
+  assert.match(picker, /includeInactive/);
+  // The keyboard, because a buyer keying a ten-line order never leaves it.
+  assert.match(picker, /ArrowDown/);
+  assert.match(picker, /event\.key === 'Enter'/);
+  // mousedown rather than click, or the field's blur hides the list under the pointer.
+  assert.match(picker, /onmousedown/);
+  // The catalogue list's two guards, for its reasons.
+  assert.match(picker, /setTimeout\(search, 120\)/);
+  assert.match(picker, /mine !== latest/);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

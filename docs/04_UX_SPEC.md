@@ -363,7 +363,12 @@ ordered against what has arrived, and the status word from `PO-102`. The status 
 by `GET /purchase-orders`; the screen keeps no copy of it.
 
 `SCR-802` **Order** — one purchase order. Lines of product, quantity and unit cost, with the
-running total. **A `DRAFT` is edited in place; a sent order is amended into a new revision**
+running total. The product on a line is **chosen from a list**, the same picker the POS search
+uses — type two letters, see the SKU, the buying unit and what is on the shelf, and pick one.
+A line binds because somebody chose a row and never because the search returned one: a buyer who
+typed "feed" at a shop with four feeds must not walk away having ordered the wrong one. Editing
+the field after a choice unbinds the line, so what it says and what it resolved to cannot
+disagree. **A `DRAFT` is edited in place; a sent order is amended into a new revision**
 (`PO-104`), and the screen says which of the two it is about to do before the buyer presses
 save — the supplier is holding a printed copy of something, and "rev 2" is the word that tells
 them which. **Nothing on this screen moves stock** (`PO-103`); the only thing that does is
