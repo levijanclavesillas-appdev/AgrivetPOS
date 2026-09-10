@@ -20,6 +20,10 @@ screens the original backlog never assigned to anybody — see [the screen gap](
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
 shippable: nothing has run in the store. [Status](#status) has the detail.
 
+**The v1.2 backlog is now written** — `TASK-029` to `TASK-035`, seven files, in
+[Open — v1.2 "Trace"](#open--v12-trace). Writing it is not the same as starting it: the next
+thing that moves this product is a Windows build and a visit to the counter, not another task.
+
 ---
 
 ## The critical path to v1.0
@@ -273,15 +277,60 @@ instant it exists, so it has no due date and nothing to age.
 
 ## Open — v1.2 "Trace"
 
-| ID | Task | Feature |
-| :--- | :--- | :--- |
-| `TASK-029` | Batches, expiry status, FEFO allocation | `FT-205` |
-| `TASK-030` | Recall by batch | `INV-206` |
-| `TASK-031` | Customer statements and ageing buckets | `FT-406`, `FT-407` |
-| `TASK-032` | Payment reconciliation | `FT-606` |
-| `TASK-033` | Profitability, fast/slow movers, movement analysis | `FT-602`, `FT-605` |
-| `TASK-034` | Bad-debt write-off | `FT-409` |
-| `TASK-035` | Evaluate SQLCipher encryption against POS latency | `SEC-9` |
+**The files are written.** Seven of them, in the established format, each self-contained enough
+that an implementer needs it plus the specs it cites and nothing else. Every one of the ten v1.2
+rules in `03_BUSINESS_RULES.md` is claimed by exactly one task, checked mechanically rather than
+by eye, and `07_TEST_PLAN.md` §6.4 reserves the case ids so no two tasks reach for the same
+number.
+
+**In dependency order, which is not numeric order.** `TASK-029` first and alone at the front:
+batches are the substrate, and `TASK-030` is unbuildable without the decision `TASK-029` makes
+about how a sale line records the batches it consumed. `TASK-031` before `TASK-034`, because a
+write-off has to land on a statement and it is cheaper to have the statement first. `TASK-032`,
+`TASK-033` and `TASK-035` depend on nothing in v1.2 and can be taken in any order — though
+`TASK-035` should not be started at all until the store visit, for the reason its own first
+section gives.
+
+| ID | Task | Feature | Depends on |
+| :--- | :--- | :--- | :--- |
+| [TASK-029](TASK-029-batches-and-fefo.md) | Batches, expiry status, FEFO allocation | `FT-205` | — |
+| [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | `FT-205`, `INV-206` | `TASK-029` |
+| [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | `FT-406`, `FT-407` | — |
+| [TASK-032](TASK-032-payment-reconciliation.md) | Payment reconciliation | `FT-606` | — |
+| [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | `FT-602`, `FT-605` | — |
+| [TASK-034](TASK-034-bad-debt-write-off.md) | Bad-debt write-off | `FT-409` | `TASK-031` |
+| [TASK-035](TASK-035-evaluate-sqlcipher.md) | Evaluate SQLCipher encryption against POS latency | `SEC-9` | the store visit |
+
+**Three carry a question that has to be answered before the code is written.** `TASK-029` needs
+`Q-2` from the brief — which of the store's goods are batch-tracked, and whether it holds anything
+cold-chain — because `is_batch_tracked` decides how a product is costed, whether a sale has to
+choose stock and whether a return defaults to write-off. It also needs `INV-205`'s own deferral
+answered: the rule permits an owner override on selling expired stock "only where the store's own
+policy allows it", and if the answer is no, the override is not built, because a switch nobody may
+use is a switch somebody will. `TASK-035` needs the reference machine, which is not a question but
+a visit.
+
+**Four fill seams v1.0 and v1.1 left deliberately, and this is the pattern by now.**
+`products.is_batch_tracked` has been read by exactly one thing since `TASK-006`;
+`goods_receipt_lines.batch_no` and `expiry_date` were added nullable by `TASK-019` with a comment
+saying they exist so batch receiving would be a service change rather than a migration;
+`sale_items.batch_id` has been written `null` on every line ever sold since `TASK-011`; and
+`WRITE_OFF` has been in `customer_credit_transactions.txn_type`'s `CHECK` since `TASK-008` with
+nothing able to write one. `CR-103` already names write-offs in the list of things the balance
+derives from, so the arithmetic is correct for a transaction that has never occurred.
+
+**Two of the seven are where the money can quietly go wrong, and both are called out in their
+files rather than left to review.** `TASK-029` has to keep `INV-201`'s batch quantities and
+`INV-101`'s derived on-hand from disagreeing — the safe reading is that they are the same sum
+against the same ledger, one column finer, rather than a stored counter maintained beside it. And
+`TASK-034` has to keep a write-off out of every collections figure (`CR-303`), or the store's
+collection performance improves every time it gives up on a debt.
+
+**The screen-gap lesson is applied.** Each task names the `SCR-` id it needs in its technical
+requirements — `SCR-206`, `SCR-207`, `SCR-404`, `SCR-605`, `SCR-606` — rather than assuming
+somebody will notice. None of them is added to `04_UX_SPEC.md` §3 yet, on purpose: `TC-UI-10`
+reads that section and requires a view for every screen in it, so a screen enters the spec in the
+commit that builds it and the guard stays green in between.
 
 <a id="status"></a>
 ## Status — 2026-09-10

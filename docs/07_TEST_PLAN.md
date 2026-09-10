@@ -267,6 +267,34 @@ to return against" forced the status the same way, and now drives the real void.
 writes `status = 'VOIDED'` by hand is a fake, and `saleRepository.setStatus` now refuses that
 value outright so a new one cannot be written.
 
+## 6.4 v1.2 cases, reserved
+
+The same reservation, for `TASK-029`–`TASK-035`. `TC-UT-52` follows `TC-UT-51`; the 90s and the
+98–100 band stay where they are, holding the guards that are not numbered by task.
+
+| Range | Task | Subject |
+| :--- | :--- | :--- |
+| `TC-UT-52` – `TC-UT-54`, `TC-INT-107` – `TC-INT-111` | `TASK-029` | Batches: the three expiry statuses at the boundary, FEFO across two batches, batch cost against moving average, batches reconciling to on-hand, the expired refusal, the near-expiry alert |
+| `TC-INT-112` – `TC-INT-113` | `TASK-030` | Recall: per-batch quantities on a line that spanned two, and the voided, returned and walk-in sales that must appear as themselves |
+| `TC-UT-55`, `TC-INT-114` – `TC-INT-116` | `TASK-031` | Statements and ageing: the bucket boundaries, the closing balance that must equal the account, one account in two buckets, the invoices a collection settled |
+| `TC-INT-117` – `TC-INT-119` | `TASK-032` | Reconciliation: the variance, the tolerance and reason, and that no recorded figure moved |
+| `TC-INT-120` – `TC-INT-122` | `TASK-033` | Breakdowns reconciling to `RPT-101`'s net, a slow mover that sold nothing, movement analysis against the on-hand change |
+| `TC-INT-123` – `TC-INT-125` | `TASK-034` | Write-off: owner only, the debits that stop ageing, and the collections figures that must not move |
+| `TC-E2E-23` – `TC-E2E-28` | one per task | The journey each task exists for. `TASK-035` has none — it ships a decision, not a path |
+| `TC-PERF-07` | `TASK-033` | The new reports inside `TC-PERF-05`'s budget at `TC-PERF-06`'s scale |
+| `TC-PERF-08` – `TC-PERF-09` | `TASK-035` | Encrypted against plain, across the budgets and across backup, verification and restore |
+
+**Two cases are expected to be re-pointed, and both are named in their tasks.** `TC-UT-31` asserts
+`PR-101`'s four precedence levels resolve; if `TASK-029`'s sale-line decision splits a line across
+batches, the price it resolves is unchanged but the line count is not, and the case has to say so.
+`TC-INT-62`'s void, re-pointed once already at `TASK-021`, reverses stock — and reversing
+batch-tracked stock has to put it back in the batch it came from, which is an assertion that case
+does not currently make.
+
+**`TC-PERF-08` and `TC-PERF-09` are reserved but cannot be run here.** §6 says a figure from a
+build machine is not a measurement, and `TASK-035` is gated on the reference machine for exactly
+that reason. Reserving the ids now keeps them from being taken by something that *can* run.
+
 ## 7. Regression guards
 
 Permanent, never deleted, run on every build:
