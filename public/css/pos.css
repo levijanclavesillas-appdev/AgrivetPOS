@@ -164,6 +164,12 @@
 }
 .pos-prompt h2, .authorisation-rule { margin-top: 0; }
 .pos-prompt input, .authorisation input { min-height: var(--touch); width: 100%; }
+/* POS-102's unit picker, and the two sentences under it: what the quantity comes to in
+   the base unit, and — before the submit rather than after — what the unit refuses. */
+.pos-prompt select { min-height: var(--touch); width: 100%; font: inherit;
+  border: 1px solid var(--rule); border-radius: 4px; background: #fff; padding: 0 .6rem; }
+.prompt-note { margin: .25rem 0 0; font-variant-numeric: tabular-nums; }
+.prompt-rule { margin: .25rem 0 0; color: var(--warn-ink); font-size: .875rem; }
 .prompt-actions, .authorisation-actions, .payment-actions, .receipt-actions {
   display: flex; gap: .5rem; margin-top: .75rem;
 }

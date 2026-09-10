@@ -11,6 +11,7 @@
 
 const express = require('express');
 const pricingService = require('../services/pricingService');
+const saleService = require('../services/saleService');
 const discountRuleService = require('../services/discountRuleService');
 const taxService = require('../services/taxService');
 const storeProfileService = require('../services/storeProfileService');
@@ -39,7 +40,12 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
     const result = pricingService.priceCart({
       lines: lines.map((line) => ({
         productId: line.productId,
-        qtyMilli: line.qtyMilli,
+        // POS-102: a line may be entered in a pack, and a price is per base unit — so
+        // the quantity is resolved to base before it is multiplied by one, through the
+        // **same function POST /sales uses**. Priced raw, two sacks would preview as
+        // two kilos and be charged as a hundred, which is exactly the drift the head of
+        // this file says cannot happen.
+        qtyMilli: saleService.resolveLineQuantity(line).qtyMilli,
         discountCentavos: line.discountCentavos || 0,
         // PR-204 records the reason against a manual discount; PR-206 needs it to say
         // what was suppressed when an automatic one beats it.

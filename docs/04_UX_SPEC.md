@@ -418,7 +418,7 @@ the operator needs if the import turns out to have been a mistake (`OPS-103`).
 | Component | Rule |
 | :--- | :--- |
 | Money field | Right-aligned, tabular numerals, always 2 decimals, `₱` prefix, never a bare number |
-| Quantity field | Up to 3 decimals, unit label always attached, base unit and pack shown together (`UOM-002`) |
+| Quantity field | Up to 3 decimals, unit label always attached, base unit and pack shown together (`UOM-002`). `F3` asks for the **unit** beside the quantity where the product has packs, shows what it comes to in the base unit as it is typed, and states `UOM-004`'s refusal — a unit that cannot be halved — before the submit rather than after it |
 | Authorisation panel | Inline, not a modal-over-modal: names the rule, states which role may approve, takes approver username + password, and records both actors (`AUD-603`) |
 | Destructive confirm | Typed confirmation for restore and import only (`OPS-004`); everything else is a two-step button |
 | Toast | Success 3 s auto-dismiss; error persists until dismissed |

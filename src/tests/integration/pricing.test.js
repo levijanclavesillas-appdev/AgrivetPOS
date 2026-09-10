@@ -829,6 +829,46 @@ test('POST /sales/price-check prices a cart without committing anything', async 
   assert.equal(movements, 0);
 });
 
+test('POS-102: the price check prices a pack line the way the till will charge it', async () => {
+  // The preview and the sale run the same computation — that is the whole reason
+  // /sales/price-check exists rather than the screen adding up prices. A pack line is
+  // where the two nearly parted company: a price is per base unit, the quantity arrives
+  // in sacks, and the preview was multiplying without converting. Two sacks previewed
+  // at ₱125.00 and would have been charged at ₱6,250.
+  const product = makeProduct({ retailPriceCentavos: 6250 });
+  productService.addPack(product.id, { unitId: ref.sack.id, factorMilli: 50000 }, sessions.OWNER);
+
+  const previewed = await (await call('/sales/price-check', {
+    token: tokens.CASHIER,
+    method: 'POST',
+    body: { lines: [{ productId: product.id, qtyMilli: 2000, packUnitId: ref.sack.id }] },
+  })).json();
+
+  // 2 sacks × 50 KG × ₱62.50.
+  assert.equal(previewed.total_centavos, 6250 * 100);
+  assert.equal(previewed.lines[0].qty_milli, 100000, 'resolved to base before it was priced');
+  assert.equal(previewed.lines[0].unit_price_centavos, 6250, 'and the price is still per KG');
+
+  // The same cart, previewed in the base unit, comes to the same money — which is what
+  // says the conversion happened once and in the right direction.
+  const inKilos = await (await call('/sales/price-check', {
+    token: tokens.CASHIER,
+    method: 'POST',
+    body: { lines: [{ productId: product.id, qtyMilli: 100000 }] },
+  })).json();
+  assert.equal(inKilos.total_centavos, previewed.total_centavos);
+
+  // And a pack the product does not have is refused here as it is at the sale, rather
+  // than quietly priced as though the unit had been left off.
+  const wrong = await call('/sales/price-check', {
+    token: tokens.CASHIER,
+    method: 'POST',
+    body: { lines: [{ productId: product.id, qtyMilli: 1000, packUnitId: ref.piece.id }] },
+  });
+  assert.equal(wrong.status, 400);
+  assert.equal((await wrong.json()).error.rule_id, 'UOM-002');
+});
+
 test('the price check needs TX-401, and the client cannot choose the tax mode', async () => {
   const product = makeProduct();
 

@@ -71,7 +71,9 @@ export function createPos({ root, session, onPay }) {
           h('span', {
             class: 'qty',
             text: packAndBase({
-              qtyMilli: line.qtyMilli,
+              // The base equivalent, derived: the line holds what was entered, and
+              // packAndBase's job is to show both halves of POS-102.
+              qtyMilli: cart.baseMilliOf(line),
               baseUnit: line.baseUnit,
               packUnit: line.packUnitCode,
               packFactorMilli: line.packFactorMilli,
@@ -192,10 +194,11 @@ export function createPos({ root, session, onPay }) {
     const product = catalogue.get(line.productId);
     if (!product || product.on_hand_milli === undefined || product.on_hand_milli === null) return null;
 
+    // In base units: what comes off the shelf is kilos, whatever the line was keyed in.
     const takenBefore = cart.lines
       .slice(0, cart.lines.findIndex((l) => l.key === line.key) + 1)
       .filter((l) => l.productId === line.productId)
-      .reduce((sum, l) => sum + l.qtyMilli, 0);
+      .reduce((sum, l) => sum + cart.baseMilliOf(l), 0);
     return product.on_hand_milli - takenBefore;
   }
 
@@ -334,14 +337,29 @@ export function createPos({ root, session, onPay }) {
     await reprice();
   }
 
-  /** POS-104 needs on-hand, which the product payload does not carry. */
+  /**
+   * What a cart line needs that a search result does not carry.
+   *
+   * Two things: `POS-104`'s on-hand, and — since the unit picker — the product's packs.
+   * The search payload has neither, and it is right not to: fifty rows in the catalogue
+   * list would be fifty pack queries for a screen that shows none of them. A line being
+   * *added* is one product and one moment, so it is the place to ask.
+   *
+   * Both in parallel, and both optional. A product that arrived by scan already carries
+   * its packs — `/products/barcode/:code` answers with the detail — and a failed fetch
+   * leaves the line sellable in its base unit rather than refusing to add it at all.
+   */
   async function withStock(product) {
-    try {
-      const { on_hand: onHand } = await api.get(`/inventory/${product.id}`);
-      return { ...product, on_hand_milli: onHand.qty_on_hand_milli };
-    } catch {
-      return product;
-    }
+    const [detail, stock] = await Promise.all([
+      product.packs ? Promise.resolve({ product }) : api.get(`/products/${product.id}`).catch(() => null),
+      api.get(`/inventory/${product.id}`).catch(() => null),
+    ]);
+
+    return {
+      ...product,
+      packs: product.packs ?? detail?.product?.packs ?? [],
+      on_hand_milli: stock ? stock.on_hand.qty_on_hand_milli : undefined,
+    };
   }
 
   async function lookup(term) {
@@ -462,6 +480,108 @@ export function createPos({ root, session, onPay }) {
     queueMicrotask(() => idNo.focus());
   }
 
+  /**
+   * `POS-102` — the quantity **and the unit it is in** (`F3`).
+   *
+   * The unit was missing from this screen until now, and its absence was not neutral:
+   * the field was labelled "In KG or SACK" and the number was always taken as KG. A
+   * cashier keying 2 for two sacks sold two kilos, at a fiftieth of the money. The
+   * server has taken a pack unit per line since `TASK-011`, the cart has kept pack
+   * lines apart since `TASK-015`, and the receipt has printed both halves all along —
+   * the counter simply had no way to say which.
+   *
+   * The conversion is shown as it is typed, because "2 SACK = 100 KG" is the sentence
+   * that catches a mis-keyed unit while the customer is still standing there, and
+   * `UOM-004`'s refusal is stated **before** the submit rather than after it: a unit
+   * that cannot be halved says so under the field, not in a toast once the sale is
+   * refused.
+   */
+  function quantityPrompt(line) {
+    const product = catalogue.get(line.productId);
+    const packs = product?.packs ?? [];
+    const units = [
+      { id: null, code: line.baseUnit, allowsFraction: line.baseUnitAllowsFraction, factorMilli: 1000 },
+      ...packs.map((pack) => ({
+        id: pack.unit.id,
+        code: pack.unit.code,
+        allowsFraction: pack.unit.allows_fraction ?? false,
+        factorMilli: pack.factor_milli,
+      })),
+    ];
+
+    modalOpen = true;
+    const close = () => { modalOpen = false; clear(panelHost); search.focus(); };
+
+    const qty = h('input', { type: 'text', inputmode: 'decimal', value: String(line.qtyMilli / 1000), autocomplete: 'off' });
+    const unit = h('select', {}, units.map((u) => h('option', {
+      value: u.id || '', text: u.code, selected: (u.id || null) === (line.packUnitId || null),
+    })));
+    const note = h('p', { class: 'prompt-note' });
+    const rule = h('p', { class: 'prompt-rule', hidden: true });
+
+    const chosen = () => units.find((u) => (u.id || '') === unit.value) || units[0];
+
+    /** The sentence under the field: what this comes to, and what the unit refuses. */
+    function explain() {
+      const picked = chosen();
+      const typed = Number.parseFloat(qty.value);
+      const milli = Number.isFinite(typed) ? Math.round(typed * 1000) : null;
+
+      note.textContent = milli === null || milli <= 0 || picked.factorMilli === 1000
+        ? ''
+        : `${quantity(milli, picked.code)} = ${quantity(Math.round((milli * picked.factorMilli) / 1000), line.baseUnit)}`;
+
+      // UOM-004, said before it is needed rather than after it is broken.
+      const indivisible = !picked.allowsFraction;
+      rule.hidden = !indivisible;
+      if (indivisible) {
+        rule.textContent = `${picked.code} cannot be sold in parts — a whole number of them.`;
+      }
+    }
+
+    clear(panelHost).append(h('form', {
+      class: 'pos-prompt',
+      onsubmit: async (event) => {
+        event.preventDefault();
+        const picked = chosen();
+        const typed = Math.round(Number.parseFloat(qty.value) * 1000);
+        if (!Number.isFinite(typed) || typed <= 0) {
+          return ui.toast('Enter a quantity greater than zero.', { kind: 'error' });
+        }
+        // Refused here as well as at the server, because the counter should not have to
+        // send a sale to find out (UOM-004).
+        if (!picked.allowsFraction && typed % 1000 !== 0) {
+          return ui.toast(`${picked.code} cannot be sold in parts. Enter a whole number of `
+            + `${picked.code}, or sell by ${line.baseUnit}.`, { kind: 'error' });
+        }
+
+        const moved = cart.setUnit(line.key, picked.id, product);
+        cart.setQuantity(moved ? moved.key : line.key, typed);
+        selectedKey = moved ? moved.key : line.key;
+        close();
+        await reprice();
+        return undefined;
+      },
+    }, [
+      h('h2', { text: `Quantity — ${line.name}` }),
+      h('label', { text: 'Quantity' }, [qty]),
+      // Only where there is a choice to make. A product sold by the kilo alone gets the
+      // field it always had, with no control that has one option in it.
+      units.length > 1 ? h('label', { text: 'Unit' }, [unit]) : null,
+      note,
+      rule,
+      h('div', { class: 'prompt-actions' }, [
+        h('button', { type: 'submit', class: 'primary', text: 'Apply' }),
+        h('button', { type: 'button', text: 'Cancel', onclick: close }),
+      ]),
+    ]));
+
+    qty.addEventListener('input', explain);
+    unit.addEventListener('change', explain);
+    explain();
+    queueMicrotask(() => qty.select());
+  }
+
   const actions = {
     search: () => search.focus(),
     customer: () => chooseCustomer(),
@@ -470,17 +590,7 @@ export function createPos({ root, session, onPay }) {
     quantity: () => {
       const line = selected();
       if (!line) return;
-      prompt({
-        title: `Quantity — ${line.name}`,
-        label: `In ${line.baseUnit}${line.packUnitCode ? ` or ${line.packUnitCode}` : ''}`,
-        value: String(line.qtyMilli / 1000),
-        onSubmit: async (raw) => {
-          const qty = Math.round(Number.parseFloat(raw) * 1000);
-          if (!Number.isFinite(qty) || qty <= 0) return ui.toast('Enter a quantity greater than zero.', { kind: 'error' });
-          cart.setQuantity(line.key, qty);
-          await reprice();
-        },
-      });
+      quantityPrompt(line);
     },
 
     lineDiscount: () => {

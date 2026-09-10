@@ -1971,6 +1971,83 @@ app.whenReady().then(async () => {
   log(await run(`!document.querySelector('.audit input[type=text][aria-label*=reason]')`),
     'there is no field that would write to it');
 
+  // ── SCR-301: the unit at the counter (POS-102) ───────────────────────────
+  //
+  // The pack machinery has been complete since TASK-011 — the server takes a unit per
+  // line, the cart keeps pack lines apart, the receipt prints both halves — and the
+  // counter had no way to say which unit it meant. F3 said "In KG or SACK" and took
+  // the number as KG either way.
+
+  console.log('\n— SCR-301: selling by the sack (POS-102) —');
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+  await run(`(() => {
+    const el = document.querySelector('.pos-search');
+    el.value = 'Hog Grower';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(FIND('.search-results button', '/Hog Grower/'), { label: 'the product' });
+  await clickOn('.search-results button', '/Hog Grower/');
+  await waitFor(`document.querySelectorAll('.cart-line').length >= 1`, { label: 'a cart line' });
+
+  await press('F3');
+  const unitPicker = await waitFor(`!!document.querySelector('.pos-prompt select')`, { label: 'the unit picker' });
+  log(unitPicker, 'F3 asks for the unit as well as the quantity');
+  log(await run(`[...document.querySelectorAll('.pos-prompt select option')].map(o => o.textContent).join(',')`) === 'KG,SACK',
+    'and offers the base unit and the product’s packs');
+
+  await run(`(() => {
+    const form = document.querySelector('.pos-prompt');
+    form.querySelector('input').value = '2';
+    form.querySelector('input').dispatchEvent(new Event('input', { bubbles: true }));
+    const select = form.querySelector('select');
+    select.value = [...select.options].find(o => o.textContent === 'SACK').value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await settle(200);
+  const conversion = await run(`(document.querySelector('.prompt-note') || {}).textContent || ''`);
+  log(/2 SACK = 100 KG/.test(conversion), 'the conversion is shown as it is typed', conversion);
+  log(/cannot be sold in parts/.test(await run(`(document.querySelector('.prompt-rule') || {}).textContent || ''`)),
+    'UOM-004 is stated before the submit, not after the refusal');
+
+  await run(`document.querySelector('.pos-prompt').requestSubmit()`);
+  await waitFor(`/SACK/.test(document.querySelector('.cart-lines').textContent)`, { label: 'the line in sacks' });
+  const packLine = await run(`document.querySelector('.cart-line .qty').textContent`);
+  log(/2 SACK \(100 KG\)/.test(packLine), 'POS-102: the line shows both units', packLine);
+
+  // The money is the point: two sacks at ₱62.50 a kilo is ₱6,250, not ₱125.
+  const packTotal = await run(`(document.querySelector('.rail-totals') || {}).textContent || ''`);
+  log(/₱6,250\.00/.test(packTotal), 'and the total is the sack price, not the kilo price', packTotal.trim());
+  // POS-104's figure is the shelf's, so it is in kilos and a hundred of them are gone
+  // — read from the ledger rather than assumed, because the walk has sold from this
+  // product already.
+  const onShelf = (await api(`/inventory/${PRODUCT_ID}`)).json.on_hand.qty_on_hand_milli;
+  const afterLine = await run(`document.querySelector('.cart-line').textContent`);
+  // Compared as a number: the figure renders grouped ("2,741 KG"), and a string match
+  // against the arithmetic would fail on the comma alone.
+  const shelfAfter = (/stock after: ([\d.,]+) KG/.exec(afterLine) || [])[1];
+  log(Number(String(shelfAfter).replace(/,/g, '')) === (onShelf - 100000) / 1000,
+    'POS-104: the shelf figure counts kilos, whatever the line was keyed in',
+    `${shelfAfter} KG, from ${onShelf / 1000} on the shelf`);
+
+  // Clear it, so the walk that follows starts where it expects to.
+  await press('F3');
+  await waitFor(`!!document.querySelector('.pos-prompt select')`, { label: 'the dialog again' });
+  await run(`(() => {
+    const form = document.querySelector('.pos-prompt');
+    const select = form.querySelector('select');
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    form.querySelector('input').value = '1.255';
+    form.requestSubmit();
+    return true;
+  })()`);
+  await settle(400);
+  log(await run(`/1.255 KG/.test(document.querySelector('.cart-line .qty').textContent)`),
+    'and the line goes back to the base unit, keeping what was typed');
+
   console.log('\n— console —');
   log(errors.length === 0, 'the renderer logged no errors', errors.slice(0, 4).join(' | '));
 

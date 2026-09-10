@@ -58,6 +58,60 @@ export function createCart() {
     return line;
   }
 
+  /**
+   * `POS-102`: **`qtyMilli` is what the cashier entered, in the unit they entered it
+   * in.** Two sacks is `qtyMilli: 2000` with the sack's `packUnitId`, not 100,000.
+   *
+   * That is the wire's convention — `POST /sales`, `/sales/price-check` and the parked
+   * cart all take the entered quantity and the unit beside it, and `saleService`
+   * multiplies by the pack factor to get base. It is also what the rule says: a line
+   * quantity **is entered** in the base unit or in a defined pack, and the ledger
+   * stores base.
+   *
+   * Everything on this screen that needs base — the second half of "2 SACK (100 KG)",
+   * and `POS-104`'s stock-after — asks for it here rather than assuming. Before the
+   * unit picker existed no line ever carried a pack, so the two readings of `qtyMilli`
+   * had never disagreed; the first pack line would have shown 2 SACK as 0.04 SACK and
+   * counted 2 KG against the shelf.
+   */
+  const baseMilliOf = (line) => (line.packFactorMilli
+    ? Math.round((line.qtyMilli * line.packFactorMilli) / 1000)
+    : line.qtyMilli);
+
+  /**
+   * Move a line to another of the product's units, keeping the quantity as typed.
+   *
+   * Changing the unit changes the line's identity — a sack and a loose kilo are
+   * different things to pick — so where the cart already holds a line in the unit being
+   * moved to, the two merge rather than becoming a second line the counter has to
+   * notice. That is `add`'s own rule, applied to a line that already exists.
+   */
+  function setUnit(key, packUnitId, product) {
+    const line = lines.find((l) => l.key === key);
+    if (!line) return null;
+    if ((line.packUnitId || null) === (packUnitId || null)) return line;
+
+    const pack = packUnitId
+      ? product?.packs?.find((p) => p.unit.id === packUnitId) ?? null
+      : null;
+    if (packUnitId && !pack) return line;
+
+    const merged = lines.find(
+      (l) => l.key !== key && l.productId === line.productId && l.packUnitId === (packUnitId || null)
+    );
+    if (merged) {
+      merged.qtyMilli += line.qtyMilli;
+      remove(key);
+      return merged;
+    }
+
+    line.packUnitId = packUnitId || null;
+    line.packUnitCode = pack ? pack.unit.code : null;
+    line.packFactorMilli = pack ? pack.factor_milli : null;
+    line.key = `${line.productId}:${packUnitId || 'base'}`;
+    return line;
+  }
+
   function setQuantity(key, qtyMilli) {
     const line = lines.find((l) => l.key === key);
     if (!line) return null;
@@ -137,6 +191,8 @@ export function createCart() {
 
   return {
     add,
+    baseMilliOf,
+    setUnit,
     setQuantity,
     setLineDiscount,
     remove,

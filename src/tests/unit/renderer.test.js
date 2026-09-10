@@ -147,6 +147,72 @@ test('a sack line and a loose line of one product stay apart', async () => {
   assert.equal(cart.lines[1].packFactorMilli, 50000);
 });
 
+test('POS-102: a line holds what was keyed, in the unit it was keyed in', async () => {
+  const { createCart } = await load('js/pos/cart.js');
+  const cart = createCart();
+
+  // Two sacks is 2000 with the sack's unit — not 100,000. That is the wire's own
+  // convention (POST /sales, price-check and the parked cart all take the entered
+  // quantity beside the unit it is in) and the rule's wording: a line quantity **is
+  // entered** in the base unit or in a defined pack, and the ledger stores base.
+  const line = cart.add({ product: feed, qtyMilli: 2000, packUnitId: 'u-sack' });
+  assert.equal(line.qtyMilli, 2000);
+
+  // What comes off the shelf is a hundred kilos, and everything that needs that figure
+  // — the second half of "2 SACK (100 KG)", POS-104's stock-after — derives it rather
+  // than assuming one reading of the other.
+  assert.equal(cart.baseMilliOf(line), 100000);
+  assert.equal(cart.baseMilliOf(cart.add({ product: feed, qtyMilli: 1255 })), 1255);
+});
+
+test('POS-102: changing a line’s unit keeps the quantity as typed, and merges rather than doubles', async () => {
+  const { createCart } = await load('js/pos/cart.js');
+  const cart = createCart();
+
+  const loose = cart.add({ product: feed, qtyMilli: 3000 });
+  const moved = cart.setUnit(loose.key, 'u-sack', feed);
+
+  // Three, now three sacks — the cashier said "these are sacks", not "make this 150 kg".
+  assert.equal(moved.qtyMilli, 3000);
+  assert.equal(moved.packUnitCode, 'SACK');
+  assert.equal(cart.baseMilliOf(moved), 150000);
+  assert.equal(moved.key, `${feed.id}:u-sack`, 'the line’s identity moved with its unit');
+  assert.equal(cart.count, 1);
+
+  // A second line in the unit being moved to is the same thing to pick, so the two
+  // become one — add()'s own rule, applied to a line that already exists.
+  const alsoLoose = cart.add({ product: feed, qtyMilli: 500 });
+  const merged = cart.setUnit(alsoLoose.key, 'u-sack', feed);
+  assert.equal(cart.count, 1);
+  assert.equal(merged.qtyMilli, 3500);
+
+  // And back the other way, to a unit the cart no longer holds.
+  const base = cart.setUnit(merged.key, null, feed);
+  assert.equal(base.packUnitId, null);
+  assert.equal(base.packFactorMilli, null);
+  assert.equal(cart.baseMilliOf(base), 3500);
+});
+
+test('POS-102: F3 asks for the unit as well as the quantity, and says what it comes to', () => {
+  const source = codeOf('js/pos/view.js');
+
+  // The field was labelled "In KG or SACK" and the number was always taken as KG: a
+  // cashier keying 2 for two sacks sold two kilos, at a fiftieth of the money. The
+  // unit is now part of the same question.
+  assert.match(source, /function quantityPrompt/);
+  assert.match(source, /cart\.setUnit\(line\.key, picked\.id, product\)/);
+  assert.equal(/In \$\{line\.baseUnit\}\$\{line\.packUnitCode/.test(source), false,
+    'the label that lied is gone');
+
+  // The conversion is shown as it is typed — "2 SACK = 100 KG" is the sentence that
+  // catches a mis-keyed unit while the customer is still standing there.
+  assert.match(source, /picked\.factorMilli/);
+  // UOM-004 before the submit rather than after: a unit that cannot be halved says so
+  // under the field, not in a refusal once the sale is sent.
+  assert.match(source, /cannot be sold in parts/);
+  assert.match(proseOf('js/pos/view.js'), /UOM-004/);
+});
+
 test('the cart request is the shape POST /sales takes', async () => {
   const { createCart } = await load('js/pos/cart.js');
   const cart = createCart();
