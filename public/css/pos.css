@@ -198,6 +198,8 @@
 
 .credit-block { margin: 1rem 0; padding: .75rem; border: 1px solid var(--rule); border-radius: 6px; }
 .credit-block .over { color: var(--error); font-weight: 600; }
+/* CR-108: money the store owes the customer, on the screen where it is spent. */
+.summary-line.store-credit .money { color: var(--accent); font-weight: 600; }
 .credit-warning { color: var(--warn-ink); background: var(--warn-bg); padding: .5rem; border-radius: 4px; }
 .blocked-note { color: var(--muted); }
 

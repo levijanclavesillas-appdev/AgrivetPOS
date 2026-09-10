@@ -21,6 +21,11 @@ cd "$ROOT"
 ELECTRON="$ROOT/node_modules/electron/dist/electron"
 [ -x "$ELECTRON" ] || { echo "Electron is not installed — run npm install first."; exit 2; }
 
+# The walk is one long function, so a duplicate `const` anywhere in it is a load-time
+# SyntaxError — and Electron answers that by hanging rather than exiting, which costs a
+# timeout to discover. Parsed here first, where it costs a second.
+node --check "$HERE/main.js" || { echo "the walk does not parse — fix main.js first"; exit 2; }
+
 LOG="$(mktemp)"
 node "$HERE/server.js" > "$LOG" 2>&1 &
 SERVER_PID=$!
@@ -48,6 +53,6 @@ LAUNCH=("$ELECTRON" --no-sandbox "$HERE/main.js")
 command -v xvfb-run >/dev/null && [ -z "${DISPLAY:-}" ] && LAUNCH=(xvfb-run -a "${LAUNCH[@]}")
 
 UI_TOKEN="$TOKEN" UI_PRODUCT="$PRODUCT" UI_MEDICINE="$MEDICINE" UI_CUSTOMER="$CUSTOMER" UI_SUPPLIER="$SUPPLIER" "${LAUNCH[@]}" 2>&1 \
-  | grep -vE "GPU|Fontconfig|dbus|libva|Vulkan|gbm|DevTools|MESA|glx|sandbox|Passthrough|EGL"
+  | grep --line-buffered -vE "GPU|Fontconfig|dbus|libva|Vulkan|gbm|DevTools|MESA|glx|sandbox|Passthrough|EGL"
 STATUS=${PIPESTATUS[0]}
 exit "$STATUS"

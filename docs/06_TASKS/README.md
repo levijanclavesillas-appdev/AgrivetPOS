@@ -3,7 +3,7 @@
 Work items, closed and open. Each task is self-contained: an implementer should need this file,
 plus the specs it cites, and nothing else. **Never "build the POS". Always `TASK-011`.**
 
-**v1.0 is code-complete; v1.1 is under way** — `TASK-019` to `TASK-027` are closed. With
+**v1.0 is code-complete; v1.1 is complete** — `TASK-019` to `TASK-028` are closed. With
 `TASK-024` went the last of `PR-101`'s stubs, so every price the rules describe now resolves; with
 `TASK-025` the store's data can leave the machine as something other than an opaque backup, and with
 `TASK-026` another store's data can come *in* — a cutover from three spreadsheets rather than eight
@@ -12,7 +12,9 @@ come both of `POS-107`'s corrections, so a sale can be unsold either way round, 
 stocktake, so the shelf figure can be checked against the shelf. With `TASK-027` the store can
 grant the senior citizen and PWD discount correctly on the day it is asked for one — and grants it
 to nobody until an owner switches it on, which is the only honest thing to do with a question
-belonging to the store's accountant.
+belonging to the store's accountant. With `TASK-028` a balance may be money the store owes the
+customer, and they may spend it — which is the difference between a figure on a screen and a
+feature.
 `TASK-001`–`TASK-018` built it and `TASK-036`–`TASK-041` built the
 screens the original backlog never assigned to anybody — see [the screen gap](#the-screen-gap--found-and-closed),
 which is worth reading before writing the next backlog. What code-complete does **not** mean is
@@ -108,6 +110,7 @@ again quietly.
 | [TASK-025](TASK-025-json-export-and-import.md) | JSON export and validated import | `9e134b0` | No schema. `exportService`, `importService`, `dataRepository`; `zip.js` grew multi-entry; `SCR-706`; `TC-INT-94`–`TC-INT-97`, `TC-E2E-20`. `api.saveAs` extracted from two screens that had each rolled their own |
 | [TASK-026](TASK-026-opening-data-load.md) | Opening-data load from CSV | `f254088` | No schema. `openingDataService`; `config/csv.js` — the RFC 4180 **reader**, with `reportService`'s writer moved into it so both halves are one understanding of the format; the opening load on `SCR-706`; `TC-UT-100`, `TC-INT-98`–`TC-INT-100`, `TC-E2E-21`. `productService.create` and `customerService.create` split into `createWithin` so a whole cutover fits in one transaction |
 | [TASK-027](TASK-027-statutory-discount.md) | Senior citizen and PWD statutory discount | `bb70e9d` | No schema — `sales.statutory_discount_centavos`, `sale_discounts`' three ID columns and `products.statutory_discount_eligible`, carried unused since `TASK-011`, all finally written. `taxService.statutoryLine` and `chooseStatutory`; `statutory_discount_enabled` (off, owner-only); `F8` on `SCR-301`; `TC-UT-50`–`TC-UT-51`, `TC-INT-101`–`TC-INT-102`. And `POS-207`'s day window, which had been eight hours out since `TASK-011` |
+| [TASK-028](TASK-028-store-credit.md) | Store credit balances | *this commit* | No schema — `sale_tenders`' `STORE_CREDIT` method, unissued since `TASK-011`, finally issued. `creditService.spendStoreCredit`, `allocateToDebits` and `allocateToDebit`; `creditRepository.openCredits`; the tender on `SCR-303`; `TC-INT-103`–`TC-INT-106`, `TC-E2E-22`. And `CR-203`'s allocation applied to a **return** credit, which had never had it |
 
 **The answer to its opening question was "yes, build the full lifecycle."** The store does raise
 orders, so `PO-101`–`PO-105` are built rather than deferred behind the receipt.
@@ -197,7 +200,7 @@ project's history — this task happened to be worked at 23:20 UTC. `auditServic
 conversion correctly since `TASK-005`; the defect was a *second* implementation of one idea, and the
 fix was to delete it rather than to correct it.
 
-## Open — v1.1 "Supply"
+## The last two of v1.1, and the questions they carried
 
 Written at v1.0 close, as planned. Ordered by dependency, not by number: `TASK-023` before
 `TASK-024` because the second slots into the precedence the first defines — which it did:
@@ -210,9 +213,13 @@ about a spreadsheet. `TASK-020` came before `TASK-028` for the same kind of reas
 a return is the other thing that creates store credit, and `CR-108`'s negative balance is
 already written and tested by it.
 
-| ID | Task | Feature | Depends on |
-| :--- | :--- | :--- | :--- |
-| [TASK-028](TASK-028-store-credit.md) | Store credit balances | `FT-408` | `TASK-020` |
+**Nothing is open.** Both remaining tasks landed together, and the table that held them is kept
+below as the record of what they were and what each depended on.
+
+| ID | Task | Feature | Depends on | Closed |
+| :--- | :--- | :--- | :--- | :--- |
+| [TASK-027](TASK-027-statutory-discount.md) | Senior citizen / PWD statutory discount | `FT-309` | — | ✓ |
+| [TASK-028](TASK-028-store-credit.md) | Store credit balances | `FT-408` | `TASK-020` | ✓ |
 
 `TASK-027` carried a question that had to be answered before the work started, in the same shape
 `TASK-016` and `TASK-018` used: whether the store is required to grant the statutory discount — a
@@ -223,14 +230,46 @@ shipping it off. A task blocked on an answer nobody at a keyboard can give is on
 where the answer would change the code. (`TASK-019`'s was answered the other way: the store does
 raise purchase orders, so the full lifecycle was built.)
 
-Four fill things v1.0 deliberately left stubbed rather than absent: `PR-101`'s top two
+Four filled things v1.0 deliberately left stubbed rather than absent: `PR-101`'s top two
 precedence levels (`TASK-024`), `RPT-101`'s `returns` term (`TASK-020`), `sales.voided_at` and
 its siblings (`TASK-021`), and `sale_tenders`' `STORE_CREDIT` method (`TASK-028`). Each was
-built with the seam in place, and each task's job is to fill it rather than to reshape anything.
+built with the seam in place, and each task's job was to fill it rather than to reshape anything.
+**All four are filled, and none of them needed a migration** — which is the whole of what leaving a
+seam is for.
 `TASK-027` was a fifth of the same kind and is now filled: `sales.statutory_discount_centavos`,
 `sale_discounts`' three ID columns and `products.statutory_discount_eligible` have carried nothing
 since `TASK-011` precisely so that granting the discount would be a settings change and not a
 migration — and it was.
+
+**What `TASK-028` found, and it was pointing the wrong way round.** `CR-107` ages an account from
+its **unsettled debits**, and `credit_allocations` is what marks a debit settled. Collections have
+allocated since `TASK-012`; **return credits never did**. So a farm whose ₱600 credit sale was
+returned in full carried a balance of nothing and an open ₱600 invoice at the same time — `PAID` by
+the balance and `OVERDUE` by the ageing, and it is the ageing that reaches the collections worklist
+and the dashboard's overdue count. The store would have chased a customer for money it had itself
+given back. It was found by requirement 6, which asks that a credit balance never be *rendered* as a
+debt; the fix is not in the rendering. A credit settles the debits it covers, whichever kind of
+credit it is — so `allocate` moved out of `collectionService` into `creditService`, where the ledger
+is, and both callers use it.
+
+**And what only the browser could find, again.** `TASK-028`'s walk waited for the receipt preview
+on `SCR-304` and never saw it. `04_UX_SPEC.md` §5's loading state **clears the element it is given**,
+and the receipt handed it the sheet the paper lives in — so the `<pre>` was detached, the document
+then arrived and was written into a node no longer in the page, and the preview stayed a grey
+skeleton. It had done that since `TASK-015`. Every assertion anybody had written read `.screen`,
+where the sale number and the total are, so a walk through the receipt screen passed while the
+receipt itself was never on it: a cashier's only way to read what had printed was to press Reprint,
+which stamps REPRINT on it (`POS-208`). The guard now waits for the paper, and the error state goes
+into the sheet rather than over the whole screen.
+
+**And what `TASK-028` decided that `CR-108` did not settle: which row spends it.** The schema names
+six transaction types and the task forbids a migration, so a store-credit spend is a `CREDIT_SALE`
+carrying `method = 'STORE_CREDIT'` — which turned out to be the honest reading rather than a
+workaround. The account *is* debited for the goods and the credit held *is* what covers it, so the
+statement reads `RETURN_CREDIT −₱300` then `CREDIT_SALE +₱300` and the balance walks back to zero in
+front of whoever is reading it. What stops that debit looking like a debt is the allocation written
+beside it, in the same transaction, by the same allocator running the other way: it is settled the
+instant it exists, so it has no due date and nothing to age.
 
 ## Open — v1.2 "Trace"
 
@@ -247,22 +286,22 @@ migration — and it was.
 <a id="status"></a>
 ## Status — 2026-09-10
 
-**What is built.** 25,300 lines across 102 server files — 13 migrations — and 9,700 lines across
-35 renderer modules, with no build step and four runtime dependencies, against 26,800 lines of
+**What is built.** 25,500 lines across 102 server files — 13 migrations — and 9,800 lines across
+35 renderer modules, with no build step and four runtime dependencies, against 27,700 lines of
 tests and harnesses.
 
 *(The figures above were written once at v1.0 close and not recomputed until now, so they had
 drifted by seven tasks. They are counted as: `src/**/*.js` outside `src/tests`, then `public/js`,
 then `src/tests` plus `tools`.)*
 
-`npm run test:all` is green: **972 cases** across 63 files — 257 unit, 545 integration and API,
-170 end-to-end. Beside it, 4 performance files and two harnesses that are deliberately outside
+`npm run test:all` is green: **991 cases** across 65 files — 258 unit, 556 integration and API,
+177 end-to-end. Beside it, 4 performance files and two harnesses that are deliberately outside
 the gate because they need things a gate machine may not have: `tools/browser-smoke` drives the
 real renderer in Chromium through nineteen screens, and `tools/installer/check.sh` compiles the
 NSIS macros with `makensis`.
 
-Every v1.0 service, repository, API route, business rule **and screen** is implemented and
-tested. `TC-UT-98` asserts the rule-coverage obligation mechanically — 62 covered v1.0 rules and
+Every v1.0 **and v1.1** service, repository, API route, business rule and screen is implemented
+and tested. `TC-UT-98` asserts the rule-coverage obligation mechanically — 62 covered v1.0 rules and
 28 built v1.1 rules, all cited by a test, and 51 of 51 outside the obligation as well — and
 `TC-UI-10` asserts every screen in `04_UX_SPEC.md` §3 has a view.
 
@@ -287,6 +326,11 @@ power cut does. Both have a UAT check waiting for them.
 **Nothing further can be settled from a build machine.** The next step is a visit:
 `npm run build:exe` on Windows with a signing certificate, then `docs/UAT_RECORD.md` at the
 store's own counter.
+
+**v1.1 is closed.** `TASK-019` to `TASK-028` are all in, and `07_TEST_PLAN.md` §10's v1.1 gate
+reads twenty of twenty-six: every criterion that a machine can answer is met, and the six that are
+not are the six that need a counter, a customer and a store — purchasing on the store's own
+supplier data, a return, a void, a stocktake, a cutover, and a statutory discount actually granted.
 
 **One question is deliberately still open, and the software is finished around it.** `TASK-027`
 asks whether an agrivet's goods carry the senior citizen and PWD entitlement at all. Nobody at a

@@ -126,8 +126,15 @@ export function createCustomerList({ root, onOpen, onCollect }) {
         h('td', { text: customer.price_level }),
         h('td', {
           class: 'money',
-          // CR-103: the figure the ledger derives, never one added up here.
-          text: customer.credit ? money(customer.credit.balance_centavos) : '—',
+          // CR-103: the figure the ledger derives, never one added up here. CR-108: a
+          // negative balance is money the store owes them, shown as a positive figure
+          // — a minus sign in a "balance owed" column reads as a debt of the wrong
+          // sign, which is the one thing this column must never say.
+          text: customer.credit
+            ? money(customer.credit.store_credit_centavos > 0
+              ? customer.credit.store_credit_centavos
+              : customer.credit.balance_centavos)
+            : '—',
         }),
         h('td', {}, [ageing(customer)]),
         h('td', {}, [
@@ -146,6 +153,13 @@ export function createCustomerList({ root, onOpen, onCollect }) {
   function ageing(customer) {
     if (!customer.credit) return h('span', { class: 'muted', text: 'cash only' });
     const { ageing_status: status, days_overdue: days } = customer.credit;
+
+    // CR-108 first: a customer the store owes is never aged at all. They owe nothing,
+    // so there is nothing to be overdue — and "in credit" is the fact the cashier
+    // needs, because it is spendable at the counter.
+    if (customer.credit.store_credit_centavos > 0) {
+      return h('span', { class: 'tag in-credit', text: 'in credit' });
+    }
 
     if (status === 'OVERDUE') {
       return h('span', { class: 'tag overdue', text: `overdue ${days} day${days === 1 ? '' : 's'}` });

@@ -13,7 +13,6 @@
 // over.
 
 const db = require('../config/database');
-const ids = require('../config/ids');
 const clock = require('../config/clock');
 const errors = require('./errors');
 const money = require('./money');
@@ -121,10 +120,11 @@ function record({
       occurredAt: at,
     });
 
-    // CR-203 — applied oldest credit sale first, recorded per sale.
-    const allocations = allocate({
+    // CR-203 — applied oldest credit sale first, recorded per sale. The allocator moved
+    // to `creditService` with TASK-028, because a return credit has to use the same one.
+    const allocations = creditService.allocateToDebits({
       accountId: account.id,
-      collectionTxnId: posted.transaction.id,
+      creditTxnId: posted.transaction.id,
       amountCentavos: amount,
       at,
     });
@@ -201,49 +201,9 @@ function normaliseAmount(value) {
 
 // ── CR-203 — oldest credit sale first ───────────────────────────────────────
 
-/**
- * Apply the payment to the open debits, oldest first, and record what it settled.
- *
- * Oldest first is not an accounting nicety. It is what makes ageing mean anything: a
- * payment applied to the newest invoice would leave the oldest one standing and the
- * account permanently overdue while the customer pays every month.
- *
- * The last allocated sale takes whatever is left, which may be a part payment — that
- * is the row CR-203 exists to produce, and what a statement later shows as "₱3,000 of
- * SALE-20260901-000004".
- */
-function allocate({ accountId, collectionTxnId, amountCentavos, at }) {
-  let remaining = amountCentavos;
-  const written = [];
-
-  for (const debit of creditRepository.openDebits(accountId)) {
-    if (remaining <= 0) break;
-
-    const applied = Math.min(remaining, debit.outstanding_centavos);
-    if (applied <= 0) continue;
-
-    const row = creditRepository.insertAllocation({
-      id: ids.uuidv7(),
-      collection_txn_id: collectionTxnId,
-      sale_txn_id: debit.id,
-      amount_centavos: applied,
-      created_at: at,
-    });
-
-    written.push({
-      ...row,
-      sale_document_no: debit.document_no,
-      sale_due_at: debit.due_at,
-      settled_in_full: applied === debit.outstanding_centavos,
-      remaining_on_sale_centavos: debit.outstanding_centavos - applied,
-    });
-    remaining -= applied;
-  }
-
-  // Anything left is the overpayment, which is already on the account as a negative
-  // balance (CR-108). It allocates to nothing because it settles nothing.
-  return written;
-}
+// CR-203's allocation itself lives in `creditService` since TASK-028: a collection and
+// a return credit both settle open invoices, and two implementations of "oldest first"
+// is one more than the number of ways it can be right.
 
 // ── CR-206 — the acknowledgement ────────────────────────────────────────────
 
@@ -336,5 +296,5 @@ function listFor(customerId, { limit = 50, offset = 0 } = {}) {
 
 module.exports = {
   METHODS, CASH_METHODS,
-  record, allocate, buildAcknowledgement, listFor, normaliseAmount,
+  record, buildAcknowledgement, listFor, normaliseAmount,
 };

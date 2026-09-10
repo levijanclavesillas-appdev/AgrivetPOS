@@ -182,7 +182,10 @@ test('TC-INT-60: every dashboard tile equals the report behind it, to the centav
   // are net figures. A tile overstating cash by the change given is the defect
   // TC-INT-60 is about.
   assert.equal(tile('PAYMENT_MIX').value_centavos, sales.totals.net_centavos);
-  assert.equal(tile('CREDIT_OUTSTANDING').value_centavos, credit.total_balance_centavos);
+  // CR-108 (TASK-028): what the farms owe, never netted against the store credit the
+  // shop is holding for other customers. A debt and a liability are two questions.
+  assert.equal(tile('CREDIT_OUTSTANDING').value_centavos, credit.total_receivable_centavos);
+  assert.equal(tile('CREDIT_OUTSTANDING').store_credit_centavos, credit.total_store_credit_centavos);
   assert.equal(
     tile('OVERDUE_ACCOUNTS').value_centavos,
     credit.accounts.filter((a) => a.ageing_status === 'OVERDUE').length

@@ -101,9 +101,13 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect }) {
         : h('p', { class: 'muted', text: credit.balance_centavos === 0
           ? 'Nothing owing.'
           : `Ageing: ${credit.ageing_status.toLowerCase().replace(/_/g, ' ')}.` }),
+      // CR-108: money the store owes *them*, said in the store's favour language and
+      // never as a debt — and since TASK-028 it is spendable, which is the sentence
+      // that stops the cashier telling them to pay cash for their next sack.
       credit.store_credit_centavos > 0
-        ? h('p', { class: 'muted', text: `They are ${money(credit.store_credit_centavos)} in credit `
-          + 'with the store from an overpayment.' })
+        ? h('p', { class: 'store-credit-note', text: `The store owes them `
+          + `${money(credit.store_credit_centavos)} — from an overpayment or a return. It can pay `
+          + 'for their next purchase, in whole or in part (CR-108).' })
         : null,
       limitControl(),
     ]);

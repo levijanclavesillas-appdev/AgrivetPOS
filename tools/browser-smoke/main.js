@@ -208,6 +208,17 @@ app.whenReady().then(async () => {
     (receiptText.match(/SALE-[\d-]+/) || [receiptText.replace(/\s+/g, ' ').slice(0, 70)])[0]);
   log(/37\.50/.test(receiptText), 'and the change to hand over');
 
+  // The preview itself, not the header above it. Every assertion here read `.screen`
+  // until TASK-028, and `.screen` contains the sale number and the total whether or not
+  // the paper ever rendered — which is how a receipt preview that was a grey skeleton
+  // for ever passed a browser walk.
+  const paperShown = await waitFor(`((document.querySelector('.receipt-paper') || {}).textContent || '').length > 0`,
+    { label: 'the receipt preview', timeoutMs: 15000 });
+  log(paperShown, 'INT-1: and the document the server rendered is on the screen',
+    (await run(TEXT('.receipt-paper'))).replace(/\s+/g, ' ').slice(0, 60));
+  log(/not an official receipt/i.test(await run(TEXT('.receipt-paper'))),
+    'TAX-006: with the notice the law requires on it');
+
   const after = (await api('/carts/active')).json;
   log(after.cart === null, 'the counter is cleared after the sale');
 
@@ -375,6 +386,92 @@ app.whenReady().then(async () => {
     done.replace(/\s+/g, ' ').slice(0, 80));
   log(/What it settled/.test(done), 'CR-203: and which invoices it settled');
   log(/acknowledgement/i.test(done), 'CR-206: with the acknowledgement’s outcome');
+
+  console.log('\n— SCR-303: spending store credit (CR-108) —');
+
+  // Put the farm in credit the way a counter does: they hand over more than they owe
+  // and the cashier ticks CR-204's acknowledgement.
+  const ahead = await api(`/customers/${CUSTOMER_ID}/collections`, {
+    method: 'POST',
+    body: { amountCentavos: 50000, method: 'CASH', acceptOverpayment: true, notes: 'Paying ahead' },
+  });
+  log(ahead.json.store_credit_centavos === 50000, 'CR-204: the overpayment becomes store credit',
+    `₱${(ahead.json.store_credit_centavos / 100).toFixed(2)}`);
+
+  // SCR-401: a customer the store owes is never shown as a debtor.
+  await run(OPEN_RAIL('Customers'));
+  await waitFor(`!!document.querySelector('.customer-list')`, { label: 'SCR-401' });
+  const inCreditRow = await run(`(document.querySelector('.customer-list tbody tr') || {}).textContent || ''`);
+  log(/in credit/.test(inCreditRow), 'CR-108: the list says "in credit" rather than ageing them',
+    inCreditRow.replace(/\s+/g, ' ').slice(0, 70));
+  log(!/overdue/.test(inCreditRow), 'and nothing on the row calls it a debt');
+
+  // Now sell them something and pay with it.
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+  await press('F2');
+  await settle(400);
+  await run(`(() => {
+    const el = document.querySelector('.pos-prompt input[type=search]');
+    el.value = 'Santos';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(900);
+  await run(`(document.querySelector('.customer-result') || {}).click && document.querySelector('.customer-result').click()`);
+  await settle(900);
+  log(await run(`/Santos Farm/.test((document.querySelector('.rail-customer') || {}).textContent || '')`),
+    'the customer is on the cart');
+
+  await run(`(() => {
+    const el = document.querySelector('.pos-search');
+    el.focus();
+    for (const ch of '4800012345678') {
+      el.value += ch;
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  })()`);
+  await settle(1200);
+
+  await press('F9');
+  await waitFor(`!!document.querySelector('.payment')`, { label: 'SCR-303' });
+  await settle(900);
+
+  const creditPanel = await run(`(document.querySelector('.credit-block') || {}).textContent || ''`);
+  log(/In credit/.test(creditPanel), 'CR-108: the payment screen shows what the store owes them',
+    creditPanel.replace(/\s+/g, ' ').slice(0, 80));
+  log(/can pay for this sale/.test(creditPanel), 'and says it can pay for this sale');
+
+  const storeCreditButton = await run(FIND('.tender-add-button', '/STORE CREDIT/'));
+  log(Boolean(storeCreditButton), 'the tender is offered, with the balance on the button');
+  await clickOn('.tender-add-button', '/STORE CREDIT/');
+  await settle(600);
+
+  // It defaults to as much of the bill as the balance covers, which is what "pay with
+  // my credit" means at a counter.
+  const amount = await run(`(document.querySelector('.tender-amount') || {}).value || ''`);
+  log(amount === '62.50', 'and it defaults to what the balance covers', `₱${amount}`);
+  log(await run(`document.querySelector('.complete').disabled === false`),
+    'POS-204: the sale is covered, so Complete is live');
+
+  await run(`document.querySelector('.complete').click()`);
+  const reached = await waitFor(`!!document.querySelector('.receipt-paper')`, { label: 'SCR-304', timeoutMs: 15000 });
+  log(reached, 'the sale completes', await run(TEXT('.blocked-note')));
+  log(/STORE_CREDIT/.test(await run(TEXT('.receipt-paper'))),
+    'the receipt records what paid for it');
+
+  const spent = await api(`/customers/${CUSTOMER_ID}/credit`);
+  log(spent.json.credit.store_credit_centavos === 50000 - 6250,
+    'CR-108: the balance fell by exactly the sale',
+    `₱${(spent.json.credit.store_credit_centavos / 100).toFixed(2)}`);
+  log(spent.json.open_sales.length === 0,
+    'CR-107: and it opened no invoice — a sale paid from credit is not a debt');
+  const statement = spent.json.transactions.rows[0];
+  log(statement.method === 'STORE_CREDIT',
+    'requirement 4: the statement shows it spent, on its own line', statement.type);
+  log((await api('/customers/credit-reconciliation')).json.ok === true,
+    'CR-103: and the ledger still reconciles, with a negative balance in it');
 
   console.log('\n— SCR-601: the dashboard —');
   await run(OPEN_RAIL('Reports'));

@@ -339,6 +339,152 @@ const textOrNull = (value) => {
   return trimmed || null;
 };
 
+// ── CR-203 / CR-108 — allocation, in both directions ────────────────────────
+
+/**
+ * Apply a credit to the open debits, oldest first (`CR-203`).
+ *
+ * Lived in `collectionService` until `TASK-028` and belongs here, beside the ledger it
+ * writes. The move is not tidying: **a return credit was never allocated**, so a farm
+ * whose credit sale was returned in full kept an "open" ₱1,000 invoice on their
+ * statement and aged towards `OVERDUE` on a balance of nothing. `CR-107` derives ageing
+ * from unsettled debits, so a credit that settles one and does not say so is a
+ * collection letter waiting to be sent to somebody who owes nothing.
+ *
+ * Anything left over allocates to nothing, because it settles nothing: it is store
+ * credit (`CR-108`), and `allocateToDebit` below is what eventually spends it.
+ */
+function allocateToDebits({ accountId, creditTxnId, amountCentavos, at }) {
+  let remaining = Math.abs(amountCentavos);
+  const written = [];
+
+  for (const debit of creditRepository.openDebits(accountId)) {
+    if (remaining <= 0) break;
+
+    const applied = Math.min(remaining, debit.outstanding_centavos);
+    if (applied <= 0) continue;
+
+    const row = creditRepository.insertAllocation({
+      id: ids.uuidv7(),
+      collection_txn_id: creditTxnId,
+      sale_txn_id: debit.id,
+      amount_centavos: applied,
+      created_at: at,
+    });
+
+    written.push({
+      ...row,
+      sale_document_no: debit.document_no,
+      sale_due_at: debit.due_at,
+      settled_in_full: applied === debit.outstanding_centavos,
+      remaining_on_sale_centavos: debit.outstanding_centavos - applied,
+    });
+    remaining -= applied;
+  }
+
+  return written;
+}
+
+/**
+ * The other direction: settle a new debit from the credit already held (`CR-108`).
+ *
+ * A sale paid from store credit writes a debit like any other, and this is what stops
+ * it looking like one the store must chase. The rows it writes are ordinary `CR-203`
+ * allocations — the customer's own money, applied to their own purchase — which is why
+ * `openDebits`, the statement and the ageing all need no special case for it.
+ */
+function allocateToDebit({ accountId, saleTxnId, amountCentavos, at }) {
+  let remaining = amountCentavos;
+  const written = [];
+
+  for (const credit of creditRepository.openCredits(accountId)) {
+    if (remaining <= 0) break;
+
+    const applied = Math.min(remaining, credit.available_centavos);
+    if (applied <= 0) continue;
+
+    written.push(creditRepository.insertAllocation({
+      id: ids.uuidv7(),
+      collection_txn_id: credit.id,
+      sale_txn_id: saleTxnId,
+      amount_centavos: applied,
+      created_at: at,
+    }));
+    remaining -= applied;
+  }
+
+  return written;
+}
+
+/**
+ * `CR-108` — what a customer holds, as a positive figure.
+ *
+ * Derived from the one balance `CR-103` derives, never a second ledger. A store-credit
+ * table would be a second figure to disagree with the first, and the disagreement would
+ * be discovered by a customer being told they have nothing.
+ */
+function storeCreditFor(account) {
+  return account && account.balance_centavos < 0 ? -account.balance_centavos : 0;
+}
+
+/**
+ * Spend store credit on a sale (`CR-108`, requirement 2 and 3).
+ *
+ * Joins the caller's transaction, as `post` does: `TASK-011`'s sale, its movements and
+ * this must commit together or not at all.
+ *
+ * The refusal quotes the figure, because "not enough store credit" is unanswerable at a
+ * counter — the cashier has to know how much to take in cash instead. Over-spending is
+ * refused rather than allowed to run the balance positive: a customer spending credit
+ * they do not hold is a customer taking credit, which is `CR-102`'s question and needs
+ * a limit, terms and eligibility rather than a silent slide into debt.
+ */
+function spendStoreCredit({
+  accountId, amountCentavos, actor, saleId = null, documentNo = null, shiftId = null,
+  occurredAt = null, customerName = null,
+}) {
+  const account = creditRepository.findAccount(accountId);
+  if (!account) throw errors.notFound('No such credit account');
+
+  const held = storeCreditFor(account);
+  const amount = normaliseAmount('CREDIT_SALE', amountCentavos);
+
+  if (amount > held) {
+    const who = customerName ? `${customerName} has` : 'This customer has';
+    throw errors.badRequest(
+      held === 0
+        ? `${who} no store credit to spend. Take the ${money.toDisplay(amount)} another way.`
+        : `${who} ${money.toDisplay(held)} in store credit and this payment is `
+          + `${money.toDisplay(amount)}. Reduce it to ${money.toDisplay(held)} and take the rest `
+          + 'another way.',
+      { ruleId: 'CR-108' }
+    );
+  }
+
+  const at = occurredAt || clock.nowUtc();
+
+  // A debit, with the method saying where it came from — and **no due date**. A due
+  // date is a promise to pay later, and this is paid now, out of money the store is
+  // already holding.
+  const posted = post({
+    accountId,
+    type: 'CREDIT_SALE',
+    amountCentavos: amount,
+    actor,
+    documentNo,
+    saleId,
+    method: 'STORE_CREDIT',
+    shiftId,
+    occurredAt: at,
+  });
+
+  const allocations = allocateToDebit({
+    accountId, saleTxnId: posted.transaction.id, amountCentavos: amount, at,
+  });
+
+  return { ...posted, allocations, store_credit_before_centavos: held, store_credit_after_centavos: storeCreditFor(posted.account) };
+}
+
 // ── CR-106 — the limit change ───────────────────────────────────────────────
 
 /**
@@ -412,9 +558,10 @@ function summaryFor(customer, { now = clock.nowUtc() } = {}) {
     days_overdue: ageing.days_overdue,
     oldest_due_at: ageing.oldest_due_at,
     outstanding_centavos: ageing.outstanding_centavos,
-    // CR-108 is v1.1, but a negative balance is representable today and the screen
-    // must not render it as a debt.
-    store_credit_centavos: account.balance_centavos < 0 ? -account.balance_centavos : 0,
+    // CR-108: money the store owes *them*, shown as a positive figure and never as a
+    // debt. Spendable as a tender since TASK-028, which is what makes it a balance
+    // rather than a line on a screen.
+    store_credit_centavos: storeCreditFor(account),
     updated_at: account.updated_at,
   };
 }
@@ -487,8 +634,16 @@ function outstanding({ now = clock.nowUtc() } = {}) {
   const rows = creditRepository.accountsWithBalance();
   let total = 0;
 
+  let receivable = 0;
+  let storeCredit = 0;
+
   const accounts = rows.map((row) => {
     total += row.balance_centavos;
+    // CR-108, requirement 7: a debt and a liability are two different questions, and
+    // one netted figure answers neither. A store owed ₱40,000 by farms while holding
+    // ₱3,000 of other people's money is not "owed ₱37,000" — it is both, at once.
+    if (row.balance_centavos > 0) receivable += row.balance_centavos;
+    else storeCredit += -row.balance_centavos;
     const ageing = ageingFor(row.account_id, { now });
     return {
       account_id: row.account_id,
@@ -502,10 +657,20 @@ function outstanding({ now = clock.nowUtc() } = {}) {
       ageing_status: ageing.status,
       days_overdue: ageing.days_overdue,
       oldest_due_at: ageing.oldest_due_at,
+      // CR-108: money the store holds for them, said in the row rather than left as a
+      // minus sign for a screen to interpret.
+      store_credit_centavos: storeCreditFor(row),
     };
   });
 
-  return { as_of: now, total_balance_centavos: total, accounts };
+  return {
+    as_of: now,
+    total_balance_centavos: total,
+    // The two halves the netted figure hides.
+    total_receivable_centavos: receivable,
+    total_store_credit_centavos: storeCredit,
+    accounts,
+  };
 }
 
 module.exports = {
@@ -514,5 +679,6 @@ module.exports = {
   openAccount, accountFor, assertCreditEligible, available,
   ageingFor, statusFor, daysBetween, dueDateFor,
   post, postStandalone, setLimit,
+  allocateToDebits, allocateToDebit, storeCreditFor, spendStoreCredit,
   summaryFor, creditFor, presentTransaction, reconcile, outstanding,
 };

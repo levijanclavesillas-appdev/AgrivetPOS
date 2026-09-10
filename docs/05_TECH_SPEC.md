@@ -991,7 +991,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/inventory/:productId/movements` | `TX-422` | the ledger view |
 | `POST` | `/inventory/adjustments` | `TX-407` | `INV-108` |
 | `GET` | `/customers?q=` | `TX-413` | |
-| `GET` | `/customers/:id/credit` | `TX-413` | limit, balance, available, ageing |
+| `GET` | `/customers/:id/credit` | `TX-413` | limit, balance, available, ageing, and — since `TASK-028` — `store_credit_centavos`, the balance past zero the customer may spend (`CR-108`) |
 | `POST` | `/customers/:id/collections` | `TX-416` | `CR-201`..`CR-206` |
 | `POST` | `/shifts/open` | `TX-418` | `POS-502` |
 | `POST` | `/shifts/:id/till` | `TX-420` | `POS-504` |
@@ -1001,7 +1001,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` `PUT` | `/products/:id/quantity-breaks` | `TX-422` / `TX-411` | `PR-104`. The `PUT` takes a **whole set** for one price level — a band added on its own is a set nobody validated. An empty list removes them |
 | `GET` `PUT` | `/customers/:id/prices` | `TX-413` / `TX-411` | `PR-103`. Behind `TX-411`, not `TX-413`: a negotiated price is a selling price that happens to be attached to a customer, and `TX-413` reaches a cashier |
 | `GET` | `/sales/pricing-policy` | `TX-401` | The acting user's ceiling, who may approve above it, and — since `TASK-023` — the configured tiers and capped categories, so no screen holds a copy (`OPS-005`). Since `TASK-027` it also reports whether the store grants the statutory discount, at what rate and on which ID types (`TAX-004`) |
-| `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5`. Takes the same optional `statutory` block as the price check; the discount itself is never sent, only the claim (`TAX-004`) |
+| `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5`. Takes the same optional `statutory` block as the price check; the discount itself is never sent, only the claim (`TAX-004`). Since `TASK-028` a tender may be `STORE_CREDIT`, spending the balance the store holds for that customer (`CR-108`) |
 | `POST` | `/sales/:id/reprint` | `TX-430` | `POS-208` |
 | `GET` | `/reports/dashboard?date=` | `TX-421` | `FR_6.1` — every tile from the query behind it |
 | `GET` | `/reports/alerts` | `TX-421` | `OPS-007` |

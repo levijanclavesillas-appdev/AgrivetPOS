@@ -459,8 +459,16 @@ function dashboard({ date = null } = {}, actor = null) {
       // than overstating cash by every peso handed back.
       tile('PAYMENT_MIX', 'Payment mix', mixSummary(paid),
         paid.total_centavos, 'payments', 'RPT-102', { methods: paid.methods }),
-      tile('CREDIT_OUTSTANDING', 'Credit outstanding', money.toDisplay(credit.total_balance_centavos),
-        credit.total_balance_centavos, 'credit', 'CR-103'),
+      // CR-108, requirement 7: **what the farms owe**, not that figure netted against
+      // the store credit the shop is holding for other people. The two are a debt and a
+      // liability — one is money to collect, the other money already spent by somebody
+      // who has not taken the goods yet — and a single netted figure answers neither.
+      // The liability travels with the tile rather than beside it, so a dashboard that
+      // shows one has the other.
+      tile('CREDIT_OUTSTANDING', 'Credit outstanding', money.toDisplay(credit.total_receivable_centavos),
+        credit.total_receivable_centavos, 'credit', 'CR-103',
+        // Not `rule_id` — that names the tile's own rule, and `extra` spreads last.
+        { store_credit_centavos: credit.total_store_credit_centavos, store_credit_rule_id: 'CR-108' }),
       tile('OVERDUE_ACCOUNTS', 'Overdue accounts', String(overdue), overdue, 'credit', 'CR-107'),
       tile('LOW_STOCK', 'Low stock', String(low.total), low.total, 'inventory', 'INV-109'),
       // The seventh — see the note above.

@@ -42,6 +42,7 @@ const productRepository = require('../repositories/productRepository');
 const referenceRepository = require('../repositories/referenceRepository');
 const customerRepository = require('../repositories/customerRepository');
 const inventoryRepository = require('../repositories/inventoryRepository');
+const creditRepository = require('../repositories/creditRepository');
 
 /**
  * POS-107's four statuses, in the words a counter uses for them.
@@ -57,12 +58,20 @@ const STATUS_LABELS = Object.freeze({
   RETURNED: 'Returned in full',
 });
 
-/** POS-201's tender types. STORE_CREDIT and OTHER exist in the schema for v1.1. */
+/**
+ * POS-201's tender types. `OTHER` exists in the schema and is still unissued.
+ *
+ * `STORE_CREDIT` joined them at TASK-028 and is the odd one: it is not money arriving.
+ * It is money the store is already holding for this customer (`CR-108`), so it opens no
+ * drawer, may not over-tender — there is no change to give out of a balance — and, like
+ * `CREDIT`, needs a customer to belong to.
+ */
 const TENDERS = Object.freeze({
   CASH: { needsReference: false, mayOverTender: true, movesStock: false, inDrawer: true },
   GCASH: { needsReference: true, mayOverTender: false, movesStock: false, inDrawer: false },
   QRPH: { needsReference: true, mayOverTender: false, movesStock: false, inDrawer: false },
   CREDIT: { needsReference: false, mayOverTender: false, movesStock: false, inDrawer: false },
+  STORE_CREDIT: { needsReference: false, mayOverTender: false, movesStock: false, inDrawer: false },
 });
 
 const TENDER_METHODS = Object.freeze(Object.keys(TENDERS));
@@ -187,7 +196,28 @@ function complete(input, actor) {
       });
     }
 
-    // ── 11. The credit transaction, where credit was tendered (CR-103) ──────
+    // ── 11a. The store credit spent, where any was tendered (CR-108) ───────
+    //
+    // A debit on the same ledger as everything else: CR-103 derives one balance from
+    // one set of transactions, and a second store-credit ledger would be a second
+    // figure to disagree with it. The statement then reads continuously — earned on
+    // one line, spent on another — instead of a balance that moves for no visible
+    // reason.
+    let storeCreditTransaction = null;
+    if (settled.storeCreditCentavos > 0) {
+      storeCreditTransaction = creditService.spendStoreCredit({
+        accountId: settled.storeCreditAccount.id,
+        amountCentavos: settled.storeCreditCentavos,
+        actor,
+        saleId,
+        documentNo: saleNo,
+        shiftId: shift.id,
+        occurredAt: at,
+        customerName: customer ? customer.name : null,
+      });
+    }
+
+    // ── 11b. The credit transaction, where credit was tendered (CR-103) ─────
     let creditTransaction = null;
     if (settled.creditCentavos > 0) {
       const dueAt = creditService.dueDateFor(settled.creditAccount, { at });
@@ -226,7 +256,8 @@ function complete(input, actor) {
     }
 
     return {
-      saleId, saleNo, shift, priced, settled, creditTransaction, written, at, taxMode,
+      saleId, saleNo, shift, priced, settled, creditTransaction, storeCreditTransaction,
+      written, at, taxMode,
     };
   }, { immediate: true });
 
@@ -324,6 +355,7 @@ function settleTenders({
   const normalised = [];
   let cashCentavos = 0;
   let creditCentavos = 0;
+  let storeCreditCentavos = 0;
 
   for (const [index, tender] of tenders.entries()) {
     const method = String(tender.method || '').toUpperCase();
@@ -382,12 +414,49 @@ function settleTenders({
 
     if (method === 'CASH') cashCentavos += amount;
     if (method === 'CREDIT') creditCentavos += amount;
+    if (method === 'STORE_CREDIT') storeCreditCentavos += amount;
 
     normalised.push({
       method,
       amountCentavos: amount,
       referenceNo: declared.needsReference ? referenceNo : referenceNo || null,
     });
+  }
+
+  // ── Store credit: held, and enough of it (CR-108) ─────────────────────────
+  //
+  // Inside step 5, before its sum. Checked **before** POS-204's shortfall below, and
+  // that order is the cashier's rather than the specification's: "this does not cover the total yet" is what they see while
+  // they are still counting, and a store-credit figure larger than the balance is one
+  // that will never be accepted however much cash follows it. The specific refusal
+  // first, so the counter is told the thing it can act on.
+  //
+  // It does not interact with CR-104 below either: a limit governs what a customer may
+  // *owe*, not what they may *hold*, so a farm at their limit may still spend credit
+  // the store owes them — and a farm spending credit is not taking any.
+  let storeCreditAccount = null;
+  if (storeCreditCentavos > 0) {
+    if (!customer) {
+      throw errors.badRequest(
+        'Store credit belongs to a customer. Choose the customer before paying with it.',
+        { ruleId: 'CR-108' }
+      );
+    }
+    storeCreditAccount = creditRepository.findAccountByCustomer(customer.id);
+    const held = creditService.storeCreditFor(storeCreditAccount);
+    if (storeCreditCentavos > held) {
+      // The figure, because "not enough store credit" is unanswerable at a counter:
+      // the cashier has to know how much to take another way.
+      throw errors.badRequest(
+        held === 0
+          ? `${customer.name} has no store credit to spend. Take the `
+            + `${money.toDisplay(storeCreditCentavos)} another way.`
+          : `${customer.name} has ${money.toDisplay(held)} in store credit and this payment is `
+            + `${money.toDisplay(storeCreditCentavos)}. Reduce it to ${money.toDisplay(held)} and `
+            + 'take the rest another way.',
+        { ruleId: 'CR-108' }
+      );
+    }
   }
 
   // ── 5. SUM(tenders) >= total (POS-204) ────────────────────────────────────
@@ -452,6 +521,8 @@ function settleTenders({
     changeCentavos: over,
     cashCentavos,
     creditCentavos,
+    storeCreditCentavos,
+    storeCreditAccount,
     creditAccount,
     overLimit,
     warnings,

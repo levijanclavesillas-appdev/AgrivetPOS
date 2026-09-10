@@ -191,6 +191,15 @@ Running "remaining" and, once cash exceeds the balance, "change" (`MON-007`). `C
 customer's limit, balance and available credit, and blocks with the manager-override panel when
 over limit (`CR-104`). Complete is disabled until `SUM(tenders) ≥ due` (`POS-204`).
 
+**`STORE_CREDIT` (`CR-108`, `TASK-028`)** appears only where the customer has a balance, and the
+button carries the figure — *STORE CREDIT ₱400.00* — because the first question a cashier asks is
+how much of the bill it covers. It defaults to exactly that: as much of what is due as the balance
+reaches, which is what "pay with my credit" means at a counter. The credit block above the rows
+says **In credit** rather than showing a negative balance, and says in words that the store owes
+them and that it can pay for this sale. Tendering more than they hold is refused on the screen with
+the figure, before Complete rather than after it — and refused again at the server, which is where
+the balance actually lives.
+
 Non-cash rows carry the word **RECORDED** next to the amount (`POS-206`) — in the UI, on the
 receipt, and in reports.
 
@@ -265,6 +274,14 @@ cashier can say it out loud while handing the slip over.
 Profile shows credit limit, current balance, available credit and ageing status (`CR-107`) as the
 first block, then sale history, then collection history. `OVERDUE` renders in the error colour
 with the day count. Credit limit is editable only under `TX-414`.
+
+**A customer the store owes is never rendered as one who owes** (`CR-108`, `TASK-028`). The list
+shows the figure without its minus sign and tags the row **in credit** — in the accent the
+"available" figure carries, not the error colour a debt carries — instead of an ageing word, because
+there is no debt there to age. The profile says it in a sentence: the store owes them this much,
+from an overpayment or a return, and it can pay for their next purchase in whole or in part. That
+last clause is the point of saying it at all: before `TASK-028` a customer ₱500 in credit was told
+so and then asked for cash.
 
 ### `SCR-403` — Collection · `FT-403`
 

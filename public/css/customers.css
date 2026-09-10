@@ -23,6 +23,12 @@
 .credit-figure.available .figure-value { color: var(--accent); }
 .credit-summary.is-overdue .credit-figure.balance .figure-value { color: var(--error); }
 .overdue-note { margin: 0 0 .75rem; font-weight: 600; color: var(--error); }
+
+/* CR-108 (TASK-028). Store credit is money the store owes, so it reads in the accent
+   the "available" figure reads in — the store's favour — and never in the error colour
+   a debt carries. A customer in credit is not a problem to chase. */
+.tag.in-credit { background: #eef4f0; color: var(--accent); font-weight: 600; }
+.store-credit-note { margin: 0 0 .75rem; color: var(--accent); max-width: 44rem; }
 .limit-form { margin-top: .75rem; }
 .limit-form input { min-height: var(--touch); padding: 0 .6rem; border: 1px solid var(--rule);
   border-radius: 4px; font: inherit; background: #fff; }

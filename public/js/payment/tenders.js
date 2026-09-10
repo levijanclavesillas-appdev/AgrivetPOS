@@ -5,7 +5,14 @@
 // cashier sees "remaining ₱400.00" while they are counting, not after they press
 // Complete.
 
-export const METHODS = Object.freeze(['CASH', 'GCASH', 'QRPH', 'CREDIT']);
+export const METHODS = Object.freeze(['CASH', 'GCASH', 'QRPH', 'CREDIT', 'STORE_CREDIT']);
+
+/**
+ * CR-108: these two belong to a customer rather than to the counter, so a walk-in is
+ * offered neither. `CREDIT` is money the customer will owe; `STORE_CREDIT` is money the
+ * store already owes them — opposite directions on one account.
+ */
+export const NEEDS_CUSTOMER = Object.freeze(['CREDIT', 'STORE_CREDIT']);
 
 /** POS-205: these carry a reference that is neither defaulted nor generated. */
 export const NEEDS_REFERENCE = Object.freeze(['GCASH', 'QRPH']);
@@ -13,8 +20,12 @@ export const NEEDS_REFERENCE = Object.freeze(['GCASH', 'QRPH']);
 /** POS-203: only cash may over-tender, and change is cash only (MON-007). */
 export const MAY_OVER_TENDER = Object.freeze(['CASH']);
 
-export function createTenders(totalCentavos) {
+export function createTenders(totalCentavos, { storeCreditCentavos = 0 } = {}) {
   let rows = [];
+  // CR-108: what the customer holds. Settable rather than fixed at construction, because
+  // the screen draws before `GET /customers/:id/credit` answers — and rebuilding the
+  // model when it does would throw away whatever the cashier had already keyed.
+  let held = storeCreditCentavos;
 
   function add(method, amountCentavos = 0, referenceNo = '') {
     const row = {
@@ -41,6 +52,15 @@ export function createTenders(totalCentavos) {
 
   /** What is still owed, never negative — the over-tender is change, not a shortfall. */
   const remainingCentavos = () => Math.max(0, totalCentavos - tenderedCentavos());
+
+  /** CR-108: how much of the balance this payment is spending. */
+  const storeCreditTendered = () => rows
+    .filter((row) => row.method === 'STORE_CREDIT')
+    .reduce((sum, row) => sum + (row.amountCentavos || 0), 0);
+
+  // The screen's own formatter is in format.js; this model is imported by tests that
+  // load no DOM, so it carries the one line of it that a refusal needs.
+  const peso = (centavos) => `₱${(centavos / 100).toFixed(2)}`;
 
   /** MON-007: change is what cash exceeds the bill by, and it is cash only. */
   const changeCentavos = () => Math.min(
@@ -74,6 +94,15 @@ export function createTenders(totalCentavos) {
       }
     }
 
+    // CR-108: more store credit than the customer holds. Checked before POS-204's
+    // shortfall, because "this does not cover it yet" is what the cashier sees while
+    // they are still counting and this is a figure that will never be accepted.
+    if (storeCreditTendered() > held) {
+      return held === 0
+        ? 'This customer has no store credit to spend.'
+        : `Only ${peso(held)} of store credit is held. Reduce it and take the rest another way.`;
+    }
+
     // POS-204.
     if (tenderedCentavos() < totalCentavos) return 'The payment does not cover the total yet.';
 
@@ -93,6 +122,9 @@ export function createTenders(totalCentavos) {
     remainingCentavos,
     changeCentavos,
     cashCentavos,
+    storeCreditTendered,
+    setStoreCreditHeld: (centavos) => { held = Math.max(0, centavos || 0); },
+    get storeCreditCentavos() { return held; },
     get rows() { return rows.slice(); },
     get isComplete() { return blockedReason() === null; },
     toRequest: () => rows.map((row) => ({

@@ -150,6 +150,36 @@ function openDebits(accountId) {
   `).all(accountId);
 }
 
+/**
+ * The mirror image: credits with something left to give (`CR-108`).
+ *
+ * A collection that overpaid and a return credit are both money the customer has with
+ * the store, and `credit_allocations` records what each has been used for. What is left
+ * of one is its amount less everything allocated **from** it — the same derivation as
+ * `openDebits` above, read from the other end of the same table, which is why neither
+ * needs a status column.
+ *
+ * Oldest first, so the credit a customer has held longest is the one spent next. That
+ * is the same ordering `CR-203` fixes for a payment, and for the same reason: money
+ * should not sit on an account gathering questions.
+ */
+function openCredits(accountId) {
+  return db.get().prepare(`
+    SELECT t.id, t.amount_centavos, t.txn_type, t.occurred_at, t.document_no,
+           COALESCE(alloc.used_centavos, 0) AS used_centavos,
+           -t.amount_centavos - COALESCE(alloc.used_centavos, 0) AS available_centavos
+      FROM customer_credit_transactions t
+      LEFT JOIN (
+        SELECT collection_txn_id, SUM(amount_centavos) AS used_centavos
+          FROM credit_allocations GROUP BY collection_txn_id
+      ) alloc ON alloc.collection_txn_id = t.id
+     WHERE t.account_id = ?
+       AND t.amount_centavos < 0
+       AND -t.amount_centavos - COALESCE(alloc.used_centavos, 0) > 0
+     ORDER BY t.occurred_at, t.id
+  `).all(accountId);
+}
+
 // ── Allocations (CR-203) ────────────────────────────────────────────────────
 
 function insertAllocation(row) {
@@ -208,6 +238,6 @@ function accountsWithBalance() {
 module.exports = {
   findAccount, findAccountByCustomer, insertAccount, updateAccountFields,
   insertTransaction, findTransaction, transactionsFor, countTransactionsFor, transactionsForSale,
-  ledgerSum, reconciliationBreaks, openDebits,
+  ledgerSum, reconciliationBreaks, openDebits, openCredits,
   insertAllocation, allocationsForCollection, allocationsForSale, accountsWithBalance,
 };

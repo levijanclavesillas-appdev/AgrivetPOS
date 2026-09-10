@@ -22,6 +22,9 @@ import { money } from '../shell/format.js';
 
 export function createReceipt({ root, sale, printed, onNewSale }) {
   const paper = h('pre', { class: 'receipt-paper', 'aria-label': 'Receipt preview' });
+  // The sheet is held rather than built inline in `mount`, because `load` below has to
+  // put the paper back into it. See the note there.
+  const sheet = h('div', { class: 'receipt-sheet' }, [paper]);
 
   let voidable = null;       // GET /sales/:id/voidable
   let voiding = false;       // the reason panel is open
@@ -30,13 +33,32 @@ export function createReceipt({ root, sale, printed, onNewSale }) {
   let refusal = null;
   let voided = null;
 
+  /**
+   * The document the server rendered, into the sheet.
+   *
+   * §5's loading state **clears the element it is given**, which detaches the paper —
+   * so setting its text afterwards writes into a node that is no longer in the page,
+   * and the preview stays a skeleton for ever. It did exactly that from TASK-015 until
+   * TASK-028's browser walk waited for `.receipt-paper` and never saw it: every
+   * assertion anyone had written read `.screen`, where the sale number and the total
+   * are, and none of them read the paper itself.
+   *
+   * The failure is worth naming: a cashier looking at SCR-304 saw a header and a grey
+   * placeholder where the receipt should be, and the only way to see what had printed
+   * was to press Reprint — which stamps REPRINT on it (POS-208).
+   *
+   * The error state goes into the sheet for the same reason it now does: `ui.error(root)`
+   * would clear the whole screen, taking the sale number, the total and the void button
+   * with it, over a preview that failed to fetch.
+   */
   async function load() {
-    ui.loading(paper.parentElement ?? root, { rows: 6 });
+    ui.loading(sheet, { rows: 6 });
     try {
       const { document: doc } = await api.get(`/sales/${sale.sale.id}/receipt`);
       paper.textContent = doc.text;
+      clear(sheet).append(paper);
     } catch (err) {
-      ui.error(root, { message: err.message, retry: load });
+      ui.error(sheet, { message: err.message, retry: load });
     }
   }
 
@@ -236,7 +258,7 @@ export function createReceipt({ root, sale, printed, onNewSale }) {
           ])
           : null,
       ]),
-      h('div', { class: 'receipt-sheet' }, [paper]),
+      sheet,
       h('div', { id: 'receipt-actions' }, [actionsBlock()]),
     ]));
 

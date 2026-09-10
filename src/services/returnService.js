@@ -541,6 +541,19 @@ function post(input, actor) {
         reason: `${reason} — return against ${sale.sale_no}`,
         occurredAt: at,
       });
+
+      // CR-203, which this rule needed all along: the part of the refund that reduces
+      // what they owe is applied to the open invoices, oldest first, exactly as a
+      // payment is. Without it the returned sale stayed "open" on the statement and
+      // aged towards OVERDUE on money nobody owed — a collection letter for a debt the
+      // store itself had cancelled. Anything beyond what is owed allocates to nothing,
+      // because it settles nothing: that is the store credit half of CR-108.
+      creditService.allocateToDebits({
+        accountId: account.id,
+        creditTxnId: creditTransaction.transaction.id,
+        amountCentavos: creditMovement,
+        at,
+      });
     }
 
     returnRepository.insert({

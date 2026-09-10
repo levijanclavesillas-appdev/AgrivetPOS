@@ -9,17 +9,58 @@ import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money } from '../shell/format.js';
-import { createTenders, METHODS, NEEDS_REFERENCE } from './tenders.js';
+import { createTenders, METHODS, NEEDS_REFERENCE, NEEDS_CUSTOMER } from './tenders.js';
 
 export function createPayment({ root, cart, priced, approver = null, onComplete, onCancel }) {
-  const tenders = createTenders(priced.total_centavos);
+  // CR-108: what the store is holding for this customer, fetched with their credit
+  // below. Nothing is offered against it until the server has said what it is — a
+  // screen that guessed would offer a tender the sale then refuses.
+  let storeCreditCentavos = 0;
+  const tenders = createTenders(priced.total_centavos, { storeCreditCentavos });
   const rowsHost = h('div', { class: 'tender-rows' });
   const summaryHost = h('div', { class: 'payment-summary' });
   const creditHost = h('div', { class: 'credit-block', hidden: true });
   const completeButton = h('button', { class: 'primary complete', text: 'Complete  Enter' });
   const blockedNote = h('p', { class: 'blocked-note' });
+  // Its own host: which tenders may be offered depends on the customer's credit, which
+  // the server has not answered when the screen is first drawn.
+  const addBar = h('div', { class: 'tender-add' });
+
+  function renderAddBar() {
+    clear(addBar).append(...METHODS.map((method) => {
+      // CR-102 / CR-108: both of these belong to a customer, and neither is offered to
+      // a walk-in. Store credit is further conditioned on there being some — a button
+      // for a balance of nothing is a button that only ever refuses.
+      const needsCustomer = NEEDS_CUSTOMER.includes(method);
+      const noBalance = method === 'STORE_CREDIT' && storeCreditCentavos === 0;
+      if (noBalance) return null;
+
+      return h('button', {
+        class: 'tender-add-button',
+        text: method === 'STORE_CREDIT' ? `STORE CREDIT ${money(storeCreditCentavos)}` : method,
+        disabled: needsCustomer && !cart.customer,
+        title: needsCustomer && !cart.customer
+          ? 'A walk-in has no account to pay from (CR-102, CR-108)'
+          : null,
+        onclick: () => {
+          // Cash defaults to what is still owed; the cashier changes it when the
+          // customer hands over more. Store credit defaults to as much of the bill as
+          // the balance covers, which is what "pay with my credit" means at a counter.
+          const amount = method === 'CASH'
+            ? tenders.remainingCentavos()
+            : (method === 'STORE_CREDIT'
+              ? Math.min(tenders.remainingCentavos(), storeCreditCentavos - tenders.storeCreditTendered())
+              : 0);
+          tenders.add(method, Math.max(0, amount));
+          renderRows();
+          renderSummary();
+        },
+      });
+    }).filter(Boolean));
+  }
 
   function renderRows() {
+    renderAddBar();
     clear(rowsHost);
 
     for (const row of tenders.rows) {
@@ -123,17 +164,33 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
       const { credit } = await api.get(`/customers/${cart.customer.id}/credit`);
       if (!credit) return;
 
+      // CR-108: the balance the customer holds, and the tender that spends it. Set
+      // before the rows are drawn, so the STORE_CREDIT button appears with the figure
+      // on it rather than appearing and then being refused.
+      storeCreditCentavos = credit.store_credit_centavos || 0;
+      tenders.setStoreCreditHeld(storeCreditCentavos);
+
       const over = priced.total_centavos > credit.available_centavos;
-      clear(creditHost).append(
+      clear(creditHost).append(...[
         h('h3', { text: `${cart.customer.name} — credit` }),
         line('Limit', money(credit.credit_limit_centavos)),
-        line('Balance', money(credit.balance_centavos)),
+        // CR-108: never rendered as a debt. A negative balance is money the store owes
+        // them, and the row says so in those words rather than with a minus sign.
+        storeCreditCentavos > 0
+          ? line('In credit', money(storeCreditCentavos), 'store-credit')
+          : line('Balance', money(credit.balance_centavos)),
         line('Available', money(credit.available_centavos), over ? 'over' : ''),
+        storeCreditCentavos > 0
+          ? h('p', { class: 'muted', text: `The store owes ${cart.customer.name} ${money(storeCreditCentavos)}. `
+            + 'It can pay for this sale, in whole or in part (CR-108).' })
+          : null,
         over
           ? h('p', { class: 'credit-warning', text: 'This sale is over their available credit. A manager or owner must authorise it.' })
-          : null
-      );
+          : null,
+      ].filter(Boolean));
       creditHost.hidden = false;
+      renderRows();
+      renderSummary();
     } catch { /* not credit-eligible; the server refuses a credit tender anyway */ }
   }
 
@@ -188,19 +245,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
       summaryHost,
       creditHost,
       rowsHost,
-      h('div', { class: 'tender-add' }, METHODS.map((method) => h('button', {
-        class: 'tender-add-button',
-        text: method,
-        disabled: method === 'CREDIT' && !cart.customer,
-        title: method === 'CREDIT' && !cart.customer ? 'A walk-in cannot buy on credit (CR-102)' : null,
-        onclick: () => {
-          // Cash defaults to what is still owed; the cashier changes it when the
-          // customer hands over more.
-          tenders.add(method, method === 'CASH' ? tenders.remainingCentavos() : 0);
-          renderRows();
-          renderSummary();
-        },
-      }))),
+      addBar,
       blockedNote,
       h('div', { class: 'payment-actions' }, [
         completeButton,

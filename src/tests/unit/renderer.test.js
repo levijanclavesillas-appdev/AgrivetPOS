@@ -263,6 +263,42 @@ test('POS-203 / MON-007: only cash over-tenders, and change is the cash excess',
   assert.match(nonCashOver.blockedReason(), /Only cash may be over-tendered/);
 });
 
+test('CR-108: store credit is offered up to the balance held, and refused past it', async () => {
+  const { createTenders, METHODS, NEEDS_CUSTOMER } = await load('js/payment/tenders.js');
+
+  // TASK-028: the method was in the schema's CHECK from TASK-011 and in no screen.
+  assert.ok(METHODS.includes('STORE_CREDIT'));
+  // CR-102 / CR-108: both of these belong to an account, so a walk-in is offered
+  // neither — money the customer will owe, and money the store already owes them.
+  assert.deepEqual([...NEEDS_CUSTOMER], ['CREDIT', 'STORE_CREDIT']);
+
+  const tenders = createTenders(60000);
+  // The balance arrives from GET /customers/:id/credit after the screen is drawn, so
+  // the model takes it late rather than being rebuilt — rebuilding would throw away
+  // whatever the cashier had already keyed.
+  tenders.setStoreCreditHeld(40000);
+
+  tenders.add('STORE_CREDIT', 50000);
+  assert.match(tenders.blockedReason(), /Only ₱400\.00 of store credit is held/,
+    'the figure, because "not enough" is unanswerable at a counter');
+
+  tenders.rows[0].amountCentavos = 40000;
+  // Checked before POS-204's shortfall: "this does not cover it yet" is the normal
+  // state while counting, and a figure past the balance never becomes acceptable.
+  assert.match(tenders.blockedReason(), /does not cover the total yet/);
+
+  tenders.add('CASH', 20000);
+  assert.equal(tenders.blockedReason(), null);
+  assert.equal(tenders.storeCreditTendered(), 40000);
+  // MON-007: change is the cash excess, and store credit is not cash — a balance
+  // cannot be handed back as notes.
+  assert.equal(tenders.changeCentavos(), 0);
+
+  const none = createTenders(10000);
+  none.add('STORE_CREDIT', 10000);
+  assert.match(none.blockedReason(), /no store credit to spend/);
+});
+
 test('POS-206: every non-cash row is RECORDED and nothing says verified', async () => {
   const { createTenders } = await load('js/payment/tenders.js');
   const tenders = createTenders(1000);

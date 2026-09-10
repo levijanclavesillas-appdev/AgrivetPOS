@@ -7,6 +7,10 @@
 
 ---
 
+> **Closed.** Store credit is spendable: `STORE_CREDIT` is a tender, a customer in credit is never
+> rendered or aged as a debtor, and the debt and the liability are reported apart. One ledger, as
+> `CR-103` requires — the spend is an ordinary debit, settled by the credit it spends.
+
 ## Objective
 
 Let a customer's credit balance be money the store owes *them*, and let them spend it.
@@ -65,13 +69,13 @@ complaint rather than a feature.
 
 ## Acceptance Criteria
 
-- [ ] An overpayment leaves store credit, and the profile calls it money the store owes
-- [ ] A return with nothing owing leaves store credit rather than cash
-- [ ] A sale can be paid wholly or partly from it, and beyond it is refused with the figure
-- [ ] Spending it writes a transaction the statement shows
-- [ ] A credit balance is never rendered as a debt or aged as overdue
-- [ ] The credit reconciliation holds with negative balances present
-- [ ] Store credit is reported as a liability, separately from customer debt
+- [x] An overpayment leaves store credit, and the profile calls it money the store owes
+- [x] A return with nothing owing leaves store credit rather than cash
+- [x] A sale can be paid wholly or partly from it, and beyond it is refused with the figure
+- [x] Spending it writes a transaction the statement shows
+- [x] A credit balance is never rendered as a debt or aged as overdue
+- [x] The credit reconciliation holds with negative balances present
+- [x] Store credit is reported as a liability, separately from customer debt
 
 ## Tests
 
@@ -82,6 +86,51 @@ complaint rather than a feature.
 | `TC-INT-105` | `CR-103` reconciles with negative balances in the data |
 | `TC-INT-106` | A credit balance is never aged as overdue |
 | `TC-E2E-22` | Overpay, return, then buy a sack paid half from credit — and reconcile |
+
+---
+
+## What it found: a dunning letter for a debt the store had cancelled
+
+`CR-107` derives ageing from **unsettled debits**, and `credit_allocations` is what marks a debit
+settled. Collections have allocated since `TASK-012`. **Return credits never did.** So a farm whose
+₱600 credit sale was returned in full carried a balance of nothing and an open ₱600 invoice at the
+same time — `PAID` by the balance, `OVERDUE` by the ageing, and it is the ageing that reaches the
+collections worklist and the dashboard's overdue count. The store would have chased a customer for
+money it had itself given back.
+
+Requirement 6 is what surfaced it — "the list's ageing column must not call a credit balance
+overdue" — and the fix is not in the list. It is in the ledger: a credit settles the debits it
+covers, whichever kind of credit it is. `allocate` moved out of `collectionService` into
+`creditService`, `returnService` calls it, and `TC-INT-106` is the case that would have caught it
+at `TASK-020` had anybody thought to ask.
+
+## And a second thing it found, on the screen next door
+
+The walk waited for `SCR-304`'s receipt preview and never saw it. §5's loading state clears the
+element it is handed, and the receipt handed it the **sheet the paper lives in** — so the `<pre>`
+was detached, the fetched document was written into a node no longer in the page, and the preview
+stayed a skeleton. Since `TASK-015`. Every assertion on that screen read `.screen`, which carries
+the sale number and the total whether or not the paper renders, so it passed a browser walk for six
+tasks. A cashier's only way to see what had printed was Reprint — which stamps REPRINT on it
+(`POS-208`), on a receipt nobody had yet been given.
+
+## What was decided here, that `CR-108` did not settle
+
+**Which transaction type spends it.** The schema's `CHECK` names six and the task forbids a
+migration, so the spend is a `CREDIT_SALE` with `method = 'STORE_CREDIT'` — which turns out to be
+the honest reading rather than a workaround: the customer's account *is* debited for the goods, and
+the credit they hold *is* what covers it. The statement reads `RETURN_CREDIT −₱300` then
+`CREDIT_SALE +₱300`, and the balance walks back to zero in front of the reader.
+
+**And what stops that debit looking like a debt.** It is allocated against the credit it spends, in
+the same transaction, by the same allocator running the other way round (`allocateToDebit`). So it
+is settled the instant it is written: no due date, no open invoice, nothing to age. `TC-INT-106`
+asserts it a year later, because "not yet overdue" and "never overdue" look identical on the day.
+
+**`CR-104` has nothing to say about it.** A limit governs what a customer may *owe*. A farm at its
+₱100 limit holding ₱500 of store credit may spend every peso of it, because spending it is not
+borrowing — and `available = limit − balance` grows rather than shrinks against a negative balance,
+which is the arithmetic already saying so.
 
 ---
 
