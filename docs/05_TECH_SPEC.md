@@ -1128,6 +1128,8 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/customers/:id/statement?from=&to=` | `TX-421` | `CR-302`, `SCR-404`. Opening balance derived as the balance before the window, the period's movements, closing balance — and the service **refuses** to answer if the walked total and the ledger disagree. `TX-421` at store scope: a cashier's `OWN_SHIFT` grant is not a licence to read the receivable |
 | `POST` | `/customers/:id/statement/print` | `TX-421` | `CR-206`'s precedent — a document a customer takes away, with `TAX-006`'s notice on it |
 | `GET` | `/customers/:id/statement/export.csv` | `TX-426` | the same call the screen makes |
+| `POST` | `/customers/:id/write-off` | `TX-413` → `TX-417` | `CR-303`, `FT-409`. **The door is `TX-413` and the rule is `TX-417`** — the same shape the void uses (`TX-401` at the edge, `POS-403` inside): a route behind `TX-417` would answer a manager with a bare 403 from the middleware, before anything could audit the attempt or say what they *can* do |
+| `GET` | `/reports/write-offs?from=&to=` | `TX-421` | `CR-303`'s separation, in the one place a write-off is counted. It is in no collections figure |
 | `GET` | `/reports/ageing` | `TX-421` | `CR-301`, `SCR-605`. Four buckets **per unsettled debit**, not per account, plus what customers hold in credit — which is never netted into a bucket, and is what makes the report tie to the ledger |
 | `GET` | `/reports/ageing/export.csv` | `TX-426` | |
 | `GET` | `/customers/:id/credit` | `TX-413` | limit, balance, available, ageing, and — since `TASK-028` — `store_credit_centavos`, the balance past zero the customer may spend (`CR-108`) |

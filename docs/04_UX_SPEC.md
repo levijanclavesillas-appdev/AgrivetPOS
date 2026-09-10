@@ -381,6 +381,13 @@ non-cash, and a preview of the resulting balance before confirming. On confirm i
 acknowledgement (`CR-206`). Overpayment requires explicit confirmation and states that the excess
 becomes store credit (`CR-204`).
 
+`SCR-402` also carries the **write-off** (`FT-409`, `CR-303`) — the owner's alone, and hidden
+rather than disabled for everybody else, because a greyed-out "write off" is an invitation to ask
+why. It asks two things: how much, and **why**, the second free text because "why did this money
+never arrive" has no list of five options and it is the field the store's accountant reads. The
+panel says what it will do before it does it — the balance falls, the invoices stop being chased,
+it is counted as a write-off and never as a collection, and it cannot be undone.
+
 ### `SCR-404` — Statement · `FT-407` — v1.2
 
 Behind `TX-421`, from `SCR-402` beside the payment button — *"what do I owe"* and *"here is some

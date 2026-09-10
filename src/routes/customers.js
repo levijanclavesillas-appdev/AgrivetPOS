@@ -113,6 +113,32 @@ router.get('/customers/:id/statement',
   });
 
 /**
+ * `CR-303` — the owner declares a debt uncollectable (`FT-409`).
+ *
+ * **The door is `TX-413` and the rule is `TX-417`**, which is the same shape the void
+ * uses (`TX-401` at the edge, `POS-403` inside) and for the same reason: a route behind
+ * `TX-417` would answer a manager with a bare 403 from the middleware, before anything
+ * could audit the attempt or tell them what they *can* do. `creditService.writeOff`
+ * enforces the owner-only rule where the refusal can do both.
+ *
+ * A cashier is stopped at the edge, and rightly — `TX-413` is the counter's grant for
+ * customer work, and a cashier who reaches this URL has typed it by hand.
+ */
+router.post('/customers/:id/write-off', editCustomers, (req, res, next) => {
+    try {
+      const body = req.body || {};
+      res.status(201).json(creditService.writeOff(req.params.id, {
+        amountCentavos: body.amountCentavos,
+        reason: body.reason,
+        approver: body.approver || null,
+        actor: req.session,
+      }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+/**
  * `CR-302` on paper. `TX-421` to read it, and the printer does not care who asked —
  * `CR-206`'s acknowledgement set the precedent for a document a customer takes away.
  */

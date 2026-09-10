@@ -88,15 +88,15 @@ the third. A written-off debit is settled, so it ages no further and leaves the 
 
 ## Acceptance Criteria
 
-- [ ] A manager is refused and the refusal is audited; an owner succeeds
-- [ ] A write-off without a reason is refused
-- [ ] The balance falls by exactly the amount, derived and not stored
-- [ ] The written-off invoices leave the ageing and the collections worklist
-- [ ] Writing off more than the balance is refused with the figure
-- [ ] The collections report and the dashboard are unchanged by a write-off
-- [ ] The write-offs report shows it, by customer and reason
-- [ ] It appears on the customer's statement as a `WRITE_OFF` row
-- [ ] A later payment against a written-off account is an ordinary collection, and both rows stand
+- [x] A manager is refused and the refusal is audited; an owner succeeds
+- [x] A write-off without a reason is refused
+- [x] The balance falls by exactly the amount, derived and not stored
+- [x] The written-off invoices leave the ageing and the collections worklist
+- [x] Writing off more than the balance is refused with the figure
+- [x] The collections report and the dashboard are unchanged by a write-off
+- [x] The write-offs report shows it, by customer and reason
+- [x] It appears on the customer's statement as a `WRITE_OFF` row
+- [x] A later payment against a written-off account is an ordinary collection, and both rows stand
 
 ## Tests
 
@@ -106,6 +106,25 @@ the third. A written-off debit is settled, so it ages no further and leaves the 
 | `TC-INT-124` | `CR-103`, `CR-107`: the balance moves, and the settled debits stop ageing |
 | `TC-INT-125` | `CR-303`: collections figures are identical before and after a write-off, and the write-off appears in its own report |
 | `TC-E2E-28` | A farm three months overdue, written off, then paying six months later — the ledger, the statement and the collections report all telling the truth |
+
+**`CR-303`'s separation was mostly already true, and that is worth recording rather than
+claiming credit for.** The only collections aggregate in the product —
+`shiftRepository.collectionTotalsByMethod` — filters on `txn_type = 'COLLECTION'`, so a write-off
+could never have reached it. `TC-INT-125` holds it there rather than fixing it: the figure is
+asserted *identical* either side of a write-off, so the day somebody widens that query to "all
+credits" the case fails loudly instead of the store's collection performance quietly improving.
+
+**Where the rule is enforced, and why not at the door.** A route behind `TX-417` would have
+answered a manager with the middleware's bare 403 — before anything could audit the attempt or
+tell them what they *can* do. The door is `TX-413` and `creditService.writeOff` enforces
+`TX-417`, which is the shape `voidService` already uses for `POS-403`. The first version did it
+the other way and `TC-INT-123` caught it: the refusal carried no reason and left no trail.
+
+**What the walk showed about the late payment.** Six months on, the farm pays anyway. The
+write-off is not reversed — it happened, and the ledger is append-only — so the payment lands on
+an account owing nothing and becomes store credit (`CR-108`). That is the honest answer: the
+store is holding their money now. Both rows stand on the statement, and the collections figure
+moves for the payment because this time the store was actually paid.
 
 ---
 

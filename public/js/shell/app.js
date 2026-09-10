@@ -335,6 +335,7 @@ export function createApp({ root }) {
     current = createCustomerProfile({
       root: host(),
       customerId,
+      session,
       onBack: () => showCustomers(),
       onCollect: (id) => showCollection(id),
       onStatement: (id) => showStatement(id),

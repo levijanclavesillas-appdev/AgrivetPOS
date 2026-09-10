@@ -19,7 +19,7 @@ import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, manila } from '../shell/format.js';
 
-export function createCustomerProfile({ root, customerId, onBack, onCollect, onStatement = null }) {
+export function createCustomerProfile({ root, customerId, session = null, onBack, onCollect, onStatement = null }) {
   let customer = null;
   let credit = null;
   let openSales = [];
@@ -55,6 +55,56 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect, onS
     }
   }
 
+  /**
+   * `CR-303` — declare a debt uncollectable.
+   *
+   * Two answers, because the rule asks for two: how much, and **why**. The reason is
+   * free text and required — it is the field the store's accountant reads, and "why did
+   * this money never arrive" has no list of five options.
+   *
+   * ui.ask, not window.prompt: Electron does not implement prompt.
+   */
+  async function writeOff() {
+    const owed = credit.balance_centavos;
+    if (owed <= 0) {
+      ui.toast('There is nothing owing on this account to write off.', { kind: 'error' });
+      return;
+    }
+
+    const answers = await ui.ask({
+      title: `Write off ${customer.name}'s debt`,
+      message: `${money(owed)} is outstanding. Writing it off says the store is not going to `
+        + 'get this money: the balance falls, the invoices stop being chased, and it is counted '
+        + 'as a write-off and never as a collection (CR-303). It cannot be undone — a later '
+        + 'payment is an ordinary payment, and both rows stand.',
+      fields: [
+        { name: 'amount', label: 'Amount to write off (₱)', value: String(owed / 100) },
+        { name: 'reason', label: 'Why', maxLength: 300,
+          hint: 'The store’s accountant will read this. Say what actually happened.' },
+      ],
+      submitLabel: 'Write it off',
+    });
+    if (!answers || !answers.reason) return;
+
+    const pesos = Number.parseFloat(answers.amount);
+    if (!Number.isFinite(pesos) || pesos <= 0) {
+      ui.toast('Enter an amount greater than zero.', { kind: 'error' });
+      return;
+    }
+
+    try {
+      const result = await api.post(`/customers/${customerId}/write-off`, {
+        amountCentavos: Math.round(pesos * 100),
+        reason: answers.reason,
+      });
+      ui.toast(`${money(Math.round(pesos * 100))} written off. Balance now `
+        + `${money(result.balance_centavos)}.`, { kind: 'success' });
+      await load();
+    } catch (err) {
+      ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+    }
+  }
+
   function render() {
     clear(root).append(h('section', { class: 'customers profile' }, [
       h('header', { class: 'admin-head' }, [
@@ -69,6 +119,13 @@ export function createCustomerProfile({ root, customerId, onBack, onCollect, onS
         // halves of the same conversation.
         onStatement
           ? h('button', { class: 'row-action', text: 'Statement', onclick: () => onStatement(customerId) })
+          : null,
+        // CR-303 / TX-417: the owner's alone, and hidden rather than disabled for
+        // everybody else — §2's rule, and a greyed-out "write off" is an invitation to
+        // ask why. The server refuses it again regardless (SEC-6), where the refusal is
+        // audited and says what a manager can do instead.
+        credit && session && session.role === 'OWNER'
+          ? h('button', { class: 'row-action danger', text: 'Write off', onclick: writeOff })
           : null,
       ]),
 

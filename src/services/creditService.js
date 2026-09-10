@@ -26,6 +26,8 @@ const printService = require('./printService');
 const documentService = require('./documentService');
 const storeProfileService = require('./storeProfileService');
 const permissions = require('./permissions');
+const authService = require('./authService');
+const userRepository = require('../repositories/userRepository');
 const auditService = require('./auditService');
 const settingsService = require('./settingsService');
 const creditRepository = require('../repositories/creditRepository');
@@ -622,6 +624,207 @@ function presentTransaction(row) {
   };
 }
 
+// ── CR-303 — the bad-debt write-off (TASK-034) ──────────────────────────────
+
+/**
+ * Declare a debt uncollectable (`FT-409`, `CR-303`).
+ *
+ * **A write-off is not a correction.** `ADJUSTMENT` already means "this ledger row was
+ * wrong"; `WRITE_OFF` means "this debt was real and the store is not going to get it",
+ * which is an accounting event the store's accountant cares about and has tax
+ * consequences a correction does not. The ledger is append-only, so using one for the
+ * other loses the difference for ever — there is nothing left to re-derive it from.
+ *
+ * **It settles the debits it is written off against**, oldest first, through the same
+ * allocator a collection uses. That is `TASK-028`'s lesson in the same place: a credit
+ * that moved a balance without allocating left an account square by balance and overdue
+ * by ageing, and it is the ageing that reaches the collections worklist. A written-off
+ * invoice must stop being chased.
+ *
+ * **It may not manufacture store credit** (`CR-108`). Writing off more than is
+ * outstanding is refused with the figure: the store does not owe money to somebody it
+ * has just given up on.
+ *
+ * `TX-417` is owner-only and has been in the matrix since v1.0 with nothing behind it.
+ * A refusal is audited, because "who tried to write off a debt" is a question worth
+ * being able to answer.
+ */
+function writeOff(customerId, {
+  amountCentavos, reason = null, approver = null, occurredAt = null, actor,
+}) {
+  if (!actor || !actor.id) throw new TypeError('a write-off needs an acting user (CR-303)');
+
+  if (!permissions.can(actor, 'TX-417')) {
+    // Audited before the refusal is thrown: a manager reaching for this is not a
+    // security incident, and it is a fact the owner is entitled to know.
+    auditService.write({
+      actor,
+      action: 'PERMISSION_REFUSED',
+      entityType: 'customer',
+      entityId: customerId,
+      after: { attempted: 'WRITE_OFF', amount_centavos: amountCentavos, role: actor.role },
+      reason: 'CR-303: only the owner may write off a debt',
+    });
+    throw errors.forbidden(
+      'Only the owner may write off a debt. A manager can take a payment or agree terms, '
+      + 'and giving up on money owed is the owner’s decision.',
+      { ruleId: 'TX-417', requiresRole: 'OWNER' }
+    );
+  }
+
+  const customer = customerRepository.findById(customerId);
+  if (!customer) throw errors.notFound('No such customer');
+  const account = creditRepository.findAccountByCustomer(customerId);
+  if (!account) {
+    throw errors.conflict(
+      `${customer.name} has no credit account, so there is nothing to write off.`,
+      { ruleId: 'CR-101' }
+    );
+  }
+
+  // CR-303: the reason is the field the accountant reads, so it is required and it is
+  // not a dropdown — "why did this money never arrive" has no fixed list.
+  const why = textOrNull(reason, { max: 300 });
+  if (!why) {
+    throw errors.badRequest(
+      'A write-off needs a reason. It is what the store’s accountant will read, and what a '
+      + 'later query about this account will be answered from.',
+      { ruleId: 'CR-303' }
+    );
+  }
+
+  const amount = normaliseAmount('WRITE_OFF', amountCentavos);
+  const outstanding = Math.max(account.balance_centavos, 0);
+  if (Math.abs(amount) > outstanding) {
+    throw errors.conflict(
+      `${customer.name} owes ${money.toDisplay(outstanding)} and this write-off is `
+      + `${money.toDisplay(Math.abs(amount))}. A write-off cannot put an account into credit — `
+      + 'the store does not owe money to somebody it has just given up on (CR-108).',
+      { ruleId: 'CR-303' }
+    );
+  }
+
+  // AUD-603 where there is a second pair of eyes to be had. Not waived silently: where
+  // the store has one active user the trail records that nobody else was available,
+  // which is INV-112's distinction applied to money instead of stock.
+  const others = userRepository.list({ includeInactive: false })
+    .filter((user) => user.id !== actor.id);
+  const resolved = approver && approver.username
+    ? authService.resolveApprover(approver, { roles: ['OWNER'], ruleId: 'CR-303' })
+    : null;
+  if (resolved && resolved.id === actor.id) {
+    throw errors.forbidden(
+      'A write-off is authorised by somebody other than the person recording it (AUD-603).',
+      { ruleId: 'AUD-603', requiresRole: 'OWNER' }
+    );
+  }
+
+  const at = occurredAt || clock.nowUtc();
+
+  return db.transaction(() => {
+    const posted = post({
+      accountId: account.id,
+      type: 'WRITE_OFF',
+      amountCentavos: Math.abs(amount),
+      actor,
+      documentNo: `WOFF-${clock.manilaDate(at).replace(/-/g, '')}-${account.id.slice(-6)}`,
+      reason: why,
+      occurredAt: at,
+    });
+
+    // CR-203's allocator, third caller. The debits this settles stop ageing, which is
+    // the difference between a debt forgiven and a debt still on the worklist.
+    const allocations = allocateToDebits({
+      accountId: account.id,
+      creditTxnId: posted.transaction.id,
+      amountCentavos: Math.abs(amount),
+      at,
+    });
+
+    auditService.write({
+      actor,
+      approver: resolved,
+      action: 'CREDIT_WRITTEN_OFF',
+      entityType: 'customer_credit_accounts',
+      entityId: account.id,
+      after: {
+        customer: customer.name,
+        amount_centavos: Math.abs(amount),
+        balance_after_centavos: posted.balanceCentavos,
+        settled: allocations.map((row) => row.sale_document_no),
+        // Stated rather than inferred from a user count that will have changed by the
+        // time anybody reads this row: "nobody else was available" and "nobody bothered"
+        // must not read alike a year later.
+        authorisation: resolved ? 'approved' : (others.length === 0 ? 'no second user' : 'self'),
+      },
+      reason: why,
+    });
+
+    return {
+      customer: { id: customer.id, name: customer.name },
+      transaction: presentTransaction({ ...posted.transaction, created_by_username: actor.username }),
+      balance_centavos: posted.balanceCentavos,
+      settled: allocations,
+      authorised_by: resolved ? resolved.username : null,
+    };
+  });
+}
+
+/**
+ * `CR-303`'s other half: written-off debt, in its own report.
+ *
+ * **Never in a collections figure.** A write-off credits the account exactly as a
+ * payment does, so a report that counted both would improve the store's collection
+ * performance every time it gave up on a debt — a month where nobody paid and ₱40,000
+ * was written off would read as the best month of the year.
+ *
+ * The separation is by transaction type, which is why the type had to be its own value
+ * rather than an `ADJUSTMENT` with a note.
+ */
+function writeOffReport({ from = null, to = null, now = clock.nowUtc(), actor = null } = {}) {
+  assertReceivableScope(actor, 'the store’s write-offs');
+
+  const fromDate = from || clock.manilaDate(now).slice(0, 8) + '01';
+  const toDate = to || clock.manilaDate(now);
+  const rows = creditRepository.writeOffsBetween(
+    new Date(`${fromDate}T00:00:00.000+08:00`).toISOString(),
+    new Date(`${toDate}T23:59:59.999+08:00`).toISOString()
+  );
+
+  const total = rows.reduce((sum, row) => sum + Math.abs(row.amount_centavos), 0);
+  const byCustomer = new Map();
+  for (const row of rows) {
+    const entry = byCustomer.get(row.customer_id)
+      || { customer_id: row.customer_id, customer_name: row.customer_name, total_centavos: 0, count: 0 };
+    entry.total_centavos += Math.abs(row.amount_centavos);
+    entry.count += 1;
+    byCustomer.set(row.customer_id, entry);
+  }
+
+  return {
+    from_date: fromDate,
+    to_date: toDate,
+    write_offs: rows.map((row) => ({
+      id: row.id,
+      customer_id: row.customer_id,
+      customer_name: row.customer_name,
+      occurred_at: row.occurred_at,
+      occurred_at_manila: clock.toManila(row.occurred_at),
+      amount_centavos: Math.abs(row.amount_centavos),
+      document_no: row.document_no,
+      // The field the accountant reads, on the row rather than behind a click.
+      reason: row.reason,
+      written_off_by: row.created_by_username,
+    })),
+    totals: { total_centavos: total, count: rows.length, customers: byCustomer.size },
+    by_customer: [...byCustomer.values()].sort((a, b) => b.total_centavos - a.total_centavos),
+    // RPT-106, and CR-303's own sentence.
+    basis: 'Debt the owner has declared uncollectable in this period. A write-off is not a '
+      + 'collection and is counted in no collections figure — a month where nobody paid and the '
+      + 'store gave up on ₱40,000 would otherwise read as its best month.',
+  };
+}
+
 // ── CR-301 / CR-302 — ageing buckets and the statement (TASK-031) ───────────
 
 /**
@@ -1084,5 +1287,6 @@ module.exports = {
   allocateToDebits, allocateToDebit, storeCreditFor, spendStoreCredit,
   summaryFor, creditFor, presentTransaction, reconcile, outstanding,
   BUCKETS, BUCKET_LABELS, bucketFor, ageingReport, statement, statementCsv, ageingCsv,
+  writeOff, writeOffReport,
   printStatement,
 };

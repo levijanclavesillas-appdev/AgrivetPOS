@@ -21,7 +21,7 @@ which is worth reading before writing the next backlog. What code-complete does 
 shippable: nothing has run in the store. [Status](#status) has the detail.
 
 **The v1.2 backlog is now written** — `TASK-029` to `TASK-035`, plus `TASK-042` and `TASK-043`
-raised while `TASK-029` was built, nine files, of which five are in. See
+raised while `TASK-029` was built, nine files, of which six are in. See
 [Open — v1.2 "Trace"](#open--v12-trace). Writing it is not the same as starting it: the next
 thing that moves this product is a Windows build and a visit to the counter, not another task.
 
@@ -282,7 +282,8 @@ instant it exists, so it has no due date and nothing to age.
 | :--- | :--- | :--- | :--- |
 | [TASK-029](TASK-029-batches-and-fefo.md) | Batches, expiry status, FEFO allocation | `74a29ab` | `014_batches.sql` — `product_batches`, `sale_item_batches`, `inventory_movements.batch_id`; `batchService` and `batchRepository`; FEFO inside the sale transaction; `MON-004`'s second costing path; `OPS-007`'s two expiry alerts; `GET /products/:id/batches`, `POST /batches/:id/expire`; the opening load's batch columns; `TC-UT-52`–`54`, `TC-INT-107`–`111`, `TC-E2E-23`. And `INV-201` joined `/inventory/reconciliation`, so one page answers whether the ledger is telling the truth |
 | [TASK-042](TASK-042-count-by-batch.md) | Counting batch-tracked stock, by batch | *this commit* | `015_count_by_batch.sql` — `stock_count_lines.batch_id`, and the only table rebuild in this schema's history; the sheet's line per batch, with the product's own totals computed server-side; `TC-UT-56`, `TC-INT-126`–`116`, `TC-E2E-29`. It removed the exclusion `TASK-029` added, along with the two tests that pinned it — the count sheet has one way of treating batch-tracked stock again |
-| [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | *this commit* | No schema. `creditService.statement`, `ageingReport` and their CSVs; `printService.renderStatement`; `GET /customers/:id/statement` and `/reports/ageing`; `SCR-404` and `SCR-605`; `TC-UT-55`, `TC-INT-114`–`116`, `TC-E2E-25`. It found that the rule's own reconciliation was not true as written — ageing sums debts gross and a balance nets them — and reconciles against the arithmetic that is |
+| [TASK-034](TASK-034-bad-debt-write-off.md) | Bad-debt write-off | *this commit* | No schema — `WRITE_OFF` had been in `txn_type`'s `CHECK` since `TASK-008` with nothing writing one. `creditService.writeOff` (the allocator's third caller) and `writeOffReport`; `POST /customers/:id/write-off`, `GET /reports/write-offs`; the owner-only control on `SCR-402`; `TC-INT-123`–`125`, `TC-E2E-28`. `CR-303`'s separation was already true by construction, and `TC-INT-125` now holds it there |
+| [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | `f91ec53` | No schema. `creditService.statement`, `ageingReport` and their CSVs; `printService.renderStatement`; `GET /customers/:id/statement` and `/reports/ageing`; `SCR-404` and `SCR-605`; `TC-UT-55`, `TC-INT-114`–`116`, `TC-E2E-25`. It found that the rule's own reconciliation was not true as written — ageing sums debts gross and a balance nets them — and reconciles against the arithmetic that is |
 | [TASK-030](TASK-030-recall-by-batch.md) | Recall by batch | `744a0e0` | No schema, which was `TASK-029`'s own test of its sale-line decision. `batchService.recallFor` and `recallCsv`; `GET /batches/:id/recall` and its CSV; `SCR-207`, one step from any batch; `TC-INT-112`, `TC-INT-113`, `TC-E2E-24`. It also fixed a test that failed every evening after 21:00 Manila, having quietly assumed office hours |
 | [TASK-044](TASK-044-shift-receipts.md) | `SCR-306`, this shift's receipts | `4eff796` | `public/js/receipt/list.js`; the rail item and `SCR-306` in `04_UX_SPEC.md` §3; a way back on `SCR-304` where it was opened from a list; `TC-UI-12` and `TC-E2E-31`. It found nothing wrong with the void or the reprint — both worked, and neither could be reached once the next customer had started |
 | [TASK-043](TASK-043-batch-screen.md) | `SCR-206`, the batch list and the write-off | `044fb57` | `public/js/catalogue/batches.js`; `SCR-206` in `04_UX_SPEC.md` §3; the row action on `SCR-201` and the action on `SCR-601`'s expiry alerts; `TC-UI-11` and the browser smoke's fourteen. It also found that the smoke had been seeding its batch-tracked medicine with a bare adjustment `INV-201` refuses — the fixture had silently held no stock since `TASK-029` |
@@ -295,7 +296,7 @@ and the alert shipped without anywhere to act on them. Both are now in, and the 
 
 ## Open — v1.2 "Trace"
 
-**The files are written, and five of the nine are built.** All nine are in the established format,
+**The files are written, and six of the nine are built.** All nine are in the established format,
 each self-contained enough that an implementer needs it plus the specs it cites and nothing else. Every one of the ten v1.2
 rules in `03_BUSINESS_RULES.md` is claimed by exactly one task, checked mechanically rather than
 by eye, and `07_TEST_PLAN.md` §6.4 reserves the case ids so no two tasks reach for the same
@@ -314,7 +315,6 @@ section gives.
 | :--- | :--- | :--- | :--- |
 | [TASK-032](TASK-032-payment-reconciliation.md) | Payment reconciliation | `FT-606` | — |
 | [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | `FT-602`, `FT-605` | — |
-| [TASK-034](TASK-034-bad-debt-write-off.md) | Bad-debt write-off | `FT-409` | `TASK-031` ✅ |
 | [TASK-035](TASK-035-evaluate-sqlcipher.md) | Evaluate SQLCipher encryption against POS latency | `SEC-9` | the store visit |
 
 **Three carry a question that has to be answered before the code is written.** `TASK-029` needs

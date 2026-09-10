@@ -89,6 +89,11 @@ const ACTIONS = Object.freeze({
   // needs a name against it when the close comes up short.
   COLLECTION_RECORDED: { what: 'Collection recorded', rule: 'CR-201' },
   CREDIT_ADJUSTED: { what: 'Credit balance adjusted', rule: 'CR-103' },
+  // CR-303 (TASK-034). Its own action, not an adjustment: "this ledger row was wrong"
+  // and "this debt was real and the store is not getting it" are different events with
+  // different consequences, and the trail is append-only — using one name for both
+  // loses the difference permanently.
+  CREDIT_WRITTEN_OFF: { what: 'Debt written off', rule: 'CR-303' },
 
   // ── AUD-601: purchasing (FT-501–FT-504) ───────────────────────────────────
   //

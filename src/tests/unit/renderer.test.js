@@ -1854,6 +1854,27 @@ test('SCR-404 / SCR-605: the receivable is shown, never recomputed (CR-301, CR-3
   assert.match(proseOf('js/reports/ageing.js'), /never netted into a bucket/);
 });
 
+test('CR-303: the write-off is the owner’s, and it asks why (TASK-034)', () => {
+  const source = codeOf('js/customers/profile.js');
+
+  // §2: a control a role cannot use is hidden, not disabled. A greyed-out "write off"
+  // is an invitation to ask why — and the server refuses it again regardless (SEC-6).
+  assert.match(source, /session\.role === 'OWNER'/);
+  assert.match(source, /Write off/);
+
+  // Two answers, because the rule asks for two — and the reason is free text, since
+  // "why did this money never arrive" has no list of five options.
+  assert.match(source, /name: 'reason'/);
+  assert.equal(/reason.*options|select.*reason/i.test(source), false, 'the reason is not a dropdown');
+  // ui.ask, never window.prompt: Electron does not implement one.
+  assert.match(source, /ui\.ask/);
+
+  // The screen says what a write-off does before it does it, including the part a store
+  // will otherwise learn from its accountant.
+  assert.match(proseOf('js/customers/profile.js'), /never as a collection \(CR-303\)/);
+  assert.match(proseOf('js/customers/profile.js'), /cannot be undone/);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

@@ -112,6 +112,25 @@ router.get('/reports/ageing', readSales, (req, res, next) => {
   }
 });
 
+/**
+ * `CR-303` — what the store gave up on, in the one place it is counted.
+ *
+ * Its own report, and in no collections figure: a write-off credits an account exactly
+ * as a payment does, and a report that counted both would make giving up on a debt look
+ * like collecting it.
+ */
+router.get('/reports/write-offs', readSales, (req, res, next) => {
+  try {
+    res.json(creditService.writeOffReport({
+      from: dateParam(req.query.from),
+      to: dateParam(req.query.to),
+      actor: req.session,
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** The receivable as a file. TX-426 to export, TX-421 to read what is in it. */
 router.get('/reports/ageing/export.csv', exportData, (req, res, next) => {
   try {

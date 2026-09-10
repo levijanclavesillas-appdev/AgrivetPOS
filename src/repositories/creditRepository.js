@@ -290,6 +290,26 @@ function balancesForAll() {
   `).all();
 }
 
+/**
+ * `CR-303`: the write-offs in a period, with the customer and the reason.
+ *
+ * Filtered by transaction type, which is the whole separation the rule asks for — a
+ * write-off is not a collection and no query that counts collections may see one.
+ */
+function writeOffsBetween(fromAt, toAt) {
+  return db.get().prepare(`
+    SELECT t.id, t.account_id, t.amount_centavos, t.occurred_at, t.document_no, t.reason,
+           a.customer_id, c.name AS customer_name, u.username AS created_by_username
+      FROM customer_credit_transactions t
+      JOIN customer_credit_accounts a ON a.id = t.account_id
+      JOIN customers c ON c.id = a.customer_id
+      LEFT JOIN users u ON u.id = t.created_by
+     WHERE t.txn_type = 'WRITE_OFF'
+       AND t.occurred_at >= ? AND t.occurred_at <= ?
+     ORDER BY t.occurred_at DESC
+  `).all(fromAt, toAt);
+}
+
 // ── Allocations (CR-203) ────────────────────────────────────────────────────
 
 function insertAllocation(row) {
@@ -349,6 +369,6 @@ module.exports = {
   findAccount, findAccountByCustomer, insertAccount, updateAccountFields,
   insertTransaction, findTransaction, transactionsFor, countTransactionsFor, transactionsForSale,
   ledgerSum, reconciliationBreaks, openDebits, openCredits,
-  openDebitsForAll, openCreditsForAll, balanceBefore, balanceAsOf, balancesForAll,
+  openDebitsForAll, openCreditsForAll, writeOffsBetween, balanceBefore, balanceAsOf, balancesForAll,
   insertAllocation, allocationsForCollection, allocationsForSale, accountsWithBalance,
 };
