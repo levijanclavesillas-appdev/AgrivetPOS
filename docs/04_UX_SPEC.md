@@ -35,7 +35,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │                                                          │
 │  SELL         SCR-301 POS            SCR-302 Park        │
 │               SCR-303 Payment        SCR-304 Receipt     │
-│               SCR-305 Return                             │
+│               SCR-305 Return         SCR-306 Receipts    │
 │  CUSTOMERS    SCR-401 List           SCR-402 Profile     │
 │               SCR-403 Collection                         │
 │  STOCK        SCR-201 Products       SCR-202 Product     │
@@ -275,6 +275,29 @@ panel is open**, or it would fire a destructive action mid-sentence.
 Afterwards the screen states `POS-404` rather than leaving it to be noticed: the sale keeps its
 receipt number, the sequence has no gap, it is out of the day's takings, and here is what to hand
 back.
+
+### `SCR-306` — Receipts · `FT-304`, `FT-308` — v1.2
+
+Behind `TX-401`, in the rail beside the POS. **This shift's** sales, newest first: receipt
+number, the time in Manila, the customer or "Walk-in", and the total. Choosing one opens
+`SCR-304` on it, with everything that screen already does — the rendered document, `POS-208`'s
+stamped reprint, and the void where `GET /sales/:id/voidable` allows it.
+
+It exists because `SCR-304` appears when a sale completes and nowhere else, and Enter on that
+screen starts the next customer. A cashier who notices the mis-scan three customers later still
+holds `POS-402`'s right to void — same shift, still open — and had no screen to exercise it
+from. The reprint was in the same position: the endpoint and the REPRINT stamp exist, and the
+button that reaches them had gone.
+
+**Nothing on it edits a sale**, and there is no field of any kind: `POS-107` makes a completed
+sale immutable, the corrections are the void and the return, and this is a way to *find* a
+receipt rather than to change one. A voided sale is listed and marked rather than hidden —
+`POS-404` keeps its number and its place in the sequence, and a gap in the numbers is what an
+auditor looks for.
+
+**The shift's, not the day's.** `TX-421` governs who reads the day and `SCR-602` shows it. Where
+the shift is closed the screen says so and says where else to look, because "no sales" would send
+somebody hunting for a receipt that exists.
 
 ### `SCR-305` — Return · `FT-307` — v1.1
 

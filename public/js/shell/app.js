@@ -11,6 +11,7 @@ import { h, clear } from './ui.js';
 import { createPos } from '../pos/view.js';
 import { createPayment } from '../payment/view.js';
 import { createReceipt } from '../receipt/view.js';
+import { createReceiptList } from '../receipt/list.js';
 import { createDashboard } from '../reports/dashboard.js';
 import { createReport } from '../reports/report.js';
 import { createBackup } from '../admin/backup.js';
@@ -48,6 +49,10 @@ const RAIL = [
   // because a return is a different conversation from a sale and starts with a
   // receipt in somebody's hand, not a barcode.
   { id: 'returns', label: 'Returns', tx: 'TX-406', screen: 'SCR-305' },
+  // TX-401 — the counter's own. SCR-304 appears when a sale completes and nowhere else,
+  // and Enter on it starts the next customer, so a cashier who notices a mis-scan three
+  // customers later held POS-402's right to void with no screen to exercise it from.
+  { id: 'receipts', label: 'Receipts', tx: 'TX-401', screen: 'SCR-306' },
   { id: 'customers', label: 'Customers', tx: 'TX-413', screen: 'SCR-401' },
   { id: 'products', label: 'Products', tx: 'TX-422', screen: 'SCR-201' },
   { id: 'shift', label: 'Shift', tx: 'TX-418', screen: 'SCR-501' },
@@ -247,6 +252,7 @@ export function createApp({ root }) {
     if (id === 'admin') return showAdmin();
     if (id === 'products') return showProducts();
     if (id === 'low-stock') return showProducts({ mode: 'low-stock' });
+    if (id === 'receipts') return showReceipts();
     if (id === 'shift') return showShift();
     if (id === 'customers') return showCustomers();
     if (id === 'buying') return showPurchaseOrders();
@@ -602,13 +608,37 @@ export function createApp({ root }) {
     current.mount();
   }
 
-  function showReceipt(sale) {
+  function showReceipt(sale, { from = null } = {}) {
     if (current?.unmount) current.unmount();
     current = createReceipt({
       root: host(),
       sale,
       printed: sale.printed ?? null,
       onNewSale: () => showPos(),
+      // Only when it was opened from the list: reached from a completed sale, SCR-304
+      // has one way on and it is the next customer.
+      onBack: from === 'receipts' ? () => show('receipts') : null,
+    });
+    current.mount();
+  }
+
+  /** SCR-306. The shift's receipts, and the way back to one after the moment has passed. */
+  function showReceipts() {
+    if (current?.unmount) current.unmount();
+    current = createReceiptList({
+      root: host(),
+      onOpenSale: async (saleId) => {
+        try {
+          // The same payload POST /sales answers with, so the receipt screen is the one
+          // screen rather than a second rendering of the same document.
+          const sale = await api.get(`/sales/${saleId}`);
+          renderRail('receipts');
+          showReceipt(sale, { from: 'receipts' });
+        } catch (err) {
+          ui.toast(err.message, { kind: 'error' });
+        }
+      },
+      onBack: () => showPos(),
     });
     current.mount();
   }

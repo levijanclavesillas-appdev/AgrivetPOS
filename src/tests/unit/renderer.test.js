@@ -1772,6 +1772,32 @@ test('the buying screens pick a product from a list, and never guess one', () =>
   assert.match(picker, /mine !== latest/);
 });
 
+test('TC-UI-12: SCR-306 finds a receipt and cannot change one (POS-107)', () => {
+  const source = codeOf('js/receipt/list.js');
+
+  // POS-107: a completed sale is immutable. This screen was added so a cashier could
+  // reach POS-402's void three customers later — not so anything could be edited — and
+  // the absence of every input is how that is kept true.
+  assert.equal(/h\('input'/.test(source), false, 'no field of any kind');
+  assert.equal(/api\.(post|put|delete)/.test(source), false, 'the screen writes nothing');
+  assert.match(source, /onOpenSale\(sale\.id\)/, 'a row opens the receipt it names');
+
+  // The shift's, not the day's: TX-421 governs who reads the day, and the question at a
+  // till is only ever "the one I just did".
+  assert.match(source, /shiftId=\$\{shift\.shift\.id\}/);
+  // A closed shift is the one state where the answer is somewhere else entirely, and
+  // "no sales" would send somebody hunting for a receipt that exists.
+  assert.match(proseOf('js/receipt/list.js'), /corrected by a return \(POS-402\)/);
+  // POS-404: a voided sale keeps its number, so it is listed and marked rather than
+  // hidden — a gap in the receipt numbers is what an auditor looks for.
+  assert.match(source, /VOIDED: 'voided'/);
+
+  // And the receipt screen only offers a way back when there is one to offer: reached
+  // from a completed sale it has one way on, which is the next customer.
+  assert.match(codeOf('js/receipt/view.js'), /onBack \? h\('button'/);
+  assert.match(codeOf('js/shell/app.js'), /from === 'receipts'/);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

@@ -20,7 +20,7 @@ import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money } from '../shell/format.js';
 
-export function createReceipt({ root, sale, printed, onNewSale }) {
+export function createReceipt({ root, sale, printed, onNewSale, onBack = null }) {
   const paper = h('pre', { class: 'receipt-paper', 'aria-label': 'Receipt preview' });
   // The sheet is held rather than built inline in `mount`, because `load` below has to
   // put the paper back into it. See the note there.
@@ -247,6 +247,10 @@ export function createReceipt({ root, sale, printed, onNewSale }) {
 
   function mount() {
     clear(root).append(h('div', { class: 'receipt' }, [
+      // Only where there is somewhere to go back to. Reached from a completed sale this
+      // screen has one way on — the next customer — and a back button would offer to
+      // return to a cart that has already been paid for.
+      onBack ? h('button', { class: 'report-back', text: '← Receipts', onclick: () => onBack() }) : null,
       h('h1', { text: sale.sale.sale_no }),
       h('div', { class: 'receipt-figures' }, [
         h('div', { class: 'summary-line total' }, [

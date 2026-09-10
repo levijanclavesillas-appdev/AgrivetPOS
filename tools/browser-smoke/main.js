@@ -1781,10 +1781,14 @@ app.whenReady().then(async () => {
     )).replace(/\s+/g, ' ').slice(0, 200));
   }
   await run(`(document.querySelector('.backup-list .restore') || { click(){} }).click()`);
-  await settle(900);
-  log(await run(`!!document.querySelector('.restore-dialog')`), 'the dialog opens',
+  // Waited for, not sampled: the panel rebuilds itself around the dialog, and on a
+  // loaded machine a fixed pause landed in the gap — which then crashed the step below
+  // it, taking the rest of the walk with it.
+  const dialogOpen = await waitFor(`!!document.querySelector('.restore-dialog')`,
+    { label: 'the restore dialog', timeoutMs: 6000 });
+  log(dialogOpen, 'the dialog opens',
     `${restoreButtons} restore button(s) across ${backupRows} row(s)`);
-  log(await run(`document.querySelector('.restore-dialog .danger').disabled === true`),
+  log(dialogOpen && await run(`document.querySelector('.restore-dialog .danger').disabled === true`),
     'and Restore is disabled until the filename is typed');
 
   const name = backups.json.backups[0].file_name;
@@ -2066,6 +2070,106 @@ app.whenReady().then(async () => {
   await settle(400);
   log(await run(`/1.255 KG/.test(document.querySelector('.cart-line .qty').textContent)`),
     'and the line goes back to the base unit, keeping what was typed');
+
+  // ── SCR-306: the receipt you have walked away from (TASK-044) ────────────
+  //
+  // The gap this screen was built for: SCR-304 appears when a sale completes and Enter
+  // on it starts the next customer, so a mis-scan noticed three customers later held
+  // POS-402's right to void with no screen to exercise it from.
+
+  console.log('\n— SCR-306: this shift’s receipts —');
+  const soldBefore = (await api('/sales?limit=1')).json.sales[0];
+  // This section runs last, after the walk has closed the day (SCR-503), so the till
+  // needs opening again before it will sell. POS-502 makes a second open resume the
+  // existing shift where there is one, so this is safe whichever way the walk left it.
+  await api('/shifts/open', { method: 'POST', body: { openingFloatCentavos: 500000, confirmed: true } });
+  // And an empty counter: POS-105 keeps the active cart on the server, so whatever the
+  // walk left in it — a statutory claim, a credit customer, a line of stock since
+  // written off — would come back with the screen and be refused at the sale.
+  await api('/carts/active', { method: 'DELETE' });
+  await run(OPEN_POS);
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
+
+  // A sale, and then another customer — which is what puts the first receipt out of reach.
+  await run(`(() => {
+    const el = document.querySelector('.pos-search');
+    el.value = 'Hog';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(FIND('.search-results button', '/Hog Grower/'), { label: 'the product' });
+  await clickOn('.search-results button', '/Hog Grower/');
+  await waitFor(`document.querySelectorAll('.cart-line').length >= 1`, { label: 'a cart line' });
+  await press('F9');
+  await waitFor(`!!document.querySelector('.payment')`, { label: 'SCR-303' });
+  // CASH, then an amount that covers it — the two actions the screen asks for, as the
+  // first walk through SCR-303 does them.
+  await clickOn('button', '/^CASH$/');
+  await waitFor(`!!document.querySelector('.tender-amount')`, { label: 'a tender row' });
+  await run(`(() => {
+    const el = document.querySelector('.tender-amount');
+    el.focus();
+    el.value = '10000.00';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.complete') && !document.querySelector('.complete').disabled`,
+    { label: 'Complete to enable' });
+  await run(`(document.querySelector('.complete') || { click() {} }).click()`);
+  const receipted = await waitFor(`!!document.querySelector('.receipt')`, { label: 'SCR-304', timeoutMs: 15000 });
+  log(receipted, 'a sale completes and lands on its receipt');
+  const soldNo = (await run(`(document.querySelector('.receipt h1') || {}).textContent || ''`)).trim();
+  // Guarded, because an empty number would match every row of the list below and turn
+  // the assertion that follows into one that cannot fail.
+  log(/^SALE-\d{8}-\d{6}$/.test(soldNo), 'and the receipt carries its number', soldNo || '(none)');
+
+  // Enter starts the next customer, exactly as it does at a counter.
+  await press('Enter');
+  await waitFor(`!!document.querySelector('.pos')`, { label: 'the POS again' });
+  log(await run(`!document.querySelector('.receipt')`), 'and the next customer takes the screen');
+
+  await clickOn('.rail button', '/Receipts/');
+  await waitFor(`!!document.querySelector('.receipt-list')`, { label: 'SCR-306' });
+  log(true, 'SCR-306 is in the rail, beside the POS');
+  log(await run(`document.querySelectorAll('.receipt-list tbody tr').length >= 1`),
+    'this shift’s sales are listed', `${await run(`document.querySelectorAll('.receipt-list tbody tr').length`)} rows`);
+  log(await run(`document.querySelectorAll('.receipts input').length === 0`),
+    'POS-107: there is no field on it — a sale is found here, never changed');
+
+  const foundAgain = soldNo && await run(`(() => {
+    const row = [...document.querySelectorAll('.receipt-list tbody tr')]
+      .find(r => r.textContent.includes(${JSON.stringify(soldNo)}));
+    if (!row) return false;
+    row.click();
+    return true;
+  })()`);
+  log(foundAgain, 'the sale from before the last customer is findable by its number', soldNo);
+  await waitFor(`!!document.querySelector('.receipt')`, { label: 'the receipt again' });
+  log(await run(`/← Receipts/.test(document.body.textContent)`),
+    'and it opens with a way back, which a completed sale does not have');
+
+  // POS-402: the shift is still open, so the void is still the right correction.
+  const voidOffered = await waitFor(FIND('.receipt button', '/Void/'), { label: 'the void button' });
+  log(Boolean(voidOffered), 'POS-402: the void is offered, because the shift is still open');
+  await clickOn('.receipt button', '/Void this sale/');
+  await waitFor(`!!document.querySelector('.receipt textarea, .receipt input[type=text]')`,
+    { label: 'the reason field' });
+  await run(`(() => {
+    const area = document.querySelector('.receipt textarea, .receipt input[type=text]');
+    area.value = 'Rang up twice';
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  // POS-403: the owner drives this walk, so no approver is asked for — a cashier would
+  // see §4's inline panel under the reason.
+  await waitFor(FIND('.receipt button', '/Void the sale/'), { label: 'the confirm button' });
+  await clickOn('.receipt button', '/Void the sale/');
+  await settle(900);
+
+  const status = (await api(`/sales?limit=5`)).json.sales.find((sale) => sale.sale_no === soldNo.trim());
+  log(Boolean(status) && status.status === 'VOIDED', 'the sale is voided from the screen it was found on',
+    status ? status.status : 'not found');
+  log(Boolean(soldBefore), 'and the earlier sales are all still there', `${(await api('/sales?limit=50')).json.total} on the day`);
 
   console.log('\n— console —');
   log(errors.length === 0, 'the renderer logged no errors', errors.slice(0, 4).join(' | '));
