@@ -389,8 +389,21 @@ label small { display: block; margin-top: var(--space-1); color: var(--md-on-sur
    never widen the page. */
 
 table { width: 100%; border-collapse: collapse; font-size: var(--type-body-md-size); }
+/* **Not sticky**, and that is a decision rather than an omission.
+ *
+ * A pane has one sticky element and it is the screen's own bar — the range and the
+ * export on a report, the search on the catalogue, the tab strip in admin. A second
+ * sticky row in the same scrollport has nowhere good to go: pinned at the top it hides
+ * *under* the screen bar, and pinned below it needs the bar's height as a number, which
+ * stops being true the first time that bar wraps at some width. The one that was tried
+ * did both — it slid under the bar on one screen and, on another, did not stick at all,
+ * because a `border-radius` with `overflow: hidden` on the table makes the table its own
+ * clipping context and sticky has nothing left to stick to.
+ *
+ * 04_UX_SPEC.md §4 asks a table for a sticky header. What it gets is the screen bar
+ * above it, which is the thing a reader actually needs to keep — and the column labels
+ * where a table scrolls sideways inside `.table-scroll`, which is its own scrollport. */
 thead th {
-  position: sticky; top: 0; z-index: 1;
   height: 40px; padding: 0 var(--space-3);
   background: var(--md-surface-container);
   color: var(--md-on-surface-variant);

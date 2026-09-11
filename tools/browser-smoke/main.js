@@ -595,6 +595,63 @@ app.whenReady().then(async () => {
   await clickOn('.admin-tab', /Users/);
   await waitFor(`!!document.querySelector('.users')`, { label: 'SCR-701' });
 
+  console.log('\n— the sticky bars, with the pane scrolled under them —');
+  // The bar a screen keeps on the glass is the one thing that must not be damaged by
+  // scrolling, and it was twice: on the catalogue the search bar painted its own
+  // background 16 px upward to cover the pane's padding and sliced the bottom off the
+  // header's buttons, and a sticky table header pinned itself under the bar and
+  // disappeared. Both read as "the top bar is cut".
+  await run(OPEN_RAIL('Products'));
+  await waitFor(`!!document.querySelector('.catalogue-list tbody tr')`, { label: 'SCR-201' });
+  await settle(500);
+  // Enough rows to scroll, cloned: the question is about height, not about data.
+  await run(`(() => { const b = document.querySelector('.catalogue-list tbody');
+    for (let i = 0; i < 12; i += 1) for (const r of [...b.children].slice(0, 3)) b.append(r.cloneNode(true));
+    document.querySelector('.screen').scrollTop = 500; return true; })()`);
+  await settle(500);
+
+  const bars = await run(`(() => {
+    const box = (s) => { const el = document.querySelector(s); if (!el) return null;
+      const r = el.getBoundingClientRect(); return { t: Math.round(r.top), b: Math.round(r.bottom) }; };
+    return { head: box('.catalogue > .admin-head'), controls: box('.catalogue-controls'),
+      scrolled: document.querySelector('.screen').scrollTop,
+      firstRow: box('.catalogue-list tbody tr') };
+  })()`);
+
+  log(bars.scrolled > 0, 'the pane scrolls', `${bars.scrolled}px`);
+  log(bars.head.t === 0, 'the header is pinned to the top of the pane, not above it', `top ${bars.head.t}`);
+  log(bars.controls.t === bars.head.b,
+    'and the search bar sits exactly under it — no overlap, no gap',
+    `header ends ${bars.head.b}, bar starts ${bars.controls.t}`);
+  // What is actually on top, asked of the browser rather than derived from boxes: a row
+  // scrolled under a bar still *has* a box up there, so geometry cannot answer this.
+  // `elementFromPoint` returns whatever paints last at that pixel.
+  const onTop = await run(`(() => {
+    const at = (y) => { const el = document.elementFromPoint(700, y); if (!el) return 'nothing';
+      return el.closest('.admin-head') ? 'header'
+        : el.closest('.catalogue-controls') ? 'search bar'
+        : el.closest('.catalogue-list') ? 'the list' : (el.className || el.tagName); };
+    return { inHeader: at(30), inBar: at(90), belowBars: at(140) };
+  })()`);
+  log(onTop.inHeader === 'header', 'nothing paints over the header', onTop.inHeader);
+  log(onTop.inBar === 'search bar', 'nothing paints over the search bar', onTop.inBar);
+  log(onTop.belowBars === 'the list', 'and the list has the pane below them', onTop.belowBars);
+  await fits('SCR-201 scrolled');
+
+  // And the report's bar, which is one row rather than two: it never scrolls away, so
+  // every pixel of it is 741 somebody does not get back.
+  await run(OPEN_RAIL('Reports'));
+  await waitFor(`!!document.querySelector('.tile-gross-sales')`, { label: 'SCR-601' });
+  await run(`document.querySelector('.tile-gross-sales').click()`);
+  await waitFor(`!!document.querySelector('.report-head')`, { label: 'SCR-602' });
+  await settle(600);
+  const head = await run(`(() => { const r = document.querySelector('.report-head').getBoundingClientRect();
+    return { t: Math.round(r.top), h: Math.round(r.height) }; })()`);
+  log(head.t === 0 && head.h <= 80, 'the report bar is one row and none of it is cut',
+    `top ${head.t}, ${head.h}px tall`);
+  await run(OPEN_RAIL('Reports'));
+  await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
+
   console.log('\n— SCR-601: the dashboard —');
   await run(OPEN_RAIL('Reports'));
   await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });

@@ -9,18 +9,29 @@
 
 .catalogue { padding: 0 0 var(--space-6); max-width: 80rem; }
 
-/* Sticky, like the report header: the search box is what this screen is used through,
-   and scrolling a list should never take it off the screen.
-   It sticks at the top of the pane rather than above it — unlike `.report-head` and
-   `.admin-tabs`, this bar is **not** the first child of its screen, and the negative
-   margin those two use to cancel the pane's padding pulled it over the header's
-   buttons. The shadow paints the pane's own background into the gap the padding leaves,
-   so nothing scrolls through it. */
-.catalogue-controls { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
-  position: sticky; top: 0; z-index: 3;
-  margin: 0; padding: var(--space-2) 0;
+/* The header and the search bar stick as a pair, because the search box is what this
+   screen is used through and scrolling a list should never take it off the screen.
+ *
+ * **Two stacked sticky bars, not one with a shadow behind it.** The first attempt gave
+ * the search bar an upward `box-shadow` to paint over the gap the pane's padding leaves
+ * above it — and that shadow painted over the *header's buttons*, which is why "New
+ * product" looked sliced off along its bottom edge. A background that reaches upward
+ * covers whatever is up there. So the header sticks too, at the top, and the search bar
+ * pins directly under it: sticky offsets are measured from the scrollport's padding box,
+ * which is why the header's is negative and the bar's is the header's height less that
+ * same padding. */
+.catalogue > .admin-head {
+  position: sticky; top: calc(var(--space-4) * -1); z-index: 4;
   background: var(--md-background);
-  box-shadow: 0 calc(var(--space-4) * -1) 0 var(--md-background); }
+  margin: calc(var(--space-4) * -1) 0 0; padding: var(--space-4) 0 0;
+}
+.catalogue-controls { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
+  /* The header's own height. A sticky offset is measured from the scrollport's padding
+     box, and the header above pins at `-1 × padding` — so the two cancel and this is
+     just the 44 px row the header is. */
+  position: sticky; top: var(--touch); z-index: 3;
+  margin: 0; padding: var(--space-2) 0;
+  background: var(--md-background); }
 .catalogue-search { flex: 1 1 22rem; min-height: var(--touch); }
 .catalogue-controls select { min-height: var(--touch); }
 .catalogue-controls .check { display: flex; align-items: center; gap: var(--space-1); margin: 0; }

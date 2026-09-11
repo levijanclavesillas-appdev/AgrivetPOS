@@ -197,7 +197,10 @@ List: search across name, SKU, barcode and brand (`FR_3.1` latency budget), colu
 name, brand, category, base unit, on-hand with unit, retail price, status. The brand is beside
 the name it qualifies, and an em dash where there is none — a shelf holds four makes of the same
 feed, and a blank cell reads as a brand that failed to load rather than one that was never set. Low-stock rows carry an amber
-left border; inactive rows are muted. Filters: category, low stock, inactive.
+left border; inactive rows are muted. Filters: category, low stock, inactive — **low stock is on
+this screen and not only on the dashboard's tile** (§2.1): the dashboard is behind `TX-421`, which
+the inventory clerk does not hold, and a reorder list the stock role cannot open is a reorder list
+nobody reads. The title bar and the search bar both stay on the glass while the list scrolls.
 
 Editor tabs: **Identity** (SKU, name, category, brand, `tax_class`) · **Units** (base unit —
 locked once movements exist per `UOM-003`, with the reason shown — and the pack table) ·
@@ -711,7 +714,7 @@ the operator needs if the import turns out to have been a mistake (`OPS-103`).
 | Authorisation panel | Inline, not a modal-over-modal: names the rule, states which role may approve, takes approver username + password, and records both actors (`AUD-603`) |
 | Destructive confirm | Typed confirmation for restore and import only (`OPS-004`); everything else is a two-step button |
 | Toast | Success 3 s auto-dismiss; error persists until dismissed |
-| Table | Sticky header, zebra rows, keyboard row navigation, no horizontal page scroll — wide tables scroll inside their own container |
+| Table | Zebra rows, keyboard row navigation, no horizontal page scroll — wide tables scroll inside their own container. **The header is not separately pinned**: a pane has one sticky bar and it is the screen's own (§8), and a second one either hides under the first or needs its height as a number that stops being true the moment that bar wraps |
 
 ## 5. UI states
 
@@ -758,6 +761,14 @@ no modal is open.
   Material 3 pass: `SCR-702` at 6,941 px — nine viewports of settings in one column, with the tab
   strip somewhere above the fold — then `SCR-705`, `SCR-703`, `SCR-706` and `SCR-602`. The browser
   smoke measures every rail destination in a real 1366×768 window and fails if the document moves.
+- **One sticky bar per pane**, and it is the screen's own: the range and export on a report, the
+  tab strip in admin, the title and the search on the catalogue — which stick as a pair, because
+  the search bar is not the first thing in that screen. A sticky offset is measured from the
+  scrollport's **padding box**, not its border box, which is why the first bar's offset is minus
+  one padding and the second's is the first's height. Getting that wrong is not subtle: the first
+  attempt gave the search bar a background reaching 16 px upward to cover the padding, and it
+  painted over the bottom of the header's buttons — "the top bar is cut" is what that looks like.
+  The smoke scrolls the pane and asks the browser, with `elementFromPoint`, what is actually on top.
 - Touch targets ≥ 44 px on POS and payment (`NFR_4.3`) — and, since the Material 3 pass,
   **everywhere**. M3's compact density would put a button at 40 px; the four pixels buy nothing,
   because what wins vertical space at 768 px is the row height and the scroll container, not a

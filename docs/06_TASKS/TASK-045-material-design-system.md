@@ -114,6 +114,30 @@ some hundreds of inputs written as `label > input`. And there is no ripple: it i
 component, and a listener on every button is a framework by instalments. The state layers are the
 same specification's hover, focus and pressed opacities, in CSS.
 
+**The sticky bars, which took two goes.** A pane has one sticky bar and it is the screen's own.
+The first attempt broke that twice over, and both read to the operator as *the top bar is cut*:
+
+* On the catalogue the search bar is **not** the first thing in the screen — the header is — so the
+  negative-margin trick the report header uses did not apply, and a `box-shadow` reaching 16 px
+  upward was used instead to paint over the pane's padding. A background that reaches upward covers
+  whatever is up there, and what was up there was the bottom of the header's buttons. "New product"
+  came out sliced along its lower edge. The two now stick as a **pair**: the header at minus one
+  padding, the search bar at the header's own height. A sticky offset is measured from the
+  scrollport's *padding box*, not its border box, which is why those two numbers cancel.
+* And `thead th` was made sticky in the system file, which was a mistake in both directions. Where
+  a screen bar existed the table header pinned itself **underneath** it and vanished; where the
+  table had a `border-radius` with `overflow: hidden` it did not stick at all, because that makes
+  the table its own clipping context and sticky has nothing left to stick to. It is gone, and
+  `04_UX_SPEC.md` §4 now says what a table's header does and why.
+
+The report bar was also two rows and 88 px tall, because the date fields stacked their labels
+above them. It is one row and 72 px now — on the bar that never scrolls away, that is 16 px of 741
+somebody gets back on every report.
+
+The smoke scrolls the catalogue's pane and asks the browser with `elementFromPoint` what is
+actually on top at three heights, because geometry cannot answer it: a row scrolled under a bar
+still has a box up there.
+
 **What was not done.** `SCR-705` is still about three panes of scrolling — it is a diagnostics page
 read top to bottom, and a column layout would interleave its headings with the wrong tables. The
 shell still has no top app bar, which `04_UX_SPEC.md` §2's diagram has described since v1.0: it
