@@ -415,6 +415,481 @@ function valuation(actor = null) {
   };
 }
 
+// ── SCR-607 — sales analysis (TASK-033, FT-602, FT-605) ─────────────────────
+//
+// Four groupings of one arithmetic. `daily()` above already sums revenue, cost and
+// margin from the sale-line snapshot (RPT-104, MON-005); these group the same sums by
+// category, by cashier, by product and by what moved, because "we took ₱48,000 today"
+// is the figure the owner has and "which shelf and which till" is the one they buy and
+// staff by.
+//
+// ## What these reconcile to, stated exactly rather than approximately
+//
+// TASK-033's first acceptance criterion asks that category and cashier totals "sum to
+// the daily report's net". Only one of the two can, and the difference is worth being
+// precise about rather than papering over:
+//
+//   * **A cashier's figures are sale-level.** A sale has one cashier, so summing
+//     `total_centavos` by cashier gives the day's sales exactly. It reconciles to the
+//     daily report's `gross_sales_net_centavos` — net before returns, because a return
+//     is its own document with its own operator and is not the selling cashier's.
+//   * **A category's figures are line-level.** A sale has as many categories as it has
+//     lines, and the transaction discount, the change and the returns sit on the sale
+//     rather than on any line. There is no honest way to split a ₱50 transaction
+//     discount between feed and veterinary supplies, so this report does not invent
+//     one: it reconciles to `profit.revenue_centavos` — revenue net of VAT, which is
+//     the figure margin is computed from and the only one that is a sum of lines.
+//
+// Both checks are exact equalities computed here and printed on the report, in the
+// shape RPT-101 and FR_6.2 ask for: the reader can add the column up.
+//
+// ## The grouping key is live, and the report says so
+//
+// MON-005 keeps money off the live product record, and every figure here obeys it. A
+// **category** is not money and nothing snapshots it — no column on `sale_items` could
+// answer "what was this product filed under last March". So the category on these rows
+// is the product's category now, and recategorising a product moves its history with
+// it. Stated in `basis` on the report rather than left for somebody to discover the
+// month they reorganise the shelves.
+
+const MOVER_BASIS = 'Revenue is net of VAT and cost is the sale-line snapshot (RPT-104, '
+  + 'MON-005). Quantities are in each product’s own base unit (UOM-001).';
+
+/** Margin in basis points, guarded against the empty range. */
+const marginBp = (revenue, cost) => (revenue > 0
+  ? Math.round(((revenue - cost) * 10000) / revenue)
+  : 0);
+
+const withProfit = (row) => ({
+  revenue_centavos: row.revenue_centavos,
+  cost_centavos: row.cost_centavos,
+  gross_profit_centavos: row.revenue_centavos - row.cost_centavos,
+  margin_bp: marginBp(row.revenue_centavos, row.cost_centavos),
+});
+
+/**
+ * Requirement 1 — the shelves, ranked.
+ *
+ * Share is of revenue rather than of gross, so that the percentages beside a margin
+ * are percentages of the same figure the margin was computed from.
+ */
+function byCategory({ from, to = null, shiftId = null } = {}, actor = null) {
+  const scope = range({ from, to });
+  const shift = actor ? assertShiftScope(actor, shiftId, { what: 'the category breakdown' }) : shiftId;
+  const q = { ...scope, shiftId: shift };
+
+  const rows = reportRepository.salesByCategory(q);
+  const total = reportRepository.profitTotals(q);
+  const grouped = rows.reduce((sum, row) => sum + row.revenue_centavos, 0);
+
+  return {
+    header: header({ scope, shiftId: shift, actor, extra: { report: 'SALES_BY_CATEGORY', rule_id: 'RPT-104' } }),
+    totals: {
+      category_count: rows.length,
+      ...withProfit({ revenue_centavos: total.revenue_centavos, cost_centavos: total.cost_centavos }),
+    },
+    categories: rows.map((row) => ({
+      category_id: row.category_id,
+      category_name: row.category_name,
+      product_count: row.product_count,
+      line_count: row.line_count,
+      discount_centavos: row.discount_centavos,
+      ...withProfit(row),
+      share_bp: total.revenue_centavos > 0
+        ? Math.round((row.revenue_centavos * 10000) / total.revenue_centavos)
+        : 0,
+    })),
+    // The check, printed. A grouping that loses a line loses it silently otherwise:
+    // an INNER JOIN to a category is exactly the shape that drops a row.
+    reconciliation: {
+      rule_id: 'RPT-101',
+      statement: `${money.toDisplay(grouped)} across ${rows.length} categor${rows.length === 1 ? 'y' : 'ies'}`
+        + ` = ${money.toDisplay(total.revenue_centavos)} revenue on the daily report`,
+      grouped_centavos: grouped,
+      report_centavos: total.revenue_centavos,
+      difference_centavos: grouped - total.revenue_centavos,
+      balances: grouped === total.revenue_centavos,
+    },
+    basis: 'Revenue net of VAT, less the cost snapshotted on each sale line (RPT-104, MON-005). '
+      + 'A category is read from the product as it is filed **today** — nothing snapshots it, '
+      + 'so recategorising a product moves its history with it. Transaction discounts, change '
+      + 'and returns belong to the sale rather than to any line, which is why this reconciles '
+      + 'to revenue and not to net sales.',
+  };
+}
+
+/**
+ * Requirement 2 — the tills.
+ *
+ * `TX-421`'s OWN_SHIFT is the reason this report is interesting and the reason it is
+ * guarded: a cashier asking for the store's breakdown is asking to read every other
+ * till's takings, and `assertShiftScope` refuses it and writes the attempt down.
+ */
+function byCashier({ from, to = null, shiftId = null } = {}, actor = null) {
+  const scope = range({ from, to });
+  const shift = actor ? assertShiftScope(actor, shiftId, { what: 'the cashier breakdown' }) : shiftId;
+  const q = { ...scope, shiftId: shift };
+
+  const rows = reportRepository.salesByCashier(q);
+  const totals = reportRepository.dailyTotals(q);
+  const grouped = rows.reduce((sum, row) => sum + row.net_centavos, 0);
+  const saleCount = rows.reduce((sum, row) => sum + row.sale_count, 0);
+
+  return {
+    header: header({ scope, shiftId: shift, actor, extra: { report: 'SALES_BY_CASHIER', rule_id: 'RPT-104' } }),
+    totals: {
+      cashier_count: rows.length,
+      sale_count: saleCount,
+      net_centavos: totals.net_centavos,
+      average_sale_centavos: saleCount > 0 ? Math.round(totals.net_centavos / saleCount) : 0,
+    },
+    cashiers: rows.map((row) => ({
+      user_id: row.user_id,
+      cashier: row.cashier || 'unknown',
+      role: row.role,
+      sale_count: row.sale_count,
+      shift_count: row.shift_count,
+      line_count: row.line_count,
+      net_centavos: row.net_centavos,
+      discount_centavos: row.discount_centavos,
+      statutory_discount_centavos: row.statutory_discount_centavos,
+      vat_centavos: row.vat_centavos,
+      // Requirement 2's second measure. Rounded to the centavo for display; the
+      // division is of two integers the reader can check against the two columns
+      // beside it.
+      average_sale_centavos: row.sale_count > 0 ? Math.round(row.net_centavos / row.sale_count) : 0,
+      ...withProfit(row),
+      share_bp: totals.net_centavos > 0
+        ? Math.round((row.net_centavos * 10000) / totals.net_centavos)
+        : 0,
+    })),
+    reconciliation: {
+      rule_id: 'RPT-101',
+      statement: `${money.toDisplay(grouped)} across ${rows.length} cashier${rows.length === 1 ? '' : 's'}`
+        + ` = ${money.toDisplay(totals.net_centavos)} of sales on the daily report, before returns`,
+      grouped_centavos: grouped,
+      report_centavos: totals.net_centavos,
+      difference_centavos: grouped - totals.net_centavos,
+      balances: grouped === totals.net_centavos,
+    },
+    basis: 'Sales are attributed to the user who rang them up. The figure is net sales '
+      + 'before returns (RPT-101): a return is its own document with its own operator, and '
+      + 'charging it back to the cashier who made the sale would report a refund as their '
+      + 'mistake. Revenue and cost are the sale-line snapshots (RPT-104, MON-005).',
+  };
+}
+
+/** Requirement 3 — `dailyLines` with the sort and the limit in the reader's hands. */
+function byProduct({ from, to = null, shiftId = null, sort = 'revenue', limit = 100 } = {}, actor = null) {
+  const scope = range({ from, to });
+  const shift = actor ? assertShiftScope(actor, shiftId, { what: 'the product breakdown' }) : shiftId;
+  const q = { ...scope, shiftId: shift };
+
+  const chosen = Object.prototype.hasOwnProperty.call(reportRepository.PRODUCT_SORTS, sort)
+    ? sort
+    : 'revenue';
+  const capped = Math.min(Math.max(Number.parseInt(limit, 10) || 100, 1), 1000);
+  const rows = reportRepository.salesByProduct({ ...q, sort: chosen, limit: capped });
+  const total = reportRepository.profitTotals(q);
+
+  return {
+    header: header({ scope, shiftId: shift, actor, extra: { report: 'SALES_BY_PRODUCT', rule_id: 'RPT-104' } }),
+    sort: chosen,
+    sorts: Object.keys(reportRepository.PRODUCT_SORTS),
+    limit: capped,
+    totals: {
+      shown: rows.length,
+      // What the limit hides, said out loud. A list of 100 rows that is silently the
+      // top 100 of 5,000 is a list somebody will add up and disbelieve.
+      ...withProfit(total),
+      shown_revenue_centavos: rows.reduce((sum, row) => sum + row.revenue_centavos, 0),
+    },
+    products: rows.map(presentProductRow),
+    basis: MOVER_BASIS,
+  };
+}
+
+const presentProductRow = (row) => ({
+  product_id: row.product_id,
+  sku: row.sku,
+  product_name: row.product_name,
+  category_name: row.category_name,
+  unit_code: row.unit_code,
+  qty_milli: row.qty_milli,
+  qty_display: quantity.format(row.qty_milli, row.unit_code),
+  sale_count: row.sale_count,
+  line_count: row.line_count,
+  discount_centavos: row.discount_centavos,
+  qty_on_hand_milli: row.qty_on_hand_milli,
+  qty_on_hand_display: quantity.format(row.qty_on_hand_milli, row.unit_code),
+  ...withProfit(row),
+});
+
+/**
+ * Requirements 4, 5 and 6 — what is moving, what is not, and what to do about it.
+ *
+ * **Two rankings, shown as two rankings.** A sack of feed at ₱1,400 and a sachet at ₱35
+ * sort in opposite orders by money and by units; the store reorders on the second and
+ * decides what to stock more of on the first. Merging them into one "top sellers" list
+ * answers neither question, so there is no merged list here.
+ *
+ * **The units ranking is partitioned by base unit** (UOM-001). Comparing 40 KG with 40
+ * sachets is not a ranking, and the alternative — making the reader pick a unit before
+ * they can see anything — hides the report behind a control nobody presses.
+ *
+ * **Slow movers are built from the catalogue outward**, which is the opposite direction
+ * from every other query here, because a product that sold nothing has no sale line to
+ * group. What makes a row actionable is what is sitting on the shelf and when it last
+ * sold: 200 units of something last sold in March is a different problem from two.
+ *
+ * All three come from **one** query. They are three orderings of the same set — what
+ * each product did in the period — and asking the database for it three times cost three
+ * full aggregates over every sale line in the range, which measured at most of a
+ * report's whole budget over a quarter. The ordering is done here; the arithmetic is
+ * still entirely the repository's.
+ */
+function movers({
+  from, to = null, shiftId = null, top = 10, maxRevenueCentavos = 0, slowLimit = 200,
+} = {}, actor = null) {
+  const scope = range({ from, to });
+  const shift = actor ? assertShiftScope(actor, shiftId, { what: 'the movers report' }) : shiftId;
+
+  const cappedTop = Math.min(Math.max(Number.parseInt(top, 10) || 10, 1), 100);
+  const threshold = Math.max(Number.parseInt(maxRevenueCentavos, 10) || 0, 0);
+  const cappedSlow = Math.min(Math.max(Number.parseInt(slowLimit, 10) || 200, 1), 1000);
+
+  const all = reportRepository.moversOverview({ ...scope, shiftId: shift });
+  const sold = all.filter((row) => row.line_count > 0);
+
+  const byRevenue = [...sold]
+    .sort((a, b) => b.revenue_centavos - a.revenue_centavos || a.product_name.localeCompare(b.product_name))
+    .slice(0, cappedTop);
+
+  // One ranking per base unit, in the order the store sells most money of — so the unit
+  // that matters is first and the long tail of units is still there underneath.
+  const units = new Map();
+  for (const row of sold) {
+    if (!units.has(row.unit_id)) {
+      units.set(row.unit_id, { unit_code: row.unit_code, revenue_centavos: 0, rows: [] });
+    }
+    const group = units.get(row.unit_id);
+    group.revenue_centavos += row.revenue_centavos;
+    group.rows.push(row);
+  }
+
+  const byUnits = [...units.values()]
+    .sort((a, b) => b.revenue_centavos - a.revenue_centavos || a.unit_code.localeCompare(b.unit_code))
+    .map((group) => ({
+      unit_code: group.unit_code,
+      revenue_centavos: group.revenue_centavos,
+      products: group.rows
+        .sort((a, b) => b.qty_milli - a.qty_milli || a.product_name.localeCompare(b.product_name))
+        .slice(0, cappedTop)
+        .map((row, index) => ({ rank: index + 1, ...presentProductRow(row) })),
+    }));
+
+  // An inactive product is not a slow mover — it is a line the store already decided
+  // about. It stays in the rankings above, because the quarter it was discontinued in
+  // still has its sales in it.
+  const slow = all
+    .filter((row) => row.is_active === 1 && row.revenue_centavos <= threshold)
+    .sort((a, b) => a.revenue_centavos - b.revenue_centavos
+      || b.qty_on_hand_milli - a.qty_on_hand_milli
+      || a.product_name.localeCompare(b.product_name))
+    .slice(0, cappedSlow);
+
+  return {
+    header: header({ scope, shiftId: shift, actor, extra: { report: 'MOVERS', rule_id: 'RPT-104' } }),
+    top: cappedTop,
+    by_revenue: byRevenue.map((row, index) => ({ rank: index + 1, ...presentProductRow(row) })),
+    by_units: byUnits,
+    units_note: 'Ranked within each base unit, not across them: 40 KG of feed and 40 sachets '
+      + 'of dewormer are not 40 of the same thing (UOM-001).',
+    slow: slow.map((row) => presentSlowRow(row, scope)),
+    slow_threshold_centavos: threshold,
+    slow_note: threshold === 0
+      ? 'Products that sold nothing at all in this range.'
+      : `Products that sold ${money.toDisplay(threshold)} or less in this range, including nothing at all.`,
+    basis: MOVER_BASIS,
+  };
+}
+
+/**
+ * A slow mover, with the two figures that decide what to do about it.
+ *
+ * Requirement 5's flag: a product created inside the range has not had the range to sell
+ * in, so it is marked rather than counted against. Judging a line stocked last Tuesday
+ * by a quarter's sales is how a report teaches a store to ignore it.
+ */
+function presentSlowRow(row, scope) {
+  const newInRange = row.created_at >= scope.fromAt && row.created_at <= scope.toAt;
+  return {
+    product_id: row.product_id,
+    sku: row.sku,
+    product_name: row.product_name,
+    category_name: row.category_name,
+    unit_code: row.unit_code,
+    qty_milli: row.qty_milli,
+    qty_display: quantity.format(row.qty_milli, row.unit_code),
+    sale_count: row.sale_count,
+    revenue_centavos: row.revenue_centavos,
+    cost_centavos: row.cost_centavos,
+    qty_on_hand_milli: row.qty_on_hand_milli,
+    qty_on_hand_display: quantity.format(row.qty_on_hand_milli, row.unit_code),
+    // What the shelf is worth at today's average (RPT-103's basis, not a sale-line
+    // snapshot — there is no sale to snapshot).
+    on_hand_value_centavos: row.qty_on_hand_milli >= 0
+      ? money.mulQty(row.avg_cost_centavos, row.qty_on_hand_milli)
+      // INV-104 lets a shelf go negative where the store allows it, and a negative
+      // quantity is worth a negative amount rather than a thrown error.
+      : -money.mulQty(row.avg_cost_centavos, -row.qty_on_hand_milli),
+    last_sold_at: row.last_sold_at,
+    last_sold_at_manila: row.last_sold_at ? clock.toManila(row.last_sold_at) : null,
+    never_sold: row.last_sold_at === null,
+    new_in_range: newInRange,
+    // The sentence a reader acts on, rather than three columns they have to combine.
+    verdict: newInRange
+      ? 'Added during this range — too new to judge'
+      : (row.last_sold_at === null
+        ? 'Never sold'
+        : `Last sold ${clock.manilaDate(row.last_sold_at)}`),
+  };
+}
+
+// ── SCR-608 — movement analysis (TASK-033, INV-102, INV-103, TX-422) ────────
+//
+// **This is an inventory report and not a sales one, and the split is the point.** Every
+// increase and decrease has been append-only and typed since TASK-007 — RECEIPT, SALE,
+// DAMAGE, EXPIRY, COUNT_VARIANCE, INTERNAL_USE and the rest — and nothing has ever
+// summarised them, so a store cannot see that it wrote ₱18,000 of damage off this
+// quarter. TX-422 rather than TX-421: the person who needs this is the inventory clerk,
+// who has no business reading the day's takings.
+//
+// ## The honest limitation, on the report rather than in a comment
+//
+// INV-106 costs a movement on the way **in** and never on the way out. A sale, a damage
+// write-off or a negative adjustment consumes at the prevailing average, and that
+// average is used and not stored. So the ledger knows exactly how many kilos were
+// damaged and does not know what they were worth.
+//
+// The report therefore carries two value columns and never one: what the movements
+// themselves cost, which is a fact, and what the rest would be worth at today's average
+// cost, which is an estimate that moves the next time a delivery changes an average. A
+// single merged figure would be the more comfortable report and the one that silently
+// restates last quarter's write-offs.
+//
+// ## The reconciliation
+//
+// INV-101 makes on-hand a materialised sum of this ledger, so opening plus the range's
+// net must equal closing, and closing at *now* must equal what the rest of the system
+// reads as stock. That is what makes this a report rather than a list.
+
+const MOVEMENT_LABELS = Object.freeze({
+  OPENING: 'Opening stock', RECEIPT: 'Goods received', SALE: 'Sold',
+  SALE_VOID: 'Sale voided', CUSTOMER_RETURN: 'Customer return',
+  SUPPLIER_RETURN: 'Returned to supplier', ADJUSTMENT: 'Adjustment',
+  DAMAGE: 'Damaged', EXPIRY: 'Expired', INTERNAL_USE: 'Internal use',
+  COUNT_VARIANCE: 'Stock count variance', BREAK_BULK: 'Break bulk',
+});
+
+function movements({ from, to = null, type = null, limit = 500 } = {}, actor = null) {
+  const scope = range({ from, to });
+  const wanted = type && Object.prototype.hasOwnProperty.call(MOVEMENT_LABELS, type) ? type : null;
+
+  const types = reportRepository.movementsByType(scope);
+  const rows = reportRepository.movementsByProduct({
+    ...scope, type: wanted, limit: Math.min(Math.max(Number.parseInt(limit, 10) || 500, 1), 2000),
+  });
+
+  // INV-101, as arithmetic rather than as a claim.
+  const opening = reportRepository.ledgerBalanceAt({ at: beforeInstant(scope.fromAt) });
+  const closing = reportRepository.ledgerBalanceAt({ at: scope.toAt });
+  const net = types.reduce((sum, row) => sum + row.net_milli, 0);
+  const onHand = reportRepository.onHandTotal();
+  const endsInThePast = scope.toAt < clock.nowUtc();
+  const perProduct = reportRepository.ledgerBalancesByProduct(scope);
+  const outOfBalance = perProduct.filter((row) => row.opening_milli + row.net_milli !== row.closing_milli);
+
+  return {
+    header: header({ scope, shiftId: null, actor, extra: { report: 'MOVEMENTS', rule_id: 'INV-102' } }),
+    filter_type: wanted,
+    types: types.map((row) => ({
+      movement_type: row.movement_type,
+      label: MOVEMENT_LABELS[row.movement_type] || row.movement_type,
+      movement_count: row.movement_count,
+      product_count: row.product_count,
+      net_milli: row.net_milli,
+      // INV-103's declared direction, so a reader can see at a glance that DAMAGE only
+      // ever takes stock away and ADJUSTMENT goes both ways.
+      direction: row.increase_milli > 0 && row.decrease_milli > 0 ? 'BOTH'
+        : (row.increase_milli > 0 ? 'IN' : 'OUT'),
+      costed_value_centavos: row.costed_value_centavos,
+      estimated_value_centavos: row.estimated_value_centavos,
+      value_centavos: row.costed_value_centavos + row.estimated_value_centavos,
+      uncosted_count: row.uncosted_count,
+      // Which of the two figures above the reader is looking at, per row rather than
+      // once at the bottom: RECEIPT is entirely fact, DAMAGE is entirely estimate, and
+      // ADJUSTMENT is a mix.
+      value_basis: row.uncosted_count === 0 ? 'MOVEMENT_COST'
+        : (row.uncosted_count === row.movement_count ? 'ESTIMATE_AT_CURRENT_AVERAGE' : 'MIXED'),
+    })),
+    products: rows.map((row) => ({
+      product_id: row.product_id,
+      movement_type: row.movement_type,
+      label: MOVEMENT_LABELS[row.movement_type] || row.movement_type,
+      sku: row.sku,
+      product_name: row.product_name,
+      category_name: row.category_name,
+      unit_code: row.unit_code,
+      increase_milli: row.increase_milli,
+      decrease_milli: row.decrease_milli,
+      net_milli: row.net_milli,
+      net_display: quantity.format(row.net_milli, row.unit_code),
+      costed_value_centavos: row.costed_value_centavos,
+      estimated_value_centavos: row.estimated_value_centavos,
+      value_centavos: row.costed_value_centavos + row.estimated_value_centavos,
+    })),
+    reconciliation: {
+      rule_id: 'INV-101',
+      statement: `${quantity.toDecimalString(opening)} on hand at the start`
+        + ` ${net < 0 ? '−' : '+'} ${quantity.toDecimalString(Math.abs(net))} moved`
+        + ` = ${quantity.toDecimalString(closing)} at the end`,
+      opening_milli: opening,
+      net_milli: net,
+      closing_milli: closing,
+      balances: opening + net === closing,
+      difference_milli: (opening + net) - closing,
+      // INV-101's other half: the ledger and the materialised figure the POS reads are
+      // the same number, or one of them is wrong. Only checkable where the range runs
+      // up to now — a range that ended last month says nothing about today's shelf.
+      on_hand_total_milli: onHand,
+      matches_on_hand: endsInThePast ? null : closing === onHand,
+      products_checked: perProduct.length,
+      products_out_of_balance: outOfBalance.length,
+      // Quantities across products are in different base units and are shown summed
+      // only because this identity is about the ledger's own arithmetic, not about a
+      // quantity of anything (UOM-001). The figure that means something per product is
+      // in the table above.
+      units_note: 'These totals add quantities across base units. They are a check on the '
+        + 'ledger’s arithmetic (INV-101) and not a quantity of anything — 40 KG and 40 '
+        + 'sachets are not 80 of the same thing (UOM-001).',
+    },
+    value_basis: 'A movement carries a cost only where INV-106 sets one — opening stock, a '
+      + 'receipt, an adjustment. Everything else consumes stock at the average prevailing at '
+      + 'the time, which is used and not stored, so it is valued here at the product’s '
+      + 'average cost **today**. That column is an estimate and moves when an average does.',
+  };
+}
+
+/**
+ * One millisecond before the range, for the opening balance.
+ *
+ * `< fromAt` would do for the per-product query, and does there. Here the balance is a
+ * `<=` so that both ends of the identity are written the same way, and the instant
+ * before the range is the one that makes them agree.
+ */
+const beforeInstant = (at) => new Date(Date.parse(at) - 1).toISOString();
+
 // ── SCR-601 — the dashboard (FR_6.1) ────────────────────────────────────────
 
 /**
@@ -527,6 +1002,13 @@ const csvRow = csv.row;
  */
 const pesos = (centavos) => (centavos / 100).toFixed(2);
 
+/** One product row, identical in three exports, so they cannot drift apart. */
+const productCells = (row) => [
+  row.sku, row.product_name, row.category_name, row.unit_code, row.qty_display,
+  row.sale_count, pesos(row.revenue_centavos), pesos(row.cost_centavos),
+  pesos(row.gross_profit_centavos), (row.margin_bp / 100).toFixed(2), row.qty_on_hand_display,
+];
+
 function headerRows(head) {
   return [
     csvRow(['Report', head.report]),
@@ -630,6 +1112,113 @@ function exportCsv(report, params, actor) {
     lines.push(csvRow(['TOTAL', '', '', '', pesos(built.total_value_centavos)]));
   }
 
+  // TASK-033, requirement 9. Four groupings and a ledger, each written with the same
+  // columns the screen shows and in the same order, because TASK-016's criterion is
+  // that the file matches the screen rather than the storage.
+  if (report === 'by-category') {
+    lines.push(csvRow(['Reconciles', built.reconciliation.balances ? 'YES' : 'NO']));
+    lines.push(csvRow(['Reconciliation', built.reconciliation.statement]));
+    lines.push(csvRow(['Basis', built.basis]));
+    lines.push('');
+    lines.push(csvRow(['Category', 'Products', 'Lines', 'Discount', 'Revenue', 'Cost', 'Gross profit', 'Margin %', 'Share %']));
+    for (const row of built.categories) {
+      lines.push(csvRow([
+        row.category_name, row.product_count, row.line_count, pesos(row.discount_centavos),
+        pesos(row.revenue_centavos), pesos(row.cost_centavos), pesos(row.gross_profit_centavos),
+        (row.margin_bp / 100).toFixed(2), (row.share_bp / 100).toFixed(2),
+      ]));
+    }
+    lines.push(csvRow([
+      'TOTAL', built.totals.category_count, '', '',
+      pesos(built.totals.revenue_centavos), pesos(built.totals.cost_centavos),
+      pesos(built.totals.gross_profit_centavos), (built.totals.margin_bp / 100).toFixed(2), '100.00',
+    ]));
+  }
+
+  if (report === 'by-cashier') {
+    lines.push(csvRow(['Reconciles', built.reconciliation.balances ? 'YES' : 'NO']));
+    lines.push(csvRow(['Reconciliation', built.reconciliation.statement]));
+    lines.push(csvRow(['Basis', built.basis]));
+    lines.push('');
+    lines.push(csvRow(['Cashier', 'Role', 'Shifts', 'Transactions', 'Net sales', 'Average sale', 'Discounts', 'Revenue', 'Cost', 'Gross profit', 'Margin %', 'Share %']));
+    for (const row of built.cashiers) {
+      lines.push(csvRow([
+        row.cashier, row.role || '', row.shift_count, row.sale_count,
+        pesos(row.net_centavos), pesos(row.average_sale_centavos), pesos(row.discount_centavos),
+        pesos(row.revenue_centavos), pesos(row.cost_centavos), pesos(row.gross_profit_centavos),
+        (row.margin_bp / 100).toFixed(2), (row.share_bp / 100).toFixed(2),
+      ]));
+    }
+    lines.push(csvRow([
+      'TOTAL', '', '', built.totals.sale_count, pesos(built.totals.net_centavos),
+      pesos(built.totals.average_sale_centavos), '', '', '', '', '', '100.00',
+    ]));
+  }
+
+  if (report === 'by-product') {
+    lines.push(csvRow(['Sorted by', built.sort]));
+    lines.push(csvRow(['Rows shown', `${built.totals.shown} (limit ${built.limit})`]));
+    // What the limit hides, in the file as on the screen: a reader adding the revenue
+    // column up needs to know it is not the whole range.
+    lines.push(csvRow(['Revenue shown', pesos(built.totals.shown_revenue_centavos)]));
+    lines.push(csvRow(['Revenue in range', pesos(built.totals.revenue_centavos)]));
+    lines.push('');
+    lines.push(csvRow(['SKU', 'Product', 'Category', 'Unit', 'Quantity', 'Transactions', 'Revenue', 'Cost', 'Gross profit', 'Margin %', 'On hand']));
+    for (const row of built.products) lines.push(csvRow(productCells(row)));
+  }
+
+  if (report === 'movers') {
+    lines.push(csvRow(['Ranking', `Top ${built.top}`]));
+    lines.push(csvRow(['Units note', built.units_note]));
+    lines.push('');
+    lines.push(csvRow(['FAST — BY REVENUE']));
+    lines.push(csvRow(['Rank', 'SKU', 'Product', 'Category', 'Unit', 'Quantity', 'Transactions', 'Revenue', 'Cost', 'Gross profit', 'Margin %', 'On hand']));
+    for (const row of built.by_revenue) lines.push(csvRow([row.rank, ...productCells(row)]));
+
+    for (const group of built.by_units) {
+      lines.push('');
+      lines.push(csvRow([`FAST — BY UNITS (${group.unit_code})`]));
+      lines.push(csvRow(['Rank', 'SKU', 'Product', 'Category', 'Unit', 'Quantity', 'Transactions', 'Revenue', 'Cost', 'Gross profit', 'Margin %', 'On hand']));
+      for (const row of group.products) lines.push(csvRow([row.rank, ...productCells(row)]));
+    }
+
+    lines.push('');
+    lines.push(csvRow(['SLOW', built.slow_note]));
+    lines.push(csvRow(['SKU', 'Product', 'Category', 'Unit', 'Sold in range', 'Revenue', 'On hand', 'Value on hand', 'Last sold', 'Verdict']));
+    for (const row of built.slow) {
+      lines.push(csvRow([
+        row.sku, row.product_name, row.category_name, row.unit_code,
+        row.qty_display, pesos(row.revenue_centavos), row.qty_on_hand_display,
+        pesos(row.on_hand_value_centavos), row.last_sold_at_manila || '', row.verdict,
+      ]));
+    }
+  }
+
+  if (report === 'movements') {
+    lines.push(csvRow(['Reconciles', built.reconciliation.balances ? 'YES' : 'NO']));
+    lines.push(csvRow(['Reconciliation', built.reconciliation.statement]));
+    lines.push(csvRow(['Value basis', built.value_basis]));
+    lines.push('');
+    lines.push(csvRow(['Type', 'Movements', 'Products', 'Direction', 'Costed value', 'Estimated value', 'Total value', 'Value basis']));
+    for (const row of built.types) {
+      lines.push(csvRow([
+        row.label, row.movement_count, row.product_count, row.direction,
+        pesos(row.costed_value_centavos), pesos(row.estimated_value_centavos),
+        pesos(row.value_centavos), row.value_basis,
+      ]));
+    }
+    lines.push('');
+    lines.push(csvRow(['SKU', 'Product', 'Category', 'Type', 'Unit', 'In', 'Out', 'Net', 'Costed value', 'Estimated value']));
+    for (const row of built.products) {
+      lines.push(csvRow([
+        row.sku, row.product_name, row.category_name, row.label, row.unit_code,
+        quantity.toDecimalString(row.increase_milli), quantity.toDecimalString(row.decrease_milli),
+        quantity.toDecimalString(row.net_milli),
+        pesos(row.costed_value_centavos), pesos(row.estimated_value_centavos),
+      ]));
+    }
+  }
+
   // AUD-601: an export is a copy of the store's figures leaving the machine.
   auditService.write({
     actor: { id: actor.id, username: actor.username },
@@ -652,7 +1241,14 @@ function exportCsv(report, params, actor) {
   };
 }
 
-const REPORTS = Object.freeze({ daily, payments, voids, valuation: (p, a) => valuation(a) });
+const REPORTS = Object.freeze({
+  daily, payments, voids, valuation: (p, a) => valuation(a),
+  // TASK-033. Named here so `/reports/:report/export.csv` serves them from the same
+  // build — requirement 9 asks for CSV on all of them, and a second export path is a
+  // second place for RPT-106's header block to go missing.
+  'by-category': byCategory, 'by-cashier': byCashier, 'by-product': byProduct,
+  movers, movements,
+});
 
 function build(report, params, actor) {
   const fn = REPORTS[report];
@@ -664,6 +1260,8 @@ module.exports = {
   NON_CASH,
   range, assertShiftScope, header,
   daily, payments, voids, valuation, dashboard, build, exportCsv,
+  // TASK-033
+  byCategory, byCashier, byProduct, movers, movements, MOVEMENT_LABELS,
   // Named for the tests that drive one piece at a time.
   csvCell, pesos,
 };

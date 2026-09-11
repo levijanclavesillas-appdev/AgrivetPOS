@@ -1,0 +1,59 @@
+-- 017_analysis_indexes.sql — the access path movement analysis needs
+-- Conventions in 05_TECH_SPEC.md §3.1 are binding.
+--
+-- Forward-only. Once this file has been applied anywhere it is never edited (§8.9).
+--
+-- No table. TASK-033 groups sales three more ways and reads the movement ledger as a
+-- report; all five are reads over rows that TASK-007 and TASK-011 already wrote. What
+-- they need is for one of those reads to stop scanning.
+--
+-- **TASK-033's technical note says `008_report_indexes.sql` gains what the new
+-- groupings need. It cannot: 008 has been applied, and §8.9 makes an applied migration
+-- immutable.** So the index lands here, which is the same answer TASK-032 reached about
+-- its own schema file — migrations are numbered by the order they are applied, not by
+-- the order their tasks were written.
+--
+-- ## Four of the five new reports needed nothing
+--
+--   * by-category   — `sale_items` aggregates by product first (one row per product,
+--                     not per line) and only then joins `products`, so the category
+--                     join runs a few hundred times rather than 100,000. The aggregate
+--                     itself is `idx_saleitems_report`, covering, since 008.
+--   * by-cashier    — `idx_sales_date` narrows the range, and the per-sale line
+--                     aggregate is the same covering index the daily report uses.
+--   * by-product    — `dailyLines` with the sort and the limit exposed; identical plan.
+--   * slow movers   — starts at `products` and LEFT JOINs the period's aggregate, which
+--                     is the same derived table as by-category. `idx_products_active`
+--                     narrows the outer scan; `idx_move_product` answers "when did this
+--                     last sell" as a MAX seek rather than a scan of `sale_items`.
+--
+-- ## The fifth had no path at all
+--
+-- Movement analysis filters `inventory_movements` **by date across every product** and
+-- groups by type. Every index on that table since 003 leads with something else —
+-- `product_id`, `reference_type`, `corrects_movement_id` — so the only plan available
+-- was a full scan of the ledger, which is the largest append-only table in the
+-- database and the one that never stops growing.
+--
+-- Measured over 125,000 movements spread across a year — a year of trading at NFR_2.1's
+-- scale — grouping by type with the product join the value columns need:
+--
+--                    scan      index
+--   one week       73.4 ms    15.0 ms
+--   one month      76.7 ms    26.2 ms
+--   one quarter   104.6 ms    69.4 ms
+--
+-- **The shape of that table matters more than any row in it.** Without the index every
+-- range costs the same, because every range reads the whole ledger — and that figure
+-- grows for as long as the store trades, whether or not anybody asks for a longer
+-- report. With it the cost is the range's, which is the one thing the reader controls.
+-- A month is what a store actually asks for, it is three times cheaper today, and the
+-- gap widens with every year the ledger keeps (NFR_2.2 keeps five online).
+--
+-- The column order is `occurred_at` first because the range is what narrows: 12
+-- movement types over a year is not a selective leading column, and a store that has
+-- damaged something every month has no type rare enough to help. The four columns
+-- after it are what the report sums, so the table itself is never read.
+CREATE INDEX idx_move_report ON inventory_movements (
+  occurred_at, movement_type, product_id, qty_milli, unit_cost_centavos
+);

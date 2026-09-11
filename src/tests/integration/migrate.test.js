@@ -161,7 +161,7 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'idx_sales_date', 'idx_sales_shift', 'idx_sales_cust', 'idx_sales_no',
     'idx_saleitems_product', 'idx_tender_sale', 'idx_tender_ref', 'idx_discounts_sale',
     'idx_carts_user_shift', 'idx_carts_shift',
-    'idx_saleitems_report', 'idx_tender_report',
+    'idx_saleitems_report', 'idx_tender_report', 'idx_move_report',
     'idx_backups_verified', 'idx_backups_taken', 'idx_dismissals_kind', 'idx_sysevents_kind',
     'idx_po_supplier', 'idx_po_status', 'idx_poitems_product',
     'idx_gr_supplier', 'idx_gr_po', 'idx_gr_date',

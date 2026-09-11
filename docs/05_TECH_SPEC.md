@@ -1098,6 +1098,36 @@ void afterwards moves the derived total, and a reconciliation whose recorded fig
 changed under its own reason is a record of nothing — the same reasoning `MON-005` applies to a
 sale's cost snapshot and `INV-110` to a count's expected quantity.
 
+### 3.4.9 v1.2 schema — sales analysis (`TASK-033`)
+
+**No table, and one index.** The four sales breakdowns are `dailyLines` with a different
+`GROUP BY`, and every one of them resolves through indexes `006_sales.sql` and
+`008_report_indexes.sql` already carry. Slow movers reads the other way round — from `products`
+outward, LEFT JOINing the period's sales, because a product that sold nothing has no sale line to
+group — and `idx_products_active` and `idx_move_product` already serve it.
+
+Movement analysis had no path at all. It filters `inventory_movements` **by date across every
+product**, and every index on that table since `003_inventory.sql` leads with something else
+(`product_id`, `reference_type`, `corrects_movement_id`), so the only plan available was a full
+scan of the largest append-only table in the database.
+
+```sql
+CREATE INDEX idx_move_report ON inventory_movements (
+  occurred_at, movement_type, product_id, qty_milli, unit_cost_centavos
+);
+```
+
+`occurred_at` leads because the range is what narrows: twelve movement types over a year is not a
+selective first column. The four after it are what the report sums, so the table is never read.
+
+**No column was added to carry the cost of a decrease**, and that absence is deliberate.
+`INV-106` costs a movement on the way in and never on the way out — a sale or a write-off consumes
+at the average prevailing at the time, and `costing.applyMovement` uses that average without
+storing it. Adding a column now would be honest only for movements posted after it, and a value
+column that is fact for some rows and silence for others is worse than a report that names the
+estimate. So the report carries two value columns instead: what the movements cost, and what the
+rest is worth at today's average, labelled per row.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -1121,6 +1151,7 @@ migrations/013_negotiated_pricing.sql customer prices and quantity breaks (PR-10
 migrations/014_batches.sql          batches, ledger batch_id, sale_item_batches (INV-201 – INV-206)
 migrations/015_count_by_batch.sql   stock_count_lines.batch_id — counting by batch (INV-110, INV-201)
 migrations/016_reconciliation.sql   payment_reconciliations — RPT-105, and no column on sale_tenders
+migrations/017_analysis_indexes.sql indexes only — the ledger's date access path (TASK-033)
 ```
 
 
@@ -1149,6 +1180,11 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/customers/:id/statement/print` | `TX-421` | `CR-206`'s precedent — a document a customer takes away, with `TAX-006`'s notice on it |
 | `GET` | `/customers/:id/statement/export.csv` | `TX-426` | the same call the screen makes |
 | `POST` | `/customers/:id/write-off` | `TX-413` → `TX-417` | `CR-303`, `FT-409`. **The door is `TX-413` and the rule is `TX-417`** — the same shape the void uses (`TX-401` at the edge, `POS-403` inside): a route behind `TX-417` would answer a manager with a bare 403 from the middleware, before anything could audit the attempt or say what they *can* do |
+| `GET` | `/reports/by-category?from=&to=` | `TX-421` | `FT-602`, `SCR-607`. Revenue, cost and margin per category (`RPT-104`). Reconciles to the daily report's **revenue**, not its net: a transaction discount belongs to the sale and cannot be split between shelves |
+| `GET` | `/reports/by-cashier?from=&to=` | `TX-421` | `FT-602`, `SCR-607`. Sale-level, so it reconciles to net sales before returns, plus transaction count and average sale. `TX-421`'s `OWN_SHIFT` refuses a cashier the store-wide answer and audits the attempt |
+| `GET` | `/reports/by-product?from=&to=&sort=&limit=` | `TX-421` | `dailyLines` with the sort and the limit in the reader's hands. The sort is a whitelist mapped to SQL, never a string from the query |
+| `GET` | `/reports/movers?from=&to=&top=&maxRevenueCentavos=` | `TX-421` | Fast by revenue **and** by units, shown as two rankings — the units one partitioned by base unit (`UOM-001`). Slow movers built from the catalogue outward, so a product that sold nothing appears, with what is on the shelf and when it last sold |
+| `GET` | `/reports/movements?from=&to=&type=` | `TX-422` | `INV-102`, `INV-103`, `SCR-608`. Quantity and value by movement type, by product and in total, with `INV-101`'s opening-plus-net-equals-closing printed. **`TX-422`, not `TX-421`** — the inventory clerk reads it and the day's takings are not theirs |
 | `GET` | `/reports/reconciliation?from=&to=` | `TX-421` | `RPT-105`, `SCR-606`. What the POS **recorded** per settling method, from `RPT-102`'s own query — read, never written |
 | `GET` | `/reports/reconciliation/tenders?from=&to=&method=` | `TX-421` | The tenders behind one recorded total, so a variance can be found rather than only stated |
 | `GET` `POST` | `/reconciliations` | `TX-421` | `RPT-105`. **No `PUT`, no `DELETE`, and no route that names a sale** — correcting a reconciliation means reconciling again, and the prohibition on adjusting a recorded figure is kept by the absence of the path |

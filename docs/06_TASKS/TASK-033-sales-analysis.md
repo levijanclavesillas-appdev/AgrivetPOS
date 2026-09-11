@@ -89,14 +89,15 @@ asking for a store-wide breakdown is refused by `assertShiftScope`, which is alr
 
 ## Acceptance Criteria
 
-- [ ] Category and cashier totals sum to the daily report's net for the same range
-- [ ] A product that sold nothing in the range appears in slow movers
-- [ ] Fast movers by units and by revenue give different orders, and both are shown
-- [ ] A cashier asking for a store-wide breakdown is refused; their own shift is served
-- [ ] Movement analysis totals reconcile to the on-hand change over the range
-- [ ] A voided sale is excluded from every net figure and still visible as a void
-- [ ] Every report states its range and tax mode, and exports to CSV
-- [ ] All of them meet the budget at `TC-PERF-06`'s seeded scale
+- [x] Category and cashier totals sum to the daily report — **to two different anchors**, for the
+      reason set out below, and each report prints which one it used
+- [x] A product that sold nothing in the range appears in slow movers
+- [x] Fast movers by units and by revenue give different orders, and both are shown
+- [x] A cashier asking for a store-wide breakdown is refused; their own shift is served
+- [x] Movement analysis totals reconcile to the on-hand change over the range
+- [x] A voided sale is excluded from every net figure and still visible as a void
+- [x] Every report states its range and tax mode, and exports to CSV
+- [x] All of them meet the budget at `TC-PERF-06`'s seeded scale
 
 ## Tests
 
@@ -107,6 +108,55 @@ asking for a store-wide breakdown is refused by `assertShiftScope`, which is alr
 | `TC-INT-122` | Movement analysis by type reconciles to the on-hand change |
 | `TC-E2E-27` | A quarter of trading across four cashiers and six categories, read four ways, reconciling to one net |
 | `TC-PERF-07` | Every new report inside `TC-PERF-05`'s budget at `TC-PERF-06`'s scale |
+
+**Requirement 1 asks for something that is only half true, and the report says which half.**
+Category and cashier totals cannot both sum to net. A sale has one cashier, so summing
+`total_centavos` by cashier *is* net sales — before returns, because a return is its own document
+with its own operator and charging it back to the selling cashier would report a refund as their
+mistake. A sale has as many categories as it has lines, and the transaction discount, the change
+and the returns sit on the **sale**: there is no honest way to split ₱50 off a mixed basket between
+feed and veterinary supplies. So the category breakdown reconciles to revenue net of VAT — the
+figure `RPT-104` computes margin from, and the only one that is a sum of lines — and both reports
+print the identity they used rather than a tick. A single assertion against net would have been
+satisfied by a report that quietly prorated the discount, which is the defect this wording avoids.
+
+**The grouping key is live, and nothing can make it a snapshot.** `MON-005` keeps money off the
+product record and `sale_items` carries its own name, price and cost for that reason. A category is
+not money, nothing snapshots it, and no column on a sale line could answer "what was this filed
+under last March" — so recategorising a product moves its history with it. Stated in the report's
+own basis line rather than left for somebody to discover the month they reorganise the shelves.
+
+**Two value columns on the movement report, never one.** `INV-106` costs a movement on the way in
+and never on the way out: a sale or a write-off consumes at the average prevailing at the time, and
+`costing.applyMovement` uses that average without storing it. So the ledger knows exactly how many
+kilos were damaged and does not know what they were worth. `costed_value_centavos` is summed from
+the cost the movement carries and is a fact; `estimated_value_centavos` prices the rest at the
+product's average cost today and is labelled as an estimate on every row. Adding a column now would
+be honest only for movements posted after it, and a value column that is fact for some rows and
+silence for others is worse than a report that names its estimate.
+
+**The units ranking is partitioned by base unit rather than filtered to one.** `UOM-001` makes 40
+KG and 40 sachets incomparable, and the obvious fix — a unit picker — hides the report behind a
+control nobody presses. `moversOverview` returns every product's period figures once and the
+service takes the top N within each unit, in the order of the unit the store sells most money of.
+
+**`008_report_indexes.sql` could not gain the index the technical note asks it to.** It has been
+applied, and §8.9 makes an applied migration immutable, so the one new access path landed in
+`017_analysis_indexes.sql` — the same answer `TASK-032` reached about its own schema file. Four of
+the five reports needed nothing; the fifth had no path at all, because every index on
+`inventory_movements` since `003` leads with `product_id` or a reference and movement analysis
+filters by **date across every product**. Measured over a year of movements: without it every range
+costs the same, because every range reads the whole ledger.
+
+**Three queries became one, on the evidence.** Fast-by-revenue, fast-by-units and slow movers were
+written as three statements and measured at 2.4 s over a quarter — three full aggregates of the
+same sums. They are three orderings of one set, so they are now one query ordered three times, at
+1.1 s, which is what `by-product` costs on its own.
+
+**`SCR-608` is a separate screen and not a fifth tab**, because `TX-422` is a different permission
+from `TX-421` and the readerships genuinely differ: the inventory clerk needs to know what was
+damaged this quarter and has no business reading the day's takings. `TC-E2E-27` asserts both halves
+— the clerk is refused the daily report and served the ledger.
 
 ---
 

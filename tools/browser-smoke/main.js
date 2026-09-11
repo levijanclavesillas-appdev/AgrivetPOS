@@ -604,6 +604,58 @@ app.whenReady().then(async () => {
   await waitFor(`!!document.querySelector('.valuation-total')`, { label: 'SCR-604' });
   log(await run(`!!document.querySelector('.valuation-total')`), 'SCR-604 renders the valuation');
 
+  console.log('\n— SCR-608: movement analysis (TASK-033) —');
+  // Offered from the valuation, because what is on the shelf and how it got there are
+  // the same question from two sides — and both are TX-422's.
+  log(await clickOn('.report-head button', /Movement analysis/), 'the valuation offers it');
+  await waitFor(`!!document.querySelector('.report-movements')`, { label: 'SCR-608' });
+
+  const ledger = await text('.report-movements .reconciliation');
+  log(/on hand at the start/.test(ledger), 'INV-101: the ledger identity is printed as arithmetic',
+    ledger.replace(/\s+/g, ' ').slice(0, 90));
+  log(await run(`document.querySelector('.report-movements .reconciliation').classList.contains('balances')`),
+    'and it balances');
+  log(/40 KG and 40/.test(ledger), 'UOM-001: and it says why those totals are a check and not a quantity');
+
+  const types = await text('.movement-types');
+  log(/Goods received/.test(types), 'INV-103: the types are named in words', types.replace(/\s+/g, ' ').slice(0, 80));
+  log(/From the movement/.test(types), 'INV-106: a receipt’s value is a fact');
+  log(/Estimated at today/.test(types) === /Sold|Damaged|Expired/.test(types),
+    'and a decrease’s value is named as an estimate');
+
+  console.log('\n— SCR-607: sales analysis (TASK-033) —');
+  await run(OPEN_RAIL('Reports'));
+  await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
+  await run(`document.querySelector('.tile-gross-sales').click()`);
+  await waitFor(`!!document.querySelector('.report-daily')`, { label: 'SCR-602' });
+  log(await clickOn('.report-head button', /Break it down/), 'the daily report offers the breakdown');
+  await waitFor(`!!document.querySelector('.report-analysis')`, { label: 'SCR-607' });
+
+  const analysisTabs = await run(`[...document.querySelectorAll('.report-analysis .admin-tab')].map(t => t.textContent)`);
+  log(analysisTabs.length === 4, 'four tabs over one report', analysisTabs.join(' · '));
+
+  const categoryRecon = await text('.report-analysis .reconciliation');
+  log(/categor(y|ies) =/.test(categoryRecon), 'the grouping prints what it reconciles to',
+    categoryRecon.replace(/\s+/g, ' ').slice(0, 90));
+  log(await run(`document.querySelector('.report-analysis .reconciliation').classList.contains('balances')`),
+    'and every peso lands in exactly one category');
+  // MON-005: the money is a snapshot and the grouping key is not, and the report is
+  // required to say so rather than let somebody discover it when they reorganise a shelf.
+  const basis = await text('.report-analysis .rule-note');
+  log(/filed \*\*today\*\*|filed today/.test(basis) || /today/.test(basis),
+    'and the basis states that a category is read live', basis.replace(/\s+/g, ' ').slice(0, 90));
+
+  log(await clickOn('.report-analysis .admin-tab', /By cashier/), 'the cashier tab opens');
+  await waitFor(`/cashier/.test(${TEXT('.report-analysis .reconciliation')})`, { label: 'the cashier breakdown' });
+  log(/before returns/.test(await text('.report-analysis .reconciliation')),
+    'and it reconciles to net sales before returns — the other anchor');
+
+  log(await clickOn('.report-analysis .admin-tab', /Movers/), 'the movers tab opens');
+  await waitFor(`!!document.querySelector('.movers')`, { label: 'the movers tab' });
+  const movers = await text('.movers');
+  log(/by revenue/.test(movers) && /by units/.test(movers), 'two rankings, shown as two rankings');
+  log(/not across them/.test(movers), 'UOM-001: and the units ranking says it is per unit');
+
   console.log('\n— SCR-201: the catalogue —');
   await run(OPEN_RAIL('Products'));
   await waitFor(`!!document.querySelector('.catalogue')`, { label: 'SCR-201' });

@@ -6,6 +6,11 @@
 //   GET /reports/daily?from=&to=       TX-421   SCR-602 — FR_6.2, RPT-101
 //   GET /reports/payments?from=&to=    TX-421   SCR-603 — RPT-102
 //   GET /reports/voids?from=&to=       TX-421   POS-404 — the one report that looks for them
+//   GET /reports/by-category?from=&to=  TX-421  SCR-607 — FT-602, RPT-104
+//   GET /reports/by-cashier?from=&to=   TX-421  SCR-607 — FT-602, TX-421's OWN_SHIFT
+//   GET /reports/by-product?from=&to=   TX-421  SCR-607 — dailyLines, unfixed
+//   GET /reports/movers?from=&to=       TX-421  SCR-607 — fast and slow, two rankings
+//   GET /reports/movements?from=&to=    TX-422  SCR-608 — INV-102 read as a report
 //   GET /reports/inventory/valuation   TX-422   SCR-604 — RPT-103
 //   GET /reports/:report/export.csv    TX-426   the same figures, as a file
 //
@@ -88,6 +93,86 @@ router.get('/reports/voids', readSales, (req, res, next) => {
       from: dateParam(req.query.from) || dateParam(req.query.date),
       to: dateParam(req.query.to),
       shiftId: shiftParam(req.query.shiftId),
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * `FT-602`'s v1.2 half — the day's total, broken into the groupings a store acts on.
+ *
+ * All four are reads with `assertShiftScope` behind them, and all four are declared
+ * before `/reports/:report/export.csv` for the same reason the valuation route is: a
+ * path parameter that matches anything matches these too.
+ */
+router.get('/reports/by-category', readSales, (req, res, next) => {
+  try {
+    res.json(reportService.byCategory({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      shiftId: shiftParam(req.query.shiftId),
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/reports/by-cashier', readSales, (req, res, next) => {
+  try {
+    res.json(reportService.byCashier({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      shiftId: shiftParam(req.query.shiftId),
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/reports/by-product', readSales, (req, res, next) => {
+  try {
+    res.json(reportService.byProduct({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      shiftId: shiftParam(req.query.shiftId),
+      sort: req.query.sort || 'revenue',
+      limit: req.query.limit,
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/reports/movers', readSales, (req, res, next) => {
+  try {
+    res.json(reportService.movers({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      shiftId: shiftParam(req.query.shiftId),
+      top: req.query.top,
+      maxRevenueCentavos: req.query.maxRevenueCentavos,
+      slowLimit: req.query.slowLimit,
+    }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * `INV-102`'s ledger, summarised — and behind `TX-422` rather than `TX-421`.
+ *
+ * TASK-033 draws the line in its own words: this is an inventory report, and the person
+ * who needs to know what was damaged this quarter is the inventory clerk, who has no
+ * business reading the day's takings. Two permissions, two readerships, two screens.
+ */
+router.get('/reports/movements', readInventory, (req, res, next) => {
+  try {
+    res.json(reportService.movements({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      type: req.query.type || null,
+      limit: req.query.limit,
     }, req.session));
   } catch (err) {
     next(err);
@@ -204,7 +289,9 @@ router.get('/reports/inventory/valuation', readInventory, (req, res, next) => {
 router.get('/reports/:report/export.csv', exportData, (req, res, next) => {
   try {
     const report = String(req.params.report);
-    const needed = report === 'valuation' ? 'TX-422' : 'TX-421';
+    // TASK-033 adds the second inventory report, so this is a set rather than a
+    // comparison: movement analysis is TX-422's, exactly as the valuation is.
+    const needed = ['valuation', 'movements'].includes(report) ? 'TX-422' : 'TX-421';
 
     if (!permissions.can(req.session, needed)) {
       throw errors.forbidden(

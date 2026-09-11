@@ -31,6 +31,8 @@ import { createCustomerProfile } from '../customers/profile.js';
 import { createStatement } from '../customers/statement.js';
 import { createAgeing } from '../reports/ageing.js';
 import { createReconciliation } from '../reports/reconciliation.js';
+import { createAnalysis } from '../reports/analysis.js';
+import { createMovements } from '../reports/movements.js';
 import { createCollection } from '../customers/collection.js';
 import { createShift } from '../shift/view.js';
 import { createShiftSummary } from '../shift/summary.js';
@@ -250,7 +252,7 @@ export function createApp({ root }) {
     // Low stock is a filter of the products list, not a section of its own, so the
     // rail keeps Products highlighted rather than highlighting nothing.
     renderRail(id === 'low-stock' ? 'products'
-      : (['ageing', 'reconciliation'].includes(id) ? 'reports' : id));
+      : (['ageing', 'reconciliation', 'analysis', 'movements'].includes(id) ? 'reports' : id));
 
     if (id === 'pos') return showPos();
     if (id === 'reports') return showDashboard();
@@ -261,6 +263,9 @@ export function createApp({ root }) {
     // the same treatment low stock gets under Products.
     if (id === 'ageing') return showAgeing();
     if (id === 'reconciliation') return showReconciliation();
+    // SCR-607 and SCR-608 are reports too, so the rail keeps Reports highlighted.
+    if (id === 'analysis') return showAnalysis();
+    if (id === 'movements') return showMovements();
     if (id === 'receipts') return showReceipts();
     if (id === 'shift') return showShift();
     if (id === 'customers') return showCustomers();
@@ -609,6 +614,31 @@ export function createApp({ root }) {
     return current;
   }
 
+  /** SCR-607. FT-602's v1.2 half — the day's total, in the groupings a store acts on. */
+  function showAnalysis(range = null, tab = 'by-category') {
+    if (current?.unmount) current.unmount();
+    current = createAnalysis({
+      root: host(),
+      range,
+      tab,
+      onBack: () => { renderRail('reports'); showDashboard(); },
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-608. INV-102's ledger read as a report — TX-422, so a different readership. */
+  function showMovements(range = null) {
+    if (current?.unmount) current.unmount();
+    current = createMovements({
+      root: host(),
+      range,
+      onBack: () => { renderRail('reports'); showDashboard(); },
+    });
+    current.mount();
+    return current;
+  }
+
   function showReport(report) {
     if (current?.unmount) current.unmount();
     current = createReport({
@@ -619,6 +649,11 @@ export function createApp({ root }) {
       // The range travels with it: somebody reconciling the week they are looking at
       // should not have to type the dates again.
       onReconcile: (range) => showReconciliation(range),
+      // SCR-607 from the day's total, which is the screen somebody is on when they ask
+      // *why* — and SCR-608 from the valuation, because the stock on the shelf and how
+      // it got there are the same question from two sides.
+      onAnalyse: (range) => { renderRail('reports'); showAnalysis(range); },
+      onMovements: (range) => { renderRail('reports'); showMovements(range); },
     });
     current.mount();
     return current;

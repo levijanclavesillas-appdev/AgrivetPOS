@@ -130,6 +130,16 @@ test.before(() => {
     INSERT INTO sale_tenders (id, sale_id, method, amount_centavos, reference_no, status, created_at)
     VALUES (@id, @sale_id, 'CASH', @amount, NULL, 'RECORDED', @at)
   `);
+  // TASK-033 needs the ledger at scale too, and a sale that moved no stock is not the
+  // shape saleService writes: INV-101 posts one movement per line inside the sale's own
+  // transaction. Without these the movement report would be measured against 200 rows
+  // and prove nothing.
+  const insertMovement = db.get().prepare(`
+    INSERT INTO inventory_movements (id, product_id, movement_type, qty_milli, balance_after_milli,
+      unit_cost_centavos, reference_type, reference_id, reference_no, occurred_at, created_by)
+    VALUES (@id, @product_id, 'SALE', @qty, @balance, NULL, 'SALE', @sale_id, @sale_no, @occurred_at, @created_by)
+  `);
+  const balances = new Map(catalogue.map((product) => [product.id, 10000000]));
 
   const at = clock.nowUtc();
   const base = Date.parse(at);
@@ -162,7 +172,16 @@ test.before(() => {
         id: saleId, sale_no: `PERF-${String(s).padStart(8, '0')}`, shift_id: shift.id,
         subtotal: total, total, change, occurred_at: dayOf(s), created_by: owner.id,
       });
-      for (const line of lines) insertItem.run(line);
+      for (const line of lines) {
+        insertItem.run(line);
+        const balance = balances.get(line.product_id) - line.qty;
+        balances.set(line.product_id, balance);
+        insertMovement.run({
+          id: ids.uuidv7(), product_id: line.product_id, qty: -line.qty, balance,
+          sale_id: saleId, sale_no: `PERF-${String(s).padStart(8, '0')}`,
+          occurred_at: dayOf(s), created_by: owner.id,
+        });
+      }
       insertTender.run({ id: ids.uuidv7(), sale_id: saleId, amount: total + change, at });
 
       EXPECTED.grossCentavos += total;
@@ -172,6 +191,15 @@ test.before(() => {
       EXPECTED.saleCount += 1;
     }
   });
+
+  // INV-101 is a promise about two numbers, and a fixture that breaks it is a fixture
+  // that makes the movement report's reconciliation meaningless. The materialised
+  // figure is brought back to the ledger's own sum, once, rather than per line.
+  db.get().prepare(`
+    UPDATE inventory SET qty_on_hand_milli = (
+      SELECT COALESCE(SUM(m.qty_milli), 0) FROM inventory_movements m
+      WHERE m.product_id = inventory.product_id)
+  `).run();
 
   process.stdout.write(`    seeded in ${((Date.now() - started) / 1000).toFixed(1)} s\n`);
 });
@@ -251,6 +279,59 @@ test('008: no reporting statement reads a table it could read an index for', () 
     GROUP BY t.method`);
   assert.match(tenders, /INDEX idx_tender_report/);
   assert.equal(/SCAN t\b/.test(tenders), false, 'sale_tenders is never scanned');
+});
+
+test('TC-PERF-07: TASK-033’s five reports at the same scale', () => {
+  // Same treatment as TC-PERF-05 above: the figure is reported and the ceiling is what
+  // is asserted, because §6 says a measurement from a build machine is not a result.
+  // What the ceiling catches is structural — the movement report without 017's index
+  // scans the whole ledger, and the slow-mover report written the obvious way runs a
+  // query per product.
+  for (const m of [
+    measure('by category', 5, () => reportService.byCategory({ from: EXPECTED.fromDate, to: today }, owner)),
+    measure('by cashier', 5, () => reportService.byCashier({ from: EXPECTED.fromDate, to: today }, owner)),
+    measure('by product', 5, () => reportService.byProduct({ from: EXPECTED.fromDate, to: today, limit: 100 }, owner)),
+    measure('movers', 5, () => reportService.movers({ from: EXPECTED.fromDate, to: today }, owner)),
+    measure('movements', 5, () => reportService.movements({ from: EXPECTED.fromDate, to: today }, owner)),
+  ]) {
+    report(m);
+    assert.ok(m.worst < CEILING_MS, `${m.label}: worst ${m.worst.toFixed(0)} ms exceeded the ${CEILING_MS} ms ceiling`);
+  }
+});
+
+test('TC-PERF-07: the new reports agree with the old ones over the seeded quarter', () => {
+  // The measurements above are meaningless if the queries are wrong, and a breakdown is
+  // the easy thing to get subtly wrong at scale — a join that multiplies a sale total by
+  // its line count looks fine on three rows.
+  const daily = reportService.daily({ from: EXPECTED.fromDate, to: today }, owner);
+  const byCategory = reportService.byCategory({ from: EXPECTED.fromDate, to: today }, owner);
+  const byCashier = reportService.byCashier({ from: EXPECTED.fromDate, to: today }, owner);
+
+  assert.equal(byCategory.reconciliation.balances, true);
+  assert.equal(byCategory.totals.revenue_centavos, EXPECTED.revenueCentavos);
+  assert.equal(byCashier.reconciliation.balances, true);
+  assert.equal(byCashier.cashiers.reduce((sum, row) => sum + row.sale_count, 0), EXPECTED.saleCount);
+
+  const movements = reportService.movements({ from: EXPECTED.fromDate, to: today }, owner);
+  assert.equal(movements.reconciliation.balances, true);
+  assert.equal(movements.reconciliation.matches_on_hand, true, 'INV-101 holds at 100,000 lines');
+});
+
+test('017: the movement report reads an index rather than the whole ledger', () => {
+  // Machine-independent, so unlike every figure above this is a real assertion. It is
+  // also the reason 017 exists: every index on inventory_movements before it leads with
+  // product_id or a reference, so a date range across every product had no path at all.
+  const plan = db.get().prepare(`
+    EXPLAIN QUERY PLAN
+    SELECT m.movement_type, COUNT(*), SUM(m.qty_milli)
+    FROM inventory_movements m
+    WHERE m.occurred_at >= @fromAt AND m.occurred_at <= @toAt
+    GROUP BY m.movement_type
+  `).all({ fromAt: '2026-01-01T00:00:00.000Z', toAt: '2026-12-31T23:59:59.999Z' })
+    .map((row) => row.detail).join(' | ');
+
+  assert.match(plan, /INDEX idx_move_report/);
+  assert.equal(/SCAN m\b/.test(plan), false, 'the ledger is never scanned');
 });
 
 test('the figures above are not a release gate', () => {

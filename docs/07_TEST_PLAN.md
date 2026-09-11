@@ -287,7 +287,7 @@ that is decided.
 | `TC-INT-112` – `TC-INT-113` | `TASK-030` | Recall: per-batch quantities on a line that spanned two, and the voided, returned and walk-in sales that must appear as themselves |
 | `TC-UT-55`, `TC-INT-114` – `TC-INT-116` | `TASK-031` | Statements and ageing: the bucket boundaries, the closing balance that must equal the account, one account in two buckets, the invoices a collection settled |
 | `TC-INT-117` – `TC-INT-119` | `TASK-032` | Reconciliation: the variance, the tolerance and reason, and that no recorded figure moved |
-| `TC-INT-120` – `TC-INT-122` | `TASK-033` | Breakdowns reconciling to `RPT-101`'s net, a slow mover that sold nothing, movement analysis against the on-hand change |
+| `TC-INT-120` – `TC-INT-122` | `TASK-033` | Breakdowns reconciling to the daily report, a slow mover that sold nothing, movement analysis against the on-hand change |
 | `TC-INT-123` – `TC-INT-125` | `TASK-034` | Write-off: owner only, the debits that stop ageing, and the collections figures that must not move |
 | `TC-E2E-23` – `TC-E2E-28` | one per task | The journey each task exists for. `TASK-035` has none — it ships a decision, not a path |
 | `TC-UT-56`, `TC-INT-126` – `TC-INT-128`, `TC-E2E-29` | `TASK-042` | Counting by batch: the sheet's line shape, a variance landing on the batch it was found in, `INV-201` after a posted count, a batch at zero counted up |
@@ -295,6 +295,15 @@ that is decided.
 | `TC-UI-12`, `TC-E2E-31` | `TASK-044` | `SCR-306`: a list that cannot edit, and finding a receipt again after the next customer has started |
 | `TC-PERF-07` | `TASK-033` | The new reports inside `TC-PERF-05`'s budget at `TC-PERF-06`'s scale |
 | `TC-PERF-08` – `TC-PERF-09` | `TASK-035` | Encrypted against plain, across the budgets and across backup, verification and restore |
+
+**`TC-INT-120` reconciles to two different anchors, and that was a finding rather than a
+choice.** The task asks that category and cashier totals "sum to the daily report's net", and only
+one of the two can. A cashier is a property of the **sale**, so summing `total_centavos` by cashier
+is net sales exactly; a category is a property of the **line**, and the transaction discount, the
+change and the returns all sit on the sale with no honest way to split them between shelves. So the
+category breakdown reconciles to `profit.revenue_centavos` — the figure margin is computed from and
+the only one that is a sum of lines — and both reports print which anchor they used. A single
+assertion against net would have been met by a report that quietly prorated a discount.
 
 **Two cases are expected to be re-pointed, and both are named in their tasks.** `TC-UT-31` asserts
 `PR-101`'s four precedence levels resolve; if `TASK-029`'s sale-line decision splits a line across

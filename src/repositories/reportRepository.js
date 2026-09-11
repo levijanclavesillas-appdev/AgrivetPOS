@@ -294,6 +294,322 @@ function tendersOfMethod({ fromAt, toAt, method, shiftId = null, limit = 500 }) 
   `).all({ fromAt, toAt, method, shiftId, limit });
 }
 
+// ── TASK-033 — the same arithmetic, grouped three more ways ────────────────
+//
+// Four of the five reports below are `dailyLines` with a different GROUP BY, and one
+// of them — slow movers — is the opposite query from everything else in this file.
+//
+// **The shape they share is aggregate-then-join.** A breakdown by category could be
+// written as `sale_items JOIN products JOIN categories GROUP BY category`, and at
+// 100,000 lines that resolves the product of every line one line at a time. Summing by
+// product first and joining the catalogue to the *result* does the same arithmetic with
+// one catalogue lookup per product sold rather than one per line.
+//
+// **What the grouping key reads, and why it is not a snapshot.** MON-005 keeps money
+// off the live product record and `sale_items` carries its own name, price and cost for
+// exactly that reason. A category is not money: nothing snapshots it, and a sale line
+// has no column that could answer "which category was this in last March". So the
+// category on these rows is the product's category **now**, which means recategorising
+// a product moves its history with it. That is a real limitation and the report says so
+// in its own basis line rather than leaving a reader to discover it.
+
+/** The period's sales summed per product, filtered once — the base of four reports. */
+const PRODUCT_AGGREGATE = `
+  SELECT
+    i.product_id                           AS product_id,
+    SUM(i.qty_milli)                       AS qty_milli,
+    SUM(i.line_total_centavos)             AS line_total_centavos,
+    SUM(i.discount_centavos)               AS discount_centavos,
+    SUM(i.tax_centavos)                    AS tax_centavos,
+    SUM(${LINE_NET_REVENUE})               AS revenue_centavos,
+    SUM(${LINE_COST})                      AS cost_centavos,
+    COUNT(*)                               AS line_count,
+    COUNT(DISTINCT i.sale_id)              AS sale_count,
+    MAX(s.occurred_at)                     AS last_sold_at
+  FROM sale_items i
+  JOIN sales s ON s.id = i.sale_id
+  WHERE ${NOT_VOIDED}
+    AND s.occurred_at >= @fromAt AND s.occurred_at <= @toAt
+    AND (@shiftId IS NULL OR s.shift_id = @shiftId)
+  GROUP BY i.product_id
+`;
+
+/** Requirement 1 — revenue, cost and margin by category (FT-605 applied per grouping). */
+function salesByCategory({ fromAt, toAt, shiftId = null }) {
+  return db.get().prepare(`
+    SELECT
+      c.id AS category_id, c.name AS category_name,
+      COUNT(*)                       AS product_count,
+      SUM(a.line_count)              AS line_count,
+      SUM(a.line_total_centavos)     AS line_total_centavos,
+      SUM(a.discount_centavos)       AS discount_centavos,
+      SUM(a.tax_centavos)            AS tax_centavos,
+      SUM(a.revenue_centavos)        AS revenue_centavos,
+      SUM(a.cost_centavos)           AS cost_centavos
+    FROM (${PRODUCT_AGGREGATE}) a
+    JOIN products p   ON p.id = a.product_id
+    JOIN categories c ON c.id = p.category_id
+    GROUP BY c.id, c.name
+    ORDER BY revenue_centavos DESC
+  `).all({ fromAt, toAt, shiftId });
+}
+
+/**
+ * Requirement 2 — by cashier, at two grains in one query.
+ *
+ * The transaction count and the money taken belong to the **sale**; revenue and cost
+ * belong to its **lines**. Joining the lines directly would multiply each sale total by
+ * its line count, which is the classic way this report comes out four times too large.
+ * The lines are therefore summed per sale first, in a derived table carrying the same
+ * range filter, and joined back one-to-one.
+ */
+function salesByCashier({ fromAt, toAt, shiftId = null }) {
+  return db.get().prepare(`
+    SELECT
+      s.created_by                            AS user_id,
+      u.username                              AS cashier,
+      u.role                                  AS role,
+      COUNT(*)                                AS sale_count,
+      COUNT(DISTINCT s.shift_id)              AS shift_count,
+      SUM(s.total_centavos)                   AS net_centavos,
+      SUM(s.line_discount_centavos + s.txn_discount_centavos) AS discount_centavos,
+      SUM(s.statutory_discount_centavos)      AS statutory_discount_centavos,
+      SUM(s.vat_centavos)                     AS vat_centavos,
+      COALESCE(SUM(a.revenue_centavos), 0)    AS revenue_centavos,
+      COALESCE(SUM(a.cost_centavos), 0)       AS cost_centavos,
+      COALESCE(SUM(a.line_count), 0)          AS line_count
+    FROM sales s
+    LEFT JOIN users u ON u.id = s.created_by
+    LEFT JOIN (
+      SELECT i.sale_id,
+             SUM(${LINE_NET_REVENUE}) AS revenue_centavos,
+             SUM(${LINE_COST})        AS cost_centavos,
+             COUNT(*)                 AS line_count
+      FROM sale_items i
+      JOIN sales s2 ON s2.id = i.sale_id
+      WHERE s2.status <> 'VOIDED'
+        AND s2.occurred_at >= @fromAt AND s2.occurred_at <= @toAt
+        AND (@shiftId IS NULL OR s2.shift_id = @shiftId)
+      GROUP BY i.sale_id
+    ) a ON a.sale_id = s.id
+    WHERE ${NOT_VOIDED}
+      AND s.occurred_at >= @fromAt AND s.occurred_at <= @toAt
+      AND (@shiftId IS NULL OR s.shift_id = @shiftId)
+    GROUP BY s.created_by, u.username, u.role
+    ORDER BY net_centavos DESC
+  `).all({ fromAt, toAt, shiftId });
+}
+
+/**
+ * Requirement 3 and 4 — by product, with the sort and the limit in the reader's hands.
+ *
+ * `dailyLines` is this query with both fixed: 500 rows, ordered by revenue. That is the
+ * right default for a day's report and the wrong one for "what moved", which is asked
+ * by units as often as by money — a sack of feed and a sachet of dewormer rank in
+ * opposite orders, and the store uses one figure to reorder and the other to decide
+ * what to stock more of.
+ *
+ * The sort is a whitelist mapped to SQL here rather than a string from the caller: an
+ * ORDER BY built out of a query parameter is an injection, whatever the parameter
+ * happens to contain today.
+ */
+const PRODUCT_SORTS = Object.freeze({
+  revenue: 'a.revenue_centavos DESC',
+  quantity: 'a.qty_milli DESC',
+  profit: '(a.revenue_centavos - a.cost_centavos) DESC',
+  transactions: 'a.sale_count DESC',
+  name: 'p.name COLLATE NOCASE ASC',
+});
+
+function salesByProduct({ fromAt, toAt, shiftId = null, sort = 'revenue', limit = 100 }) {
+  const order = PRODUCT_SORTS[sort] || PRODUCT_SORTS.revenue;
+  return db.get().prepare(`
+    SELECT
+      p.id AS product_id, p.sku, p.name AS product_name, p.is_active,
+      c.name AS category_name, un.code AS unit_code,
+      a.qty_milli, a.line_count, a.sale_count,
+      a.discount_centavos, a.line_total_centavos,
+      a.revenue_centavos, a.cost_centavos,
+      COALESCE(inv.qty_on_hand_milli, 0) AS qty_on_hand_milli
+    FROM (${PRODUCT_AGGREGATE}) a
+    JOIN products p    ON p.id = a.product_id
+    JOIN categories c  ON c.id = p.category_id
+    JOIN units un      ON un.id = p.base_unit_id
+    LEFT JOIN inventory inv ON inv.product_id = p.id
+    ORDER BY ${order}, p.name COLLATE NOCASE
+    LIMIT @limit
+  `).all({ fromAt, toAt, shiftId, limit });
+}
+
+/**
+ * Requirements 4, 5 and 6 in one pass — every product the movers report can rank.
+ *
+ * **Three rankings, one query, on purpose.** Fast by revenue, fast by units and slow are
+ * three orderings of the same set: what each product did in the period, and what is
+ * sitting on the shelf because of it. Written as three statements this cost three full
+ * aggregates over every sale line in the range, which measured at 2.4 s over a quarter
+ * of trading — most of a report's whole budget spent computing the same sums twice.
+ *
+ * **It reads from the catalogue outward, which is the opposite direction from every
+ * other query in this file.** A product that sold nothing has no sale line, so grouping
+ * sales can never produce it — and *products that sold nothing* is precisely what a
+ * slow-mover report is for. So this starts at `products` and LEFT JOINs the period's
+ * aggregate, and the rows with `NULL` on the right are the ones the report exists to
+ * find.
+ *
+ * An inactive product is included **only if it sold** in the range: a discontinued line
+ * is not a slow mover, it is a line the store already decided about, but the quarter it
+ * was discontinued in still has its sales in it.
+ *
+ * `last_sold_at` comes from the ledger rather than from `sale_items`. INV-102 has
+ * recorded every SALE movement since TASK-007 and `idx_move_product` makes "the most
+ * recent one for this product" a seek, where the same question asked of the sales
+ * history is a scan. It is also the figure that decides what a slow mover *is*: never
+ * sold at all is a buying mistake, and sold well until March is something else.
+ */
+function moversOverview({ fromAt, toAt, shiftId = null }) {
+  return db.get().prepare(`
+    SELECT
+      p.id AS product_id, p.sku, p.name AS product_name, p.created_at, p.is_active,
+      p.avg_cost_centavos,
+      c.name AS category_name, un.id AS unit_id, un.code AS unit_code,
+      COALESCE(inv.qty_on_hand_milli, 0) AS qty_on_hand_milli,
+      COALESCE(a.qty_milli, 0)           AS qty_milli,
+      COALESCE(a.revenue_centavos, 0)    AS revenue_centavos,
+      COALESCE(a.cost_centavos, 0)       AS cost_centavos,
+      COALESCE(a.discount_centavos, 0)   AS discount_centavos,
+      COALESCE(a.sale_count, 0)          AS sale_count,
+      COALESCE(a.line_count, 0)          AS line_count,
+      (SELECT MAX(m.occurred_at) FROM inventory_movements m
+        WHERE m.product_id = p.id AND m.movement_type = 'SALE') AS last_sold_at
+    FROM products p
+    JOIN categories c ON c.id = p.category_id
+    JOIN units un     ON un.id = p.base_unit_id
+    LEFT JOIN inventory inv ON inv.product_id = p.id
+    LEFT JOIN (${PRODUCT_AGGREGATE}) a ON a.product_id = p.id
+    WHERE p.is_active = 1 OR a.product_id IS NOT NULL
+  `).all({ fromAt, toAt, shiftId });
+}
+
+// ── TASK-033 — INV-102's ledger, read as a report (TX-422) ──────────────────
+//
+// **A decrease carries no cost, and no amount of querying will produce one.** INV-106
+// costs a movement on the way *in* and never on the way out: a sale, a write-off or a
+// negative adjustment consumes at the prevailing average, and `costing.applyMovement`
+// uses that average without storing it on the row. So the ledger can say exactly how
+// many kilos were damaged and cannot say what they were worth.
+//
+// Two columns rather than one, therefore. `costed_value_centavos` is summed from the
+// cost the movement itself carries and is a fact; `estimated_value_centavos` prices the
+// rest at the product's average cost **now** and is an estimate, named as one on the
+// row and in the report's basis. Merging them into a single "value" would be the more
+// comfortable report and the one that quietly changes every historical write-off the
+// next time a delivery moves an average.
+
+const MOVEMENT_VALUE = `
+  CASE WHEN m.unit_cost_centavos IS NOT NULL
+    THEN ((m.unit_cost_centavos * ABS(m.qty_milli)) + 500) / 1000
+    ELSE 0 END`;
+
+const MOVEMENT_ESTIMATE = `
+  CASE WHEN m.unit_cost_centavos IS NULL
+    THEN ((p.avg_cost_centavos * ABS(m.qty_milli)) + 500) / 1000
+    ELSE 0 END`;
+
+/** Requirement 7 — quantity and value by INV-103 type, for the whole store. */
+function movementsByType({ fromAt, toAt }) {
+  return db.get().prepare(`
+    SELECT
+      m.movement_type,
+      COUNT(*)                                   AS movement_count,
+      COUNT(DISTINCT m.product_id)               AS product_count,
+      SUM(CASE WHEN m.qty_milli > 0 THEN m.qty_milli ELSE 0 END)  AS increase_milli,
+      SUM(CASE WHEN m.qty_milli < 0 THEN -m.qty_milli ELSE 0 END) AS decrease_milli,
+      SUM(m.qty_milli)                           AS net_milli,
+      SUM(${MOVEMENT_VALUE})                     AS costed_value_centavos,
+      SUM(${MOVEMENT_ESTIMATE})                  AS estimated_value_centavos,
+      SUM(CASE WHEN m.unit_cost_centavos IS NULL THEN 1 ELSE 0 END) AS uncosted_count
+    FROM inventory_movements m
+    JOIN products p ON p.id = m.product_id
+    WHERE m.occurred_at >= @fromAt AND m.occurred_at <= @toAt
+    GROUP BY m.movement_type
+    ORDER BY movement_count DESC
+  `).all({ fromAt, toAt });
+}
+
+/**
+ * The same, per product and per type — the grain at which a quantity means anything.
+ *
+ * UOM-001 is why there is no store-wide quantity total on the type rows above: 40 KG of
+ * feed and 40 sachets of dewormer add up to 80 of nothing. A product's own base unit is
+ * the only scope in which a quantity can be summed, so it is the scope this returns.
+ */
+function movementsByProduct({ fromAt, toAt, type = null, limit = 500 }) {
+  return db.get().prepare(`
+    SELECT
+      m.product_id, m.movement_type,
+      p.sku, p.name AS product_name, un.code AS unit_code, c.name AS category_name,
+      COUNT(*)                                   AS movement_count,
+      SUM(CASE WHEN m.qty_milli > 0 THEN m.qty_milli ELSE 0 END)  AS increase_milli,
+      SUM(CASE WHEN m.qty_milli < 0 THEN -m.qty_milli ELSE 0 END) AS decrease_milli,
+      SUM(m.qty_milli)                           AS net_milli,
+      SUM(${MOVEMENT_VALUE})                     AS costed_value_centavos,
+      SUM(${MOVEMENT_ESTIMATE})                  AS estimated_value_centavos
+    FROM inventory_movements m
+    JOIN products p   ON p.id = m.product_id
+    JOIN categories c ON c.id = p.category_id
+    JOIN units un     ON un.id = p.base_unit_id
+    WHERE m.occurred_at >= @fromAt AND m.occurred_at <= @toAt
+      AND (@type IS NULL OR m.movement_type = @type)
+    GROUP BY m.product_id, m.movement_type
+    ORDER BY ABS(SUM(m.qty_milli)) DESC, p.name COLLATE NOCASE
+    LIMIT @limit
+  `).all({ fromAt, toAt, type, limit });
+}
+
+/**
+ * Requirement 8's anchor: the ledger's own balance at an instant.
+ *
+ * INV-101 makes on-hand a materialised SUM of this table, so the balance at any moment
+ * is the sum of everything posted up to it. Opening plus the range's net must equal
+ * closing, and closing at *now* must equal the on-hand figure the rest of the system
+ * reads — which is what turns this report from a list of numbers into a check.
+ */
+function ledgerBalanceAt({ at, productId = null }) {
+  return db.get().prepare(`
+    SELECT COALESCE(SUM(m.qty_milli), 0) AS qty_milli
+    FROM inventory_movements m
+    WHERE m.occurred_at <= @at
+      AND (@productId IS NULL OR m.product_id = @productId)
+  `).get({ at, productId }).qty_milli;
+}
+
+/** The materialised figure the ledger has to agree with (INV-101). */
+function onHandTotal() {
+  return db.get().prepare(
+    'SELECT COALESCE(SUM(qty_on_hand_milli), 0) AS qty_milli FROM inventory'
+  ).get().qty_milli;
+}
+
+/** Per-product opening and closing, for the products a range actually touched. */
+function ledgerBalancesByProduct({ fromAt, toAt }) {
+  return db.get().prepare(`
+    SELECT
+      touched.product_id,
+      COALESCE((SELECT SUM(b.qty_milli) FROM inventory_movements b
+                 WHERE b.product_id = touched.product_id AND b.occurred_at < @fromAt), 0) AS opening_milli,
+      COALESCE((SELECT SUM(c.qty_milli) FROM inventory_movements c
+                 WHERE c.product_id = touched.product_id AND c.occurred_at <= @toAt), 0)  AS closing_milli,
+      touched.net_milli
+    FROM (
+      SELECT m.product_id, SUM(m.qty_milli) AS net_milli
+      FROM inventory_movements m
+      WHERE m.occurred_at >= @fromAt AND m.occurred_at <= @toAt
+      GROUP BY m.product_id
+    ) touched
+  `).all({ fromAt, toAt });
+}
+
 // ── The dashboard's counts ──────────────────────────────────────────────────
 
 /** The shift a cashier is scoped to (TX-421 OWN_SHIFT), whether open or closed. */
@@ -317,4 +633,7 @@ module.exports = {
   taxModesInRange, voidedCount,
   tendersByMethod, tenderStatuses, tendersOfMethod, changeTotal,
   shiftsForUserInRange, shiftOwner,
+  // TASK-033
+  PRODUCT_SORTS, salesByCategory, salesByCashier, salesByProduct, moversOverview,
+  movementsByType, movementsByProduct, ledgerBalanceAt, ledgerBalancesByProduct, onHandTotal,
 };

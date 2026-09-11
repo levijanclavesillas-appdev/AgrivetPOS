@@ -282,6 +282,7 @@ instant it exists, so it has no due date and nothing to age.
 | :--- | :--- | :--- | :--- |
 | [TASK-029](TASK-029-batches-and-fefo.md) | Batches, expiry status, FEFO allocation | `74a29ab` | `014_batches.sql` — `product_batches`, `sale_item_batches`, `inventory_movements.batch_id`; `batchService` and `batchRepository`; FEFO inside the sale transaction; `MON-004`'s second costing path; `OPS-007`'s two expiry alerts; `GET /products/:id/batches`, `POST /batches/:id/expire`; the opening load's batch columns; `TC-UT-52`–`54`, `TC-INT-107`–`111`, `TC-E2E-23`. And `INV-201` joined `/inventory/reconciliation`, so one page answers whether the ledger is telling the truth |
 | [TASK-042](TASK-042-count-by-batch.md) | Counting batch-tracked stock, by batch | *this commit* | `015_count_by_batch.sql` — `stock_count_lines.batch_id`, and the only table rebuild in this schema's history; the sheet's line per batch, with the product's own totals computed server-side; `TC-UT-56`, `TC-INT-126`–`116`, `TC-E2E-29`. It removed the exclusion `TASK-029` added, along with the two tests that pinned it — the count sheet has one way of treating batch-tracked stock again |
+| [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | *this commit* | `017_analysis_indexes.sql` — one index, on the ledger's date, because movement analysis was the only one of the five with no access path at all. `reportService.byCategory`/`byCashier`/`byProduct`/`movers`/`movements` and five repository queries; `SCR-607`'s four tabs and `SCR-608` behind `TX-422`; CSV on all five; `TC-INT-120`–`122`, `TC-E2E-27`, `TC-PERF-07`. It found that requirement 1 could only be half true — a category cannot carry a transaction discount — so the two breakdowns reconcile to two anchors and each prints which |
 | [TASK-032](TASK-032-payment-reconciliation.md) | Payment reconciliation | *this commit* | `016_reconciliation.sql` — one table, and **no column on `sale_tenders`**, which is `RPT-105`'s prohibition as schema. `reconciliationService`; `GET /reports/reconciliation` and its drill-down; `GET`/`POST /reconciliations`; `SCR-606`; a settlement tolerance of its own; `TC-INT-117`–`119`, `TC-E2E-26`. Both the integration and the e2e case snapshot every sale and tender and assert byte-identity afterwards |
 | [TASK-034](TASK-034-bad-debt-write-off.md) | Bad-debt write-off | `24065f6` | No schema — `WRITE_OFF` had been in `txn_type`'s `CHECK` since `TASK-008` with nothing writing one. `creditService.writeOff` (the allocator's third caller) and `writeOffReport`; `POST /customers/:id/write-off`, `GET /reports/write-offs`; the owner-only control on `SCR-402`; `TC-INT-123`–`125`, `TC-E2E-28`. `CR-303`'s separation was already true by construction, and `TC-INT-125` now holds it there |
 | [TASK-031](TASK-031-statements-and-ageing.md) | Customer statements and ageing buckets | `f91ec53` | No schema. `creditService.statement`, `ageingReport` and their CSVs; `printService.renderStatement`; `GET /customers/:id/statement` and `/reports/ageing`; `SCR-404` and `SCR-605`; `TC-UT-55`, `TC-INT-114`–`116`, `TC-E2E-25`. It found that the rule's own reconciliation was not true as written — ageing sums debts gross and a balance nets them — and reconciles against the arithmetic that is |
@@ -297,7 +298,7 @@ and the alert shipped without anywhere to act on them. Both are now in, and the 
 
 ## Open — v1.2 "Trace"
 
-**The files are written, and seven of the nine are built.** All nine are in the established format,
+**The files are written, and eight of the nine are built.** All nine are in the established format,
 each self-contained enough that an implementer needs it plus the specs it cites and nothing else. Every one of the ten v1.2
 rules in `03_BUSINESS_RULES.md` is claimed by exactly one task, checked mechanically rather than
 by eye, and `07_TEST_PLAN.md` §6.4 reserves the case ids so no two tasks reach for the same
@@ -308,13 +309,12 @@ substrate, `TASK-043` gave it a screen, `TASK-042` made it countable and `TASK-0
 recallable — and none of the four needed a column the first had not already written. What is left
 depends on nothing in v1.2 except each other. `TASK-031` before `TASK-034`, because a
 write-off has to land on a statement and it is cheaper to have the statement first. `TASK-032`,
-`TASK-033` and `TASK-035` depend on nothing in v1.2 and can be taken in any order — though
-`TASK-035` should not be started at all until the store visit, for the reason its own first
-section gives.
+`TASK-033` and `TASK-035` depended on nothing in v1.2 and could be taken in any order; the first
+two are in. `TASK-035` should not be started at all until the store visit, for the reason its own
+first section gives.
 
 | ID | Task | Feature | Depends on |
 | :--- | :--- | :--- | :--- |
-| [TASK-033](TASK-033-sales-analysis.md) | Category, cashier, movers and movement analysis | `FT-602`, `FT-605` | — |
 | [TASK-035](TASK-035-evaluate-sqlcipher.md) | Evaluate SQLCipher encryption against POS latency | `SEC-9` | the store visit |
 
 **Three carry a question that has to be answered before the code is written.** `TASK-029` needs

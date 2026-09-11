@@ -243,3 +243,26 @@
 .reconcile-drill { margin: 1.5rem 0; }
 .reconcile-drill h2 { font-size: 1rem; margin: 0 0 .25rem; }
 .report-reconciliation .rule-note { max-width: 52rem; line-height: 1.5; }
+
+/* ── SCR-607 sales analysis, SCR-608 movement analysis (TASK-033) ─────────── */
+/*
+   Tabs rather than four screens: the range, the header and the export are the same in
+   all four, and the tab strip is the one from the admin panels rather than a second
+   idea about what a tab looks like.
+*/
+.report-analysis .admin-tabs { margin: .5rem 0 1rem; }
+.report-analysis .report-controls { display: flex; align-items: baseline; gap: 1rem;
+  flex-wrap: wrap; margin: .5rem 0; }
+.report-analysis .report-controls select { min-height: var(--touch); padding: 0 .5rem;
+  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.report-analysis .report-controls p { margin: 0; }
+.movers h2 { font-size: 1.0625rem; margin: 1.5rem 0 .25rem; }
+.movers h3 { font-size: .9375rem; margin: 1rem 0 .25rem; color: var(--muted); }
+.mover-unit { margin-bottom: .5rem; }
+/* Requirement 5: a product added inside the range is flagged, not judged. */
+.slow-movers tr.is-new td { color: var(--muted); font-style: italic; }
+
+.movement-types td small { display: block; color: var(--muted); font-size: .75rem; }
+.movement-types tr.is-matched td { background: #f4f7f5; }
+.report-movements h2 { font-size: 1.0625rem; margin: 1.5rem 0 .25rem; }
+.report-movements .rule-note { max-width: 52rem; line-height: 1.5; }

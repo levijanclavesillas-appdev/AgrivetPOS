@@ -28,7 +28,7 @@ const PATHS = {
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
-export function createReport({ root, session, report, onBack, onReconcile = null }) {
+export function createReport({ root, session, report, onBack, onReconcile = null, onAnalyse = null, onMovements = null }) {
   let params = { from: today(), to: today(), shiftId: null };
 
   async function load() {
@@ -81,6 +81,16 @@ export function createReport({ root, session, report, onBack, onReconcile = null
       // the question about it. It changes nothing here — SCR-606 writes no figure back.
       report === 'payments' && onReconcile
         ? h('button', { class: 'row-action', text: 'Reconcile', onclick: () => onReconcile(params) })
+        : null,
+      // SCR-607 (TASK-033), from the screen that shows the total somebody is asking
+      // about. The range travels, so the breakdown is of the week on the screen.
+      report === 'daily' && onAnalyse
+        ? h('button', { class: 'row-action', text: 'Break it down', onclick: () => onAnalyse(params) })
+        : null,
+      // SCR-608. TX-422's report, offered from TX-422's other one: what is on the shelf
+      // and how it got there are the same question from two sides.
+      report === 'valuation' && onMovements
+        ? h('button', { class: 'row-action', text: 'Movement analysis', onclick: () => onMovements(params) })
         : null,
     ]);
   }

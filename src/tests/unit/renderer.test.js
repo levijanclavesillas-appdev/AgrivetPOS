@@ -1901,6 +1901,73 @@ test('SCR-606: the reconciliation states a difference and writes no figure back 
   assert.match(source, /reference_no/);
 });
 
+test('SCR-607: four tabs over one report, and the screen computes none of it (TASK-033)', () => {
+  const source = codeOf('js/reports/analysis.js');
+  const prose = proseOf('js/reports/analysis.js');
+
+  // TC-INT-60's rule, applied to the report that has the most figures to be tempted by.
+  // A share worked out in the renderer is a share that disagrees with the CSV of the
+  // same report the first time somebody rounds differently.
+  assert.equal(/\/ 100|\* 100|Math\.round|reduce\(/.test(source), false,
+    'no figure on it is worked out here — every one is a field the server sent');
+  assert.match(source, /row\.share_bp/);
+  assert.match(source, /row\.margin_bp/);
+  assert.match(source, /data\.totals\.average_sale_centavos/);
+
+  // It reads, and nothing more: an analysis screen has nothing to write.
+  assert.equal(/api\.(post|put|delete)\(/.test(source), false, 'a breakdown writes nothing');
+
+  // FR_6.2 / RPT-101: the check is printed and its failure is called a defect, in the
+  // same words SCR-602 uses — a reader who meets both should meet one vocabulary.
+  assert.match(source, /r\.statement/);
+  assert.match(prose, /does not add up/);
+  assert.match(prose, /defect, not a rounding artefact/);
+
+  // UOM-001: the units ranking is per unit, and says so on the screen.
+  assert.match(source, /data\.units_note/);
+  assert.match(source, /by_units/);
+  // Requirement 5: a product added inside the range is flagged, never judged.
+  assert.match(source, /row\.new_in_range/);
+  assert.match(source, /row\.verdict/);
+
+  // RPT-106's header, on every tab rather than on the first one.
+  assert.match(source, /headerBlock\(data\.header\)/);
+  for (const field of ['from_date', 'tax_mode', 'voided_excluded_count', 'generated_at_manila']) {
+    assert.ok(source.includes(field), `the header shows ${field}`);
+  }
+  // SEC-7: the export is fetched with the session, never followed as a link.
+  assert.match(source, /event\.preventDefault\(\);\s*exportCsv\(\)/);
+});
+
+test('SCR-608: the ledger’s two value columns are never merged into one (TASK-033)', () => {
+  const source = codeOf('js/reports/movements.js');
+  const prose = proseOf('js/reports/movements.js');
+
+  // INV-106 is the reason there are two: a decrease carries no cost, so what a damaged
+  // sack was worth is an estimate that moves the next time a delivery moves an average.
+  // A single merged figure is the comfortable report and the one that silently restates
+  // last quarter's write-offs.
+  assert.match(source, /costed_value_centavos/);
+  assert.match(source, /estimated_value_centavos/);
+  assert.match(source, /BASIS_LABELS/);
+  assert.match(prose, /never one/);
+  assert.match(prose, /INV-106/);
+
+  // INV-101, printed as arithmetic, and its two failures told apart: a ledger that does
+  // not balance is one defect, and a ledger that balances while disagreeing with the
+  // shelf figure the POS sells against is a different one.
+  assert.match(source, /r\.statement/);
+  assert.match(source, /matches_on_hand/);
+  assert.match(prose, /does not match the on-hand figure/);
+  assert.match(prose, /does not reconcile/);
+
+  // UOM-001: no store-wide quantity is presented as a quantity of anything.
+  assert.match(source, /r\.units_note/);
+
+  // It reads. An inventory report has nothing to write, and INV-102 is append-only.
+  assert.equal(/api\.(post|put|delete)\(/.test(source), false, 'a movement report writes nothing');
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

@@ -49,6 +49,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │  REPORTS      SCR-601 Dashboard      SCR-602 Daily sales │
 │               SCR-603 Payments       SCR-604 Inventory   │
 │               SCR-605 Ageing         SCR-606 Reconcile   │
+│               SCR-607 Analysis       SCR-608 Movements   │
 │  ADMIN        SCR-701 Users          SCR-702 Settings    │
 │               SCR-703 Audit          SCR-704 Backup      │
 │               SCR-705 Health         SCR-706 Data        │
@@ -465,6 +466,57 @@ usually turns out to be: a fee, a transfer that landed late, or a sale nobody pa
 there rather than counted twice; credit and store credit settle nowhere at all. And any variance
 drills through to the tenders behind the recorded figure, because "we are ₱50 short" is answered
 by reading down a list until the ₱50 turns up — a missing reference is the first thing to look at.
+
+### `SCR-607` — Sales analysis · `FT-602`, `FT-605` — v1.2
+
+Behind `TX-421`, reached from the daily report with its range — which is the screen somebody is
+already on when they ask *why* the total is what it is. Four tabs over one report: **by category**,
+**by cashier**, **by product** and **movers**. One range, one header, one export in all four.
+
+**What each tab reconciles to is printed on it, because the two anchors are genuinely different.**
+Category figures are line-level and reconcile to revenue net of VAT; cashier figures are sale-level
+and reconcile to net sales before returns. A transaction discount belongs to the sale and not to
+any of its lines, so there is no honest way to split ₱50 off a mixed basket between feed and
+veterinary supplies — and this report does not invent one. A return is its own document with its
+own operator, so it is not charged back to the cashier who made the sale.
+
+**A category is read from the product as it is filed today.** Nothing snapshots it — `MON-005`
+keeps money off the live record and a category is not money — so recategorising a product moves
+its history with it. Stated in the report's own basis line rather than left for somebody to
+discover the month they reorganise the shelves.
+
+**Movers is two rankings and never one.** A sack of feed at ₱1,400 and a sachet at ₱35 sort in
+opposite orders by money and by units; the store reorders on the second and decides what to stock
+more of on the first. The units ranking is **partitioned by base unit** (`UOM-001`) rather than
+filtered to one the reader has to know to ask for — 40 KG and 40 sachets are not 40 of the same
+thing. Slow movers are built from the catalogue outward, so a product that sold nothing appears;
+each row carries what is on the shelf, what it is worth, and when it last sold, because 200 units
+last sold in March is a different problem from two. A product added inside the range is **flagged
+rather than judged** — it has not had the range to sell in.
+
+### `SCR-608` — Movement analysis · `FT-602` — v1.2
+
+Behind `TX-422`, not `TX-421`, and that is why it is a separate screen rather than a fifth tab:
+the person who needs to know what was damaged this quarter is the inventory clerk, who has no
+business reading the day's takings. Reached from the valuation report, because what is on the
+shelf and how it got there are the same question from two sides.
+
+`INV-102`'s ledger summarised by `INV-103`'s types — received, sold, damaged, expired, counted,
+used internally — with the count, the products affected and the value, and a filter down to one
+type and the products behind it.
+
+**Two value columns, never one.** `INV-106` costs a movement on the way *in* and never on the way
+out: a sale or a write-off consumes at the average prevailing at the time, which is used and not
+stored. So what a receipt cost is a fact and what a damaged sack was worth is an estimate at
+today's average — and each row says which it is. A single merged figure would be the comfortable
+report and the one that quietly restates last quarter's write-offs the next time a delivery moves
+an average.
+
+**Quantities are per product, in that product's base unit.** There is no store-wide quantity
+total, because 40 KG of feed and 40 sachets of dewormer are not 80 of anything (`UOM-001`). The
+one place quantities are added across products is the reconciliation, which is a check on the
+ledger's own arithmetic and says so: opening plus what moved is closing (`INV-101`), and closing
+is what the rest of the system reads as stock.
 
 ### `SCR-602`/`603`/`604` — Reports
 
