@@ -100,18 +100,18 @@ expected answer. Record the choice in `05_TECH_SPEC.md` §3.4 either way.
 
 ## Acceptance Criteria
 
-- [ ] 20 consecutive scans add lines with no misses, each under 300 ms at 5,000 products
-- [ ] An unknown barcode offers to attach it; nothing is ever silently dropped
-- [ ] A sack line and a kilo line of the same product both show base unit and pack, and stock-after
-- [ ] The resolved price level is named on the line for a dealer, a wholesale and a walk-in customer
-- [ ] A below-cost price opens the inline authorisation panel and posts both actors
-- [ ] Idle logout, PIN unlock and an app restart each return the cashier to the same cart
-- [ ] A `GCASH` tender with an empty reference cannot complete; a duplicate reference warns and needs acceptance
-- [ ] Complete is disabled until tendered ≥ due; cash over-tender shows change, non-cash cannot
-- [ ] Every non-cash row reads `RECORDED` on screen and on the printed document
-- [ ] The receipt carries the `TAX-006` line in every tax mode; a reprint is stamped `REPRINT`
-- [ ] A tampered client total is rejected by the server and surfaced as a refusal, not a crash
-- [ ] The whole sale — search, quantity, discount, payment, print — is completable without a mouse
+- [ ] 20 consecutive scans add lines with no misses, each under 300 ms at 5,000 products — the scans are asserted by the browser smoke; the 300 ms is `NFR_1.2` on the reference machine (§10 item 6)
+- [x] An unknown barcode offers to attach it; nothing is ever silently dropped
+- [x] A sack line and a kilo line of the same product both show base unit and pack, and stock-after
+- [x] The resolved price level is named on the line for a dealer, a wholesale and a walk-in customer
+- [x] A below-cost price opens the inline authorisation panel and posts both actors
+- [x] Idle logout, PIN unlock and an app restart each return the cashier to the same cart
+- [x] A `GCASH` tender with an empty reference cannot complete; a duplicate reference warns and needs acceptance
+- [x] Complete is disabled until tendered ≥ due; cash over-tender shows change, non-cash cannot
+- [x] Every non-cash row reads `RECORDED` on screen and on the printed document
+- [x] The receipt carries the `TAX-006` line in every tax mode; a reprint is stamped `REPRINT`
+- [x] A tampered client total is rejected by the server and surfaced as a refusal, not a crash
+- [x] The whole sale — search, quantity, discount, payment, print — is completable without a mouse
 
 ## Tests
 

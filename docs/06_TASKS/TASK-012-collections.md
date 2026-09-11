@@ -54,15 +54,15 @@ though a customer handing over ₱3,000 in cash expects paper. `CR-206` closes t
 
 ## Acceptance Criteria
 
-- [ ] ₱3,000 against ₱10,000 leaves ₱7,000
-- [ ] The oldest unsettled sale is marked part-paid, with an allocation row
-- [ ] A collection with no open shift is refused
-- [ ] A non-cash collection without a reference is refused
-- [ ] Overpayment requires explicit confirmation and produces a negative balance
-- [ ] A cash collection raises the shift's expected cash by exactly the amount
-- [ ] The drawer is pulsed on a cash collection
-- [ ] The acknowledgement prints with a `COLL-` number and the `TAX-006` wording
-- [ ] The balance still reconciles to its ledger afterwards
+- [x] ₱3,000 against ₱10,000 leaves ₱7,000
+- [x] The oldest unsettled sale is marked part-paid, with an allocation row
+- [x] A collection with no open shift is refused
+- [x] A non-cash collection without a reference is refused
+- [x] Overpayment requires explicit confirmation and produces a negative balance
+- [x] A cash collection raises the shift's expected cash by exactly the amount
+- [x] The drawer is pulsed on a cash collection
+- [x] The acknowledgement prints with a `COLL-` number and the `TAX-006` wording
+- [x] The balance still reconciles to its ledger afterwards
 
 ## Tests
 

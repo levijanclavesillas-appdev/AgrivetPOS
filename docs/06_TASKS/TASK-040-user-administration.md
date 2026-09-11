@@ -82,13 +82,13 @@ because it is a security-adjacent decision rather than a rendering one.
 
 ## Acceptance Criteria
 
-- [ ] The owner creates a cashier with a PIN, and that cashier can sign in and use `SCR-102`
-- [ ] The last active owner cannot be demoted or deactivated, and the screen says why
-- [ ] A password reset clears a lockout, and the reset user can sign in immediately
-- [ ] A locked account shows the minutes remaining
-- [ ] No password or hash appears anywhere in the DOM or on the trail
-- [ ] Deactivation, not deletion, and past audit rows still name the user
-- [ ] A manager and a cashier are refused the screen server-side, not merely hidden from it
+- [x] The owner creates a cashier with a PIN, and that cashier can sign in and use `SCR-102`
+- [x] The last active owner cannot be demoted or deactivated, and the screen says why
+- [x] A password reset clears a lockout, and the reset user can sign in immediately
+- [x] A locked account shows the minutes remaining
+- [x] No password or hash appears anywhere in the DOM or on the trail
+- [x] Deactivation, not deletion, and past audit rows still name the user
+- [x] A manager and a cashier are refused the screen server-side, not merely hidden from it
 
 ## Tests
 

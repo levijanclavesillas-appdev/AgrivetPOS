@@ -54,13 +54,13 @@ times without ever listing what was configurable. The registry is that list.
 
 ## Acceptance Criteria
 
-- [ ] A fresh install serves the wizard and refuses every other route
-- [ ] Killing the app mid-wizard resumes at step 1 with nothing written
-- [ ] Completion writes exactly one profile, one owner and the full settings set, atomically
-- [ ] The recovery code is shown once and never retrievable afterwards
-- [ ] An unwritable backup folder blocks completion with a clear message
-- [ ] Changing the tax mode requires `TX-425` and is audited with both values
-- [ ] A `grep` for a numeric threshold literal in `services/` returns nothing
+- [x] A fresh install serves the wizard and refuses every other route
+- [x] Killing the app mid-wizard resumes at step 1 with nothing written
+- [x] Completion writes exactly one profile, one owner and the full settings set, atomically
+- [x] The recovery code is shown once and never retrievable afterwards
+- [x] An unwritable backup folder blocks completion with a clear message
+- [x] Changing the tax mode requires `TX-425` and is audited with both values
+- [x] A `grep` for a numeric threshold literal in `services/` returns nothing
 
 ## Tests
 

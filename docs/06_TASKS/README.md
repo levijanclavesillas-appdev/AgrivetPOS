@@ -444,6 +444,16 @@ Tests                  The TC-* cases that must exist and pass.
 Template: `/root/AdWebsite/docs/templates/TASK.template.md`. **Task IDs are permanent and never
 reused** — a closed `TASK-014` stays `TASK-014`.
 
+**An unticked acceptance box means something, and it says what.** The habit of ticking them started
+at `TASK-019`; `TASK-001`–`018` and `TASK-036`–`041` were closed with their boxes still empty, which
+made an empty box ambiguous — *not done* and *never marked* looked identical. They are ticked now
+against the suites that assert them, and the fourteen that are **not** ticked each carry the reason
+on the line. All fourteen are the same reason in different words: a budget that `07_TEST_PLAN.md` §6
+says cannot be settled on a build machine, or something that has to happen at the store — a
+certificate to sign the installer, a clean install, paper through a printer, the UAT sheet in
+`docs/UAT_RECORD.md`. `07_TEST_PLAN.md` §10 is the authority on all of them; these lines point at it
+rather than restating it.
+
 ---
 
 *Chachi's Software Development Service · DTI BN 8089738 · BIR OCN 111RC20260000002455 · TIN 752-951-092-00000*

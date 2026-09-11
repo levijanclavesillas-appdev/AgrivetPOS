@@ -85,15 +85,15 @@ requires the cashier to say so explicitly. A tick that defaults to on is not exp
 
 ## Acceptance Criteria
 
-- [ ] A credit customer can be created with a limit and terms, and appears with them
-- [ ] The profile shows limit, balance, available credit and ageing before anything else
-- [ ] `OVERDUE` renders in the error colour with the number of days
-- [ ] A collection settles the oldest invoice first and the screen shows which ones
-- [ ] Paying in full leaves a zero balance and the screen says so
-- [ ] An overpayment cannot be recorded without an explicit tick, and the excess is named
-- [ ] The acknowledgement's outcome is reported, printed or queued
-- [ ] A cashier without `TX-414` is refused a limit change, with the rule named
-- [ ] A customer with a balance cannot be deactivated
+- [x] A credit customer can be created with a limit and terms, and appears with them
+- [x] The profile shows limit, balance, available credit and ageing before anything else
+- [x] `OVERDUE` renders in the error colour with the number of days
+- [x] A collection settles the oldest invoice first and the screen shows which ones
+- [x] Paying in full leaves a zero balance and the screen says so
+- [x] An overpayment cannot be recorded without an explicit tick, and the excess is named
+- [x] The acknowledgement's outcome is reported, printed or queued
+- [x] A cashier without `TX-414` is refused a limit change, with the rule named
+- [x] A customer with a balance cannot be deactivated
 
 ## Tests
 

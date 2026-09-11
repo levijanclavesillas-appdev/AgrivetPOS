@@ -71,15 +71,15 @@ This is a renderer task.
 
 ## Acceptance Criteria
 
-- [ ] The trail renders newest first, with actor, action, entity and reason
-- [ ] Filtering by actor, action, entity and date range narrows it, and the dropdowns come
+- [x] The trail renders newest first, with actor, action, entity and reason
+- [x] Filtering by actor, action, entity and date range narrows it, and the dropdowns come
       from the server
-- [ ] A row expands to before and after, and both are readable
-- [ ] An override row shows both actors
-- [ ] No control on the screen writes anything
-- [ ] The export downloads, matches the filters, and is itself audited
-- [ ] A manager and a cashier are refused the screen server-side
-- [ ] No secret appears anywhere in the trail or on the screen
+- [x] A row expands to before and after, and both are readable
+- [x] An override row shows both actors
+- [x] No control on the screen writes anything
+- [x] The export downloads, matches the filters, and is itself audited
+- [x] A manager and a cashier are refused the screen server-side
+- [x] No secret appears anywhere in the trail or on the screen
 
 ## Tests
 

@@ -97,18 +97,18 @@ automatically** (`05_TECH_SPEC.md` §7) — migrations are forward-only and neve
 
 ## Acceptance Criteria
 
-- [ ] `npm run build:exe` produces a signed `ChachiAgrivetPOS-Setup-<version>.exe`
-- [ ] A clean install on the reference machine reaches `SCR-001` without administrator rights
-- [ ] An upgrade over a prior install preserves the data, backs up first, and migrates on launch
-- [ ] A failed migration leaves the previous database intact and reports it plainly
-- [ ] Uninstall leaves `agrivet.db` and the backup folder untouched
-- [ ] Cold start to login ≤ 8 s on the reference machine
-- [ ] `TC-E2E-08` passes on the installed build with the machine's networking disabled
-- [ ] All ten `07_TEST_PLAN.md` §8 UAT checks pass on the store's hardware, owner signed
-- [ ] "This is not an official receipt" read on a physically printed document
-- [ ] Zero open S1 or S2 defects
-- [ ] `07_TEST_PLAN.md` §10 updated with the dated, per-criterion outcome
-- [ ] `docs/HANDOVER.md` exists and covers recovery code, restore, and the off-machine copy
+- [ ] `npm run build:exe` produces a signed `ChachiAgrivetPOS-Setup-<version>.exe` — the `.exe` builds; **signing waits on the certificate**
+- [ ] A clean install on the reference machine reaches `SCR-001` without administrator rights — UAT (§10 item 9)
+- [ ] An upgrade over a prior install preserves the data, backs up first, and migrates on launch — the migrate-on-launch half is `TC-INT-*` and green; the installer half is UAT
+- [x] A failed migration leaves the previous database intact and reports it plainly
+- [ ] Uninstall leaves `agrivet.db` and the backup folder untouched — UAT (§10 item 9)
+- [ ] Cold start to login ≤ 8 s on the reference machine — `NFR_1.4` on the reference machine (§10 item 6)
+- [ ] `TC-E2E-08` passes on the installed build with the machine's networking disabled — green against throwing network stubs; the cable-out version is UAT check F (§10 item 7)
+- [ ] All ten `07_TEST_PLAN.md` §8 UAT checks pass on the store's hardware, owner signed — **not started** (§10 item 9). `docs/UAT_RECORD.md` is the sheet
+- [ ] "This is not an official receipt" read on a physically printed document — **not done** (§10 item 11)
+- [ ] Zero open S1 or S2 defects — none known, and nothing has run in the store (§10 item 5)
+- [x] `07_TEST_PLAN.md` §10 updated with the dated, per-criterion outcome
+- [x] `docs/HANDOVER.md` exists and covers recovery code, restore, and the off-machine copy
 
 ## Tests
 

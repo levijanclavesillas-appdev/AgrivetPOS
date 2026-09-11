@@ -84,15 +84,15 @@ place `OPS-005` says must not exist.
 
 ## Acceptance Criteria
 
-- [ ] Every registered setting appears, grouped, with its rule id and what it does
-- [ ] A new setting added to `settingsService` appears on the screen with no change to it
-- [ ] An `INT` outside its bounds is refused and the message names the rule
-- [ ] A `STRING` with `one_of` renders as a select and cannot be given another value
-- [ ] A manager is refused an owner-only setting by the server, and the screen shows why
-- [ ] The printer transport, the receipt width and the backup folder can all be set here
-- [ ] The print test button prints, or says it queued
-- [ ] The tax mode can be changed by an owner, with the consequence stated first
-- [ ] A settings change is audited with both values
+- [x] Every registered setting appears, grouped, with its rule id and what it does
+- [x] A new setting added to `settingsService` appears on the screen with no change to it
+- [x] An `INT` outside its bounds is refused and the message names the rule
+- [x] A `STRING` with `one_of` renders as a select and cannot be given another value
+- [x] A manager is refused an owner-only setting by the server, and the screen shows why
+- [x] The printer transport, the receipt width and the backup folder can all be set here
+- [x] The print test button prints, or says it queued
+- [x] The tax mode can be changed by an owner, with the consequence stated first
+- [x] A settings change is audited with both values
 
 ## Tests
 

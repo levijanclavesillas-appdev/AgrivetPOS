@@ -95,17 +95,17 @@ count with the expected figure, because a pre-filled count is a count nobody mad
 
 ## Acceptance Criteria
 
-- [ ] A cashier opens a shift, and a second attempt resumes it rather than opening another
-- [ ] The open drawer shows every term of `POS-509`, and they add up to the expected figure
-- [ ] Cash in and cash out move the expected figure, and a listed reason is required
-- [ ] The close shows expected against counted per method, with `CREDIT` explained
-- [ ] The counted fields are empty until somebody types in them
-- [ ] A variance beyond tolerance cannot be closed without a reason, and the screen says which
+- [x] A cashier opens a shift, and a second attempt resumes it rather than opening another
+- [x] The open drawer shows every term of `POS-509`, and they add up to the expected figure
+- [x] Cash in and cash out move the expected figure, and a listed reason is required
+- [x] The close shows expected against counted per method, with `CREDIT` explained
+- [x] The counted fields are empty until somebody types in them
+- [x] A variance beyond tolerance cannot be closed without a reason, and the screen says which
       row and how much before the reason is typed
-- [ ] A long shift closing with a variance opens the authorisation panel
-- [ ] The summary prints, and the backup's outcome is on the screen that closed the shift
-- [ ] A closed shift offers no edit
-- [ ] A manager closing another user's shift is told whose it is
+- [x] A long shift closing with a variance opens the authorisation panel
+- [x] The summary prints, and the backup's outcome is on the screen that closed the shift
+- [x] A closed shift offers no edit
+- [x] A manager closing another user's shift is told whose it is
 
 ## Tests
 

@@ -87,16 +87,16 @@ recorded as contradiction 6 and resolved as `FT-602`, **v1.2**. Do not quietly b
 
 ## Acceptance Criteria
 
-- [ ] Every dashboard tile equals the report it links to, for the same day, to the centavo
-- [ ] The daily sales report prints its reconciliation line, and it balances after the E2E day
-- [ ] `net` equals `SUM(tenders) − change` on a day containing split tenders and change
-- [ ] A voided sale is absent from net in all three reports and present in the ledger
-- [ ] Every report header states range, tax mode and void inclusion
-- [ ] Payment report labels every GCash and QR Ph row `RECORDED`
-- [ ] Valuation matches a hand-computed figure from the movement ledger, with an as-of timestamp
-- [ ] CSV export matches the screen figure for figure
-- [ ] A `CASHIER` calling `GET /reports/daily` for another shift is refused 403 and audited
-- [ ] Dashboard loads in ≤ 3 s against a seeded 100,000-line database
+- [x] Every dashboard tile equals the report it links to, for the same day, to the centavo
+- [x] The daily sales report prints its reconciliation line, and it balances after the E2E day
+- [x] `net` equals `SUM(tenders) − change` on a day containing split tenders and change
+- [x] A voided sale is absent from net in all three reports and present in the ledger
+- [x] Every report header states range, tax mode and void inclusion
+- [x] Payment report labels every GCash and QR Ph row `RECORDED`
+- [x] Valuation matches a hand-computed figure from the movement ledger, with an as-of timestamp
+- [x] CSV export matches the screen figure for figure
+- [x] A `CASHIER` calling `GET /reports/daily` for another shift is refused 403 and audited
+- [ ] Dashboard loads in ≤ 3 s against a seeded 100,000-line database — `TC-PERF-05` measures 355 ms median on a build machine, which settles nothing about `NFR_1.5` (§10 item 6)
 
 ## Tests
 

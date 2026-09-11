@@ -58,15 +58,15 @@ reaches a customer.
 
 ## Acceptance Criteria
 
-- [ ] Precedence resolves customer → quantity break → level → retail, with the two v1.1 levels stubbed
-- [ ] The resolved level is returned and is what the sale line records
-- [ ] A wholesale customer with no wholesale price is charged retail, not zero
-- [ ] `NONE` and `NON_VAT` produce zero tax and no VAT block
-- [ ] `VAT` mode: inclusive ₱1,120 VATable → net ₱1,000, VAT ₱120
-- [ ] A basket of VATable and exempt lines decomposes per line, not in aggregate
-- [ ] A cashier discount above 2% is refused, naming the role that can approve it
-- [ ] A below-cost price is refused without `TX-404`
-- [ ] No discount can make a line negative
+- [x] Precedence resolves customer → quantity break → level → retail, with the two v1.1 levels stubbed
+- [x] The resolved level is returned and is what the sale line records
+- [x] A wholesale customer with no wholesale price is charged retail, not zero
+- [x] `NONE` and `NON_VAT` produce zero tax and no VAT block
+- [x] `VAT` mode: inclusive ₱1,120 VATable → net ₱1,000, VAT ₱120
+- [x] A basket of VATable and exempt lines decomposes per line, not in aggregate
+- [x] A cashier discount above 2% is refused, naming the role that can approve it
+- [x] A below-cost price is refused without `TX-404`
+- [x] No discount can make a line negative
 
 ## Tests
 

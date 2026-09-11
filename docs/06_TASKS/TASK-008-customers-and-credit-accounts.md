@@ -59,14 +59,14 @@ overdue account as current.
 
 ## Acceptance Criteria
 
-- [ ] A credit-eligible customer must have a limit and terms
-- [ ] Available credit = limit − balance, computed, never stored
-- [ ] Balance always equals the sum of its credit transactions
-- [ ] Ageing changes across a date boundary with no job running
-- [ ] Due date is fixed at sale time and unaffected by a later terms change
-- [ ] A limit change requires `TX-414` and audits both values
-- [ ] A customer with a balance cannot be deactivated
-- [ ] A transacted customer cannot be deleted, only deactivated
+- [x] A credit-eligible customer must have a limit and terms
+- [x] Available credit = limit − balance, computed, never stored
+- [x] Balance always equals the sum of its credit transactions
+- [x] Ageing changes across a date boundary with no job running
+- [x] Due date is fixed at sale time and unaffected by a later terms change
+- [x] A limit change requires `TX-414` and audits both values
+- [x] A customer with a balance cannot be deactivated
+- [x] A transacted customer cannot be deleted, only deactivated
 
 ## Tests
 

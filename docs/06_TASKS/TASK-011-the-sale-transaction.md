@@ -70,16 +70,16 @@ movements and its credit transaction commit together or not at all.
 
 ## Acceptance Criteria
 
-- [ ] The twelve steps execute in the documented order
-- [ ] A tampered client total is rejected, not banked
-- [ ] Split tender ₱600 cash + ₱400 GCash completes a ₱1,000 sale; ₱600 alone does not
-- [ ] A GCash tender with an empty reference is rejected
-- [ ] A duplicate same-day reference warns and requires explicit acceptance
-- [ ] Over-limit credit is blocked, and an override records both actors
-- [ ] **An injected failure after the movements leaves no sale, no movement and no balance change**
-- [ ] Changing a product's cost afterwards does not change that sale's gross profit
-- [ ] Sale numbers are gapless per day, and a rolled-back sale consumes none
-- [ ] A completed sale has no update path in any repository
+- [x] The twelve steps execute in the documented order
+- [x] A tampered client total is rejected, not banked
+- [x] Split tender ₱600 cash + ₱400 GCash completes a ₱1,000 sale; ₱600 alone does not
+- [x] A GCash tender with an empty reference is rejected
+- [x] A duplicate same-day reference warns and requires explicit acceptance
+- [x] Over-limit credit is blocked, and an override records both actors
+- [x] **An injected failure after the movements leaves no sale, no movement and no balance change**
+- [x] Changing a product's cost afterwards does not change that sale's gross profit
+- [x] Sale numbers are gapless per day, and a rolled-back sale consumes none
+- [x] A completed sale has no update path in any repository
 
 ## Tests
 

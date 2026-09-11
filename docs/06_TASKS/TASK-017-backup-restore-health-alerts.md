@@ -93,17 +93,17 @@ trading a consistent one.
 
 ## Acceptance Criteria
 
-- [ ] A shift close writes a timestamped backup and reports whether it verified
-- [ ] The 31st backup prunes the oldest, and only after the 31st has verified
-- [ ] A deliberately corrupted backup target fails verification, raises an alert, and does **not** update "last successful backup"
-- [ ] A backup taken while a sale is mid-flight restores to a consistent database
-- [ ] A restore is owner-only, takes a pre-restore backup, needs the filename typed, and is audited
-- [ ] A restore is refused while a shift is open
-- [ ] Clock advanced past the backup period raises a non-dismissible launch warning
-- [ ] Clock set earlier than the last transaction raises the anomaly alert, is audited, and selling continues
-- [ ] `SCR-705` reports all six `OPS-006` figures against a seeded database
-- [ ] `SCR-704` states the shared-drive warning in plain words
-- [ ] `kill -9` during the E2E sale loop leaves a consistent ledger with no partial and no lost sale
+- [x] A shift close writes a timestamped backup and reports whether it verified
+- [x] The 31st backup prunes the oldest, and only after the 31st has verified
+- [x] A deliberately corrupted backup target fails verification, raises an alert, and does **not** update "last successful backup"
+- [x] A backup taken while a sale is mid-flight restores to a consistent database
+- [x] A restore is owner-only, takes a pre-restore backup, needs the filename typed, and is audited
+- [x] A restore is refused while a shift is open
+- [x] Clock advanced past the backup period raises a non-dismissible launch warning
+- [x] Clock set earlier than the last transaction raises the anomaly alert, is audited, and selling continues
+- [x] `SCR-705` reports all six `OPS-006` figures against a seeded database
+- [x] `SCR-704` states the shared-drive warning in plain words
+- [x] `kill -9` during the E2E sale loop leaves a consistent ledger with no partial and no lost sale
 
 ## Tests
 

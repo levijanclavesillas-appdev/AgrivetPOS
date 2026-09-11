@@ -54,13 +54,13 @@ computed.
 
 ## Acceptance Criteria
 
-- [ ] 1.255 KG at ₱62.50/KG bills ₱78.44 (half-up)
-- [ ] 1,000 such lines sum to exactly 1,000× the single line — no drift
-- [ ] A quantity with four decimals is **rejected**, never silently truncated
-- [ ] A transaction discount apportions to the centavo with the remainder on the largest line
-- [ ] Moving average across two receipts at different costs matches a hand-computed figure
-- [ ] Sale, damage and negative adjustment leave average cost untouched
-- [ ] A `grep` for `parseFloat`, `Number(` or `/ 100` on a money path returns nothing outside the display edge
+- [x] 1.255 KG at ₱62.50/KG bills ₱78.44 (half-up)
+- [x] 1,000 such lines sum to exactly 1,000× the single line — no drift
+- [x] A quantity with four decimals is **rejected**, never silently truncated
+- [x] A transaction discount apportions to the centavo with the remainder on the largest line
+- [x] Moving average across two receipts at different costs matches a hand-computed figure
+- [x] Sale, damage and negative adjustment leave average cost untouched
+- [x] A `grep` for `parseFloat`, `Number(` or `/ 100` on a money path returns nothing outside the display edge
 
 ## Tests
 

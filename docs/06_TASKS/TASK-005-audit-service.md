@@ -52,13 +52,13 @@ history.
 
 ## Acceptance Criteria
 
-- [ ] A price change writes exactly one row carrying both values
-- [ ] An override writes requester and approver as distinct actors
-- [ ] A hash or token placed in a `before`/`after` payload is stripped by the service
-- [ ] No repository method updates or deletes an audit row
-- [ ] Deactivating a user leaves their historical rows fully attributed
-- [ ] Browse filters work and are refused without `TX-429`
-- [ ] An audit write inside a rolled-back business transaction rolls back with it
+- [x] A price change writes exactly one row carrying both values
+- [x] An override writes requester and approver as distinct actors
+- [x] A hash or token placed in a `before`/`after` payload is stripped by the service
+- [x] No repository method updates or deletes an audit row
+- [x] Deactivating a user leaves their historical rows fully attributed
+- [x] Browse filters work and are refused without `TX-429`
+- [x] An audit write inside a rolled-back business transaction rolls back with it
 
 ## Tests
 

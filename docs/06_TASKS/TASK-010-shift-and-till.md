@@ -56,15 +56,15 @@ auto-closed, because auto-closing invents a count nobody made (`POS-508`).
 
 ## Acceptance Criteria
 
-- [ ] A sale and a collection are both refused with no open shift, with a clear prompt
-- [ ] A second open attempt resumes the existing shift rather than creating a second
-- [ ] Opening float is required and confirmed
-- [ ] A till movement without a listed reason is rejected
-- [ ] Cash out exceeding drawer cash is refused
-- [ ] A till movement writes no inventory movement and no credit transaction
-- [ ] `computeExpected` matches a hand-computed scripted shift, to the centavo
-- [ ] A shift open past the maximum raises an alert
-- [ ] The drawer interface is called on every till movement
+- [x] A sale and a collection are both refused with no open shift, with a clear prompt
+- [x] A second open attempt resumes the existing shift rather than creating a second
+- [x] Opening float is required and confirmed
+- [x] A till movement without a listed reason is rejected
+- [x] Cash out exceeding drawer cash is refused
+- [x] A till movement writes no inventory movement and no credit transaction
+- [x] `computeExpected` matches a hand-computed scripted shift, to the centavo
+- [x] A shift open past the maximum raises an alert
+- [x] The drawer interface is called on every till movement
 
 ## Tests
 

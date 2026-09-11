@@ -55,15 +55,15 @@ would silently reinterpret every historical quantity in the ledger.
 
 ## Acceptance Criteria
 
-- [ ] A product cannot be created without SKU, name, category, base unit and retail price
-- [ ] Duplicate SKU and duplicate barcode both rejected, case-insensitively
-- [ ] Base unit editable before any movement, refused after, with the reason shown
-- [ ] Two barcodes resolve to the same product; a weight-embedded barcode is rejected clearly
-- [ ] A pack factor of 0 or negative is rejected
-- [ ] A product with no wholesale price returns retail for a wholesale customer
-- [ ] Cost absent from the payload for a `CASHIER`; present for `OWNER`
-- [ ] A referenced product cannot be deleted, only deactivated
-- [ ] Search and barcode lookup meet their budgets at 5,000 products
+- [x] A product cannot be created without SKU, name, category, base unit and retail price
+- [x] Duplicate SKU and duplicate barcode both rejected, case-insensitively
+- [x] Base unit editable before any movement, refused after, with the reason shown
+- [x] Two barcodes resolve to the same product; a weight-embedded barcode is rejected clearly
+- [x] A pack factor of 0 or negative is rejected
+- [x] A product with no wholesale price returns retail for a wholesale customer
+- [x] Cost absent from the payload for a `CASHIER`; present for `OWNER`
+- [x] A referenced product cannot be deleted, only deactivated
+- [ ] Search and barcode lookup meet their budgets at 5,000 products — `TC-PERF-02` measures and is green; `07_TEST_PLAN.md` §6 says a figure from a build machine is not a result (§10 item 6)
 
 ## Tests
 

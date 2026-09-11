@@ -56,14 +56,14 @@ is issued in `TASK-004`'s wizard rather than on demand.
 
 ## Acceptance Criteria
 
-- [ ] Wrong password is rejected without disclosing which field was wrong
-- [ ] 5 failures lock the account 15 minutes, and the lock survives a restart
-- [ ] Idle past the timeout locks the screen and preserves the cart
-- [ ] PIN unlock reaches POS and collections; refused on settings, users and cost fields
-- [ ] Every route refuses an actor lacking its `TX-*` with 403, and the refusal is audited
-- [ ] Recovery code works exactly once, is replaced, and audits before the reset
-- [ ] The last active owner cannot be deactivated or demoted
-- [ ] No response body anywhere contains a hash
+- [x] Wrong password is rejected without disclosing which field was wrong
+- [x] 5 failures lock the account 15 minutes, and the lock survives a restart
+- [x] Idle past the timeout locks the screen and preserves the cart
+- [x] PIN unlock reaches POS and collections; refused on settings, users and cost fields
+- [x] Every route refuses an actor lacking its `TX-*` with 403, and the refusal is audited
+- [x] Recovery code works exactly once, is replaced, and audits before the reset
+- [x] The last active owner cannot be deactivated or demoted
+- [x] No response body anywhere contains a hash
 
 ## Tests
 

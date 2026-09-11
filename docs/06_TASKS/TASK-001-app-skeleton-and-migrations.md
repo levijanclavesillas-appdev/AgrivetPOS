@@ -53,14 +53,14 @@ PostgreSQL portability requirement, and it is cheap now and expensive later.
 
 ## Acceptance Criteria
 
-- [ ] `npm start` serves `/api/v1/health` on `127.0.0.1` and nothing on the LAN interface
-- [ ] `npm run start:electron` opens a window against that server
-- [ ] A fresh database applies `001` and records it in `schema_migrations`
-- [ ] Re-running migrations is a no-op
-- [ ] A database at version 99 against a binary knowing 1 **refuses to start** with a clear message
-- [ ] All four pragmas verified as set on an open connection
-- [ ] `TC-UT-99` passes on the empty skeleton
-- [ ] `npm run build:exe` produces `ChachiAgrivetPOS-Setup-<version>.exe`
+- [x] `npm start` serves `/api/v1/health` on `127.0.0.1` and nothing on the LAN interface
+- [x] `npm run start:electron` opens a window against that server
+- [x] A fresh database applies `001` and records it in `schema_migrations`
+- [x] Re-running migrations is a no-op
+- [x] A database at version 99 against a binary knowing 1 **refuses to start** with a clear message
+- [x] All four pragmas verified as set on an open connection
+- [x] `TC-UT-99` passes on the empty skeleton
+- [x] `npm run build:exe` produces `ChachiAgrivetPOS-Setup-<version>.exe`
 
 ## Tests
 

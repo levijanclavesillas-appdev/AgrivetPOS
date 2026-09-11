@@ -60,14 +60,14 @@ location entity exists (`02_PRD.md` §7).
 
 ## Acceptance Criteria
 
-- [ ] `SUM(movements.qty_milli) = inventory.qty_on_hand_milli` for every product after the E2E day
-- [ ] No repository method updates or deletes a movement
-- [ ] A correction cites the movement it corrects
-- [ ] Negative stock blocked by default; permitted and flagged when the setting is on
-- [ ] Average cost changes on receipt, and does not change on sale, damage or negative adjustment
-- [ ] An adjustment without a listed reason is rejected
-- [ ] An adjustment above the threshold requires owner authorisation and records both actors
-- [ ] Selling down to the minimum surfaces the product in low stock within one refresh
+- [x] `SUM(movements.qty_milli) = inventory.qty_on_hand_milli` for every product after the E2E day
+- [x] No repository method updates or deletes a movement
+- [x] A correction cites the movement it corrects
+- [x] Negative stock blocked by default; permitted and flagged when the setting is on
+- [x] Average cost changes on receipt, and does not change on sale, damage or negative adjustment
+- [x] An adjustment without a listed reason is rejected
+- [x] An adjustment above the threshold requires owner authorisation and records both actors
+- [x] Selling down to the minimum surfaces the product in low stock within one refresh
 
 ## Tests
 

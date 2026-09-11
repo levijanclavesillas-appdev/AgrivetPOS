@@ -61,14 +61,14 @@ never roll back a committed sale.
 
 ## Acceptance Criteria
 
-- [ ] Both column widths render legibly against the real printer (`TASK-018` UAT)
-- [ ] Every document carries "This is not an official receipt"
-- [ ] **No template contains "Official Receipt", "Sales Invoice", "OR No.", a permit number or an ATP range** — asserted by test
-- [ ] `VAT` mode prints the tax summary block; `NONE` and `NON_VAT` do not
-- [ ] Non-cash tenders print `RECORDED`
-- [ ] The drawer pulses on cash sale, cash collection and till movement; not on pure credit
-- [ ] A reprint is stamped and audited, and requires `TX-430`
-- [ ] Unplugging the printer mid-print leaves the sale committed and raises a toast
+- [ ] Both column widths render legibly against the real printer (`TASK-018` UAT) — UAT check 10; it has never been read on paper (§10 item 11)
+- [x] Every document carries "This is not an official receipt"
+- [x] **No template contains "Official Receipt", "Sales Invoice", "OR No.", a permit number or an ATP range** — asserted by test
+- [x] `VAT` mode prints the tax summary block; `NONE` and `NON_VAT` do not
+- [x] Non-cash tenders print `RECORDED`
+- [x] The drawer pulses on cash sale, cash collection and till movement; not on pure credit
+- [x] A reprint is stamped and audited, and requires `TX-430`
+- [x] Unplugging the printer mid-print leaves the sale committed and raises a toast
 
 ## Tests
 

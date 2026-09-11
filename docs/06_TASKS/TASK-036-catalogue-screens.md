@@ -101,20 +101,20 @@ roughly where; an absent one tells them nothing.
 
 ## Acceptance Criteria
 
-- [ ] A store with an empty catalogue can create a category, a unit and a product without
+- [x] A store with an empty catalogue can create a category, a unit and a product without
       leaving the editor
-- [ ] A product with movements shows its base unit locked, with the reason and the correction
+- [x] A product with movements shows its base unit locked, with the reason and the correction
       path named
-- [ ] A pack states its conversion in words, and selling by that pack deducts base units
-- [ ] Cost is absent — not disabled — for `MANAGER`, `CASHIER` and `INVENTORY`
-- [ ] A price change is refused for a role without `TX-411`, and the refusal names the rule
-- [ ] An adjustment below the threshold posts; one above it requires an approver and posts both
+- [x] A pack states its conversion in words, and selling by that pack deducts base units
+- [x] Cost is absent — not disabled — for `MANAGER`, `CASHIER` and `INVENTORY`
+- [x] A price change is refused for a role without `TX-411`, and the refusal names the rule
+- [x] An adjustment below the threshold posts; one above it requires an approver and posts both
       actors
-- [ ] An adjustment reason outside the configured list cannot be chosen
-- [ ] The low-stock screen lists exactly what `GET /inventory/low-stock` returns, and the
+- [x] An adjustment reason outside the configured list cannot be chosen
+- [x] The low-stock screen lists exactly what `GET /inventory/low-stock` returns, and the
       dashboard tile opens it
-- [ ] Search returns a first result within 500 ms at 5,000 products
-- [ ] The whole of a cutover — category, unit, product, barcode, pack, price, opening stock —
+- [ ] Search returns a first result within 500 ms at 5,000 products — `NFR_1.3` on the reference machine (§10 item 6)
+- [x] The whole of a cutover — category, unit, product, barcode, pack, price, opening stock —
       is completable from these screens with no HTTP client
 
 ## Tests

@@ -55,14 +55,14 @@ POS's history stops being evidence.
 
 ## Acceptance Criteria
 
-- [ ] Expected per method matches a scripted shift to the centavo
-- [ ] A ₱200 short close demands a reason and is refused without one
-- [ ] The close writes `AUD-602` with the variance and the reason
-- [ ] Closing another user's shift requires `TX-419`
-- [ ] No endpoint mutates a closed shift or anything inside it
-- [ ] A successful close writes a backup and reports its verification status
-- [ ] A backup failure raises an alert and does not reopen the shift
-- [ ] The closing summary prints with the `TAX-006` wording
+- [x] Expected per method matches a scripted shift to the centavo
+- [x] A ₱200 short close demands a reason and is refused without one
+- [x] The close writes `AUD-602` with the variance and the reason
+- [x] Closing another user's shift requires `TX-419`
+- [x] No endpoint mutates a closed shift or anything inside it
+- [x] A successful close writes a backup and reports its verification status
+- [x] A backup failure raises an alert and does not reopen the shift
+- [x] The closing summary prints with the `TAX-006` wording
 
 ## Tests
 
