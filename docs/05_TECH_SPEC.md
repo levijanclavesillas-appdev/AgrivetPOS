@@ -1079,6 +1079,25 @@ A batch holding **zero** is on the sheet, deliberately: a batch the system belie
 is exactly the one that turns up at the back of the fridge, and a sheet that omitted it would
 have no line to write the discovery on.
 
+### 3.4.8 v1.2 schema — payment reconciliation (`TASK-032`)
+
+`016_reconciliation.sql`, one table and no alteration to any other — and the absence is the
+point. `POS-206` admits that no payment API confirms a GCash or QRPh transfer for this store, so
+`sale_tenders.status` allows only `RECORDED` and `006_sales.sql`'s `CHECK` is written so
+`VERIFIED` cannot be stored. **This migration adds no column to `sale_tenders` and never will**:
+`RPT-105` forbids adjusting a recorded figure, and a schema that could hold "confirmed" is one a
+report would eventually print.
+
+`payment_reconciliations` holds one comparison: a Manila-day range, one settling method
+(`GCASH`, `QRPH`, `OTHER` — `CASH` is reconciled at the shift close and credit settles nowhere),
+what the POS recorded, what the statement said, the difference, a reference and a reason.
+
+**The recorded figures are stored rather than recomputed on read**, which looks redundant and is
+not: they are what the operator was shown when they judged the variance and wrote the reason. A
+void afterwards moves the derived total, and a reconciliation whose recorded figure silently
+changed under its own reason is a record of nothing — the same reasoning `MON-005` applies to a
+sale's cost snapshot and `INV-110` to a count's expected quantity.
+
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
@@ -1101,6 +1120,7 @@ migrations/012_stock_counts.sql     stock count sessions and lines (INV-110 – 
 migrations/013_negotiated_pricing.sql customer prices and quantity breaks (PR-103, PR-104)
 migrations/014_batches.sql          batches, ledger batch_id, sale_item_batches (INV-201 – INV-206)
 migrations/015_count_by_batch.sql   stock_count_lines.batch_id — counting by batch (INV-110, INV-201)
+migrations/016_reconciliation.sql   payment_reconciliations — RPT-105, and no column on sale_tenders
 ```
 
 
@@ -1129,6 +1149,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/customers/:id/statement/print` | `TX-421` | `CR-206`'s precedent — a document a customer takes away, with `TAX-006`'s notice on it |
 | `GET` | `/customers/:id/statement/export.csv` | `TX-426` | the same call the screen makes |
 | `POST` | `/customers/:id/write-off` | `TX-413` → `TX-417` | `CR-303`, `FT-409`. **The door is `TX-413` and the rule is `TX-417`** — the same shape the void uses (`TX-401` at the edge, `POS-403` inside): a route behind `TX-417` would answer a manager with a bare 403 from the middleware, before anything could audit the attempt or say what they *can* do |
+| `GET` | `/reports/reconciliation?from=&to=` | `TX-421` | `RPT-105`, `SCR-606`. What the POS **recorded** per settling method, from `RPT-102`'s own query — read, never written |
+| `GET` | `/reports/reconciliation/tenders?from=&to=&method=` | `TX-421` | The tenders behind one recorded total, so a variance can be found rather than only stated |
+| `GET` `POST` | `/reconciliations` | `TX-421` | `RPT-105`. **No `PUT`, no `DELETE`, and no route that names a sale** — correcting a reconciliation means reconciling again, and the prohibition on adjusting a recorded figure is kept by the absence of the path |
 | `GET` | `/reports/write-offs?from=&to=` | `TX-421` | `CR-303`'s separation, in the one place a write-off is counted. It is in no collections figure |
 | `GET` | `/reports/ageing` | `TX-421` | `CR-301`, `SCR-605`. Four buckets **per unsettled debit**, not per account, plus what customers hold in credit — which is never netted into a bucket, and is what makes the report tie to the ledger |
 | `GET` | `/reports/ageing/export.csv` | `TX-426` | |

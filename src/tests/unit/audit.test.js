@@ -120,7 +120,12 @@ test('every registered action carries a label and the rule that requires it', ()
     // required by INV-110 and INV-112 rather than by AUD-601, which names only the
     // posting. The omission was accidental — no action had cited an INV rule before —
     // and a pattern that silently excludes a whole prefix is a guard with a hole in it.
-    assert.match(declared.rule, /^(AUD-60[1-6]|SEC-\d+|VR-\d+|CR-\d+|POS-\d+|PO-\d+|INV-\d+|OPS-\d+|FR_[\d.]+)$/, `${name}: name the rule requiring it`);
+    //
+    // `RPT-` joined it with TASK-032, for the same reason and by the same route: a
+    // payment reconciliation writes no figure anywhere (RPT-105 forbids it), so the
+    // audit row is the only record that the comparison was made by somebody — and the
+    // rule requiring it is RPT-105 rather than anything in the AUD- range.
+    assert.match(declared.rule, /^(AUD-60[1-6]|SEC-\d+|VR-\d+|CR-\d+|POS-\d+|PO-\d+|INV-\d+|OPS-\d+|RPT-\d+|FR_[\d.]+)$/, `${name}: name the rule requiring it`);
   }
 });
 

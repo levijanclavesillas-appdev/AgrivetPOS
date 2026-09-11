@@ -20,6 +20,7 @@
 const express = require('express');
 const reportService = require('../services/reportService');
 const creditService = require('../services/creditService');
+const reconciliationService = require('../services/reconciliationService');
 const permissions = require('../services/permissions');
 const alertService = require('../services/alertService');
 const errors = require('../services/errors');
@@ -105,6 +106,38 @@ router.get('/reports/ageing', readSales, (req, res, next) => {
       includeZero: req.query.includeZero === 'true',
       // The scope check the middleware cannot make: TX-421 grants a cashier OWN_SHIFT,
       // and the receivable has no shift to scope it to.
+      actor: req.session,
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * `RPT-105` — what the POS recorded, ready to be compared against a statement.
+ *
+ * A read. Every figure on it comes from the payments report's own query, and nothing
+ * this route reaches can write to a sale or a tender.
+ */
+router.get('/reports/reconciliation', readSales, (req, res, next) => {
+  try {
+    res.json(reconciliationService.recorded({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      actor: req.session,
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Requirement 8: the tenders behind one method's total, so the ₱50 can be found. */
+router.get('/reports/reconciliation/tenders', readSales, (req, res, next) => {
+  try {
+    res.json(reconciliationService.drill({
+      from: dateParam(req.query.from) || dateParam(req.query.date),
+      to: dateParam(req.query.to),
+      method: req.query.method,
       actor: req.session,
     }));
   } catch (err) {

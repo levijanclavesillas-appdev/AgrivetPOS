@@ -78,14 +78,17 @@ asked for twice.
 
 ## Acceptance Criteria
 
-- [ ] Recorded per-method totals match the payment report exactly for the same range
-- [ ] Entering an actual produces a variance and changes nothing about any sale or tender
-- [ ] A variance beyond tolerance cannot be saved without a reason
-- [ ] `CREDIT` and `STORE_CREDIT` are excluded, and the screen says why
-- [ ] Cash shows its shift-close reconciliation rather than asking for a second count
-- [ ] Reconciling the same range twice for one method is refused or flagged
-- [ ] A variance drills through to the tenders behind the recorded total
-- [ ] The audit row carries the range, both figures, the variance and the reason
+- [x] Recorded per-method totals match the payment report exactly for the same range
+- [x] Entering an actual produces a variance and changes nothing about any sale or tender —
+      asserted as a byte-level snapshot, because a test that only checked the variance would
+      pass against an implementation that quietly fixed the books
+- [x] A variance beyond tolerance cannot be saved without a reason
+- [x] `CREDIT` and `STORE_CREDIT` are excluded, and the screen says why
+- [x] Cash shows its shift-close reconciliation rather than asking for a second count
+- [x] Reconciling the same range twice for one method is **refused**, and the refusal quotes the
+      answer already on record — the second answer is the one that would be believed
+- [x] A variance drills through to the tenders behind the recorded total
+- [x] The audit row carries the range, both figures, the variance and the reason
 
 ## Tests
 
@@ -95,6 +98,29 @@ asked for twice.
 | `TC-INT-118` | Tolerance: a reason is required beyond it and not within it |
 | `TC-INT-119` | Recorded totals agree with `RPT-102`'s payment report for the same range |
 | `TC-E2E-26` | A week of mixed tenders, a GCash statement short by one sale, and the variance that finds it |
+
+**The schema file is `016_reconciliation.sql`, not `015`.** `TASK-042` — raised and built while
+this task was still open — took 015 for `stock_count_lines.batch_id`. Migrations are numbered by
+the order they are applied, not by the order their tasks were written.
+
+**A new setting rather than `POS-510`'s.** Requirement 6 allowed either, and the two are different
+sizes of normal: a cash variance is a miscount at a drawer, a settlement variance is a wallet's
+fee, a transfer that landed the next morning, or a sale nobody paid for.
+`settlement_variance_tolerance_centavos` starts at ₱100 like its cash counterpart, and one number
+for both would have made the store either explain every fee or ignore every missing sale.
+
+**What the walk taught about its own fixture.** The first draft of `TC-E2E-26` gave the unpaid
+sale no reference number, on the theory that a cashier in a hurry would skip it — and `POS-205`
+refused the sale outright, because a non-cash tender the store cannot trace is one it cannot
+prove it received. The rule was already doing its job. The fixture now carries a reference like
+every other tender and the transfer simply never settles, which is `POS-206` exactly: RECORDED
+means the cashier saw a "sent" screen on somebody's telephone, and nothing more. The drill-down's
+value is therefore *matching references against the statement*, not spotting a blank.
+
+**Where the prohibition lives.** Not in a check — in the absence of a path. There is no `PUT` and
+no `DELETE` on a reconciliation, no route in the feature names a sale, and the migration adds no
+column to `sale_tenders`. `TC-INT-117` and `TC-E2E-26` both snapshot every sale and tender row and
+assert byte-identity afterwards.
 
 ---
 

@@ -146,12 +146,15 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'customer_prices', 'product_quantity_breaks',
     // 014_batches
     'product_batches', 'sale_item_batches',
+    // 016_reconciliation (015 added a column and an index, no table)
+    'payment_reconciliations',
   ].sort());
 
   for (const index of ['idx_audit_time', 'idx_audit_entity', 'idx_barcode', 'idx_prices_lookup',
     'idx_products_name', 'idx_products_category', 'idx_products_active',
     'idx_move_product', 'idx_move_ref', 'idx_move_corrects',
     'idx_batches_fefo', 'idx_batches_expiry', 'idx_move_batch', 'idx_sib_batch',
+    'idx_countlines_unique', 'idx_countlines_batch', 'idx_recon_method_range',
     'idx_customers_name', 'idx_credit_account', 'idx_credit_due',
     'idx_alloc_collection', 'idx_alloc_sale',
     'idx_shift_open', 'idx_till_shift', 'idx_closing_lines',

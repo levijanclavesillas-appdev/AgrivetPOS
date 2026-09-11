@@ -28,7 +28,7 @@ const PATHS = {
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
-export function createReport({ root, session, report, onBack }) {
+export function createReport({ root, session, report, onBack, onReconcile = null }) {
   let params = { from: today(), to: today(), shiftId: null };
 
   async function load() {
@@ -76,6 +76,12 @@ export function createReport({ root, session, report, onBack }) {
         onclick: (event) => { event.preventDefault(); exportCsv(); },
         text: 'Export CSV',
       }),
+      // RPT-105 (TASK-032), from the screen somebody is already on when the wallet's
+      // statement arrives: this report is the recorded figure, and reconciliation is
+      // the question about it. It changes nothing here — SCR-606 writes no figure back.
+      report === 'payments' && onReconcile
+        ? h('button', { class: 'row-action', text: 'Reconcile', onclick: () => onReconcile(params) })
+        : null,
     ]);
   }
 

@@ -94,6 +94,10 @@ const ACTIONS = Object.freeze({
   // different consequences, and the trail is append-only — using one name for both
   // loses the difference permanently.
   CREDIT_WRITTEN_OFF: { what: 'Debt written off', rule: 'CR-303' },
+  // RPT-105 (TASK-032). What was compared, to what, and what the difference was — the
+  // reconciliation itself changes no figure, so the trail is the only place the
+  // comparison is recorded as having been made by somebody.
+  PAYMENT_RECONCILED: { what: 'Payments reconciled against a statement', rule: 'RPT-105' },
 
   // ── AUD-601: purchasing (FT-501–FT-504) ───────────────────────────────────
   //

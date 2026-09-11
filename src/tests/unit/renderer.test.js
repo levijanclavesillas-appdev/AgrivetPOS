@@ -1875,6 +1875,32 @@ test('CR-303: the write-off is the owner’s, and it asks why (TASK-034)', () =>
   assert.match(proseOf('js/customers/profile.js'), /cannot be undone/);
 });
 
+test('SCR-606: the reconciliation states a difference and writes no figure back (RPT-105)', () => {
+  const source = codeOf('js/reports/reconciliation.js');
+  const prose = proseOf('js/reports/reconciliation.js');
+
+  // The rule's prohibition, kept by the absence of the path: the screen posts a
+  // reconciliation and nothing else. A "correct to actual" button would make a
+  // discrepancy disappear along with the only record of a sale nobody paid for.
+  const posts = source.match(/api\.(post|put|delete)\(/g) || [];
+  assert.equal(posts.length, 1, 'one write, and it is the reconciliation');
+  assert.match(source, /api\.post\('\/reconciliations'/);
+  assert.equal(/\/sales|\/tenders['"]/.test(source), false, 'it names no sale and no tender to write');
+
+  // POS-206 on the figure it qualifies — the reason the screen exists at all.
+  assert.match(source, /RECORDED/);
+  assert.match(prose, /the cashier saw it/);
+
+  // Requirement 2: the three methods that are not here are named, with why.
+  assert.match(source, /data\.excluded/);
+  assert.match(source, /data\.cash/);
+
+  // Requirement 8: a variance drills to the tenders behind it, because "we are ₱50
+  // short" is answered by a list somebody reads down.
+  assert.match(source, /reconciliation\/tenders/);
+  assert.match(source, /reference_no/);
+});
+
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   // The screen gap, asserted rather than tracked in prose. It was thirteen missing
   // when TASK-036 started; this is the case that says when it is closed.

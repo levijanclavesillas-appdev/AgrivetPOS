@@ -269,6 +269,31 @@ function tenderStatuses({ fromAt, toAt, shiftId = null }) {
   `).all({ fromAt, toAt, shiftId });
 }
 
+/**
+ * The tenders behind one method's recorded total (`RPT-105`, requirement 8).
+ *
+ * A variance that can only be stated is a variance nobody can act on: the answer to
+ * "we are ₱50 short" is a list somebody reads down until they find the ₱50. The same
+ * filter as `tendersByMethod` — voids excluded, the same range — so the rows add up to
+ * the figure they are drilling into, which is the only property that makes this useful.
+ */
+function tendersOfMethod({ fromAt, toAt, method, shiftId = null, limit = 500 }) {
+  return db.get().prepare(`
+    SELECT t.id, t.method, t.amount_centavos, t.reference_no, t.status,
+           s.id AS sale_id, s.sale_no, s.occurred_at, s.total_centavos,
+           u.username AS cashier
+    FROM sale_tenders t
+    JOIN sales s ON s.id = t.sale_id
+    LEFT JOIN users u ON u.id = s.created_by
+    WHERE ${NOT_VOIDED}
+      AND t.method = @method
+      AND s.occurred_at >= @fromAt AND s.occurred_at <= @toAt
+      AND (@shiftId IS NULL OR s.shift_id = @shiftId)
+    ORDER BY s.occurred_at, s.sale_no
+    LIMIT @limit
+  `).all({ fromAt, toAt, method, shiftId, limit });
+}
+
 // ── The dashboard's counts ──────────────────────────────────────────────────
 
 /** The shift a cashier is scoped to (TX-421 OWN_SHIFT), whether open or closed. */
@@ -290,6 +315,6 @@ module.exports = {
   NOT_VOIDED, LINE_COST, LINE_NET_REVENUE, voidsInRange,
   dailyTotals, tenderTotal, profitTotals, dailyLines, salesInRange,
   taxModesInRange, voidedCount,
-  tendersByMethod, tenderStatuses, changeTotal,
+  tendersByMethod, tenderStatuses, tendersOfMethod, changeTotal,
   shiftsForUserInRange, shiftOwner,
 };

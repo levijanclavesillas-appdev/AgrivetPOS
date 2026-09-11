@@ -48,7 +48,7 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 │               SCR-803 Receive        SCR-804 Suppliers   │
 │  REPORTS      SCR-601 Dashboard      SCR-602 Daily sales │
 │               SCR-603 Payments       SCR-604 Inventory   │
-│               SCR-605 Ageing                             │
+│               SCR-605 Ageing         SCR-606 Reconcile   │
 │  ADMIN        SCR-701 Users          SCR-702 Settings    │
 │               SCR-703 Audit          SCR-704 Backup      │
 │               SCR-705 Health         SCR-706 Data        │
@@ -442,6 +442,29 @@ works a morning in. A row opens the customer, where the statement is.
 three months old does not become younger for a payment landing later. The reconciliation is
 stated as arithmetic rather than a tick (`FR_6.2`'s demand, applied to the debt): aged debt, less
 the credit customers hold, is exactly what the ledger says the store is owed.
+
+### `SCR-606` — Reconciliation · `FT-606` — v1.2
+
+Behind `TX-421` at store scope, from the payments report — which is the screen somebody is
+already on when the wallet's statement arrives. The range travels with them.
+
+One row per method that settles somewhere else: what the POS **recorded** on the left, what the
+statement says settled in the middle, the difference on the right. `POS-206` is stated on the
+recorded figure — *RECORDED, the cashier saw it* — because that is all this store can know
+without a payment API, and it is the reason the screen exists.
+
+**Nothing on it writes back to the recorded column** (`RPT-105`), and the layout is meant to make
+that obvious rather than only true. A "correct to actual" button would make a discrepancy
+disappear along with the only record of a ₱50 sale a cashier recorded and nobody ever paid.
+
+A variance beyond the configured tolerance cannot be saved without a reason — `POS-510`'s shape,
+one level up, against a statement instead of a drawer — and the refusal names the three things it
+usually turns out to be: a fee, a transfer that landed late, or a sale nobody paid for.
+
+**What is not on it is stated on it.** Cash is reconciled at the shift close and is shown from
+there rather than counted twice; credit and store credit settle nowhere at all. And any variance
+drills through to the tenders behind the recorded figure, because "we are ₱50 short" is answered
+by reading down a list until the ₱50 turns up — a missing reference is the first thing to look at.
 
 ### `SCR-602`/`603`/`604` — Reports
 

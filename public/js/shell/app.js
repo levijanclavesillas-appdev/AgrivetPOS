@@ -30,6 +30,7 @@ import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
 import { createStatement } from '../customers/statement.js';
 import { createAgeing } from '../reports/ageing.js';
+import { createReconciliation } from '../reports/reconciliation.js';
 import { createCollection } from '../customers/collection.js';
 import { createShift } from '../shift/view.js';
 import { createShiftSummary } from '../shift/summary.js';
@@ -248,7 +249,8 @@ export function createApp({ root }) {
     clear(main);
     // Low stock is a filter of the products list, not a section of its own, so the
     // rail keeps Products highlighted rather than highlighting nothing.
-    renderRail(id === 'low-stock' ? 'products' : (id === 'ageing' ? 'reports' : id));
+    renderRail(id === 'low-stock' ? 'products'
+      : (['ageing', 'reconciliation'].includes(id) ? 'reports' : id));
 
     if (id === 'pos') return showPos();
     if (id === 'reports') return showDashboard();
@@ -258,6 +260,7 @@ export function createApp({ root }) {
     // SCR-605 is a report, so the rail keeps Reports highlighted rather than nothing —
     // the same treatment low stock gets under Products.
     if (id === 'ageing') return showAgeing();
+    if (id === 'reconciliation') return showReconciliation();
     if (id === 'receipts') return showReceipts();
     if (id === 'shift') return showShift();
     if (id === 'customers') return showCustomers();
@@ -594,6 +597,18 @@ export function createApp({ root }) {
     return current;
   }
 
+  /** SCR-606. RPT-105's comparison, which changes no figure anywhere. */
+  function showReconciliation(range = null) {
+    if (current?.unmount) current.unmount();
+    current = createReconciliation({
+      root: host(),
+      range,
+      onBack: () => { renderRail('reports'); showDashboard(); },
+    });
+    current.mount();
+    return current;
+  }
+
   function showReport(report) {
     if (current?.unmount) current.unmount();
     current = createReport({
@@ -601,6 +616,9 @@ export function createApp({ root }) {
       session,
       report,
       onBack: () => { clear(main); showDashboard(); },
+      // The range travels with it: somebody reconciling the week they are looking at
+      // should not have to type the dates again.
+      onReconcile: (range) => showReconciliation(range),
     });
     current.mount();
     return current;

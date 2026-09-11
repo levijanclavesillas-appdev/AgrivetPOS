@@ -222,3 +222,24 @@
 .ageing-list td.money { font-variant-numeric: tabular-nums; }
 .ageing-list small { display: block; color: var(--muted); font-size: .75rem; }
 .report-ageing .rule-note { max-width: 52rem; line-height: 1.5; }
+
+/* ── SCR-606 the reconciliation (TASK-032) ────────────────────────────────── */
+/*
+   One row per method that settles somewhere else, and a form in the middle of it: the
+   recorded figure on the left, what the statement says in the middle, the difference on
+   the right. Nothing on this screen writes back to the left-hand column — RPT-105 — and
+   the layout is meant to make that obvious rather than only true.
+*/
+.settle-form { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.settle-form input { min-height: var(--touch); padding: 0 .5rem; border: 1px solid var(--rule);
+  border-radius: 4px; font: inherit; background: #fff; }
+.settle-amount { width: 7rem; text-align: right; font-variant-numeric: tabular-nums; }
+.settle-reference { width: 10rem; }
+.settle-reason { flex: 1 1 12rem; }
+.reconcile-list td small { display: block; color: var(--muted); font-size: .75rem; }
+.reconcile-list tr.is-matched td { background: #f4f7f5; }
+.reconcile-excluded { margin: 1.5rem 0 .5rem; }
+.reconcile-excluded h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.reconcile-drill { margin: 1.5rem 0; }
+.reconcile-drill h2 { font-size: 1rem; margin: 0 0 .25rem; }
+.report-reconciliation .rule-note { max-width: 52rem; line-height: 1.5; }

@@ -27,6 +27,7 @@ const collectionRoutes = require('./routes/collections');
 const printRoutes = require('./routes/print');
 const cartRoutes = require('./routes/carts');
 const reportRoutes = require('./routes/reports');
+const reconciliationRoutes = require('./routes/reconciliations');
 const backupRoutes = require('./routes/backups');
 const purchasingRoutes = require('./routes/purchasing');
 const returnRoutes = require('./routes/returns');
@@ -66,6 +67,7 @@ function createApp() {
   app.use(API_BASE, printRoutes);
   app.use(API_BASE, cartRoutes);
   app.use(API_BASE, reportRoutes);
+  app.use(API_BASE, reconciliationRoutes);
   app.use(API_BASE, backupRoutes);
   app.use(API_BASE, purchasingRoutes);
   app.use(API_BASE, returnRoutes);

@@ -60,6 +60,15 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 10000, group: 'SALES', ruleId: 'POS-510', ownerOnly: false,
     what: 'Cash variance at shift close that requires a reason', min: 0, max: 1000000,
   },
+  // RPT-105 (TASK-032). Its own setting rather than POS-510's: a cash variance is a
+  // miscount at a drawer, and a settlement variance is a wallet's fee, a transfer that
+  // landed the next morning, or a sale a cashier recorded that nobody ever paid. The
+  // two are different sizes of normal, and one number for both would make the store
+  // either explain every fee or ignore every missing sale.
+  settlement_variance_tolerance_centavos: {
+    type: 'INT', value: 10000, group: 'SALES', ruleId: 'RPT-105', ownerOnly: false,
+    what: 'Settlement variance that requires a reason', min: 0, max: 1000000,
+  },
   // POS-504: till cash in/out requires "a reason from the configured list". Same
   // reasoning as INV-108's adjustment reasons — a list in code is what OPS-005 exists
   // to stop, and an owner withdrawal is the entry every store words differently.
