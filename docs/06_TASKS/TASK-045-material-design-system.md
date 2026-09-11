@@ -152,6 +152,27 @@ there — does anything paint over one. It reports nothing on any of them.
 against 1366×768 — so a screen added later with a bar pinned above the pane, two bars claiming the
 same 60 px, or a background reaching over the one above it, fails a walk rather than a counter.
 
+**And the counter itself, which was the one screen never measured with anything on it.**
+`SCR-301` was audited empty — the walk had no shift open — so what was checked was the "open your
+shift" state. Measured properly, with 1, 8 and 20 lines on the counter, the layout holds exactly as
+`04_UX_SPEC.md` §8 promises: the document never moves, the pane never scrolls, the **cart scrolls
+inside itself** (84 px at eight lines, 1,056 px at twenty) and the totals rail, the total, the
+56 px Pay button and the key bar stay where they were. The search list and `F3`'s quantity prompt
+both stay inside the window.
+
+**What was wrong there was not the layout.** The totals rail printed the word **`null`** under the
+Pay button — on every ordinary sale, on the screen this product is for. `h()` skips a null child;
+`Element.append()` is the DOM's own and coerces it to the *string* `"null"`, and the rail's last
+block is `priced?.requires_authorisation ? authorisations() : null` handed straight to it. The
+payment screen already filtered for exactly this reason; this call site never had. It is a v1.0
+defect that eleven months of tests walked past, because every assertion about that rail asked
+whether a figure was right rather than what else was on it.
+
+So the smoke now asks, at every screen it measures: does anything on this screen read `null`,
+`undefined`, `NaN` or `[object Object]`? `pre`, `code` and `textarea` are out of scope — `SCR-703`
+shows an audit row's before and after as JSON, and a null in there is the value. Every other screen
+is clean.
+
 **What was not done.** `SCR-705` is still about three panes of scrolling — it is a diagnostics page
 read top to bottom, and a column layout would interleave its headings with the wrong tables. The
 shell still has no top app bar, which `04_UX_SPEC.md` §2's diagram has described since v1.0: it

@@ -315,6 +315,10 @@ Posted, it is immutable and offers no edit — the correction is an adjustment c
 
 ### `SCR-301` — Point of sale · `FT-301` — **the critical screen**
 
+Measured at 1366×768 with 1, 8 and 20 lines on the counter: the document never moves, the pane
+never scrolls, the **cart scrolls inside itself**, and the totals rail, the total, the Pay button
+and the key bar hold their places. The search list and `F3`'s prompt stay inside the window.
+
 ```text
 ┌──────────────────────────────────────────────┬──────────────────────┐
 │ [ scan or search ⌕                        ]  │  CUSTOMER            │

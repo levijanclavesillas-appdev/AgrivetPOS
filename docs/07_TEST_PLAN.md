@@ -294,6 +294,14 @@ that is decided.
 | `TC-UI-11`, `TC-E2E-30` | `TASK-043` | `SCR-206`: the batch list with no quantity field, and the alert-to-write-off walk |
 | `TC-UI-12`, `TC-E2E-31` | `TASK-044` | `SCR-306`: a list that cannot edit, and finding a receipt again after the next customer has started |
 | `TC-UI-13` | `TASK-045` | The three-transition walk, per role, against `04_UX_SPEC.md` §2.1's reach table — and every report one press from the dashboard |
+
+**The browser smoke asks three questions of every screen it measures**, not one: does the document
+scroll at 1366×768, are the screen's sticky bars whole and clear of each other, and does anything
+on it read `null`, `undefined`, `NaN` or `[object Object]`. The third found a v1.0 defect on
+`SCR-301` — `Element.append()` coerces a null child to the **string** "null", where `h()` skips it,
+so the totals rail printed the word under the Pay button on every ordinary sale. Eleven months of
+assertions walked past it because each one asked whether a *figure* was right rather than what else
+was on the screen beside it.
 | `TC-PERF-07` | `TASK-033` | The new reports inside `TC-PERF-05`'s budget at `TC-PERF-06`'s scale |
 | `TC-PERF-08` – `TC-PERF-09` | `TASK-035` | Encrypted against plain, across the budgets and across backup, verification and restore |
 

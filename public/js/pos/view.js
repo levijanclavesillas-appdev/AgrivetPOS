@@ -204,7 +204,13 @@ export function createPos({ root, session, onPay }) {
 
   function renderRail() {
     const customer = cart.customer;
-    clear(railHost).append(
+    // `.filter(Boolean)`, and it is not decoration: `Element.append()` is the DOM's own
+    // and coerces `null` to the **string** "null", where `h()`'s children are filtered.
+    // The last block below is conditional, so on every sale that needed no
+    // authorisation — which is nearly all of them — the word `null` was printed under
+    // the Pay button, on the one screen this product is for. The payment screen already
+    // filters for the same reason; this call site did not.
+    clear(railHost).append(...[
       h('div', { class: 'rail-block' }, [
         h('h2', { text: 'Customer' }),
         h('p', { class: 'rail-customer', text: customer ? customer.name : 'Walk-in' }),
@@ -247,8 +253,8 @@ export function createPos({ root, session, onPay }) {
         h('button', { class: 'rail-action', text: 'Park & new  F12', onclick: () => park({ andNew: true }) }),
       ]),
       // PR-105 and PR-203 surfaced where they happen (§6), not at Complete.
-      priced?.requires_authorisation ? authorisations() : null
-    );
+      priced?.requires_authorisation ? authorisations() : null,
+    ].filter(Boolean));
   }
 
   /** A rate the server sent, in words. The figure is never this screen's (OPS-005). */

@@ -114,6 +114,36 @@ app.whenReady().then(async () => {
       `${m.w}×${m.hgt}, document ${m.v > 0 ? `${m.v}px taller` : 'no taller'}`
       + `${m.h > 0 ? `, ${m.h}px wider` : ''}`);
     await stickyBars(label);
+    await noStrayValues(label);
+  };
+
+  /**
+   * A literal `null`, `undefined`, `NaN` or `[object Object]` rendered on a screen.
+   *
+   * `h()` skips a null child; `Element.append()` is the DOM's own and coerces it to the
+   * **string** "null". So `clear(host).append(a, b, cond ? c() : null)` prints the word,
+   * and that is what SCR-301's totals rail did under the Pay button on every sale that
+   * needed no authorisation — which is nearly all of them.
+   *
+   * `pre`, `code` and `textarea` are out of scope: SCR-703 shows an audit row's before
+   * and after as JSON, and a null in there is the value, not a bug.
+   */
+  const noStrayValues = async (label) => {
+    const strays = await run(`(() => {
+      const root = document.querySelector('.screen') || document.body;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const found = [];
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (n.parentElement && n.parentElement.closest('pre, code, textarea')) continue;
+        if (/(^|\\s)(null|undefined|NaN|\\[object Object\\])(\\s|$)/.test(n.nodeValue || '')) {
+          const el = n.parentElement;
+          found.push(((el && el.className) || (el && el.tagName) || '?') + ': ' + n.nodeValue.trim().slice(0, 40));
+        }
+      }
+      return [...new Set(found)];
+    })()`);
+    log(strays.length === 0, `and nothing on it reads "null" or "undefined"`,
+      strays.join(' | ') || 'clean');
   };
 
   /**
@@ -229,6 +259,15 @@ app.whenReady().then(async () => {
   log(await run(LINE_COUNT) >= 1, 'the scan adds a line', `${await run(LINE_COUNT)} line(s)`);
   const railText = await run(`(document.querySelector('.rail-totals') || {}).textContent || ''`);
   log(/62\.50/.test(railText), 'the total is on the rail', railText.replace(/\s+/g, ' ').slice(0, 70));
+
+  // SCR-301's totals rail, with a cart on it. `Element.append()` coerces a null child
+  // to the string "null", and the rail's last block is conditional on an authorisation
+  // that an ordinary sale does not need — so the word was printed under the Pay button
+  // on every ordinary sale, on the one screen this product is for.
+  const wholeRail = (await run(TEXT('.pos-rail'))).replace(/\s+/g, ' ');
+  log(!/\bnull\b|\bundefined\b/.test(wholeRail), 'the totals rail prints no stray value',
+    wholeRail.slice(0, 70));
+  await fits('SCR-301 with a cart');
 
   console.log('\n— F6 parks, F7 resumes (POS-106) —');
   await press('F6');
