@@ -761,14 +761,19 @@ no modal is open.
   Material 3 pass: `SCR-702` at 6,941 px — nine viewports of settings in one column, with the tab
   strip somewhere above the fold — then `SCR-705`, `SCR-703`, `SCR-706` and `SCR-602`. The browser
   smoke measures every rail destination in a real 1366×768 window and fails if the document moves.
-- **One sticky bar per pane**, and it is the screen's own: the range and export on a report, the
-  tab strip in admin, the title and the search on the catalogue — which stick as a pair, because
-  the search bar is not the first thing in that screen. A sticky offset is measured from the
-  scrollport's **padding box**, not its border box, which is why the first bar's offset is minus
-  one padding and the second's is the first's height. Getting that wrong is not subtle: the first
-  attempt gave the search bar a background reaching 16 px upward to cover the padding, and it
-  painted over the bottom of the header's buttons — "the top bar is cut" is what that looks like.
-  The smoke scrolls the pane and asks the browser, with `elementFromPoint`, what is actually on top.
+- **At most two sticky bars per pane**, and they are the screen's own: a title row carrying the
+  screen's actions, and under it a search bar (the list screens) or a tab strip (`SCR-202`). A
+  sticky offset is measured from the scrollport's **padding box**, not its border box, so the
+  first bar's offset is minus one padding and the second's is the first bar's height, the two
+  paddings having cancelled. Both are declared in one place — two files cannot keep that
+  agreement.
+- Getting it wrong is not subtle, and it took three goes. A background reaching upward to cover
+  the pane's padding painted over the bottom of the header's buttons; a rule scoped to one screen
+  left three others with a bar pinned and **nothing above it**, so rows scrolled through the band
+  over its head; and on `SCR-202` a header and a tab strip both claimed the top. "The top bar is
+  cut" is what all three look like. Every screen is now walked twice — unscrolled and scrolled —
+  and asked whether the document moves, whether a bar is pinned above the pane, whether two bars
+  overlap, and, with `elementFromPoint` rather than geometry, whether anything paints over one.
 - Touch targets ≥ 44 px on POS and payment (`NFR_4.3`) — and, since the Material 3 pass,
   **everywhere**. M3's compact density would put a button at 40 px; the four pixels buy nothing,
   because what wins vertical space at 768 px is the row height and the scroll container, not a

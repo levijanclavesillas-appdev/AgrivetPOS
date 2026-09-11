@@ -134,9 +134,23 @@ The report bar was also two rows and 88 px tall, because the date fields stacked
 above them. It is one row and 72 px now — on the bar that never scrolls away, that is 16 px of 741
 somebody gets back on every report.
 
-The smoke scrolls the catalogue's pane and asks the browser with `elementFromPoint` what is
-actually on top at three heights, because geometry cannot answer it: a row scrolled under a bar
-still has a box up there.
+**And then every screen was audited for the same fault, which found three more.** The rule was
+written as `.catalogue > .admin-head`, so on `SCR-401`, `SCR-801` and `SCR-804` the search bar
+pinned with **nothing above it** and rows scrolled visibly through the 60 px band over its head. On
+`SCR-202` the header and the editor's own tab strip both claimed the top and overlapped by 61 px.
+The rule is now the shell's rather than the catalogue's: it names the six screen roots whose header
+is their first child, and the second bar — a search bar or a tab strip — pins at `--touch`, the
+header's row. `.admin > .admin-head` is deliberately not in that list: those panels sit under
+`SCR-701`'s tab strip, which is already that pane's sticky bar.
+
+The audit walks all 34 screens twice, unscrolled and scrolled, and asks four questions: does the
+document scroll either way, is any bar pinned above the top of the pane, do two bars overlap, and —
+with `elementFromPoint` rather than geometry, because a row scrolled under a bar still has a box up
+there — does anything paint over one. It reports nothing on any of them.
+
+**The same four questions are now asked by the smoke**, at every place it already measures a screen
+against 1366×768 — so a screen added later with a bar pinned above the pane, two bars claiming the
+same 60 px, or a background reaching over the one above it, fails a walk rather than a counter.
 
 **What was not done.** `SCR-705` is still about three panes of scrolling — it is a diagnostics page
 read top to bottom, and a column layout would interleave its headings with the wrong tables. The

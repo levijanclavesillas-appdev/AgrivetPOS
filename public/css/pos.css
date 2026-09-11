@@ -98,6 +98,50 @@
    wrapper out of the box tree, so no existing layout has to know it is there. */
 .screen-host { display: contents; }
 
+/* ── The screen's own sticky bars ──────────────────────────────────────────
+ *
+ * A pane has one sticky bar and it is the screen's own — except on the list screens,
+ * where it is two: a title row with the screen's actions, and a search bar under it.
+ * Both are declared here rather than in each screen's stylesheet, because the second
+ * one's offset is the first one's height and two files cannot keep that agreement.
+ *
+ * **The arithmetic, once.** A sticky offset is measured from the scrollport's *padding*
+ * box, not its border box. `.screen` pads by `--space-4`, so a bar that should pin flush
+ * against the top of the window asks for `-1 × --space-4` — and gives the same padding
+ * back as its own, or its contents sit against the glass. The bar under it then asks for
+ * exactly `--touch`: the header's 44 px row, with the two paddings already cancelled.
+ *
+ * **What this replaced, three times over.** The search bar alone was sticky, with a
+ * `box-shadow` reaching upward to paint over the pane's padding — and a background that
+ * reaches upward covers whatever is up there, which was the bottom of the header's
+ * buttons: "New product" came out sliced along its lower edge. The fix for that was
+ * scoped to `.catalogue`, which left `SCR-401`, `SCR-801` and `SCR-804` with a bar
+ * pinned and nothing above it, so rows scrolled through the 60 px band over its head.
+ * And on `SCR-202` the header and the editor's own tab strip both claimed the top and
+ * overlapped by 61 px. All three look identical to an operator: the top bar is cut.
+ */
+.catalogue > .admin-head,
+.customers > .admin-head,
+.purchasing > .admin-head,
+.receipts > .admin-head,
+.returns > .admin-head,
+.shift > .admin-head,
+.dashboard > .dash-head {
+  position: sticky; top: calc(var(--space-4) * -1); z-index: 4;
+  margin: calc(var(--space-4) * -1) 0 0; padding: var(--space-4) 0 0;
+  background: var(--md-background);
+}
+/* Not `.admin > .admin-head`: those panels sit under SCR-701's tab strip, which is the
+   sticky bar of that pane. A third one would need the strip's height as a number too. */
+
+/* The second bar, wherever a screen has one: the search on a list, the tab strip on the
+   product editor. `--touch` is the header's row above it — see the arithmetic above. */
+.catalogue-controls,
+.catalogue > .admin-tabs {
+  position: sticky; top: var(--touch); z-index: 3;
+  background: var(--md-background);
+}
+
 /* Below 1024 px the drawer collapses to M3's navigation rail — icons only (§8). The
    label is hidden rather than the item, so nothing becomes unreachable. */
 @media (max-width: 1023px) {

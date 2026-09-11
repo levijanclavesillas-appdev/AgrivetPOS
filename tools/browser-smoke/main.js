@@ -113,6 +113,61 @@ app.whenReady().then(async () => {
     log(m.v <= 0 && m.h <= 0, `1366×768: ${label} fits the window without scrolling it`,
       `${m.w}×${m.hgt}, document ${m.v > 0 ? `${m.v}px taller` : 'no taller'}`
       + `${m.h > 0 ? `, ${m.h}px wider` : ''}`);
+    await stickyBars(label);
+  };
+
+  /**
+   * The screen's sticky bars, asked the three questions that went wrong.
+   *
+   * Generic on purpose: it runs wherever `fits` runs, so a screen added later with a bar
+   * pinned above the pane, two bars claiming the same 60 px, or a background reaching
+   * over the one above it, fails here rather than at a counter. The third question is
+   * put to the browser with `elementFromPoint` because geometry cannot answer it — a row
+   * scrolled under a bar still has a box up there.
+   */
+  const stickyBars = async (label) => {
+    const found = await run(`(() => {
+      const pane = document.querySelector('.screen');
+      if (!pane) return { bars: [], problems: [] };
+      const name = (el) => {
+        if (!el) return 'nothing';
+        const c = (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className) || '';
+        return String(c).trim().split(/\\s+/)[0] || el.tagName.toLowerCase();
+      };
+      const sticky = [...pane.querySelectorAll('*')].filter((el) => {
+        const cs = getComputedStyle(el);
+        if (cs.position !== 'sticky' && cs.position !== 'fixed') return false;
+        const r = el.getBoundingClientRect();
+        return r.height > 0 && r.width > 0;
+      });
+      const boxes = []; const problems = [];
+      for (const el of sticky) {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        const box = { cls: name(el), t: Math.round(r.top), b: Math.round(r.bottom),
+          l: Math.round(r.left), rt: Math.round(r.right) };
+        boxes.push(box);
+        if (cs.bottom === 'auto' && box.t < 0) problems.push(box.cls + ' is cut: top ' + box.t);
+        const x = Math.round((Math.max(r.left, 0) + Math.min(r.right, window.innerWidth)) / 2);
+        for (const y of [box.t + 3, Math.round((box.t + box.b) / 2), box.b - 3]) {
+          if (y < 0 || y > window.innerHeight) continue;
+          const hit = document.elementFromPoint(x, y);
+          if (hit && hit !== el && !el.contains(hit) && !hit.contains(el)) {
+            problems.push(box.cls + ' is painted over by ' + name(hit));
+          }
+        }
+      }
+      for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) {
+        const a = boxes[i]; const b = boxes[j];
+        if (Math.min(a.b, b.b) - Math.max(a.t, b.t) > 1
+          && Math.min(a.rt, b.rt) - Math.max(a.l, b.l) > 1) {
+          problems.push(a.cls + ' overlaps ' + b.cls);
+        }
+      }
+      return { bars: boxes.map((b) => b.cls + '@' + b.t + '–' + b.b), problems };
+    })()`);
+    log(found.problems.length === 0, `and its sticky bars are whole and clear of each other`,
+      found.bars.join(', ') || 'none' + (found.problems.length ? ' — ' + found.problems.join(' | ') : ''));
   };
 
   const press = (key) => run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`);
@@ -227,6 +282,8 @@ app.whenReady().then(async () => {
   await run(`document.querySelector('.complete').click()`);
   await settle(1800);
 
+  await fits('SCR-303 payment');
+
   console.log('\n— SCR-304: the receipt —');
   const receiptText = await run(`document.querySelector('.screen').textContent`);
   log(/SALE-\d{8}-\d{6}/.test(receiptText), 'the receipt shows the sale number',
@@ -246,6 +303,8 @@ app.whenReady().then(async () => {
 
   const after = (await api('/carts/active')).json;
   log(after.cart === null, 'the counter is cleared after the sale');
+
+  await fits('SCR-304 receipt');
 
   console.log('\n— SCR-501 to SCR-503: the shift —');
   await run(OPEN_RAIL('Shift'));
@@ -637,6 +696,21 @@ app.whenReady().then(async () => {
   log(onTop.inBar === 'search bar', 'nothing paints over the search bar', onTop.inBar);
   log(onTop.belowBars === 'the list', 'and the list has the pane below them', onTop.belowBars);
   await fits('SCR-201 scrolled');
+
+  // The product editor stacks a **tab strip** under its header rather than a search bar,
+  // and it is the same arithmetic: the second bar's offset is the first bar's height.
+  await run(`(document.querySelector('.catalogue-list tbody tr') || { click(){} }).click()`);
+  await waitFor(`!!document.querySelector('.editor .admin-tabs')`, { label: 'SCR-202' });
+  await settle(500);
+  const editor = await run(`(() => {
+    const b = (s) => { const r = document.querySelector(s).getBoundingClientRect();
+      return { t: Math.round(r.top), b: Math.round(r.bottom) }; };
+    document.querySelector('.screen').scrollTop = 400;
+    return { head: b('.editor > .admin-head'), tabs: b('.editor > .admin-tabs') };
+  })()`);
+  log(editor.head.t === 0 && editor.tabs.t === editor.head.b,
+    'SCR-202: the tab strip pins under the header, not over it',
+    `header 0–${editor.head.b}, tabs ${editor.tabs.t}–${editor.tabs.b}`);
 
   // And the report's bar, which is one row rather than two: it never scrolls away, so
   // every pixel of it is 741 somebody does not get back.
