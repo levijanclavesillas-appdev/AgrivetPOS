@@ -62,11 +62,19 @@ to something a grep can enforce (`TC-UT-99`).
 | Auth | bcryptjs + jsonwebtoken | ^3.0 / ^9.0 | `SEC-1` |
 | ID | UUIDv7 | — | Time-ordered, index-friendly, migration-stable (`VR-101`) |
 | Frontend | Vanilla ES modules + CSS custom properties | — | No build step; a store PC gets a folder that runs |
+| Design system | Material 3, as tokens in `public/css/tokens.css` | — | The specification, not the library — see `04_UX_SPEC.md` §0 |
 | Packaging | electron-builder NSIS | ^25.1 | `ChachiAgrivetPOS-Setup-<version>.exe` |
 | Tests | `node:test` + a project runner | — | `07_TEST_PLAN.md` |
 
 **Deliberately absent**: no ORM (the repository layer is the abstraction), no frontend framework,
 no bundler, no runtime network dependency. Every dependency must survive being offline forever.
+
+**Material 3 is in the product and is not a dependency.** Material Web Components would be a
+framework, the Material icon font and Roboto would be runtime network dependencies, and the
+shell's CSP (`index.html`) forbids a remote asset outright. What M3 specifies is a set of
+decisions — colour roles, a type scale, a shape scale, elevation, state layers, motion, density —
+and those are 60 custom properties and the component rules that read them. `04_UX_SPEC.md` §0 is
+the contract; `public/css/tokens.css` is the whole of the implementation.
 
 ## 3. Data model
 

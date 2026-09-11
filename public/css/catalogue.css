@@ -1,71 +1,94 @@
-/* SCR-201 – SCR-204. Tokens come from app.css; nothing here redefines a colour. */
+/* SCR-201 – SCR-207. The design system is `tokens.css`; nothing here declares a
+   colour, a radius or a shadow of its own.
+ *
+ * The list screens are the ones density is for: at 1366×768 a 40 px row shows 12 rows
+ * where a 52 px row shows 9, and a product list is read by scanning. The row is still
+ * `--touch` tall where it is a control rather than a line of data — M3's compact
+ * density and NFR_4.3's 44 px floor are not in conflict, they apply to different
+ * things. */
 
-.catalogue { padding: 1rem 1.25rem 3rem; max-width: 76rem; }
+.catalogue { padding: 0 0 var(--space-6); max-width: 80rem; }
 
-.catalogue-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
-.catalogue-search { flex: 1 1 22rem; min-height: var(--touch); padding: 0 .6rem; }
+/* Sticky, like the report header: the search box is what this screen is used through,
+   and scrolling a list should never take it off the screen.
+   It sticks at the top of the pane rather than above it — unlike `.report-head` and
+   `.admin-tabs`, this bar is **not** the first child of its screen, and the negative
+   margin those two use to cancel the pane's padding pulled it over the header's
+   buttons. The shadow paints the pane's own background into the gap the padding leaves,
+   so nothing scrolls through it. */
+.catalogue-controls { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 3;
+  margin: 0; padding: var(--space-2) 0;
+  background: var(--md-background);
+  box-shadow: 0 calc(var(--space-4) * -1) 0 var(--md-background); }
+.catalogue-search { flex: 1 1 22rem; min-height: var(--touch); }
 .catalogue-controls select { min-height: var(--touch); }
-.catalogue-controls .check { display: flex; align-items: center; gap: .4rem; margin: 0; }
+.catalogue-controls .check { display: flex; align-items: center; gap: var(--space-1); margin: 0; }
 
-.catalogue-list { width: 100%; border-collapse: collapse; background: #fff; margin: .5rem 0 1rem; }
-.catalogue-list th, .catalogue-list td { text-align: left; padding: .5rem .75rem;
-  border-bottom: 1px solid var(--rule); }
-.catalogue-list thead th { font-size: .8125rem; color: var(--muted); }
+.catalogue-list { background: var(--md-surface); margin: 0 0 var(--space-4);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-md); overflow: hidden; }
 .catalogue-list tbody tr { cursor: pointer; border-left: 4px solid transparent; }
-.catalogue-list tbody tr:hover, .catalogue-list tbody tr:focus-visible { background: #f4f7f5; }
-.catalogue-list .sku { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
+.catalogue-list tbody tr:hover, .catalogue-list tbody tr:focus-visible {
+  background: var(--md-primary-container); }
+.catalogue-list .sku { font-family: var(--font-mono); font-size: var(--type-body-sm-size); }
 .catalogue-list .qty, .catalogue-list .money { font-variant-numeric: tabular-nums; }
 /* UOM-005: the base unit is a code, and codes read as codes. */
-.catalogue-list .unit { font-size: .8125rem; letter-spacing: .04em; color: var(--muted); }
-.catalogue-list td.muted { color: var(--muted); }
-.catalogue-list .money { text-align: right; }
+.catalogue-list .unit { font-size: var(--type-label-md-size); letter-spacing: var(--tracking-label);
+  color: var(--md-on-surface-muted); }
+.catalogue-list td.muted { color: var(--md-on-surface-muted); }
 
-/* 04_UX_SPEC §3: low-stock rows carry an amber left border; inactive rows are muted. */
-.catalogue-list tr.is-low { border-left-color: var(--warn-ink); }
-.catalogue-list tr.is-inactive { color: var(--muted); }
+/* 04_UX_SPEC §3: low-stock rows carry an amber left border; inactive rows are muted.
+   §8: colour is never the only signal — both carry a word in the row as well. */
+.catalogue-list tr.is-low { border-left-color: var(--md-warning); }
+.catalogue-list tr.is-inactive { color: var(--md-on-surface-muted); }
 
-.tag { display: inline-block; margin-left: .4rem; padding: 0 .35rem; border-radius: 3px;
-  font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase;
-  background: var(--rule); color: var(--muted); }
-.tag.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.tag { margin-left: var(--space-1); text-transform: uppercase;
+  font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-label);
+  background: var(--md-surface-container-highest); color: var(--md-on-surface-muted); }
+.tag.warn { background: var(--md-warning-container); color: var(--md-on-warning-container);
+  border-color: color-mix(in srgb, var(--md-warning) 30%, transparent); }
 
-.row-action { min-height: var(--touch); padding: 0 .75rem; background: #fff; font: inherit;
-  border: 1px solid var(--rule); border-radius: 4px; cursor: pointer; color: inherit; }
-
-.pager { display: flex; align-items: center; gap: .75rem; }
-.pager button { min-height: var(--touch); padding: 0 1rem; }
+.pager { display: flex; align-items: center; gap: var(--space-3); }
+.pager button { min-height: var(--touch); padding: 0 var(--space-4); }
 
 /* ── SCR-202 the editor ──────────────────────────────────────────────────── */
 
-.editor-panel { padding-top: 1rem; }
+.editor-panel { padding-top: var(--space-4); }
+/* Two columns at the design width: the product editor was 863 px tall in one column,
+   which is a scroll to reach a save button on a 768 px screen. */
 .editor-form { max-width: 34rem; }
 .editor-form.inline { max-width: none; }
-.editor-field { margin: 0 0 1rem; }
-.editor-field label { display: block; margin-bottom: .3rem; font-size: .875rem; }
-.editor-field input, .editor-field select { min-height: var(--touch); width: 100%;
-  padding: 0 .6rem; border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
-.field-row { display: flex; gap: .5rem; align-items: center; }
+.editor-form.two-column { max-width: 58rem; display: grid; gap: 0 var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); align-items: start; }
+.editor-form.two-column .editor-actions,
+.editor-form.two-column .full-width { grid-column: 1 / -1; }
+.editor-field { margin: 0 0 var(--space-4); }
+.editor-field label { display: block; margin-bottom: var(--space-1);
+  font-size: var(--type-body-sm-size); color: var(--md-on-surface-variant); font-weight: 500; }
+.editor-field input, .editor-field select { min-height: var(--touch); width: 100%; }
+.field-row { display: flex; gap: var(--space-2); align-items: center; }
 .field-row select, .field-row input { flex: 1; }
-.editor-actions { display: flex; gap: .5rem; margin-top: 1.25rem; }
-.editor-actions button { min-height: var(--touch); padding: 0 1.25rem; }
+.editor-actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+.editor-actions button { min-height: var(--touch); padding: 0 var(--space-5); }
 
 /* UOM-003: a locked field that explains itself. A disabled input with no reason is a
    support call, so the lock is rendered as prose rather than as a greyed box. */
-.editor-field.locked { background: var(--warn-bg); border-left: 4px solid var(--warn-ink);
-  padding: .75rem 1rem; border-radius: 4px; }
-.locked-value { margin: 0 0 .5rem; font-weight: 600; }
-.locked-why { margin: 0 0 .4rem; font-size: .875rem; line-height: 1.5; }
+.editor-field.locked { background: var(--md-warning-container); color: var(--md-on-warning-container);
+  border-left: 4px solid var(--md-warning); padding: var(--space-3) var(--space-4);
+  border-radius: var(--shape-sm); }
+.locked-value { margin: 0 0 var(--space-2); font-weight: 600; }
+.locked-why { margin: 0 0 var(--space-1); font-size: var(--type-body-md-size); line-height: 1.5; }
 
-.cost-block { margin-bottom: 1.5rem; }
-.cost-block h2 { font-size: 1rem; margin: 0 0 .25rem; }
+.cost-block { margin-bottom: var(--space-5); }
+.cost-block h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-1); }
 
 /* ── SCR-203 the adjustment ──────────────────────────────────────────────── */
 
-.adjustment .variance-block { margin: 0 0 1rem; min-height: 1.5rem; }
-.variance { margin: 0; font-size: 1.0625rem; }
-.variance.zero { color: var(--muted); }
-.variance.down strong { color: var(--error); }
-.variance.up strong { color: var(--accent); }
+.adjustment .variance-block { margin: 0 0 var(--space-4); min-height: 1.5rem; }
+.variance { margin: 0; font-size: var(--type-body-lg-size); }
+.variance.zero { color: var(--md-on-surface-muted); }
+.variance.down strong { color: var(--md-error); }
+.variance.up strong { color: var(--md-tertiary); }
 
 @media (max-width: 1023px) {
   .catalogue-controls { flex-direction: column; align-items: stretch; }
@@ -76,17 +99,18 @@
 
 /* The same visual language SCR-201 already speaks: amber down the side for something
    to deal with, and the refusal's own colour for stock that may not be sold at all. */
-.batch-list tr.is-expired { border-left-color: var(--error); background: var(--refuse-bg); }
-.batch-list td small { display: block; color: var(--muted); font-size: .75rem; }
-.batches .check { display: flex; align-items: center; gap: .4rem; margin: 0 0 .5rem; }
-.batches .admin-meta { margin-bottom: .75rem; }
+.batch-list tr.is-expired { border-left-color: var(--md-error); background: var(--md-error-container); }
+.batch-list td small { display: block; color: var(--md-on-surface-muted); font-size: var(--type-label-md-size); }
+.batches .check { display: flex; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-2); }
+.batches .admin-meta { margin-bottom: var(--space-3); }
 
 /* TASK-042: a batch-tracked product's batches, under a heading that carries the
    product's own frozen total — four rows that each look right can still be wrong
    together, and the heading is where that shows. */
-.count-sheet tr.count-group td { background: #f4f7f5; font-weight: 600; border-top: 2px solid var(--rule); }
+.count-sheet tr.count-group td { background: var(--md-surface-container); font-weight: 600;
+  border-top: 2px solid var(--md-outline-variant); color: var(--md-on-surface); }
 .count-sheet tr.count-group small { font-weight: 400; }
-.count-sheet td.is-batch-line { padding-left: 1.5rem; }
+.count-sheet td.is-batch-line { padding-left: var(--space-5); }
 
 /* ── SCR-207 the recall (TASK-030) ───────────────────────────────────────── */
 /*
@@ -94,57 +118,67 @@
    The third is the one a store would otherwise never learn — the buyers it cannot
    reach — so it is given the same size as the other two rather than a footnote.
 */
-.recall-figures { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
-.recall-figure { flex: 1 1 12rem; padding: .75rem 1rem; background: #fff;
-  border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 4px; }
-.recall-figure-value { display: block; font-size: 1.5rem; font-weight: 600;
-  font-variant-numeric: tabular-nums; }
-.recall-figure-label { display: block; font-size: .875rem; }
+.recall-figures { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-4) 0; }
+.recall-figure { flex: 1 1 12rem; padding: var(--space-3) var(--space-4); background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant); border-left: 4px solid var(--md-primary);
+  border-radius: var(--shape-md); box-shadow: var(--elev-1); }
+.recall-figure-value { display: block; font-size: var(--type-headline-size);
+  line-height: var(--type-headline-line); font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.recall-figure-label { display: block; font-size: var(--type-body-md-size); color: var(--md-on-surface-muted); }
 .recall .rule-note { line-height: 1.5; max-width: 52rem; }
 /* A walk-in is a row somebody cannot act on, and it should look like one. */
-.recall-list tr.is-walk-in td { color: var(--muted); }
-.recall-list .sku { font-size: .8125rem; }
+.recall-list tr.is-walk-in td { color: var(--md-on-surface-muted); }
+.recall-list .sku { font-size: var(--type-body-sm-size); }
 
 /* SCR-205 — the stocktake (TASK-022).
    Three row treatments, and the third is the one that matters: a line nobody counted
    must not look like a line that matched, or somebody posts a half-finished count. */
 .stock-count .count-sheet { min-width: 46rem; }
 .count-list { min-width: 44rem; }
-.count-sheet .count-input { width: 6.5rem; min-height: var(--touch); padding: 0 .4rem;
-  text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+.count-sheet .count-input { width: 6.5rem; min-height: var(--touch); padding: 0 var(--space-1);
+  text-align: right; font-variant-numeric: tabular-nums; }
 .count-sheet .variance { font-variant-numeric: tabular-nums; }
 
 .count-sheet tr.is-uncounted { background: repeating-linear-gradient(
-  135deg, transparent, transparent 6px, var(--rule) 6px, var(--rule) 7px); }
-.count-sheet tr.is-uncounted .count-input::placeholder { color: var(--muted); font-style: italic; }
-.count-sheet tr.is-matched { color: var(--muted); }
-.count-sheet tr.is-short .variance { color: var(--error); font-weight: 600; }
-.count-sheet tr.is-over .variance { color: var(--warn-ink); font-weight: 600; }
+  135deg, transparent, transparent 6px, var(--md-outline-variant) 6px, var(--md-outline-variant) 7px); }
+.count-sheet tr.is-uncounted .count-input::placeholder { color: var(--md-on-surface-muted); font-style: italic; }
+.count-sheet tr.is-matched { color: var(--md-on-surface-muted); }
+.count-sheet tr.is-short .variance { color: var(--md-error); font-weight: 600; }
+.count-sheet tr.is-over .variance { color: var(--md-on-warning-container); font-weight: 600; }
 
-.count-list tr.is-stale { border-left: 3px solid var(--warn-ink); }
-.count-list small.warn { display: block; font-size: .75rem; color: var(--warn-ink); background: none; padding: 0; }
+.count-list tr.is-stale { border-left: 3px solid var(--md-warning); }
+.count-list small.warn { display: block; font-size: var(--type-label-md-size);
+  color: var(--md-on-warning-container); background: none; padding: 0; border: 0; }
 
-.count-controls { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0 .5rem; }
+.count-controls { display: flex; gap: var(--space-4); flex-wrap: wrap; margin: var(--space-4) 0 var(--space-2); }
 .count-controls .editor-field { flex: 1 1 14rem; }
-.count-controls input, .count-controls select { min-height: var(--touch); width: 100%; padding: 0 .6rem; }
+.count-controls input, .count-controls select { min-height: var(--touch); width: 100%; }
 
-.count-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
-.count-progress { display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: baseline; margin-bottom: 1rem; }
-.count-progress .warn { color: var(--warn-ink); background: none; padding: 0; }
-.count-actions .editor-actions { display: flex; gap: .5rem; margin-top: 1rem; }
-.count-actions .editor-actions button { min-height: var(--touch); padding: 0 1.25rem; }
+/* The sheet's own footer, and the one place on a long screen that has to stay reachable:
+   a stocktake is posted from here, and hunting for the button at the bottom of 300 rows
+   is how a count gets posted half-finished. */
+.count-footer { margin-top: var(--space-5); padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--md-outline-variant);
+  position: sticky; bottom: 0; background: var(--md-background); }
+.count-progress { display: flex; gap: var(--space-5); flex-wrap: wrap; align-items: baseline;
+  margin-bottom: var(--space-3); }
+.count-progress .warn { color: var(--md-on-warning-container); background: none; padding: 0; border: 0; }
+.count-actions .editor-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.count-actions .editor-actions button { min-height: var(--touch); padding: 0 var(--space-5); }
 
-.count-outcome { list-style: none; margin: 1rem 0; padding: 0; }
-.count-outcome li { padding: .4rem 0; border-bottom: 1px solid var(--rule); }
+.count-outcome { list-style: none; margin: var(--space-4) 0; padding: 0; }
+.count-outcome li { padding: var(--space-1) 0; border-bottom: 1px solid var(--md-outline-variant); }
 .count-outcome li:last-child { border-bottom: 0; }
-.count-outcome li.warn { color: var(--warn-ink); background: none; }
+.count-outcome li.warn { color: var(--md-on-warning-container); background: none; border: 0; }
 
 @media (max-width: 900px) { .count-controls { flex-direction: column; } }
 
 /* PR-104's band editor (TASK-024). A set is edited and saved whole, so the table is
    plain — there is no per-row save to hang a control off. */
-.breaks-block { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--rule); }
-.breaks-block h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.breaks-block { margin-top: var(--space-6); padding-top: var(--space-5);
+  border-top: 1px solid var(--md-outline-variant); }
+.breaks-block h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-2); }
 .breaks-table { max-width: 32rem; }
-.breaks-table input { width: 8rem; min-height: var(--touch); padding: 0 .4rem;
-  text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+.breaks-table input { width: 8rem; min-height: var(--touch); padding: 0 var(--space-1);
+  text-align: right; font-variant-numeric: tabular-nums; }

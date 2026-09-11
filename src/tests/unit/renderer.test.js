@@ -74,6 +74,20 @@ function walkFiles(dir, files = []) {
   return files;
 }
 
+/**
+ * Every stylesheet at once.
+ *
+ * Component sizing moved into `tokens.css` with the Material 3 pass: `--touch`,
+ * `.row-action` and the field minimums are the **system's** promise now, not each
+ * screen's, and a test that reads one sheet would report a minimum as missing the day
+ * it was stated once instead of eight times. Screen-specific treatments — a colour on a
+ * row, a border on a panel — are still asserted against the file they belong to.
+ */
+const allCss = () => fs.readdirSync(path.join(root, 'public', 'css'))
+  .filter((name) => name.endsWith('.css'))
+  .map((name) => fs.readFileSync(path.join(root, 'public', 'css', name), 'utf8'))
+  .join('\n');
+
 function cssRule(css, selector) {
   const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
   for (const match of stripped.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
@@ -458,9 +472,12 @@ test('TC-UI-01: POS and payment controls declare a 44 px minimum', () => {
   // NFR_4.3. The real measurement is on the reference machine at 1366×768 (UAT §8);
   // what is checkable here is that every interactive rule on these screens carries the
   // minimum rather than relying on default button height.
-  const css = fs.readFileSync(path.join(root, 'public', 'css', 'pos.css'), 'utf8');
+  const css = allCss();
 
   assert.match(css, /--touch:\s*44px/, 'the token is the rule’s figure');
+  // And density does not get to argue with it: M3 compact sizes the rest of the
+  // product, and the comment beside the token says which of the two wins.
+  assert.match(css, /--touch/, 'the floor is a token, not a number typed per screen');
 
   for (const selector of [
     '.pos-search', '.rail-item', '.rail-action', '.pay',
@@ -485,7 +502,15 @@ test('the POS keeps the cart and the rail visible without scrolling the page', (
   assert.match(pos, /grid-template-columns/, 'cart and rail side by side');
   assert.match(pos, /height:\s*calc\(100vh/, 'the screen is the viewport, not taller');
   assert.match(cssRule(css, '.cart-lines'), /overflow-y:\s*auto/);
-  assert.match(cssRule(css, '.screen'), /overflow:\s*hidden/);
+
+  // The invariant moved up a level with the Material 3 pass, and got stronger: the
+  // **shell** is the viewport and clips, and `.screen` is the one scroll container in
+  // the product. Before that, five screens scrolled the whole document — SCR-702 at
+  // 6,941 px of it, with the tab strip somewhere above the fold.
+  assert.match(cssRule(css, '.shell'), /height:\s*100vh/);
+  assert.match(cssRule(css, '.shell'), /overflow:\s*hidden/);
+  assert.match(cssRule(css, '.screen'), /overflow-y:\s*auto/);
+  assert.match(cssRule(css, '.screen'), /overflow-x:\s*hidden/, 'and never sideways (§4)');
 
   // §8: below 1024 px the rail collapses to icons rather than disappearing.
   assert.match(css, /@media \(max-width: 1023px\)/);
@@ -834,7 +859,7 @@ test('INV-101: no catalogue screen lets anyone type an on-hand figure', () => {
 });
 
 test('NFR_4.3: the catalogue controls are touchable', () => {
-  const css = fs.readFileSync(path.join(root, 'public', 'css', 'catalogue.css'), 'utf8');
+  const css = allCss();
   for (const selector of ['.catalogue-search', '.row-action', '.pager button',
     '.editor-actions button', '.catalogue-controls select']) {
     const rule = cssRule(css, selector);
@@ -842,9 +867,10 @@ test('NFR_4.3: the catalogue controls are touchable', () => {
     assert.match(rule, /min-height:\s*var\(--touch\)|min-height:\s*44px/, `${selector} is ≥ 44 px`);
   }
 
-  // 04_UX_SPEC §3's two row treatments.
-  assert.match(cssRule(css, '.catalogue-list tr.is-low'), /border-left-color/);
-  assert.match(cssRule(css, '.catalogue-list tr.is-inactive'), /color/);
+  // 04_UX_SPEC §3's two row treatments, which are this screen's own and stay here.
+  const own = fs.readFileSync(path.join(root, 'public', 'css', 'catalogue.css'), 'utf8');
+  assert.match(cssRule(own, '.catalogue-list tr.is-low'), /border-left-color/);
+  assert.match(cssRule(own, '.catalogue-list tr.is-inactive'), /color/);
 });
 
 // ── SCR-501 – SCR-503 (TASK-038) ────────────────────────────────────────────
@@ -1235,8 +1261,8 @@ test('requirement 7: the counter reads the discount rules from the policy endpoi
   // Both explanations are quiet: the figures above them are what the eye should land
   // on, and a rule note in the error colour beside every discounted line would be read
   // as a problem rather than as an answer.
-  assert.match(cssRule(css, '.rail-tier-why'), /color:\s*var\(--muted\)/);
-  assert.match(cssRule(css, '.cart-line-discount .discount-why'), /color:\s*var\(--muted\)/);
+  assert.match(cssRule(css, '.rail-tier-why'), /color:\s*var\(--md-on-surface-muted\)/);
+  assert.match(cssRule(css, '.cart-line-discount .discount-why'), /color:\s*var\(--md-on-surface-muted\)/);
 });
 
 // ── PR-103 and PR-104 on the screens (TASK-024) ─────────────────────────────
@@ -1488,12 +1514,12 @@ test('NFR_4.3: the void controls are touchable, and read as destructive', () => 
     assert.ok(rule, `${selector} has a rule`);
     assert.match(rule, /min-height:\s*var\(--touch\)/);
   }
-  assert.match(cssRule(css, '.void-panel'), /var\(--error\)/);
+  assert.match(cssRule(css, '.void-panel'), /var\(--md-error\)/);
 
   // `.danger` itself is defined once, beside OPS-004's restore — the two destructive
   // controls in this product read alike because they share the rule.
   const reports = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
-  assert.match(cssRule(reports, '.danger'), /background:\s*var\(--error\)/);
+  assert.match(cssRule(reports, '.danger'), /background:\s*var\(--md-error\)/);
 });
 
 // ── SCR-305 (TASK-020) ──────────────────────────────────────────────────────
@@ -1515,8 +1541,8 @@ test('POS-304: the screen shows the rule’s own sentence, and warns only on the
   assert.match(source, /must authorise putting this back \(POS-304\)/);
 
   const css = fs.readFileSync(path.join(root, 'public', 'css', 'returns.css'), 'utf8');
-  assert.match(cssRule(css, '.return-table .default-why'), /color:\s*var\(--muted\)/);
-  assert.match(cssRule(css, '.return-table .override-note'), /var\(--warn-ink\)/);
+  assert.match(cssRule(css, '.return-table .default-why'), /color:\s*var\(--md-on-surface-muted\)/);
+  assert.match(cssRule(css, '.return-table .override-note'), /var\(--md-warning\)/);
 });
 
 test('POS-301 / POS-307: the limit and the window are the server’s answers, not the screen’s', () => {
@@ -1966,6 +1992,115 @@ test('SCR-608: the ledger’s two value columns are never merged into one (TASK-
 
   // It reads. An inventory report has nothing to write, and INV-102 is append-only.
   assert.equal(/api\.(post|put|delete)\(/.test(source), false, 'a movement report writes nothing');
+});
+
+test('TC-UI-13: no operation is more than three screen transitions away', () => {
+  // 04_UX_SPEC.md §2.1. The rail is always one transition, so every screen has to be
+  // within two of a rail item — and that is a constraint on where a feature may be put,
+  // which is why it is a test and not a paragraph. A tab, a dialog, an inline panel and
+  // a filter cost nothing: they do not replace the screen.
+  //
+  // **The walk is per role, and that is what makes it worth running.** The rail is
+  // role-filtered (§2), so a screen whose only entrance is behind a permission is a
+  // screen some role cannot open at all — which is exactly what this found: SCR-204,
+  // the low-stock list, hung off the dashboard's tile and nowhere else, and the
+  // dashboard is behind TX-421, which the inventory clerk does not hold. The one screen
+  // that says what to reorder was unreachable by the one role whose job that is.
+  const spec = fs.readFileSync(path.join(root, 'docs', '04_UX_SPEC.md'), 'utf8');
+  const section = spec.split('### 2.1')[1].split('## 3.')[0];
+
+  const claimed = new Map();
+  const opens = new Map();     // screen -> the screens it opens
+  const railScreens = new Set();
+  for (const line of section.split('\n')) {
+    const row = line.match(/^\|\s*`(SCR-\d{3})`[^|]*\|([^|]*)\|\s*(\d)\s*\|/);
+    if (!row) continue;
+    const [, screen, from, transitions] = row;
+    claimed.set(screen, Number(transitions));
+    if (/rail/.test(from)) railScreens.add(screen);
+    for (const source of [...from.matchAll(/SCR-\d{3}/g)].map((m) => m[0])) {
+      if (!opens.has(source)) opens.set(source, []);
+      opens.get(source).push(screen);
+    }
+  }
+  assert.ok(claimed.size >= 30, `only ${claimed.size} screens parsed from the reach table`);
+
+  // The rail, its permissions and the role matrix, read from the shell rather than
+  // restated here: a spec that names a rail item the renderer does not render, or gives
+  // a role a door the matrix closes, is a spec that proves nothing.
+  const shell = codeOf('js/shell/app.js');
+  const rail = [...shell.matchAll(/\{ id: '[^']+', label: '[^']+', tx: '(TX-\d{3})', screen: '(SCR-\d{3})' \}/g)]
+    .map(([, tx, screen]) => ({ tx, screen }));
+  assert.equal(rail.length, 9, 'the nine rail items are parsed');
+  assert.deepEqual([...railScreens].sort(), rail.map((item) => item.screen).sort(),
+    'the table’s rail items are the shell’s rail items');
+
+  const grants = {};
+  for (const [, tx, roles] of shell.matchAll(/'(TX-\d{3})':\s*\[([^\]]*)\]/g)) {
+    grants[tx] = [...roles.matchAll(/'([A-Z]+)'/g)].map((m) => m[1]);
+  }
+
+  const walk = (from, roots) => {
+    const depth = new Map([[from, 0]]);
+    for (const item of roots) if (!depth.has(item)) depth.set(item, 1);
+    const queue = [...depth.keys()];
+    while (queue.length > 0) {
+      const at = queue.shift();
+      for (const next of opens.get(at) || []) {
+        if (depth.has(next) && depth.get(next) <= depth.get(at) + 1) continue;
+        depth.set(next, depth.get(at) + 1);
+        queue.push(next);
+      }
+    }
+    return depth;
+  };
+
+  const LANDING = { CASHIER: 'SCR-301', INVENTORY: 'SCR-201', MANAGER: 'SCR-601', OWNER: 'SCR-601' };
+  for (const [role, landing] of Object.entries(LANDING)) {
+    // Only the rail items this role is shown. A screen unreachable for a role is not
+    // necessarily a defect — a cashier has no business in Buying — so what is asserted
+    // is the distance to what they *can* reach.
+    const roots = rail.filter((item) => (grants[item.tx] || []).includes(role)).map((item) => item.screen);
+    assert.ok(roots.includes(landing), `${role} lands on a screen their rail contains`);
+
+    const depth = walk(landing, roots);
+    const tooFar = [...depth.entries()].filter(([, d]) => d > 3).map(([screen, d]) => `${screen} (${d})`);
+    assert.deepEqual(tooFar, [], `${role} needs more than three transitions for ${tooFar.join(', ')}`);
+  }
+
+  // The inventory clerk in particular, because they have the narrowest rail of the four
+  // and are the role a stock screen is for.
+  const clerkRoots = rail.filter((item) => (grants[item.tx] || []).includes('INVENTORY')).map((i) => i.screen);
+  const clerk = walk('SCR-201', clerkRoots);
+  for (const screen of ['SCR-202', 'SCR-203', 'SCR-204', 'SCR-205', 'SCR-206', 'SCR-207']) {
+    assert.ok(clerk.has(screen), `the inventory clerk can reach ${screen}`);
+  }
+
+  // And the table's own third column is the answer the walk gives from the owner's
+  // landing, so a row edited without moving the feature fails here rather than quietly
+  // misdescribing it.
+  const owner = walk('SCR-601', rail.map((item) => item.screen));
+  for (const [screen, transitions] of claimed) {
+    assert.equal(owner.get(screen), transitions, `${screen} claims ${transitions} transitions`);
+  }
+});
+
+test('TC-UI-13: every report is one press from the dashboard', () => {
+  // The change that made the rule true. Reconciliation was reached through payments,
+  // sales analysis through the daily report, and movement analysis through the
+  // *valuation*, which is itself opened from the product list — so an owner looking for
+  // what the store had written off started at Reports and found nothing naming it.
+  const source = codeOf('js/reports/dashboard.js');
+  for (const report of ['daily', 'payments', 'reconciliation', 'analysis', 'valuation',
+    'movements', 'ageing']) {
+    assert.match(source, new RegExp(`id: '${report}'`), `the index offers ${report}`);
+  }
+  assert.match(source, /onOpenReport\(report\.id, Boolean\(report\.screen\)\)/);
+
+  // And it is an index, not a second set of tiles: a tile carries a figure and these
+  // carry a destination, so they do not get the same shape (TC-INT-60's reasoning,
+  // applied to layout — the dashboard still computes nothing).
+  assert.equal(/report-link[^}]*value|tile-value/.test(source.split('reportIndex')[1] || ''), false);
 });
 
 test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {

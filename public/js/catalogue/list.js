@@ -19,7 +19,9 @@ import { money, quantity } from '../shell/format.js';
 
 const PAGE = 50;
 
-export function createProductList({ root, mode = 'all', onOpen, onAdjust, onBatches, onValuation, onCount }) {
+export function createProductList({
+  root, mode = 'all', onOpen, onAdjust, onBatches, onValuation, onCount, onMode = null,
+}) {
   let query = '';
   let categoryId = '';
   let includeInactive = false;
@@ -109,6 +111,20 @@ export function createProductList({ root, mode = 'all', onOpen, onAdjust, onBatc
       // SCR-205. Beside the valuation because they answer the two halves of the same
       // question: what the system thinks is here, and what actually is.
       onCount ? h('button', { class: 'row-action', text: 'Stock count', onclick: () => onCount() }) : null,
+      // SCR-204, from the list it is a filter of.
+      //
+      // It used to hang off the dashboard's low-stock tile and nowhere else, and the
+      // dashboard is behind TX-421 — which the **inventory clerk does not hold**. So the
+      // one screen that says what to reorder was unreachable by the one role whose job
+      // that is. 04_UX_SPEC.md §2.1's walk is what found it: the rail is role-filtered,
+      // and a screen with a single entrance behind a permission is a screen some role
+      // cannot open at all.
+      onMode ? h('button', {
+        class: 'row-action',
+        'aria-pressed': lowStockOnly() ? 'true' : 'false',
+        text: lowStockOnly() ? 'All products' : 'Low stock',
+        onclick: () => onMode(lowStockOnly() ? 'all' : 'low-stock'),
+      }) : null,
       lowStockOnly()
         ? null
         : h('button', {

@@ -1,0 +1,453 @@
+/* The design system: Material 3, expressed as tokens and CSS.
+ *
+ * ## Why this file exists, and what it is not
+ *
+ * **Material Design is a system, not a library, and this is the system.** There is no
+ * framework and no build step here (`05_TECH_SPEC.md` §2), and `index.html` declares a
+ * same-origin CSP with no exception — so Material Web Components, the Material icon
+ * font and Roboto from Google Fonts are all unavailable, and none of them is needed.
+ * What Material 3 actually specifies is a set of decisions — colour roles, a type
+ * scale, a shape scale, elevation, state layers, motion and density — and those are
+ * tokens. They are written here once and consumed by every screen.
+ *
+ * **The palette is the platform's, not Material's baseline.** M3's own colours are a
+ * demonstration; `/root/AdWebsite/docs/branding.md` §3 is the house palette, and
+ * `04_UX_SPEC.md` has cited it since v2.0 of that document while the stylesheets
+ * quietly used a green nobody had specified. That drift is closed here: the brand
+ * tokens are the source, and the M3 colour *roles* are derived from them. A design
+ * system gives the structure; the brand gives the colour.
+ *
+ * **Typography is the system font stack, at Material's type scale.** Roboto cannot be
+ * fetched and will not be vendored for a point of sale that has to start in under four
+ * seconds on a shop PC. The scale — display, headline, title, body, label, each with
+ * its own size, line height, weight and tracking — is Material's, applied to the font
+ * the machine already has.
+ *
+ * **The density is Material's compact (-2), because 768 px is the design target**
+ * (`04_UX_SPEC.md` §1 principle 5, §8). M3's default comfortable density assumes a
+ * laptop with room to spare; a store PC has 768 physical pixels and a row of Windows
+ * chrome out of it. Every list row, table cell and field here is sized at the compact
+ * end of the scale — and never below `NFR_4.3`'s 44 px on anything a finger touches,
+ * which is the one figure density does not get to argue with.
+ *
+ * ## The two deliberate departures, stated rather than hidden
+ *
+ * 1. **Text fields carry their label above the box, not floating inside it.** M3's
+ *    floating label needs a wrapper element and a filled or notched-outline container
+ *    per field; there are some hundreds of inputs across 37 renderer modules, all
+ *    written as `label > input`. The outline, its 1 px resting and 2 px focused states,
+ *    the shape, the error treatment and the supporting-text slot are M3's. The label
+ *    position is not, and a persistent label is the better answer for dense data entry
+ *    anyway — a floating label is a placeholder that has to be remembered.
+ * 2. **No ripple.** M3's touch ripple is a JavaScript component; the state layers below
+ *    are the same specification's hover, focus and pressed opacities, done in CSS. A
+ *    ripple that needed a listener on every button would be a framework by instalments.
+ */
+
+:root {
+  /* ── Brand source (branding.md §3), copied once and never re-typed ────── */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #eff6ff;
+  --color-cyan: #06b6d4;
+  --color-cyan-light: #ecfeff;
+  --color-emerald: #10b981;
+  --color-emerald-light: #ecfdf5;
+  --brand-gradient: linear-gradient(135deg, #4f46e5 0%, #2563eb 35%, #06b6d4 70%, #10b981 100%);
+
+  --bg-main: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+
+  --text-heading: #0f172a;
+  --text-body: #334155;
+  --text-muted: #64748b;
+  --text-disabled: #94a3b8;
+
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-accent: #93c5fd;
+
+  /* ── M3 colour roles, derived from the above ──────────────────────────── */
+  --md-primary: var(--color-primary);
+  --md-on-primary: #ffffff;
+  --md-primary-container: var(--color-primary-light);
+  --md-on-primary-container: #16327a;
+  --md-primary-hover: var(--color-primary-hover);
+
+  --md-secondary: var(--color-cyan);
+  --md-secondary-container: var(--color-cyan-light);
+  --md-on-secondary-container: #05505f;
+
+  --md-tertiary: var(--color-emerald);
+  --md-tertiary-container: var(--color-emerald-light);
+  --md-on-tertiary-container: #06553b;
+
+  --md-error: #b3261e;
+  --md-on-error: #ffffff;
+  --md-error-container: #fdecea;
+  --md-on-error-container: #741210;
+
+  /* Warning is not an M3 role. It is a role this product needs — POS-510's variance,
+     INV-104's negative stock, OPS-007's overdue backup — and colour is never the only
+     signal for any of them (04_UX_SPEC.md §8), so it is a container and a word. */
+  --md-warning: #b45309;
+  --md-warning-container: #fff7ed;
+  --md-on-warning-container: #7c4a03;
+
+  /* M3's surface container roles. The tonal ladder a card, a dialog and a menu sit on,
+     so depth is a surface and not only a shadow. */
+  --md-surface: var(--bg-surface);
+  --md-surface-dim: var(--bg-subtle);
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: var(--bg-main);
+  --md-surface-container: var(--bg-subtle);
+  --md-surface-container-high: #e9eef5;
+  --md-surface-container-highest: #e2e8f0;
+  --md-background: var(--bg-main);
+
+  --md-on-surface: var(--text-heading);
+  --md-on-surface-variant: var(--text-body);
+  --md-on-surface-muted: var(--text-muted);
+  --md-on-surface-disabled: var(--text-disabled);
+
+  --md-outline: var(--border-strong);
+  --md-outline-variant: var(--border-subtle);
+  --md-outline-focus: var(--border-accent);
+
+  /* The dark surface the rail and the snackbar sit on — M3's inverse-surface pair. */
+  --md-inverse-surface: #1e293b;
+  --md-on-inverse-surface: #f1f5f9;
+  --md-inverse-primary: #93c5fd;
+
+  /* ── Shape scale (M3) ─────────────────────────────────────────────────── */
+  --shape-xs: 4px;
+  --shape-sm: 8px;
+  --shape-md: 12px;
+  --shape-lg: 16px;
+  --shape-xl: 28px;
+  --shape-full: 999px;
+
+  /* ── Elevation (M3 levels 0–5), in the brand's slate rather than pure black ── */
+  --elev-0: none;
+  --elev-1: 0 1px 2px 0 rgba(15, 23, 42, .06), 0 1px 3px 1px rgba(15, 23, 42, .05);
+  --elev-2: 0 1px 2px 0 rgba(15, 23, 42, .08), 0 2px 6px 2px rgba(15, 23, 42, .06);
+  --elev-3: 0 4px 8px 3px rgba(15, 23, 42, .07), 0 1px 3px 0 rgba(15, 23, 42, .10);
+  --elev-4: 0 6px 10px 4px rgba(15, 23, 42, .07), 0 2px 3px 0 rgba(15, 23, 42, .10);
+  --elev-5: 0 8px 12px 6px rgba(15, 23, 42, .08), 0 4px 4px 0 rgba(15, 23, 42, .10);
+
+  /* ── State layers (M3): the opacity of the tint over a component ──────── */
+  --state-hover: .08;
+  --state-focus: .10;
+  --state-press: .12;
+
+  /* ── Motion (M3) ──────────────────────────────────────────────────────── */
+  --motion-short: 120ms;
+  --motion-medium: 200ms;
+  --easing-standard: cubic-bezier(.2, 0, 0, 1);
+  --easing-emphasized: cubic-bezier(.05, .7, .1, 1);
+
+  /* ── Type scale (M3), on the system stack ─────────────────────────────── */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  --type-display-size: 2.25rem;   --type-display-line: 2.75rem;
+  --type-headline-size: 1.5rem;   --type-headline-line: 2rem;
+  --type-title-lg-size: 1.25rem;  --type-title-lg-line: 1.75rem;
+  --type-title-md-size: 1rem;     --type-title-md-line: 1.5rem;
+  --type-title-sm-size: .875rem;  --type-title-sm-line: 1.25rem;
+  --type-body-lg-size: 1rem;      --type-body-lg-line: 1.5rem;
+  --type-body-md-size: .875rem;   --type-body-md-line: 1.25rem;
+  --type-body-sm-size: .75rem;    --type-body-sm-line: 1rem;
+  --type-label-lg-size: .875rem;  --type-label-lg-line: 1.25rem;
+  --type-label-md-size: .75rem;   --type-label-md-line: 1rem;
+  --type-label-sm-size: .6875rem; --type-label-sm-line: 1rem;
+  --tracking-label: .0071em;
+  --tracking-overline: .08em;
+
+  /* ── Density (M3 compact, −2) and the floor NFR_4.3 puts under it ─────── */
+  --touch: 44px;                 /* NFR_4.3, and not negotiable by density */
+  --density-row: 40px;           /* a list or table row that is read, not tapped */
+  /* Every control a hand lands on is the floor, everywhere — not only on POS and
+     payment where NFR_4.3 demands it. M3's compact density would put a button at 40 px
+     and the four pixels buy nothing: what actually wins the vertical space on a 768 px
+     screen is the row height above and the scroll container the shell provides, not a
+     shorter button. Density here is rows and spacing, never the size of a target. */
+  --density-field: var(--touch);
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* ── Legacy aliases ───────────────────────────────────────────────────────
+     The stylesheets and their tests have spoken in these names since v1.0. They are
+     kept as aliases onto the roles above rather than renamed across 37 modules in the
+     same change that introduces the system — one of those is reviewable and the other
+     is not. New rules use the `--md-*` names. */
+  --ink: var(--md-on-surface);
+  --muted: var(--md-on-surface-muted);
+  --error: var(--md-error);
+  --rule: var(--md-outline-variant);
+  --line: var(--md-outline-variant);
+  --bg: var(--md-background);
+  --surface: var(--md-surface);
+  --accent: var(--md-primary);
+  --ok: var(--md-tertiary);
+  --warn-ink: var(--md-on-warning-container);
+  --warn-bg: var(--md-warning-container);
+  --refuse-bg: var(--md-error-container);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--md-background);
+  color: var(--md-on-surface-variant);
+  font-family: var(--font);
+  font-size: var(--type-body-md-size);
+  line-height: var(--type-body-md-line);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 { font-size: var(--type-title-lg-size); line-height: var(--type-title-lg-line);
+  font-weight: 600; color: var(--md-on-surface); margin: 0 0 var(--space-1); }
+h2 { font-size: var(--type-title-md-size); line-height: var(--type-title-md-line);
+  font-weight: 600; color: var(--md-on-surface); margin: 0 0 var(--space-2); }
+h3 { font-size: var(--type-title-sm-size); line-height: var(--type-title-sm-line);
+  font-weight: 600; color: var(--md-on-surface); margin: 0 0 var(--space-2); }
+
+.muted { color: var(--md-on-surface-muted); }
+.error { color: var(--md-error); }
+
+/* Money and quantity, wherever they appear (04_UX_SPEC.md §4). Stated once here so a
+   screen cannot forget it. */
+.money, .sku, [class*="-centavos"] { font-variant-numeric: tabular-nums; }
+.money { text-align: right; }
+
+/* §8: a visible focus ring at all times, and M3's focus indicator is the outline. */
+:focus-visible {
+  outline: 3px solid var(--md-outline-focus);
+  outline-offset: 2px;
+  border-radius: var(--shape-xs);
+}
+
+/* ── Buttons (M3) ──────────────────────────────────────────────────────────
+   Four of M3's five variants, mapped onto the class names the renderer already uses:
+
+     button            outlined   the ordinary action
+     button.primary    filled     the one action a screen is for
+     .row-action       text       an action belonging to a row or a header
+     .danger           filled     in the error role (OPS-004's restore, CR-303's write-off)
+
+   Elevated is not used: it is M3's answer to a button on a busy surface, and every
+   surface here is quiet. */
+
+button, .row-action, input[type="submit"] {
+  --state: transparent;
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: var(--touch);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--shape-full);
+  background: var(--md-surface);
+  background-image: linear-gradient(var(--state), var(--state));
+  color: var(--md-primary);
+  font: inherit;
+  font-size: var(--type-label-lg-size);
+  line-height: var(--type-label-lg-line);
+  letter-spacing: var(--tracking-label);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--motion-short) var(--easing-standard),
+              box-shadow var(--motion-short) var(--easing-standard),
+              border-color var(--motion-short) var(--easing-standard);
+}
+
+button:hover:not(:disabled), .row-action:hover:not(:disabled) {
+  --state: color-mix(in srgb, currentColor var(--state-hover), transparent);
+}
+button:active:not(:disabled), .row-action:active:not(:disabled) {
+  --state: color-mix(in srgb, currentColor var(--state-press), transparent);
+}
+
+button.primary {
+  border-color: transparent;
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: var(--elev-0);
+}
+button.primary:hover:not(:disabled) { background-color: var(--md-primary-hover); box-shadow: var(--elev-1); }
+
+/* M3's text button: no container until it is touched. Used in table rows and headers,
+   where a row of outlined pills would out-shout the data they act on. */
+.row-action, button.text {
+  border-color: transparent;
+  background-color: transparent;
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+}
+
+/* M3 filled-tonal: the secondary action beside a filled one. */
+button.tonal {
+  border-color: transparent;
+  background-color: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+button:disabled, .row-action:disabled {
+  background-color: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+  border-color: transparent;
+  color: var(--md-on-surface-disabled);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+button[disabled][aria-busy="true"] { cursor: progress; }
+
+/* ── Text fields (M3 outlined) ─────────────────────────────────────────────
+   The label sits above the box rather than floating in it — see the header. What is
+   M3's: the 1 px resting outline, 2 px on focus in the primary role, the shape, the
+   error state and the supporting text below. */
+
+input[type="text"], input[type="password"], input[type="number"], input[type="date"],
+input[type="search"], input[type="tel"], input:not([type]), select, textarea {
+  min-height: var(--density-field);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--shape-xs);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+  font-size: var(--type-body-md-size);
+  transition: border-color var(--motion-short) var(--easing-standard),
+              box-shadow var(--motion-short) var(--easing-standard);
+}
+textarea { padding: var(--space-2) var(--space-3); line-height: var(--type-body-md-line); }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--md-primary);
+  box-shadow: inset 0 0 0 1px var(--md-primary);
+}
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-disabled);
+}
+input[aria-invalid="true"], .field-error input, input.is-invalid {
+  border-color: var(--md-error);
+  box-shadow: inset 0 0 0 1px var(--md-error);
+}
+
+label {
+  display: block;
+  margin: 0 0 var(--space-4);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line);
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+}
+label input[type="text"], label input[type="password"], label input[type="date"],
+label input:not([type]), label select {
+  display: block; width: 100%; margin-top: var(--space-1); font-weight: 400;
+}
+label small { display: block; margin-top: var(--space-1); color: var(--md-on-surface-muted); font-weight: 400; }
+
+/* ── Cards and surfaces (M3) ───────────────────────────────────────────── */
+
+.card, .panel {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md);
+  box-shadow: var(--elev-0);
+}
+
+/* ── Chips (M3 assist chip) ────────────────────────────────────────────── */
+
+.chip, .tag, .price-level, .tender-status, .recorded {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: 24px; padding: 0 var(--space-2);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-sm);
+  background: var(--md-surface);
+  font-size: var(--type-label-md-size);
+  line-height: var(--type-label-md-line);
+  letter-spacing: var(--tracking-label);
+  color: var(--md-on-surface-variant);
+  white-space: nowrap;
+}
+
+/* ── Data tables (M3 density, 04_UX_SPEC.md §4) ────────────────────────────
+   Sticky header, a divider under every row, and the header in the surface-container
+   tone rather than a rule of its own. Wide tables scroll inside `.table-scroll` and
+   never widen the page. */
+
+table { width: 100%; border-collapse: collapse; font-size: var(--type-body-md-size); }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  height: 40px; padding: 0 var(--space-3);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+  font-size: var(--type-label-md-size);
+  letter-spacing: var(--tracking-label);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--md-outline-variant);
+  white-space: nowrap;
+}
+tbody td, tbody th {
+  height: var(--density-row);
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--md-outline-variant);
+  text-align: left;
+  font-weight: 400;
+  vertical-align: middle;
+}
+tbody tr:hover { background: color-mix(in srgb, var(--md-primary) 4%, transparent); }
+tfoot td, tfoot th {
+  height: var(--density-row); padding: var(--space-1) var(--space-3);
+  border-top: 2px solid var(--md-outline);
+  font-weight: 600; color: var(--md-on-surface); text-align: left;
+}
+th.money, td.money { text-align: right; }
+
+.table-scroll { overflow: auto; border-radius: var(--shape-sm); }
+
+/* ── Dialogs (M3 basic dialog) ─────────────────────────────────────────── */
+
+.ask-overlay, .lock-overlay {
+  background: color-mix(in srgb, var(--md-inverse-surface) 55%, transparent);
+  backdrop-filter: blur(2px);
+}
+.ask, .lock {
+  background: var(--md-surface-container-lowest);
+  border-radius: var(--shape-xl);
+  box-shadow: var(--elev-3);
+}
+
+/* ── Snackbar (M3), which this product calls a toast ───────────────────── */
+
+.toast {
+  background: var(--md-inverse-surface);
+  color: var(--md-on-inverse-surface);
+  border-radius: var(--shape-xs);
+  box-shadow: var(--elev-3);
+  font-size: var(--type-body-md-size);
+}
+.toast-error { background: var(--md-error); color: var(--md-on-error); }
+
+/* ── The overline, used for the small capitals that label a block ──────── */
+
+.overline {
+  font-size: var(--type-label-md-size);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  color: var(--md-on-surface-muted);
+  font-weight: 600;
+}

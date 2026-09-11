@@ -57,8 +57,14 @@ export function createSettings({ root }) {
       h('p', { class: 'muted', text: 'Every figure the store runs on is here, with the rule it '
         + 'comes from. Nothing is buried in the program (OPS-005).' }),
 
-      storeSection(),
-      ...order.map((group) => section(group, settings.filter((s) => s.group === group))),
+      // The groups are laid out in columns rather than one 6,941-pixel list: 1366×768
+      // is the design target (04_UX_SPEC.md §1), and a settings page is read by hunting
+      // rather than by reading down. The wrapper is what the columns are declared on;
+      // the order inside them is still the registry's own.
+      h('div', { class: 'settings-groups' }, [
+        storeSection(),
+        ...order.map((group) => section(group, settings.filter((s) => s.group === group))),
+      ]),
     ]));
   }
 

@@ -10,7 +10,42 @@ surface, responsive and accessibility rules. Behaviour rules are cited from
 Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`, heading
 `#0F172A`, body `#334155`, success `--color-emerald #10B981`, borders `#E2E8F0`.
 
+**The design system is Material 3, on those tokens** — see §0. The stylesheets did not adopt the
+platform palette until that pass: they ran on a green nobody had specified while this document
+cited the blue above, and the two had been disagreeing since v1.0.
+
 ---
+
+## 0. The design system
+
+**Material 3, expressed as tokens and CSS in `public/css/tokens.css`.** There is no framework and
+no build step (`05_TECH_SPEC.md` §2) and the shell declares a same-origin CSP with no exception, so
+Material Web Components, the Material icon font and Roboto from Google Fonts are all unavailable —
+and none of them is needed. What M3 actually specifies is a set of decisions: colour roles, a type
+scale, a shape scale, elevation, state layers, motion and density. Those are tokens, they are
+written once, and every screen reads them.
+
+| Layer | What it is here |
+| :--- | :--- |
+| Colour | M3 **roles** — primary, container, surface tones, outline, error — derived from the brand palette above. The system gives the structure; the brand gives the colour |
+| Type | M3's scale — display, headline, title, body, label — on the **system font stack**. Roboto cannot be fetched, and will not be vendored into a product that has to start in under four seconds on a shop PC |
+| Shape | 4 / 8 / 12 / 16 / 28 px and full. A chip, a card and a dialog each have their own corner |
+| Elevation | M3 levels 0–5, in the brand's slate rather than pure black |
+| State | M3's hover 8%, focus 10%, pressed 12% layers, in CSS. **No ripple** — that is a JavaScript component, and a listener on every button is a framework by instalments |
+| Density | M3 **compact (−2)**, because 768 px is the design target (§1 principle 5). Density is rows and spacing; it is never the size of a target |
+| Motion | 120 ms short, 200 ms medium, M3's standard and emphasized easings |
+
+Buttons map to four of M3's five variants by the class the renderer already used: `button` is
+outlined, `button.primary` is filled, `.row-action` is text, `.danger` is filled in the error role.
+Elevated is unused — it is M3's answer to a button on a busy surface, and every surface here is
+quiet.
+
+**Two departures, stated rather than hidden.** Text fields carry their label **above** the box
+rather than floating inside it: the floating label needs a wrapper and a notched container per
+field, there are some hundreds of inputs across 37 renderer modules written as `label > input`, and
+a persistent label is the better answer for dense data entry anyway. And the navigation drawer sits
+on M3's **inverse surface** rather than on `surface`, because a point of sale is looked at for eight
+hours in a room with a window.
 
 ## 1. Design principles for this product
 
@@ -59,6 +94,83 @@ Primary `--color-primary #2563EB`, canvas `--bg-main #F8FAFC`, surface `#FFFFFF`
 Role → landing screen: `CASHIER` → `SCR-301`. `INVENTORY` → `SCR-201`. `MANAGER`, `OWNER` →
 `SCR-601`. Rail items the role cannot reach are **hidden**, and the route is refused server-side
 regardless (`SEC-6`).
+
+### 2.1 Three transitions, and the table that keeps it true
+
+**No operation in this product is more than three screen transitions from where the user lands.**
+The rail is always one, so every screen has to be within two of a rail item — which is a real
+constraint on where a feature may be put, not a description of where they happen to be. A tab, a
+dialog, an inline panel and a filter are **not** transitions: they do not replace the screen, and
+`SCR-701`'s six admin panels, `SCR-607`'s four tabs and the POS's own prompts all cost nothing
+against the count.
+
+Reaching it took two changes and not a rebuild.
+
+**Four of the eight reports were three hops away through another report**, and movement analysis
+was reachable only by way of the *product list* — so an owner looking for what the store had
+written off started at Reports and found nothing that named it. `SCR-601` now carries an index of
+every report, so each is one press from the dashboard and two from anywhere. The contextual
+entries stay beside it, because arriving at reconciliation from the payments report carries the
+range with it.
+
+**And `SCR-204` was unreachable for the role it is for.** The low-stock list hung off the
+dashboard's tile and nowhere else; the dashboard is behind `TX-421`, which the inventory clerk
+does not hold. The one screen that says what to reorder could not be opened by the one role whose
+job that is. It is now a filter on `SCR-201`, which is where somebody looking at products for a
+reorder already is. The walk found it because the walk is **per role** — an audit that assumed one
+rail for everybody would have called it two transitions and moved on.
+
+The third column is the shortest walk from an **owner's** landing screen, which is `SCR-601` —
+so it reads 0 there and 1 for anything the dashboard opens directly. A cashier and an inventory
+clerk land elsewhere and have narrower rails; `TC-UI-13` walks all four roles and holds every one
+of them to three.
+
+| Screen | Reached from | Transitions |
+| :--- | :--- | :-: |
+| `SCR-301` Point of sale | rail | 1 |
+| `SCR-303` Payment | `SCR-301` | 2 |
+| `SCR-304` Receipt | `SCR-303`, `SCR-306` | 2 |
+| `SCR-305` Return | rail | 1 |
+| `SCR-306` Receipts | rail | 1 |
+| `SCR-401` Customers | rail | 1 |
+| `SCR-402` Customer | `SCR-401`, `SCR-605` | 2 |
+| `SCR-403` Collection | `SCR-401`, `SCR-402` | 2 |
+| `SCR-404` Statement | `SCR-402` | 3 |
+| `SCR-201` Products | rail | 1 |
+| `SCR-202` Product | `SCR-201` | 2 |
+| `SCR-203` Adjustment | `SCR-201` | 2 |
+| `SCR-204` Low stock | `SCR-201`, `SCR-601` | 1 |
+| `SCR-205` Stock count | `SCR-201` | 2 |
+| `SCR-206` Batches | `SCR-201`, `SCR-601` | 1 |
+| `SCR-207` Recall | `SCR-206` | 2 |
+| `SCR-501` Shift | rail | 1 |
+| `SCR-502` Till cash | `SCR-501` | 2 |
+| `SCR-503` Close | `SCR-501` | 2 |
+| `SCR-801` Orders | rail | 1 |
+| `SCR-802` Order | `SCR-801` | 2 |
+| `SCR-803` Receive | `SCR-801`, `SCR-802` | 2 |
+| `SCR-804` Suppliers | `SCR-801` | 2 |
+| `SCR-601` Dashboard | rail | 0 |
+| `SCR-602` Daily sales | `SCR-601` | 1 |
+| `SCR-603` Payments | `SCR-601` | 1 |
+| `SCR-604` Inventory valuation | `SCR-601`, `SCR-201` | 1 |
+| `SCR-605` Ageing | `SCR-601` | 1 |
+| `SCR-606` Reconciliation | `SCR-601`, `SCR-603` | 1 |
+| `SCR-607` Sales analysis | `SCR-601`, `SCR-602` | 1 |
+| `SCR-608` Movement analysis | `SCR-601`, `SCR-604` | 1 |
+| `SCR-701` Users | rail | 1 |
+| `SCR-702` Settings | `SCR-701` | 2 |
+| `SCR-703` Audit | `SCR-701` | 2 |
+| `SCR-704` Backups | `SCR-701` | 2 |
+| `SCR-705` Health | `SCR-701` | 2 |
+| `SCR-706` Export / import | `SCR-701` | 2 |
+
+`SCR-001` is the first run and `SCR-101`/`SCR-102` are before the shell, so none of the three is in
+the table. `SCR-302` is the park list — a panel on `SCR-301`, not a screen of its own.
+
+**`TC-UI-13` reads this table**, builds the graph, walks it from each role's landing screen and
+fails if anything is more than three transitions away — so a feature added down a fourth level
+fails a test rather than a usability review nobody has scheduled.
 
 ## 3. Screens
 
@@ -638,9 +750,18 @@ no modal is open.
 
 ## 8. Responsive and accessibility
 
-- **1366×768 minimum**, designed at that width; the POS keeps the cart and totals visible without
-  scrolling at that size. Below 1024 px the rail collapses to icons.
-- Touch targets ≥ 44 px on POS and payment (`NFR_4.3`).
+- **1366×768 minimum**, designed at that width. **The shell is exactly the viewport and clips; one
+  element scrolls — the screen pane** — so the rail, the screen header and the tab strip never
+  scroll away from the content they belong to. The POS keeps the cart and totals visible without
+  scrolling at that size. Below 1024 px the drawer collapses to M3's navigation rail — icons only.
+- **The document never scrolls, in either direction, on any screen.** Five of them did before the
+  Material 3 pass: `SCR-702` at 6,941 px — nine viewports of settings in one column, with the tab
+  strip somewhere above the fold — then `SCR-705`, `SCR-703`, `SCR-706` and `SCR-602`. The browser
+  smoke measures every rail destination in a real 1366×768 window and fails if the document moves.
+- Touch targets ≥ 44 px on POS and payment (`NFR_4.3`) — and, since the Material 3 pass,
+  **everywhere**. M3's compact density would put a button at 40 px; the four pixels buy nothing,
+  because what wins vertical space at 768 px is the row height and the scroll container, not a
+  shorter button. Density here is rows and spacing, never the size of a target.
 - Contrast ≥ 4.5:1 for body text, ≥ 3:1 for large text; the brand tokens already satisfy this.
 - **Colour is never the only signal**: variance, overdue and low stock each carry an icon or a
   word beside the colour.

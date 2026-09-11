@@ -1,204 +1,282 @@
-/* SCR-601 – SCR-604. No framework and no build step (05_TECH_SPEC.md §2).
-   The tokens come from app.css; nothing here redefines a colour. */
+/* SCR-601 – SCR-608 and the admin screens. No framework and no build step
+   (05_TECH_SPEC.md §2); the design system is `tokens.css` and nothing here declares a
+   colour, a radius or a shadow of its own.
+ *
+ * Two things in this file exist because of 1366×768 (04_UX_SPEC.md §1 principle 5).
+ * **The screen header and the tab strip are sticky**, so the range, the export and the
+ * section you are in stay on screen while a long report scrolls under them — M3's
+ * top-app-bar-on-scroll behaviour, applied to a pane instead of a window. And **the
+ * settings groups are laid out in columns**: SCR-702 was one column 6,941 px tall, nine
+ * viewports of it, with the tab strip somewhere above the fold. */
 
 /* ── SCR-601 dashboard ───────────────────────────────────────────────────── */
 
-.dashboard { padding: 1rem 1.25rem 2rem; max-width: 72rem; }
-.dash-head { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+.dashboard { padding: 0 0 var(--space-6); max-width: 76rem; }
+.dash-head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  padding-bottom: var(--space-3); }
 .dash-head h1 { margin: 0; }
-.dash-when { color: var(--muted); margin: 0; font-size: .875rem; }
-.dash-scope { margin: 0; font-size: .8125rem; font-weight: 600; color: var(--warn-ink);
-  background: var(--warn-bg); padding: .15rem .5rem; border-radius: 999px; }
-.dash-refresh { margin-left: auto; min-height: var(--touch); padding: 0 1rem; }
+.dash-when { color: var(--md-on-surface-muted); margin: 0; font-size: var(--type-body-md-size); }
+.dash-scope { margin: 0; font-size: var(--type-label-md-size); font-weight: 600;
+  color: var(--md-on-warning-container); background: var(--md-warning-container);
+  padding: 2px var(--space-2); border-radius: var(--shape-full); }
+.dash-refresh { margin-left: auto; min-height: var(--touch); padding: 0 var(--space-4); }
 
 /* OPS-007's list, above the tiles. */
-.alerts { list-style: none; margin: 1rem 0 1.5rem; padding: 0; display: grid; gap: .5rem; }
-.alert { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem;
-  border-radius: 6px; border-left: 4px solid var(--muted); background: #fff; }
-.alert-warning { border-left-color: var(--warn-ink); background: var(--warn-bg); }
-.alert-critical { border-left-color: var(--error); background: var(--refuse-bg); }
+.alerts { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid; gap: var(--space-2); }
+.alert { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+  border-radius: var(--shape-md); border-left: 4px solid var(--md-outline);
+  background: var(--md-surface); box-shadow: var(--elev-1); }
+.alert-warning { border-left-color: var(--md-warning); background: var(--md-warning-container);
+  color: var(--md-on-warning-container); }
+.alert-critical { border-left-color: var(--md-error); background: var(--md-error-container);
+  color: var(--md-on-error-container); }
 .alert-message { flex: 1; }
-.alert-rule { font-size: .75rem; letter-spacing: .06em; color: var(--muted); }
+.alert-rule { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
+  color: var(--md-on-surface-muted); }
 /* No dismiss control at all on the two that carry dismissible:false — an absent
    button says "you cannot" more clearly than a disabled one. */
 .alert-dismiss { min-width: var(--touch); min-height: var(--touch); background: none;
-  border: 0; font-size: 1.25rem; cursor: pointer; color: inherit; }
+  border: 0; border-radius: var(--shape-full); font-size: var(--type-title-lg-size);
+  cursor: pointer; color: inherit; padding: 0; }
 
-.tiles { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
-.tile { display: grid; gap: .2rem; text-align: left; padding: .9rem 1rem; min-height: 6rem;
-  background: #fff; border: 1px solid var(--rule); border-radius: 8px; cursor: pointer;
-  font: inherit; color: inherit; }
-.tile:hover:not(:disabled) { border-color: var(--accent); }
-.tile:disabled { cursor: default; opacity: .7; }
-.tile-label { color: var(--muted); font-size: .8125rem; }
-.tile-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.tile-note { font-size: .8125rem; color: var(--muted); }
-.tile-rule { font-size: .6875rem; letter-spacing: .06em; color: var(--muted); }
+/* M3 cards, and the only thing on the dashboard that is touched: filled cards at
+   elevation 1, with the system's state layer on hover. */
+.tiles { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.tile { display: grid; gap: 2px; align-content: start; text-align: left;
+  padding: var(--space-3) var(--space-4); min-height: 5.5rem;
+  background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md); box-shadow: var(--elev-1); cursor: pointer;
+  font: inherit; color: var(--md-on-surface-variant);
+  background-image: linear-gradient(var(--state), var(--state)); --state: transparent;
+  transition: box-shadow var(--motion-short) var(--easing-standard),
+              background-color var(--motion-short) var(--easing-standard); }
+.tile:hover:not(:disabled) { --state: color-mix(in srgb, var(--md-primary) var(--state-hover), transparent);
+  box-shadow: var(--elev-2); }
+.tile:disabled { cursor: default; opacity: .7; box-shadow: none; }
+.tile-label { color: var(--md-on-surface-muted); font-size: var(--type-label-md-size);
+  letter-spacing: var(--tracking-label); }
+.tile-value { font-size: var(--type-headline-size); line-height: var(--type-headline-line);
+  font-weight: 600; font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.tile-note { font-size: var(--type-body-sm-size); color: var(--md-on-surface-muted); }
+.tile-rule { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
+  color: var(--md-on-surface-muted); }
 
 /* ── SCR-602 – SCR-604 ───────────────────────────────────────────────────── */
 
-.report { padding: 1rem 1.25rem 3rem; max-width: 72rem; }
-.report-head { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.report { padding: 0 0 var(--space-6); max-width: 76rem; }
+/* The pane's top app bar: it stays while the report scrolls under it, so the range and
+   the export never have to be scrolled back to. */
+.report-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  position: sticky; top: calc(var(--space-4) * -1); z-index: 3;
+  margin: calc(var(--space-4) * -1) 0 0; padding: var(--space-3) 0;
+  background: var(--md-background); }
 .report-head h1 { margin: 0; }
-.report-back, .report-export { min-height: var(--touch); padding: 0 1rem; display: inline-flex;
-  align-items: center; border: 1px solid var(--rule); border-radius: 4px; background: #fff;
-  font: inherit; color: inherit; cursor: pointer; text-decoration: none; }
+.report-back, .report-export { min-height: var(--touch); padding: 0 var(--space-4);
+  display: inline-flex; align-items: center; border: 1px solid var(--md-outline);
+  border-radius: var(--shape-full); background: var(--md-surface);
+  font: inherit; font-size: var(--type-label-lg-size); font-weight: 500;
+  color: var(--md-primary); cursor: pointer; text-decoration: none; }
 .report-export { margin-left: auto; }
-.report-range { display: flex; gap: .5rem; align-items: flex-end; }
-.report-range label { margin: 0; font-size: .8125rem; }
+.report-range { display: flex; gap: var(--space-2); align-items: flex-end; }
+.report-range label { margin: 0; font-size: var(--type-label-md-size); }
 .report-range input { min-height: var(--touch); }
-.report-range button { min-height: var(--touch); padding: 0 1rem; }
+.report-range button { min-height: var(--touch); padding: 0 var(--space-4); }
 
 /* RPT-106's header, on every report. */
-.report-meta { display: grid; gap: .25rem 1.5rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-  margin: 1rem 0 1.5rem; padding: .75rem 1rem; background: #fff; border: 1px solid var(--rule);
-  border-radius: 6px; border-top: 1px solid var(--rule); }
-.meta-field { display: flex; gap: .5rem; font-size: .875rem; }
-.meta-field dt { flex: 0 0 8rem; }
+.report-meta { display: grid; gap: var(--space-1) var(--space-5);
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  margin: var(--space-2) 0 var(--space-4); padding: var(--space-3) var(--space-4);
+  background: var(--md-surface-container); border: 0; border-radius: var(--shape-md); }
+.meta-field { display: flex; gap: var(--space-2); font-size: var(--type-body-sm-size); }
+.meta-field dt { flex: 0 0 8rem; color: var(--md-on-surface-muted); }
+.meta-field dd { color: var(--md-on-surface); }
 
-.report table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
-.report th, .report td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--rule); }
-.report .money, .report td { font-variant-numeric: tabular-nums; }
-.report .money { text-align: right; }
-.report thead th { font-size: .8125rem; color: var(--muted); }
-.report tfoot th, .report .total-row th, .report .total-row td { font-weight: 700; border-top: 2px solid var(--ink); }
-.report .inactive { color: var(--muted); }
-.report .recorded { font-size: .75rem; letter-spacing: .08em; color: var(--muted); }
+.report table { margin: var(--space-3) 0; background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-md);
+  overflow: hidden; }
+.report td { font-variant-numeric: tabular-nums; }
+.report tfoot th, .report .total-row th, .report .total-row td {
+  font-weight: 700; border-top: 2px solid var(--md-outline); color: var(--md-on-surface); }
+.report .inactive { color: var(--md-on-surface-muted); }
+.report .recorded { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
+  color: var(--md-on-surface-muted); border: 0; background: none; padding: 0; }
 
 /* FR_6.2 — the reconciliation, printed as arithmetic rather than as a tick. */
-.reconciliation { margin: 1.5rem 0; padding: .9rem 1rem; border-radius: 6px;
-  border: 1px solid var(--rule); background: #fff; }
-.reconciliation h2 { font-size: 1rem; margin: 0 0 .5rem; }
-.recon-line { margin: .2rem 0; font-variant-numeric: tabular-nums; }
-.recon-verdict { margin: .6rem 0 0; font-weight: 600; }
-.recon-rule { font-size: .6875rem; letter-spacing: .06em; color: var(--muted); margin: .4rem 0 0; }
+/* An M3 card in the tertiary container when it balances — success is a role in this
+   system and green is where the brand puts it (branding.md §3.1). */
+.reconciliation { margin: var(--space-4) 0; padding: var(--space-3) var(--space-4);
+  border-radius: var(--shape-md); border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface); box-shadow: var(--elev-1); }
+.balances { border-left: 4px solid var(--md-tertiary); }
+.reconciliation h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-2); }
+.recon-line { margin: 2px 0; font-variant-numeric: tabular-nums; }
+.recon-verdict { margin: var(--space-2) 0 0; font-weight: 600; color: var(--md-on-surface); }
+.recon-rule { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
+  color: var(--md-on-surface-muted); margin: var(--space-1) 0 0; }
 /* RPT-101: a report that does not reconcile is a defect. It is coloured like one. */
-.does-not-balance { border-color: var(--error); background: var(--refuse-bg); }
-.does-not-balance .recon-verdict { color: var(--error); }
+.does-not-balance { border-color: var(--md-error); border-left: 4px solid var(--md-error);
+  background: var(--md-error-container); }
+.does-not-balance .recon-verdict { color: var(--md-error); }
 
-.profit { margin: 1.5rem 0; }
-.profit h2 { font-size: 1rem; margin: 0 0 .25rem; }
-.profit-figure { font-size: 1.75rem; font-weight: 600; margin: 0; font-variant-numeric: tabular-nums; }
-.profit-margin { margin: 0; color: var(--muted); }
-.profit-basis { margin: .35rem 0 0; font-size: .8125rem; color: var(--muted); }
+.profit { margin: var(--space-4) 0; }
+.profit h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-1); }
+.profit-figure { font-size: var(--type-display-size); line-height: var(--type-display-line);
+  font-weight: 600; margin: 0; font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.profit-margin { margin: 0; color: var(--md-on-surface-muted); }
+.profit-basis { margin: var(--space-1) 0 0; font-size: var(--type-body-sm-size); color: var(--md-on-surface-muted); }
 
-.valuation-total { font-size: 1.5rem; font-weight: 600; margin: 0; }
-.voids h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
-.voids ul { margin: 0; padding-left: 1.1rem; color: var(--muted); }
+.valuation-total { font-size: var(--type-headline-size); font-weight: 600; margin: 0; color: var(--md-on-surface); }
+.voids h2 { font-size: var(--type-title-md-size); margin: var(--space-4) 0 var(--space-2); }
+.voids ul { margin: 0; padding-left: 1.1rem; color: var(--md-on-surface-muted); }
 
 @media (max-width: 1023px) {
   .tiles { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
   .report-meta { grid-template-columns: 1fr; }
 }
 
-.methods-note { margin: .25rem 0 0; font-size: .8125rem; color: var(--muted); }
+.methods-note { margin: var(--space-1) 0 0; font-size: var(--type-body-sm-size); color: var(--md-on-surface-muted); }
 
 /* ── SCR-704, SCR-705 (TASK-017) ─────────────────────────────────────────── */
 
-.admin-screen { padding: 1rem 1.25rem 3rem; max-width: 72rem; }
-.admin-tabs { display: flex; gap: .5rem; border-bottom: 1px solid var(--rule); }
-.admin-tab { min-height: var(--touch); padding: 0 1rem; background: none; border: 0;
-  border-bottom: 2px solid transparent; font: inherit; color: var(--muted); cursor: pointer; }
-.admin-tab.is-active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.admin-screen { padding: 0 0 var(--space-6); max-width: 76rem; }
+/* M3 primary tabs: the active one carries a 3 px indicator in the primary role. Sticky,
+   so the section you are in does not scroll away from you on a 768 px screen. */
+.admin-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--md-outline-variant);
+  position: sticky; top: calc(var(--space-4) * -1); z-index: 3;
+  margin: calc(var(--space-4) * -1) 0 0; padding-top: var(--space-2);
+  background: var(--md-background); overflow-x: auto; }
+.admin-tab { min-height: var(--touch); padding: 0 var(--space-4); background: none; border: 0;
+  border-bottom: 3px solid transparent; border-radius: var(--shape-sm) var(--shape-sm) 0 0;
+  font: inherit; font-size: var(--type-label-lg-size); font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  color: var(--md-on-surface-muted); cursor: pointer; white-space: nowrap; }
+.admin-tab:hover { background: color-mix(in srgb, var(--md-primary) var(--state-hover), transparent); }
+.admin-tab.is-active { color: var(--md-primary); border-bottom-color: var(--md-primary); font-weight: 600; }
 
-.admin { padding: 1rem 0 2rem; }
-.admin-head { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.admin-head h1 { margin: 0; }
-.admin-head button { min-height: var(--touch); padding: 0 1rem; margin-left: auto; }
-.admin-meta { display: grid; gap: .25rem 1.5rem; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
-  margin: 1rem 0; padding: .75rem 1rem; background: #fff; border: 1px solid var(--rule); border-radius: 6px; }
-.admin-meta .warn dd { color: var(--warn-ink); }
-.backup-fresh { color: var(--muted); margin: .5rem 0 0; }
+.admin { padding: var(--space-4) 0 var(--space-6); }
+.admin-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* The title takes the slack, so the actions sit together at the right rather than each
+   taking `margin-left: auto` and spreading across the width — which is what happened
+   the moment a second button was added to a header written for one. */
+.admin-head h1 { margin: 0 auto 0 0; }
+.admin-head button { min-height: var(--touch); padding: 0 var(--space-4); }
+.admin-meta { display: grid; gap: var(--space-1) var(--space-5);
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  margin: var(--space-4) 0; padding: var(--space-3) var(--space-4);
+  background: var(--md-surface-container); border: 0; border-radius: var(--shape-md); }
+.admin-meta .warn dd { color: var(--md-on-warning-container); }
+.backup-fresh { color: var(--md-on-surface-muted); margin: var(--space-2) 0 0; }
 
 /* SEC-9 and §7's process control. Deliberately prominent: it is the only place the
    product tells the operator that the off-machine copy is theirs to make. */
-.backup-warning { margin: 1.25rem 0; padding: .9rem 1rem; border-radius: 6px;
-  background: var(--warn-bg); border-left: 4px solid var(--warn-ink); }
-.backup-warning h2 { font-size: 1rem; margin: 0 0 .5rem; }
-.backup-warning p { margin: 0 0 .5rem; line-height: 1.5; }
+.backup-warning { margin: var(--space-4) 0; padding: var(--space-3) var(--space-4);
+  border-radius: var(--shape-md); background: var(--md-warning-container);
+  color: var(--md-on-warning-container); border-left: 4px solid var(--md-warning); }
+.backup-warning h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-2); }
+.backup-warning p { margin: 0 0 var(--space-2); line-height: 1.5; }
 
-.admin table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: #fff; }
-.admin th, .admin td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--rule); }
-.admin thead th { font-size: .8125rem; color: var(--muted); }
-.backup-list .file { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
-.backup-list .failed { color: var(--muted); }
-.backup-list .failed .verified { color: var(--error); }
-.backup-list .restore { min-height: var(--touch); padding: 0 .75rem; }
+.admin table { margin: var(--space-3) 0; background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-md); overflow: hidden; }
+.backup-list .file { font-family: var(--font-mono); font-size: var(--type-body-sm-size); }
+.backup-list .failed { color: var(--md-on-surface-muted); }
+.backup-list .failed .verified { color: var(--md-error); }
+.backup-list .restore { min-height: var(--touch); padding: 0 var(--space-3); }
 .row-counts td { font-variant-numeric: tabular-nums; }
 
-.restore-dialog { background: var(--bg); padding: 1.5rem; border-radius: 8px; max-width: 34rem; }
-.restore-dialog h1 { font-size: 1.25rem; }
-.restore-dialog p { line-height: 1.5; margin: 0 0 .75rem; }
-.restore-loss { font-weight: 600; }
-.restore-dialog .file { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
-  font-size: .8125rem; word-break: break-all; }
+.restore-dialog { background: var(--md-surface-container-lowest); padding: var(--space-5);
+  border-radius: var(--shape-xl); box-shadow: var(--elev-3); max-width: 34rem; }
+.restore-dialog h1 { font-size: var(--type-title-lg-size); }
+.restore-dialog p { line-height: 1.5; margin: 0 0 var(--space-3); }
+.restore-loss { font-weight: 600; color: var(--md-on-surface); }
+.restore-dialog .file { font-family: var(--font-mono); font-size: var(--type-body-sm-size);
+  word-break: break-all; }
 .confirm-filename { min-height: var(--touch); width: 100%; }
-.dialog-actions { display: flex; gap: .5rem; justify-content: flex-end; }
-.dialog-actions button { min-height: var(--touch); padding: 0 1.25rem; }
-/* A restore is the most destructive thing in the product. Its button looks like it. */
-.danger { background: var(--error); color: #fff; border: 0; border-radius: 4px; }
-.danger:disabled { background: var(--rule); color: var(--muted); }
+.dialog-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+.dialog-actions button { min-height: var(--touch); padding: 0 var(--space-5); }
+/* A restore is the most destructive thing in the product. Its button looks like it:
+   M3's filled button in the error role, which is the one place that role is a
+   container rather than a message. */
+.danger { background: var(--md-error); color: var(--md-on-error); border-color: transparent; }
+.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--md-error) 88%, black); }
+.danger:disabled { background: var(--md-surface-container-highest); color: var(--md-on-surface-disabled); }
 
 /* SCR-701 — users (TASK-040). */
-.users .check { display: flex; align-items: center; gap: .4rem; margin: 0; }
-.users-list .is-inactive { color: var(--muted); }
-.user-form { max-width: 30rem; padding: 1rem 0; }
-.user-form input, .user-form select { min-height: var(--touch); width: 100%; padding: 0 .6rem;
-  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
-.role-note { margin: .35rem 0 0; font-size: .8125rem; }
+.users .check { display: flex; align-items: center; gap: var(--space-1); margin: 0; }
+.users-list .is-inactive { color: var(--md-on-surface-muted); }
+.user-form { max-width: 30rem; padding: var(--space-4) 0; }
+.user-form input, .user-form select { min-height: var(--touch); width: 100%; }
+.role-note { margin: var(--space-1) 0 0; font-size: var(--type-body-sm-size); }
 
-/* SCR-702 — settings (TASK-039). */
-.settings-group { margin: 0 0 2rem; padding: 1rem 1.25rem; background: #fff;
-  border: 1px solid var(--rule); border-radius: 6px; }
-.settings-group h2 { font-size: 1.0625rem; margin: 0 0 1rem; }
-.settings-group h3 { font-size: .9375rem; margin: 1.5rem 0 .5rem; }
+/* SCR-702 — settings (TASK-039).
+   Columns, not one long list: at 1366×768 this screen was 6,941 px tall — nine
+   viewports — and a settings page is read by hunting, which is what a column layout is
+   for. The groups keep their order down each column, so a reader who knows where a
+   setting lives still finds it where it was. */
+.settings-groups { columns: 26rem 2; column-gap: var(--space-4); }
+/* A form written for a full-width screen does not fit a column, so inside one it stops
+   pretending to: the fields go full width and the rows wrap. */
+.settings-groups .editor-form { max-width: none; }
+.settings-groups .field-row { flex-wrap: wrap; }
+.settings-groups .setting { max-width: none; }
+.settings-group { margin: 0 0 var(--space-4); padding: var(--space-4);
+  background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md); box-shadow: var(--elev-1);
+  break-inside: avoid; }
+.settings-group h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-3); }
+.settings-group h3 { font-size: var(--type-title-sm-size); margin: var(--space-4) 0 var(--space-2);
+  color: var(--md-on-surface-muted); letter-spacing: var(--tracking-overline); text-transform: uppercase; }
 
-.setting { margin: 0 0 1.25rem; max-width: 40rem; }
-.setting-label { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
-  margin-bottom: .3rem; font-size: .9375rem; }
+.setting { margin: 0 0 var(--space-4); max-width: 40rem; }
+.setting-label { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  margin-bottom: var(--space-1); font-size: var(--type-body-md-size);
+  color: var(--md-on-surface); font-weight: 500; }
 /* OPS-005's own id, visible: reading it down the phone is the fastest support call. */
-.setting-rule { font-size: .6875rem; letter-spacing: .06em; color: var(--muted); }
+.setting-rule { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
+  color: var(--md-on-surface-muted); }
 .setting input[type="text"], .setting select, .setting textarea {
-  min-height: var(--touch); width: 100%; padding: .4rem .6rem; border: 1px solid var(--rule);
-  border-radius: 4px; font: inherit; background: #fff; }
+  min-height: var(--touch); width: 100%; }
 .setting textarea { min-height: 5rem; line-height: 1.5; resize: vertical; }
 .setting input[type="checkbox"] { min-width: 1.15rem; min-height: 1.15rem; }
-.setting-meta { margin: .3rem 0 0; font-size: .75rem; color: var(--muted); }
-.setting-key { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; }
+.setting-meta { margin: var(--space-1) 0 0; font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
+.setting-key { font-family: var(--font-mono); }
 .setting.has-problem input, .setting.has-problem select, .setting.has-problem textarea {
-  border-color: var(--error); }
+  border-color: var(--md-error); box-shadow: inset 0 0 0 1px var(--md-error); }
 
-.tax-mode { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
-.warn-note { background: var(--warn-bg); border-left: 4px solid var(--warn-ink);
-  padding: .6rem .75rem; border-radius: 4px; margin: 0 0 .75rem; line-height: 1.5; }
+.tax-mode { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--md-outline-variant); }
+.warn-note { background: var(--md-warning-container); color: var(--md-on-warning-container);
+  border-left: 4px solid var(--md-warning); padding: var(--space-2) var(--space-3);
+  border-radius: var(--shape-sm); margin: 0 0 var(--space-3); line-height: 1.5; }
 .tax-mode select, .tax-mode input { min-height: var(--touch); }
-.print-test { margin: 1rem 0; padding-top: 1rem; border-top: 1px solid var(--rule); }
+.print-test { margin: var(--space-4) 0; padding-top: var(--space-4); border-top: 1px solid var(--md-outline-variant); }
 
 /* SCR-703 — the audit trail (TASK-041). */
-.audit-filters { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; margin: 1rem 0; }
-.audit-filter { display: flex; flex-direction: column; gap: .2rem; margin: 0; font-size: .8125rem; }
-.audit-filter select, .audit-filter input { min-height: var(--touch); padding: 0 .5rem;
-  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
-.audit-filters button { min-height: var(--touch); padding: 0 1rem; }
+.audit-filters { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap;
+  margin: var(--space-4) 0; }
+.audit-filter { display: flex; flex-direction: column; gap: 2px; margin: 0;
+  font-size: var(--type-label-md-size); }
+.audit-filter select, .audit-filter input { min-height: var(--touch); }
+.audit-filters button { min-height: var(--touch); padding: 0 var(--space-4); }
 
 .audit-list tbody tr { cursor: pointer; }
-.audit-list tbody tr:hover, .audit-list tbody tr:focus-visible { background: #f4f7f5; }
-.audit-list tr.is-open { background: #f4f7f5; }
-.audit-list .reason { color: var(--muted); font-size: .875rem; }
-.audit-list .expand-hint { color: var(--muted); font-variant-numeric: tabular-nums; }
+.audit-list tbody tr:hover, .audit-list tbody tr:focus-visible,
+.audit-list tr.is-open { background: var(--md-primary-container); }
+.audit-list .reason { color: var(--md-on-surface-muted); font-size: var(--type-body-md-size); }
+.audit-list .expand-hint { color: var(--md-on-surface-muted); font-variant-numeric: tabular-nums; }
 /* AUD-603: the second actor is what makes an override an authorisation. */
-.tag.approver { background: var(--warn-bg); color: var(--warn-ink); }
+.tag.approver { background: var(--md-warning-container); color: var(--md-on-warning-container);
+  border-color: color-mix(in srgb, var(--md-warning) 30%, transparent); }
 
-.audit-detail td { background: #fff; }
-.detail-grid { display: grid; gap: 1.5rem; grid-template-columns: 1fr 1fr; }
-.detail-grid h3 { font-size: .8125rem; color: var(--muted); margin: 0 0 .3rem;
-  letter-spacing: .04em; text-transform: uppercase; }
-.detail-grid pre { margin: 0; padding: .6rem .75rem; background: var(--bg); border-radius: 4px;
-  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem;
-  line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.detail-meta { margin: .6rem 0 0; font-size: .75rem; color: var(--muted);
-  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; }
-.trail-note { margin-top: 1.5rem; }
+.audit-detail td { background: var(--md-surface-container); height: auto; padding: var(--space-4); }
+.detail-grid { display: grid; gap: var(--space-5); grid-template-columns: 1fr 1fr; }
+.detail-grid h3 { font-size: var(--type-label-md-size); color: var(--md-on-surface-muted);
+  margin: 0 0 var(--space-1); letter-spacing: var(--tracking-overline); text-transform: uppercase; }
+.detail-grid pre { margin: 0; padding: var(--space-2) var(--space-3);
+  background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-sm); font-family: var(--font-mono);
+  font-size: var(--type-body-sm-size); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.detail-meta { margin: var(--space-2) 0 0; font-size: var(--type-label-md-size);
+  color: var(--md-on-surface-muted); font-family: var(--font-mono); }
+.trail-note { margin-top: var(--space-5); }
 
 @media (max-width: 1023px) {
   .detail-grid { grid-template-columns: 1fr; }
@@ -209,18 +287,20 @@
    Five figures across, because CR-301 buckets a debit and not an account: one farm can
    be in two of these columns at once, and the row has to be able to say so.
 */
-.ageing-buckets { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
-.ageing-bucket { flex: 1 1 8rem; padding: .75rem 1rem; background: #fff;
-  border: 1px solid var(--rule); border-top: 4px solid var(--rule); border-radius: 4px; }
-.ageing-bucket-value { display: block; font-size: 1.25rem; font-weight: 600;
-  font-variant-numeric: tabular-nums; }
-.ageing-bucket-label { display: block; font-size: .875rem; }
-/* The older the debt, the louder the column. */
-.ageing-d31_60 { border-top-color: var(--warn-bg); }
-.ageing-d61_90 { border-top-color: var(--warn-ink); }
-.ageing-d90_plus { border-top-color: var(--error); }
+.ageing-buckets { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0; }
+.ageing-bucket { flex: 1 1 8rem; padding: var(--space-3) var(--space-4); background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant); border-top: 4px solid var(--md-outline-variant);
+  border-radius: var(--shape-md); box-shadow: var(--elev-1); }
+.ageing-bucket-value { display: block; font-size: var(--type-title-lg-size); font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.ageing-bucket-label { display: block; font-size: var(--type-body-md-size); color: var(--md-on-surface-muted); }
+/* The older the debt, the louder the column. Colour is never the only signal (§8): the
+   bucket's own label says which it is. */
+.ageing-d31_60 { border-top-color: var(--md-warning-container); }
+.ageing-d61_90 { border-top-color: var(--md-warning); }
+.ageing-d90_plus { border-top-color: var(--md-error); }
 .ageing-list td.money { font-variant-numeric: tabular-nums; }
-.ageing-list small { display: block; color: var(--muted); font-size: .75rem; }
+.ageing-list small { display: block; color: var(--md-on-surface-muted); font-size: var(--type-label-md-size); }
 .report-ageing .rule-note { max-width: 52rem; line-height: 1.5; }
 
 /* ── SCR-606 the reconciliation (TASK-032) ────────────────────────────────── */
@@ -230,18 +310,17 @@
    the right. Nothing on this screen writes back to the left-hand column — RPT-105 — and
    the layout is meant to make that obvious rather than only true.
 */
-.settle-form { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
-.settle-form input { min-height: var(--touch); padding: 0 .5rem; border: 1px solid var(--rule);
-  border-radius: 4px; font: inherit; background: #fff; }
+.settle-form { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.settle-form input { min-height: var(--touch); }
 .settle-amount { width: 7rem; text-align: right; font-variant-numeric: tabular-nums; }
 .settle-reference { width: 10rem; }
 .settle-reason { flex: 1 1 12rem; }
-.reconcile-list td small { display: block; color: var(--muted); font-size: .75rem; }
-.reconcile-list tr.is-matched td { background: #f4f7f5; }
-.reconcile-excluded { margin: 1.5rem 0 .5rem; }
-.reconcile-excluded h2 { font-size: 1rem; margin: 0 0 .5rem; }
-.reconcile-drill { margin: 1.5rem 0; }
-.reconcile-drill h2 { font-size: 1rem; margin: 0 0 .25rem; }
+.reconcile-list td small { display: block; color: var(--md-on-surface-muted); font-size: var(--type-label-md-size); }
+.reconcile-list tr.is-matched td { background: var(--md-tertiary-container); }
+.reconcile-excluded { margin: var(--space-5) 0 var(--space-2); }
+.reconcile-excluded h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-2); }
+.reconcile-drill { margin: var(--space-5) 0; }
+.reconcile-drill h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-1); }
 .report-reconciliation .rule-note { max-width: 52rem; line-height: 1.5; }
 
 /* ── SCR-607 sales analysis, SCR-608 movement analysis (TASK-033) ─────────── */
@@ -250,19 +329,46 @@
    all four, and the tab strip is the one from the admin panels rather than a second
    idea about what a tab looks like.
 */
-.report-analysis .admin-tabs { margin: .5rem 0 1rem; }
-.report-analysis .report-controls { display: flex; align-items: baseline; gap: 1rem;
-  flex-wrap: wrap; margin: .5rem 0; }
-.report-analysis .report-controls select { min-height: var(--touch); padding: 0 .5rem;
-  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.report-analysis .admin-tabs { margin: 0 0 var(--space-4); position: static; }
+.report-analysis .report-controls { display: flex; align-items: baseline; gap: var(--space-4);
+  flex-wrap: wrap; margin: var(--space-2) 0; }
+.report-analysis .report-controls select { min-height: var(--touch); }
 .report-analysis .report-controls p { margin: 0; }
-.movers h2 { font-size: 1.0625rem; margin: 1.5rem 0 .25rem; }
-.movers h3 { font-size: .9375rem; margin: 1rem 0 .25rem; color: var(--muted); }
-.mover-unit { margin-bottom: .5rem; }
+.movers h2 { font-size: var(--type-title-md-size); margin: var(--space-5) 0 var(--space-1); }
+.movers h3 { font-size: var(--type-title-sm-size); margin: var(--space-4) 0 var(--space-1);
+  color: var(--md-on-surface-muted); }
+.mover-unit { margin-bottom: var(--space-2); }
 /* Requirement 5: a product added inside the range is flagged, not judged. */
-.slow-movers tr.is-new td { color: var(--muted); font-style: italic; }
+.slow-movers tr.is-new td { color: var(--md-on-surface-muted); font-style: italic; }
 
-.movement-types td small { display: block; color: var(--muted); font-size: .75rem; }
-.movement-types tr.is-matched td { background: #f4f7f5; }
-.report-movements h2 { font-size: 1.0625rem; margin: 1.5rem 0 .25rem; }
+.movement-types td small { display: block; color: var(--md-on-surface-muted); font-size: var(--type-label-md-size); }
+.movement-types tr.is-matched td { background: var(--md-primary-container); }
+.report-movements h2 { font-size: var(--type-title-md-size); margin: var(--space-5) 0 var(--space-1); }
 .report-movements .rule-note { max-width: 52rem; line-height: 1.5; }
+
+/* ── SCR-601's report index (the three-transition rule, §2) ──────────────── */
+/*
+   Every report, one press from the dashboard. Four of them used to be three hops away
+   through another report, and movement analysis was reachable only by way of the
+   *product list* — so somebody looking for what the store had written off started at
+   Reports and found nothing that said so.
+
+   M3 list items rather than more tiles: a tile carries a figure, and these carry a
+   destination. Giving them the same shape would say they were the same kind of thing.
+*/
+.report-index { margin-top: var(--space-5); }
+.report-index h2 { margin: 0 0 var(--space-2); }
+.report-index ul { list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+.report-link { display: grid; gap: 1px; width: 100%; text-align: left;
+  /* The base button centres its content; a list item does not. */
+  justify-content: start; justify-items: start;
+  min-height: var(--touch); padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-sm);
+  background: var(--md-surface); color: var(--md-on-surface-variant);
+  font-weight: 400; }
+.report-link:hover { border-color: var(--md-primary); }
+.report-link-label { font-size: var(--type-body-md-size); font-weight: 600; color: var(--md-on-surface); }
+.report-link-why { font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
+.report-link-rule { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
+  color: var(--md-on-surface-muted); }

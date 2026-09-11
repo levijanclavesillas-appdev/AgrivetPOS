@@ -97,6 +97,24 @@ app.whenReady().then(async () => {
   const FIND = (sel, re) => `[...document.querySelectorAll(${JSON.stringify(sel)})].find(b => ${re}.test(b.textContent))`;
   const clickOn = (sel, re) => run(`(() => { const el = ${FIND(sel, re)}; if (el) { el.click(); return true; } return false; })()`);
 
+  /**
+   * 04_UX_SPEC.md §1 principle 5 and §8: 1366×768 is the design target, and the window
+   * this harness opens is exactly that. The shell is the viewport and clips; `.screen`
+   * is the one scroll container. So the *document* must never scroll, in either
+   * direction, on any screen — a page that scrolls sideways has a table outside its own
+   * container, and a page that scrolls down has lost its rail and its header.
+   */
+  const fits = async (label) => {
+    const m = await run(`(() => {
+      const d = document.documentElement;
+      return { v: d.scrollHeight - window.innerHeight, h: d.scrollWidth - window.innerWidth,
+               w: window.innerWidth, hgt: window.innerHeight };
+    })()`);
+    log(m.v <= 0 && m.h <= 0, `1366×768: ${label} fits the window without scrolling it`,
+      `${m.w}×${m.hgt}, document ${m.v > 0 ? `${m.v}px taller` : 'no taller'}`
+      + `${m.h > 0 ? `, ${m.h}px wider` : ''}`);
+  };
+
   const press = (key) => run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`);
 
   await win.loadURL(`http://127.0.0.1:${PORT}/`);
@@ -149,7 +167,10 @@ app.whenReady().then(async () => {
     }
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
   })()`);
-  await settle(1200);
+  // Waited for, not sampled: the scan is a round trip to the API and back, and a fixed
+  // pause on a loaded machine reports an empty cart that fills a moment later — which
+  // then fails the three assertions after it as well.
+  await waitFor(`${LINE_COUNT} >= 1`, { label: 'the scanned line' });
   log(await run(LINE_COUNT) >= 1, 'the scan adds a line', `${await run(LINE_COUNT)} line(s)`);
   const railText = await run(`(document.querySelector('.rail-totals') || {}).textContent || ''`);
   log(/62\.50/.test(railText), 'the total is on the rail', railText.replace(/\s+/g, ' ').slice(0, 70));
@@ -542,6 +563,38 @@ app.whenReady().then(async () => {
   log((await api('/customers/credit-reconciliation')).json.ok === true,
     'CR-103: and the ledger still reconciles, with a negative balance in it');
 
+  console.log('\n— 1366×768 and the three-transition rule (§1, §2.1) —');
+  // Every rail destination, measured in the window the store PC actually has. The
+  // document scrolled on five screens before the Material 3 pass — SCR-702 at 6,941 px,
+  // nine viewports of settings with the tab strip somewhere above the fold.
+  for (const [label, rail] of [['POS', 'POS'], ['Returns', 'Returns'], ['Receipts', 'Receipts'],
+    ['Customers', 'Customers'], ['Products', 'Products'], ['Shift', 'Shift'],
+    ['Buying', 'Buying'], ['Admin', 'Admin'], ['Reports', 'Reports']]) {
+    await run(OPEN_RAIL(rail));
+    await waitFor(`!!document.querySelector('.screen-host > *')`, { label });
+    await settle(500);
+    await fits(label);
+  }
+
+  // The one that was worst, and the one a settings page becomes when it is a single
+  // column: the tab strip stays put and the pane scrolls under it.
+  await run(OPEN_RAIL('Admin'));
+  await waitFor(`!!document.querySelector('.admin-tabs')`, { label: 'SCR-701' });
+  await clickOn('.admin-tab', /Settings/);
+  await waitFor(`!!document.querySelector('.settings-groups')`, { label: 'SCR-702' });
+  await fits('SCR-702 settings');
+  log(await run(`getComputedStyle(document.querySelector('.admin-tabs')).position === 'sticky'`),
+    'and the tab strip is sticky, so the section you are in does not scroll away');
+  log(await run(`document.querySelector('.screen').scrollHeight > window.innerHeight`),
+    'the pane scrolls, not the page',
+    `${await run(`document.querySelector('.screen').scrollHeight`)}px of settings in a 741px pane`);
+
+  // The admin panel is remembered across visits, so this walk puts it back where it
+  // found it — a later section opens Admin expecting Users, and a harness that leaves
+  // state behind it fails a test about something else entirely.
+  await clickOn('.admin-tab', /Users/);
+  await waitFor(`!!document.querySelector('.users')`, { label: 'SCR-701' });
+
   console.log('\n— SCR-601: the dashboard —');
   await run(OPEN_RAIL('Reports'));
   await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
@@ -557,6 +610,20 @@ app.whenReady().then(async () => {
   const shown = await run(`(document.querySelector('.tile-gross-sales .tile-value') || {}).textContent || ''`);
   const expected = `₱${(sales.json.totals.gross_centavos / 100).toFixed(2)}`;
   log(shown === expected, 'TC-INT-60: the tile equals the report behind it', `${shown} vs ${expected}`);
+
+  // §2.1: every report one press from here. Four of them used to be three hops away
+  // through another report, and movement analysis only by way of the product list.
+  const index = await run(`[...document.querySelectorAll('.report-link-label')].map(el => el.textContent)`);
+  log(index.length === 7, 'the dashboard indexes every report', index.join(' · '));
+  log(index.includes('Movement analysis') && index.includes('Reconciliation'),
+    'including the two that had no entrance from Reports at all');
+
+  await clickOn('.report-link', /Movement analysis/);
+  await waitFor(`!!document.querySelector('.report-movements')`, { label: 'SCR-608 in one press' });
+  log(true, 'SCR-608 opens in one transition from the dashboard');
+  await fits('SCR-608');
+  await run(`document.querySelector('.report-back').click()`);
+  await waitFor(`!!document.querySelector('.dashboard')`, { label: 'SCR-601' });
 
   console.log('\n— SCR-602: the daily sales report —');
   await run(`document.querySelector('.tile-gross-sales').click()`);
@@ -665,6 +732,15 @@ app.whenReady().then(async () => {
   log(await run(`/\\d+(\\.\\d+)? KG/.test(document.querySelector('.catalogue-list').textContent)`),
     'INV-101: on hand is in the list',
     (await run(`document.querySelector('.catalogue-list tbody tr').textContent`)).replace(/\s+/g, ' ').slice(0, 70));
+
+  // §2.1: SCR-204 is a filter of this list, and not only a dashboard tile — the
+  // dashboard is behind TX-421, which the inventory clerk does not hold, so the one
+  // screen that says what to reorder was unreachable by the one role whose job it is.
+  log(await clickOn('.admin-head button', /Low stock/), 'SCR-201 offers the low-stock filter');
+  await waitFor(`/Low stock/.test(${TEXT('h1')})`, { label: 'SCR-204' });
+  await fits('SCR-204');
+  log(await clickOn('.admin-head button', /All products/), 'and switches back');
+  await waitFor(`/Products/.test(${TEXT('h1')})`, { label: 'SCR-201' });
 
   // TX-412: the owner is signed in here, and even so the *list* carries no cost.
   log(await run(`!/cost/i.test(document.querySelector('.catalogue-list').textContent)`),
@@ -1250,8 +1326,17 @@ app.whenReady().then(async () => {
     body: { transaction_discount_tiers: [{ min_subtotal_centavos: 0, discount_bp: 0, label: 'No basket discount' }] },
   });
   await api(`/categories/${catForCap.id}`, { method: 'PUT', body: { maxDiscountBp: null } });
-  await api('/carts/active', { method: 'DELETE' });
-  log((await api('/carts/active')).json.cart === null, 'and the counter is left empty for the next walk');
+  // Deleted and then *confirmed* empty, with a retry: POS-105 has the renderer save the
+  // counter's cart back to the server whenever it changes, and the screen is still
+  // mounted while this runs — so a save in flight can land after the delete and put the
+  // cart back. One sampled read reported that as a failure of the walk after it.
+  let emptied = false;
+  for (let attempt = 0; attempt < 6 && !emptied; attempt += 1) {
+    await api('/carts/active', { method: 'DELETE' });
+    await settle(250);
+    emptied = (await api('/carts/active')).json.cart === null;
+  }
+  log(emptied, 'and the counter is left empty for the next walk');
 
   console.log('\n— SCR-301: the statutory discount (TAX-004, TAX-005) —');
 
@@ -1890,7 +1975,10 @@ app.whenReady().then(async () => {
   console.log('\n— OPS-004: the restore confirmation —');
   // The panel reloads itself after a backup, so wait for the table to settle rather
   // than reading it in the gap between the skeleton and the rows.
-  await waitFor(`!!document.querySelector('.backup-list tbody tr')`, { label: 'the backup list' });
+  // The row and its own button, not the row alone: the panel renders the list first and
+  // fills the actions a tick later, and reading in that gap is how this step found one
+  // row and no way to restore it.
+  await waitFor(`!!document.querySelector('.backup-list .restore')`, { label: 'the restore control' });
   const restoreButtons = await run(`document.querySelectorAll('.backup-list .restore').length`);
   if (restoreButtons === 0) {
     console.log('        row html:', String(await run(

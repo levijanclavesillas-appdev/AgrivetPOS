@@ -31,6 +31,33 @@ const OPENS_SCREEN = {
 };
 
 /**
+ * Every report, one press from here.
+ *
+ * `04_UX_SPEC.md` §2 holds this product to **three screen transitions** for any
+ * operation, and the tiles alone did not deliver it for four of the eight reports.
+ * Reconciliation was reached through payments, analysis through the daily report,
+ * movement analysis through the valuation — which is itself reached from the *product
+ * list*, so an owner looking for what they had written off went Reports → nowhere, and
+ * had to know to try Stock instead. Each of those was three hops from a rail that did
+ * not name them anywhere.
+ *
+ * The contextual entries stay: arriving at reconciliation from the payments report
+ * carries the range with it, and that is worth keeping. This is the index beside them.
+ *
+ * `screen: true` means the target is a screen id the shell routes, not one of
+ * `createReport`'s three.
+ */
+const REPORTS = [
+  { id: 'daily', label: 'Daily sales', rule: 'RPT-101', why: 'The day, and its reconciliation' },
+  { id: 'payments', label: 'Payments', rule: 'RPT-102', why: 'What was taken, per method' },
+  { id: 'reconciliation', label: 'Reconciliation', rule: 'RPT-105', screen: true, why: 'The wallet’s statement against the till' },
+  { id: 'analysis', label: 'Sales analysis', rule: 'RPT-104', screen: true, why: 'By category, cashier, product and mover' },
+  { id: 'valuation', label: 'Inventory valuation', rule: 'RPT-103', why: 'What the shelves are worth' },
+  { id: 'movements', label: 'Movement analysis', rule: 'INV-102', screen: true, why: 'Received, sold, damaged, expired' },
+  { id: 'ageing', label: 'Ageing', rule: 'CR-301', screen: true, why: 'What the farms owe, by age' },
+];
+
+/**
  * Alerts that are worth acting on rather than only reading, and where they go.
  *
  * OPS-007's list was read-only until TASK-043: the expiry alerts carry the batch and
@@ -69,7 +96,25 @@ export function createDashboard({ root, session, onOpenReport, onOpenBatches = n
       ]),
       alertList(data.alerts),
       h('div', { class: 'tiles' }, data.tiles.map(tile)),
+      reportIndex(),
     ]));
+  }
+
+  /** §2's three-transition rule, made true for the reports rather than nearly true. */
+  function reportIndex() {
+    return h('nav', { class: 'report-index', 'aria-label': 'Reports' }, [
+      h('h2', { class: 'overline', text: 'All reports' }),
+      h('ul', {}, REPORTS.map((report) => h('li', {}, [
+        h('button', {
+          class: 'report-link',
+          onclick: () => onOpenReport(report.id, Boolean(report.screen)),
+        }, [
+          h('span', { class: 'report-link-label', text: report.label }),
+          h('span', { class: 'report-link-why', text: report.why }),
+          h('span', { class: 'report-link-rule', text: report.rule }),
+        ]),
+      ]))),
+    ]);
   }
 
   function tile(data) {

@@ -1,66 +1,80 @@
-/* SCR-801 – SCR-804. Tokens come from app.css; nothing here redefines a colour. */
+/* SCR-801 – SCR-804. The design system is `tokens.css`; nothing here declares a
+   colour, a radius or a shadow of its own. */
 
-.purchasing { padding: 1rem 1.25rem 3rem; max-width: 82rem; }
+.purchasing { padding: 0 0 var(--space-6); max-width: 86rem; }
 
 /* §4: a wide table scrolls inside its own container, never the page. The receive
    table is eight columns on a 1366-wide store PC, which is exactly the case the rule
    is written for. */
-.table-scroll { overflow-x: auto; margin: .5rem 0 1rem; }
+.table-scroll { overflow-x: auto; margin: var(--space-2) 0 var(--space-4); }
 .table-scroll .catalogue-list { margin: 0; min-width: 44rem; }
 .receive-table { min-width: 58rem; }
 
-/* PO-102's five words, coloured by what they mean for the buyer: something is still
-   expected, everything arrived, or nothing will. */
-.status { display: inline-block; padding: .1rem .45rem; border-radius: 3px;
-  font-size: .75rem; letter-spacing: .02em; background: var(--rule); color: var(--ink); }
-.status-draft { background: #eee; color: var(--muted); }
-.status-pending, .status-partially_received { background: var(--warn-bg); color: var(--warn-ink); }
-.status-received { background: #e6f1ea; color: var(--accent); }
-.status-cancelled { background: #f6e7e6; color: var(--error); }
+/* PO-102's five words as M3 chips, coloured by what they mean for the buyer:
+   something is still expected, everything arrived, or nothing will. The word is in the
+   chip, so the colour is never carrying the meaning alone (§8). */
+.status { display: inline-flex; align-items: center; min-height: 24px; padding: 0 var(--space-2);
+  border-radius: var(--shape-sm); border: 1px solid var(--md-outline-variant);
+  font-size: var(--type-label-md-size); letter-spacing: var(--tracking-label);
+  background: var(--md-surface-container); color: var(--md-on-surface-variant); }
+.status-draft { background: var(--md-surface-container-highest); color: var(--md-on-surface-muted); }
+.status-pending, .status-partially_received { background: var(--md-warning-container);
+  color: var(--md-on-warning-container); border-color: color-mix(in srgb, var(--md-warning) 30%, transparent); }
+.status-received { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container);
+  border-color: color-mix(in srgb, var(--md-tertiary) 30%, transparent); }
+.status-cancelled { background: var(--md-error-container); color: var(--md-error);
+  border-color: color-mix(in srgb, var(--md-error) 30%, transparent); }
 
-.catalogue-list tr.is-open { border-left-color: var(--warn-ink); }
-.catalogue-list tr.is-complete { color: var(--muted); }
+.catalogue-list tr.is-open { border-left-color: var(--md-warning); }
+.catalogue-list tr.is-complete { color: var(--md-on-surface-muted); }
 
 /* A rule stated on the screen it governs: PO-103's "this moves no stock", PO-202's
    "only the sound quantity", PO-104's "saving raises a revision". Quiet by default,
    and marked when it is a warning about what the next click will do. */
-.rule-note { margin: .5rem 0 1rem; font-size: .875rem; line-height: 1.5; max-width: 54rem; }
-.rule-note.warn { background: var(--warn-bg); color: var(--warn-ink);
-  padding: .6rem .75rem; border-left: 4px solid var(--warn-ink); border-radius: 3px; }
+.rule-note { margin: var(--space-2) 0 var(--space-4); font-size: var(--type-body-md-size);
+  line-height: 1.5; max-width: 54rem; color: var(--md-on-surface-muted); }
+.rule-note.warn { background: var(--md-warning-container); color: var(--md-on-warning-container);
+  padding: var(--space-2) var(--space-3); border-left: 4px solid var(--md-warning);
+  border-radius: var(--shape-sm); }
 
-.editor-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.editor-row { display: flex; gap: var(--space-4); flex-wrap: wrap; }
 .editor-row .editor-field { flex: 1 1 14rem; }
 .purchasing .editor-form { max-width: none; }
 
 .catalogue-list .qty input, .catalogue-list .money input { width: 6.5rem; min-height: var(--touch);
-  padding: 0 .4rem; text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
-.catalogue-list .unit { margin-left: .35rem; font-size: .8125rem; color: var(--muted); }
+  padding: 0 var(--space-1); text-align: right; font-variant-numeric: tabular-nums; }
+.catalogue-list .unit { margin-left: var(--space-1); font-size: var(--type-label-md-size);
+  color: var(--md-on-surface-muted); }
 .catalogue-list .line-product { width: 100%; min-width: 16rem; min-height: var(--touch);
-  padding: 0 .4rem; font: inherit; }
+  padding: 0 var(--space-1); }
 .catalogue-list .damage-note { width: 100%; min-width: 10rem; min-height: var(--touch);
-  padding: 0 .4rem; font: inherit; }
-.catalogue-list small { display: block; font-size: .75rem; color: var(--muted); }
-.catalogue-list .resolved:not(:empty) { color: var(--accent); }
+  padding: 0 var(--space-1); }
+.catalogue-list small { display: block; font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
+.catalogue-list .resolved:not(:empty) { color: var(--md-primary); }
 
 /* PO-202's figure, and the one the eye should land on while sacks are being counted
    off a van. Marked when it is below what arrived, because that is the case worth
    noticing before the delivery note is signed. */
 .qty.sound { font-weight: 600; }
-.qty.sound.warn { color: var(--warn-ink); background: var(--warn-bg); }
+.qty.sound.warn { color: var(--md-on-warning-container); background: var(--md-warning-container); }
 
-.po-total, .gr-total { margin-left: auto; font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+.po-total, .gr-total { margin-left: auto; font-size: var(--type-body-lg-size);
+  font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
 
-.po-receipts { margin-top: 2rem; }
-.po-receipts h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.po-receipts { margin-top: var(--space-6); }
+.po-receipts h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-2); }
 .plain-list { list-style: none; margin: 0; padding: 0; }
-.plain-list li { padding: .4rem 0; border-bottom: 1px solid var(--rule);
+.plain-list li { padding: var(--space-1) 0; border-bottom: 1px solid var(--md-outline-variant);
   font-variant-numeric: tabular-nums; }
 
-.supplier-editor { background: #fff; border: 1px solid var(--rule); border-radius: 6px;
-  padding: 1rem 1.25rem; margin: 1rem 0; max-width: 46rem; }
-.supplier-editor h2 { font-size: 1rem; margin: 0 0 1rem; }
+.supplier-editor { background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md); box-shadow: var(--elev-1);
+  padding: var(--space-4); margin: var(--space-4) 0; max-width: 46rem; }
+.supplier-editor h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-3); }
 
-.row-action.danger { color: var(--error); }
+/* A text button in the error role: M3 keeps the destructive action legible without
+   giving it a container it has not earned inside a row. */
+.row-action.danger { color: var(--md-error); background: transparent; border-color: transparent; }
 
 @media (max-width: 900px) {
   .editor-row { flex-direction: column; }
@@ -74,15 +88,20 @@
    cannot walk away with the wrong feed.
 */
 .picker { position: relative; }
-.picker-input { width: 100%; min-height: var(--touch); padding: 0 .6rem;
-  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
+.picker-input { width: 100%; min-height: var(--touch); }
+/* M3 menu, at elevation 2, hanging off the field it belongs to. */
 .picker-results { position: absolute; z-index: 5; left: 0; right: 0; top: 100%;
-  max-height: 16rem; overflow-y: auto; background: #fff; border: 1px solid var(--rule);
-  border-radius: 0 0 6px 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
-.picker-result { display: grid; grid-template-columns: 8rem 1fr auto auto; gap: .5rem;
-  align-items: baseline; width: 100%; padding: .5rem .6rem; border: 0; background: none;
-  font: inherit; text-align: left; cursor: pointer; }
-.picker-result:hover, .picker-result.is-cursor { background: #f4f7f5; }
-.picker-sku { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: .8125rem; }
-.picker-unit, .picker-stock { color: var(--muted); font-size: .8125rem; font-variant-numeric: tabular-nums; }
-.picker-results .no-results { margin: 0; padding: .6rem; color: var(--muted); }
+  max-height: 16rem; overflow-y: auto; background: var(--md-surface-container-lowest);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 0 0 var(--shape-sm) var(--shape-sm); box-shadow: var(--elev-2); }
+.picker-result { display: grid; grid-template-columns: 8rem 1fr auto auto; gap: var(--space-2);
+  align-items: baseline; width: 100%; min-height: var(--touch); padding: var(--space-2);
+  border: 0; border-radius: 0; background: none;
+  font: inherit; font-size: var(--type-body-md-size); font-weight: 400;
+  color: var(--md-on-surface-variant); text-align: left; cursor: pointer; }
+.picker-result:hover, .picker-result.is-cursor {
+  background: color-mix(in srgb, var(--md-primary) var(--state-hover), transparent); }
+.picker-sku { font-family: var(--font-mono); font-size: var(--type-body-sm-size); }
+.picker-unit, .picker-stock { color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size);
+  font-variant-numeric: tabular-nums; }
+.picker-results .no-results { margin: 0; padding: var(--space-2); color: var(--md-on-surface-muted); }

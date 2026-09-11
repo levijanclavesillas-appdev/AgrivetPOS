@@ -293,6 +293,7 @@ that is decided.
 | `TC-UT-56`, `TC-INT-126` – `TC-INT-128`, `TC-E2E-29` | `TASK-042` | Counting by batch: the sheet's line shape, a variance landing on the batch it was found in, `INV-201` after a posted count, a batch at zero counted up |
 | `TC-UI-11`, `TC-E2E-30` | `TASK-043` | `SCR-206`: the batch list with no quantity field, and the alert-to-write-off walk |
 | `TC-UI-12`, `TC-E2E-31` | `TASK-044` | `SCR-306`: a list that cannot edit, and finding a receipt again after the next customer has started |
+| `TC-UI-13` | `TASK-045` | The three-transition walk, per role, against `04_UX_SPEC.md` §2.1's reach table — and every report one press from the dashboard |
 | `TC-PERF-07` | `TASK-033` | The new reports inside `TC-PERF-05`'s budget at `TC-PERF-06`'s scale |
 | `TC-PERF-08` – `TC-PERF-09` | `TASK-035` | Encrypted against plain, across the budgets and across backup, verification and restore |
 

@@ -1,51 +1,58 @@
-/* SCR-401 – SCR-403. Tokens come from app.css; nothing here redefines a colour. */
+/* SCR-401 – SCR-404. The design system is `tokens.css`; nothing here declares a
+   colour, a radius or a shadow of its own. */
 
-.customers { padding: 1rem 1.25rem 3rem; max-width: 72rem; }
-.customers h2 { font-size: 1rem; margin: 1.75rem 0 .5rem; }
-.customer-form { max-width: 30rem; padding: 1rem 0; }
-.customer-form input, .customer-form select { min-height: var(--touch); width: 100%;
-  padding: 0 .6rem; border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
-.customers .check { display: flex; align-items: center; gap: .4rem; margin: 0 0 1rem; }
+.customers { padding: 0 0 var(--space-6); max-width: 76rem; }
+.customers h2 { font-size: var(--type-title-md-size); margin: var(--space-5) 0 var(--space-2); }
+.customer-form { max-width: 30rem; padding: var(--space-4) 0; }
+.customer-form input, .customer-form select { min-height: var(--touch); width: 100%; }
+.customers .check { display: flex; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-4); }
 
-/* CR-107: an overdue account must not look like every other row. */
-.tag.overdue { background: var(--refuse-bg); color: var(--error); font-weight: 600; }
-.customer-list tr.is-overdue-row td, .is-overdue-row td { color: var(--error); }
+/* CR-107: an overdue account must not look like every other row. §8: the word
+   OVERDUE is in the tag, so the colour is never carrying it alone. */
+.tag.overdue { background: var(--md-error-container); color: var(--md-error); font-weight: 600;
+  border-color: color-mix(in srgb, var(--md-error) 30%, transparent); }
+.customer-list tr.is-overdue-row td, .is-overdue-row td { color: var(--md-error); }
 
 /* SCR-402's first block — the question anybody opening the screen is asking. */
-.credit-summary { margin: 1rem 0 1.5rem; padding: 1rem 1.25rem; background: #fff;
-  border: 1px solid var(--rule); border-radius: 6px; border-left: 4px solid var(--accent); }
-.credit-summary.is-overdue { border-left-color: var(--error); background: var(--refuse-bg); }
-.credit-summary.none { border-left-color: var(--rule); }
-.credit-figures { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.credit-summary { margin: var(--space-4) 0 var(--space-5); padding: var(--space-4);
+  background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md); border-left: 4px solid var(--md-primary);
+  box-shadow: var(--elev-1); }
+.credit-summary.is-overdue { border-left-color: var(--md-error); background: var(--md-error-container); }
+.credit-summary.none { border-left-color: var(--md-outline-variant); }
+.credit-figures { display: flex; gap: var(--space-6); flex-wrap: wrap; margin-bottom: var(--space-3); }
 .credit-figure { display: flex; flex-direction: column; }
-.figure-label { font-size: .8125rem; color: var(--muted); }
-.figure-value { font-size: 1.375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.credit-figure.available .figure-value { color: var(--accent); }
-.credit-summary.is-overdue .credit-figure.balance .figure-value { color: var(--error); }
-.overdue-note { margin: 0 0 .75rem; font-weight: 600; color: var(--error); }
+.figure-label { font-size: var(--type-label-md-size); color: var(--md-on-surface-muted);
+  letter-spacing: var(--tracking-label); }
+.figure-value { font-size: var(--type-title-lg-size); font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.credit-figure.available .figure-value { color: var(--md-primary); }
+.credit-summary.is-overdue .credit-figure.balance .figure-value { color: var(--md-error); }
+.overdue-note { margin: 0 0 var(--space-3); font-weight: 600; color: var(--md-error); }
 
 /* CR-108 (TASK-028). Store credit is money the store owes, so it reads in the accent
    the "available" figure reads in — the store's favour — and never in the error colour
    a debt carries. A customer in credit is not a problem to chase. */
-.tag.in-credit { background: #eef4f0; color: var(--accent); font-weight: 600; }
-.store-credit-note { margin: 0 0 .75rem; color: var(--accent); max-width: 44rem; }
-.limit-form { margin-top: .75rem; }
-.limit-form input { min-height: var(--touch); padding: 0 .6rem; border: 1px solid var(--rule);
-  border-radius: 4px; font: inherit; background: #fff; }
+.tag.in-credit { background: var(--md-primary-container); color: var(--md-primary); font-weight: 600;
+  border-color: color-mix(in srgb, var(--md-primary) 30%, transparent); }
+.store-credit-note { margin: 0 0 var(--space-3); color: var(--md-primary); max-width: 44rem; }
+.limit-form { margin-top: var(--space-3); }
+.limit-form input { min-height: var(--touch); }
 
 .statement td { font-variant-numeric: tabular-nums; }
 
 /* SCR-403 */
-.collection .collection-amount { font-size: 1.25rem; text-align: right; }
-.collection input, .collection select { min-height: var(--touch); width: 100%; padding: 0 .6rem;
-  border: 1px solid var(--rule); border-radius: 4px; font: inherit; background: #fff; }
-.preview { margin: 1.25rem 0; padding: .9rem 1rem; background: #fff; border: 1px solid var(--rule);
-  border-radius: 6px; min-height: 3rem; }
-.preview-line { margin: 0; font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+.collection .collection-amount { font-size: var(--type-title-lg-size); text-align: right; }
+.collection input, .collection select { min-height: var(--touch); width: 100%; }
+.preview { margin: var(--space-4) 0; padding: var(--space-3) var(--space-4);
+  background: var(--md-surface-container); border: 0;
+  border-radius: var(--shape-md); min-height: 3rem; }
+.preview-line { margin: 0; font-size: var(--type-body-lg-size); font-variant-numeric: tabular-nums; }
 /* CR-204: the excess is named before the tick, and the tick starts off. */
-.overpayment { margin-top: .75rem; padding: .75rem; border-radius: 4px;
-  background: var(--warn-bg); border-left: 4px solid var(--warn-ink); }
-.overpayment p { margin: 0 0 .5rem; font-weight: 600; }
+.overpayment { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--shape-sm);
+  background: var(--md-warning-container); color: var(--md-on-warning-container);
+  border-left: 4px solid var(--md-warning); }
+.overpayment p { margin: 0 0 var(--space-2); font-weight: 600; }
 .overpayment .check { margin: 0; align-items: flex-start; }
 .overpayment input[type="checkbox"] { min-width: 1.15rem; min-height: 1.15rem; width: auto; }
 
@@ -55,13 +62,13 @@
 }
 
 /* A payment on the statement is a subtraction — the column is read down the balance. */
-.statement .money.credit { color: var(--accent); }
+.statement .money.credit { color: var(--md-primary); }
 
 /* PR-103's agreed prices on SCR-402 (TASK-024). */
-.agreed-prices { margin-top: 2rem; }
-.agreed-prices h2 { font-size: 1rem; margin: 0 0 .35rem; }
+.agreed-prices { margin-top: var(--space-6); }
+.agreed-prices h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-1); }
 .agreed-prices .muted { max-width: 46rem; }
-.agreed-prices .catalogue-list { margin-top: .75rem; }
+.agreed-prices .catalogue-list { margin-top: var(--space-3); }
 
 /* ── SCR-404 the statement (TASK-031) ─────────────────────────────────────── */
 /*
@@ -69,11 +76,12 @@
    closing figure large enough to be read across a counter.
 */
 .statement-list .money { font-variant-numeric: tabular-nums; }
-.statement-list small.settled { display: block; color: var(--muted); font-size: .75rem; }
-.statement-closing { display: flex; flex-direction: column; gap: .25rem; margin: 1rem 0;
-  padding: 1rem 1.25rem; background: #fff; border: 1px solid var(--rule);
-  border-left: 4px solid var(--accent); border-radius: 4px; }
-.statement-closing.is-credit { border-left-color: var(--warn-ink); }
-.statement-closing-amount { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.statement-closing-label { color: var(--muted); }
+.statement-list small.settled { display: block; color: var(--md-on-surface-muted); font-size: var(--type-label-md-size); }
+.statement-closing { display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-4) 0;
+  padding: var(--space-4); background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+  border-left: 4px solid var(--md-primary); border-radius: var(--shape-md); box-shadow: var(--elev-1); }
+.statement-closing.is-credit { border-left-color: var(--md-warning); }
+.statement-closing-amount { font-size: var(--type-display-size); line-height: var(--type-display-line);
+  font-weight: 600; font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.statement-closing-label { color: var(--md-on-surface-muted); }
 .statement .rule-note { max-width: 52rem; line-height: 1.5; }

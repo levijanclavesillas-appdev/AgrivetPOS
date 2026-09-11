@@ -284,6 +284,9 @@ export function createApp({ root }) {
       root: host(),
       session,
       // A tile opens either a report or a screen; the low-stock one opens SCR-204.
+      // A tile or an index entry opens either a screen the shell routes or one of
+      // createReport's three. Both paths are one transition from here, which is what
+      // 04_UX_SPEC.md §2's three-transition rule needs from the dashboard.
       onOpenReport: (target, isScreen) => (isScreen ? show(target) : showReport(target)),
       // OPS-007's expiry alerts open SCR-206 on the product they name, which is the
       // difference between being told about expired stock and being able to clear it.
@@ -306,6 +309,9 @@ export function createApp({ root }) {
       onBatches: (id) => showBatches(id),
       onValuation: () => showReport('valuation'),
       onCount: () => showStockCount(),
+      // SCR-204 is a filter of this list, so it is reachable from it — and not only
+      // from a dashboard the inventory clerk cannot open (04_UX_SPEC.md §2.1).
+      onMode: (next) => show(next === 'low-stock' ? 'low-stock' : 'products'),
     });
     current.mount();
     return current;
