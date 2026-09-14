@@ -204,6 +204,13 @@
 
 * { box-sizing: border-box; }
 
+/* `hidden` hides, whatever else the element is. The browser's own `[hidden]` is
+   `display: none` at the lowest precedence there is, so any author rule that gives an
+   element a display — `button` below is `inline-flex` — silently undid it, and every
+   `el.hidden = true` on a button did nothing. It was found on SCR-001, where Back showed
+   on step 1. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -310,6 +317,14 @@ button:disabled, .row-action:disabled {
   cursor: not-allowed;
 }
 button[disabled][aria-busy="true"] { cursor: progress; }
+
+/* M3's filled button in the error role — the one place that role is a container rather
+   than a message. For the actions that cannot be taken back: a restore (OPS-004), a
+   write-off (CR-303), an opening load. Declared here with the rest of the family; it had
+   lived in reports.css, which the setup wizard does not load. */
+.danger { background: var(--md-error); color: var(--md-on-error); border-color: transparent; }
+.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--md-error) 88%, black); }
+.danger:disabled { background: var(--md-surface-container-highest); color: var(--md-on-surface-disabled); }
 
 /* ── Text fields (M3 outlined) ─────────────────────────────────────────────
    The label sits above the box rather than floating in it — see the header. What is

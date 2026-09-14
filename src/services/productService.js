@@ -629,7 +629,8 @@ function addPackRow(productId, pack, at) {
   });
 }
 
-function addPack(productId, input, actor) {
+/** `addPack` without its own transaction, for the opening load's (§8.3, as `createWithin`). */
+function addPackWithin(productId, input, actor) {
   const product = productRepository.findById(productId);
   if (!product) throw errors.notFound('No such product');
 
@@ -637,19 +638,19 @@ function addPack(productId, input, actor) {
   const pack = normalisePack(input, baseUnit);
   const at = clock.nowUtc();
 
-  return db.transaction(() => {
-    addPackRow(productId, pack, at);
-    auditService.write({
-      actor,
-      action: 'PRODUCT_MODIFIED',
-      entityType: 'products',
-      entityId: productId,
-      after: { pack_unit: pack.unitCode, factor_milli: pack.factorMilli },
-      reason: `Pack added: 1 ${pack.unitCode} = ${quantity.format(pack.factorMilli, baseUnit.code)}`,
-    });
-    return productRepository.packsFor(productId).map(presentPack);
+  addPackRow(productId, pack, at);
+  auditService.write({
+    actor,
+    action: 'PRODUCT_MODIFIED',
+    entityType: 'products',
+    entityId: productId,
+    after: { pack_unit: pack.unitCode, factor_milli: pack.factorMilli },
+    reason: `Pack added: 1 ${pack.unitCode} = ${quantity.format(pack.factorMilli, baseUnit.code)}`,
   });
+  return productRepository.packsFor(productId).map(presentPack);
 }
+
+const addPack = (productId, input, actor) => db.transaction(() => addPackWithin(productId, input, actor));
 
 function removePack(productId, packId, actor) {
   const packs = productRepository.packsFor(productId);
@@ -951,6 +952,6 @@ module.exports = {
   toPublic, detail, resolvePrice, isSellable,
   get, search, findByBarcode,
   create, createWithin, update, deactivate, assertBaseUnitChangeable,
-  attachBarcode, detachBarcode, addPack, removePack, normalisePack,
+  attachBarcode, detachBarcode, addPack, addPackWithin, removePack, normalisePack,
   setPrices, setQuantityBreaks, quantityBreaks, validateBandSet, setCost, assertMayChangeCost,
 };

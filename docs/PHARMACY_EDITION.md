@@ -1,6 +1,7 @@
 # Pharmacy Edition — Chachi Pharmacy POS
 
-**Branch**: `pharmacy` · **Base**: `main` at `9eb81c2` · **Date**: 2026-09-14
+**Branch**: `pharmacy` · **Base**: `main` at `9eb81c2` · **Date**: 2026-09-14 ·
+**Tasks**: `TASK-046`–`TASK-049` (`06_TASKS/README.md`, *Pharmacy edition*)
 **Scope**: an **over-the-counter** drugstore. Not a dispensing pharmacy — see §5.
 
 This is the agrivet product with the changes a drugstore counter needs, and nothing else.
@@ -22,7 +23,8 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | Senior citizen / PWD discount (`TAX-004`) | Ships **off** | Ships **on** | `settingsService` |
 | Return write-off categories (`POS-304`) | Veterinary, Vaccines, Biologics… | Medicines, OTC Medicines, Vitamins, Supplements, Vaccines, Biologics | `settingsService` |
 | Return reasons | …"Animal refused the feed"… | …"Seal broken or packaging tampered", "Adverse reaction reported"… | `settingsService` |
-| Opening-data spreadsheet | Feed and vet examples | Pharmacy examples, plus `generic_name` and `senior_pwd` columns | `openingDataService`, `tools/opening-template` |
+| Opening-data spreadsheet | Three CSV files, emailed as a workbook; categories and units keyed in by hand first | **One `.xlsx`**, downloaded from the app and uploaded back unchanged, with its own tabs for categories, units, brands, suppliers and packs; `generic_name` and `senior_pwd` columns (`TASK-047`) | `openingWorkbookService`, `config/xlsx.js`, `openingDataService` |
+| Setup wizard (`SCR-001`) | Unstyled (it never loaded `tokens.css`); five steps | Styled and fitting 1366×768; an optional **step 6** loads the workbook as the new owner (`TASK-047`) | `setup.html`, `setup.js`, `shell/opening.js` |
 | Customers created by the opening balance load | `FARM` | `REGULAR` | `openingDataService` |
 
 ## 2. Recorded decisions

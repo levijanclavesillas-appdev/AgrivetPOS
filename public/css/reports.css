@@ -201,12 +201,7 @@
 .confirm-filename { min-height: var(--touch); width: 100%; }
 .dialog-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .dialog-actions button { min-height: var(--touch); padding: 0 var(--space-5); }
-/* A restore is the most destructive thing in the product. Its button looks like it:
-   M3's filled button in the error role, which is the one place that role is a
-   container rather than a message. */
-.danger { background: var(--md-error); color: var(--md-on-error); border-color: transparent; }
-.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--md-error) 88%, black); }
-.danger:disabled { background: var(--md-surface-container-highest); color: var(--md-on-surface-disabled); }
+/* `.danger` — the restore's button — is in tokens.css with the rest of the buttons. */
 
 /* SCR-701 — users (TASK-040). */
 .users .check { display: flex; align-items: center; gap: var(--space-1); margin: 0; }

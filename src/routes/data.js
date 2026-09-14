@@ -5,6 +5,7 @@
 //   POST /data/export           TX-426   OPS-101 — the archive, as a download
 //   POST /data/import/validate  TX-427   OPS-102 — the summary, writing nothing
 //   POST /data/import           TX-427   OPS-102 – OPS-104 — backup, then one transaction
+//   GET  /data/opening/workbook        TX-427   OPS-105 — every sheet, as one .xlsx
 //   GET  /data/opening/template/:kind  TX-427   OPS-105 — the blank spreadsheet
 //   POST /data/opening/validate TX-427   OPS-105 — every row checked, writing nothing
 //   POST /data/opening          TX-427   OPS-105 – OPS-107 — backup, then one transaction
@@ -28,6 +29,7 @@ const express = require('express');
 const exportService = require('../services/exportService');
 const importService = require('../services/importService');
 const openingDataService = require('../services/openingDataService');
+const openingWorkbookService = require('../services/openingWorkbookService');
 const errors = require('../services/errors');
 const csvConfig = require('../config/csv');
 const { authenticate, requirePermission } = require('../middleware/auth');
@@ -66,12 +68,13 @@ const openingData = [authenticate, requirePermission('TX-427'), archiveBody];
  * should not have to send two empty strings to say so.
  */
 function filesFrom(body) {
+  // The whole workbook, as base64 (pharmacy edition). Read into the same per-sheet CSV
+  // the separate files arrive as, so there is one validator whichever way it came.
+  if (typeof body.workbook === 'string' && body.workbook.length > 0) {
+    return openingWorkbookService.filesFromWorkbook(Buffer.from(body.workbook, 'base64'));
+  }
   const pick = (value) => (typeof value === 'string' && value.trim() !== '' ? value : null);
-  return {
-    products: pick(body.products),
-    stock: pick(body.stock),
-    balances: pick(body.balances),
-  };
+  return Object.fromEntries(openingDataService.KIND_NAMES.map((kind) => [kind, pick(body[kind])]));
 }
 
 /** The upload, as bytes. Refused with a sentence rather than a stack trace. */
@@ -148,6 +151,21 @@ router.post('/data/import', importData, (req, res, next) => {
       collisionMode: body.collisionMode || 'SKIP',
       reason: body.reason || null,
     }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The onboarding workbook (pharmacy edition): every sheet in one `.xlsx`, generated
+ * from the same table the CSV templates are, and read straight back by `/validate` and
+ * `/data/opening` when it is sent as `workbook`.
+ */
+router.get('/data/opening/workbook', [authenticate, requirePermission('TX-427')], (req, res, next) => {
+  try {
+    res.setHeader('content-type', openingWorkbookService.CONTENT_TYPE);
+    res.setHeader('content-disposition', `attachment; filename="${openingWorkbookService.FILE_NAME}"`);
+    res.send(openingWorkbookService.workbook());
   } catch (err) {
     next(err);
   }

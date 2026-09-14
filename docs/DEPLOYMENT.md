@@ -210,7 +210,33 @@ customers and their credit (`SCR-401`–`SCR-403`), and the shift screens (`SCR-
 so UAT checks 5 and 6 can be performed by the store's own people rather than by a technician
 with an HTTP client.*
 
-### Products
+### The quick way — one Excel workbook (`TASK-047`)
+
+For more than a few dozen products, load the store's lists from one workbook instead of keying
+them in. It is offered as **step 6 of the setup wizard**, straight after the recovery code, and
+at any time afterwards under **Admin → Export / import**.
+
+1. **Download the Excel template.** It has a *Read me* tab, then one tab each for Categories,
+   Units, Brands, Suppliers, Products, Packs, Opening stock and Credit balances. Row 2 of every
+   tab says whether the column is required and shows an example.
+2. **Fill it in from row 3 down**, and save it as it is (*Excel Workbook, .xlsx*). Do not save the
+   tabs as CSV, and do not reformat the columns: they are Text on purpose, which is what keeps
+   `2027-03-31` from becoming `31/03/2027` and a barcode from losing its leading zero.
+3. **Choose it and press Check.** Nothing is written. Every problem is listed with its tab and
+   row number. Fix the spreadsheet and check again as often as it takes.
+4. **Set the cutover date** (the day the notebook was closed) and press **Load this data**. A
+   verified backup is taken first, and the whole workbook loads as one transaction. The screen
+   then says whether stock and credit reconcile (`INV-101`, `CR-103`).
+
+The rules below still apply to what goes in the workbook: the base unit and batch tracking are
+fixed once stock is loaded, and every opening stock row needs its cost (`OPS-106`). Sending the
+workbook again is safe. Categories, units, brands and suppliers the store already has are left
+as they are, and products already in the catalogue are refused rather than doubled.
+
+The same template can be written to a file for emailing to a client before the store has a
+system to download it from: `node tools/opening-template/build.js`.
+
+### Products — by hand
 
 **Products** on the rail (`SCR-201`) → **New product**. For each: SKU, name, category, base
 unit, and the retail price — the price is asked for at creation because a product without one

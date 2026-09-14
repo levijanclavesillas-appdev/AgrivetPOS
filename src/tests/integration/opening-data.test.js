@@ -539,7 +539,8 @@ test('requirement 2: each template downloads, and passes its own validation', as
 });
 
 test('an unknown template kind is refused with the list of the real ones', () => {
-  assert.throws(() => openingDataService.template('suppliers'), /products, stock, balances/);
+  assert.throws(() => openingDataService.template('invoices'),
+    /categories, units, brands, suppliers, products, packs, stock, balances/);
 });
 
 // ── At the size the task was written for ────────────────────────────────────

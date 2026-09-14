@@ -5,18 +5,31 @@
 // Every one of them is repeated on the server, which is the only place a rule is
 // actually enforced (SEC-6) — VR-501, VR-502, TAX-001, SEC-5 and OPS-001 all refuse
 // again in setupService, and this file cannot weaken any of them.
+//
+// TASK-047 added a sixth step after the five: the store's existing data, loaded with the
+// same panel SCR-706 shows. It runs as the new owner — the wizard signs in with the
+// credentials it was just given, keeps the token in memory only (SEC-7), and forgets the
+// password — and it can be skipped, because an empty store is a store too.
+
+import * as api from './shell/api.js';
+import { createOpeningLoad } from './shell/opening.js';
 
 const STEPS = ['store', 'tax', 'owner', 'recovery', 'backup'];
-const LABELS = { store: 'Store', tax: 'Tax', owner: 'Owner', recovery: 'Recovery', backup: 'Backup' };
+const LABELS = { store: 'Store', tax: 'Tax', owner: 'Owner', recovery: 'Recovery code', backup: 'Backup', data: 'Your data' };
 
 const form = document.querySelector('#wizard');
 const errorBox = document.querySelector('#error');
 const stepList = document.querySelector('#steps');
 const backButton = document.querySelector('#back');
 const nextButton = document.querySelector('#next');
+const nav = document.querySelector('.wizard-nav');
 
 let index = 0;
-let done = false;
+// 'steps' → the five; 'done' → the recovery code; 'data' → step 6.
+let phase = 'steps';
+let signedIn = null;          // { user } once the new owner is signed in, for step 6
+let signingIn = null;         // the sign-in in flight, which step 6 waits for
+let loaded = false;           // step 6 has landed a load
 
 const sectionFor = (name) => document.querySelector(`.step[data-step="${name}"]`);
 const field = (name) => form.elements[name];
@@ -29,23 +42,36 @@ function showError(message) {
 }
 
 function renderProgress() {
-  stepList.innerHTML = STEPS.map((name, i) => {
-    const state = done || i < index ? 'done' : i === index ? 'current' : 'todo';
-    return `<li class="${state}"><span>${i + 1}</span> ${LABELS[name]}</li>`;
-  }).join('');
+  const saved = phase !== 'steps';
+  const five = STEPS.map((name, i) => {
+    const state = saved || i < index ? 'done' : i === index ? 'current' : 'todo';
+    return `<li class="${state}"${state === 'current' ? ' aria-current="step"' : ''}><span>${i + 1}</span> ${LABELS[name]}</li>`;
+  });
+  const sixth = loaded ? 'done' : phase === 'data' ? 'current' : 'todo';
+  five.push(`<li class="${sixth} optional"${sixth === 'current' ? ' aria-current="step"' : ''}>`
+    + `<span>6</span> ${LABELS.data} <small>optional</small></li>`);
+  stepList.innerHTML = five.join('');
 }
 
-function render() {
-  for (const name of [...STEPS, 'done']) sectionFor(name).hidden = true;
-  sectionFor(done ? 'done' : STEPS[index]).hidden = false;
+const current = () => (phase === 'steps' ? STEPS[index] : phase);
 
-  backButton.hidden = done || index === 0;
-  nextButton.hidden = done;
+function render() {
+  for (const name of [...STEPS, 'done', 'data']) sectionFor(name).hidden = true;
+  sectionFor(current()).hidden = false;
+
+  nav.hidden = phase !== 'steps';
+  // Step 6 lives outside the form; the form's sections are all hidden by then, but an
+  // empty form still takes its share of the card's height.
+  form.hidden = phase === 'data';
+  backButton.hidden = index === 0;
   nextButton.textContent = index === STEPS.length - 1 ? 'Finish setup' : 'Next';
+  document.querySelector('#wizard-lede').textContent = phase === 'steps'
+    ? 'Five steps. Nothing is saved until the last one.'
+    : 'The store is set up and saved.';
   renderProgress();
   showError('');
 
-  const first = sectionFor(done ? 'done' : STEPS[index]).querySelector('input, button');
+  const first = sectionFor(current()).querySelector('input, button');
   if (first) first.focus();
 }
 
@@ -141,16 +167,67 @@ async function complete() {
 
     // Shown once. It is not stored in plaintext anywhere and cannot be requested again
     // (SEC-5) — losing it means using POST /auth/recover, which issues a replacement.
-    done = true;
+    phase = 'done';
     document.querySelector('#recovery-code').textContent = body.recoveryCode;
     document.querySelector('#done-detail').textContent =
       `${body.profile.store_name} · owner "${body.owner.username}" · backups to ${body.backupFolder}`;
+    // Not awaited: the recovery code is what matters now, and it is shown the moment the
+    // store exists. Step 6 waits for the sign-in instead.
+    signingIn = signInAsOwner();
     render();
   } catch (err) {
     showError(`The application did not answer (${err.message}). Close it and start it again.`);
   } finally {
     nextButton.disabled = false;
   }
+}
+
+// ── Step 6 — the store's existing data (TASK-047) ───────────────────────────
+
+/**
+ * Sign in as the owner the wizard has just created, for step 6's TX-427.
+ *
+ * Done straight after setup rather than when step 6 is opened, so the password can be
+ * cleared from the form while the owner is still reading the recovery code instead of
+ * sitting in the page for as long as they take to write it down. The token is in memory
+ * only (SEC-7) and dies with this page; the application asks for the password again.
+ */
+async function signInAsOwner() {
+  try {
+    const session = await api.post('/auth/login', {
+      username: value('username'),
+      password: field('password').value,
+    });
+    api.setToken(session.token);
+    signedIn = { user: session.user };
+  } catch {
+    // Not a reason to hide the recovery code. Step 6 says what happened instead.
+    signedIn = null;
+  } finally {
+    field('password').value = '';
+    field('passwordConfirm').value = '';
+  }
+}
+
+let panel = null;
+
+async function openDataStep() {
+  await signingIn;
+  phase = 'data';
+  const lede = document.querySelector('#data-lede');
+  if (!signedIn) {
+    lede.textContent = 'The wizard could not sign in as the owner, so this step cannot run here. '
+      + 'Go to the application, sign in, and use Admin → Export / import — it is the same load.';
+    document.querySelector('#opening').hidden = true;
+  } else if (!panel) {
+    panel = createOpeningLoad({
+      root: document.querySelector('#opening'),
+      heading: null,
+      onLoaded: () => { loaded = true; renderProgress(); },
+    });
+    panel.mount();
+  }
+  render();
 }
 
 // ── Wiring ──────────────────────────────────────────────────────────────────
@@ -171,9 +248,12 @@ backButton.addEventListener('click', () => {
   render();
 });
 
-document.querySelector('#go-to-app').addEventListener('click', () => {
-  window.location.href = '/';
-});
+document.querySelector('#to-data').addEventListener('click', openDataStep);
+for (const id of ['#go-to-app', '#skip-data']) {
+  document.querySelector(id).addEventListener('click', () => {
+    window.location.href = '/';
+  });
+}
 
 try {
   const res = await fetch('/api/v1/setup');

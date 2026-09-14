@@ -1516,10 +1516,13 @@ test('NFR_4.3: the void controls are touchable, and read as destructive', () => 
   }
   assert.match(cssRule(css, '.void-panel'), /var\(--md-error\)/);
 
-  // `.danger` itself is defined once, beside OPS-004's restore — the two destructive
-  // controls in this product read alike because they share the rule.
+  // `.danger` itself is defined once, with the rest of the buttons — the destructive
+  // controls in this product read alike because they share the rule, and the setup
+  // wizard, which loads only tokens.css and app.css, gets it too.
+  const tokens = fs.readFileSync(path.join(root, 'public', 'css', 'tokens.css'), 'utf8');
+  assert.match(cssRule(tokens, '.danger'), /background:\s*var\(--md-error\)/);
   const reports = fs.readFileSync(path.join(root, 'public', 'css', 'reports.css'), 'utf8');
-  assert.match(cssRule(reports, '.danger'), /background:\s*var\(--md-error\)/);
+  assert.equal(cssRule(reports, '.danger'), null, 'and not a second time');
 });
 
 // ── SCR-305 (TASK-020) ──────────────────────────────────────────────────────
@@ -1656,10 +1659,52 @@ test('SEC-1: the export screen says what an archive does not contain', () => {
   assert.match(source, /before anybody can sign in/);
 });
 
-// ── SCR-706, the opening load (TASK-026) ────────────────────────────────────
+// ── SCR-001, the setup wizard (TASK-004, TASK-047) ──────────────────────────
+
+test('SCR-001 loads the design system, before the stylesheet that reads it', () => {
+  // TASK-045 moved every colour, space and shape into tokens.css and added it to
+  // index.html only. The wizard then rendered as browser defaults for as long as nobody
+  // installed a store — the one page every store sees first.
+  const html = fs.readFileSync(path.join(root, 'public', 'setup.html'), 'utf8');
+  const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(sheets, ['/css/tokens.css', '/css/app.css']);
+});
+
+test('[hidden] hides, whatever display the element was given', () => {
+  // The browser's own [hidden] is display:none at the lowest precedence there is, so
+  // `button { display: inline-flex }` undid it and Back showed on step 1 of the wizard.
+  const tokens = fs.readFileSync(path.join(root, 'public', 'css', 'tokens.css'), 'utf8');
+  assert.match(cssRule(tokens, '[hidden]'), /display:\s*none\s*!important/);
+});
+
+test('SCR-001 step 6 signs in as the new owner, keeps the token in memory and drops the password', () => {
+  const source = codeOf('js/setup.js');
+  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /api\.setToken\(session\.token\)/);
+  // SEC-7: in memory only.
+  assert.equal(/localStorage|sessionStorage|document\.cookie/.test(source), false);
+  // The password leaves the page as soon as the sign-in has used it.
+  assert.match(source, /field\('password'\)\.value = '';/);
+  assert.match(source, /field\('passwordConfirm'\)\.value = '';/);
+  // And the recovery code is not held back behind it.
+  assert.match(source, /signingIn = signInAsOwner\(\);\s*\n\s*render\(\);/);
+});
+
+// ── SCR-706, the opening load (TASK-026, TASK-047) ──────────────────────────
+//
+// The panel lives in `shell/opening.js` since TASK-047, because the setup wizard offers
+// the same load to a store that has just been installed. `SCR-706` mounts it; these
+// assertions follow the panel rather than the screen.
+
+test('OPS-105: SCR-706 and the wizard mount the one opening panel, not two', () => {
+  assert.match(codeOf('js/admin/data.js'), /createOpeningLoad\(\{ root: openingRoot \}\)/);
+  assert.match(codeOf('js/setup.js'), /createOpeningLoad\(/);
+  assert.equal(/\/data\/opening\/validate/.test(codeOf('js/admin/data.js')), false,
+    'the screen no longer carries a second copy of the load');
+});
 
 test('OPS-105: the load button waits for the row check, and cannot be pressed first', () => {
-  const source = codeOf('js/admin/data.js');
+  const source = codeOf('js/shell/opening.js');
 
   // The same sequence the import half enforces — check, present, confirm — because an
   // operator learns one screen, not two.
@@ -1668,30 +1713,39 @@ test('OPS-105: the load button waits for the row check, and cannot be pressed fi
   assert.match(source, /opening\.checked \? openingSummaryBlock\(\) : null/);
 
   // Choosing a different file drops the last report: it described another spreadsheet.
-  assert.match(source, /opening\.checked = null;\s*\n\s*render\(\);/);
+  for (const chooser of ['chooseWorkbook', 'chooseOpeningFile']) {
+    const body = source.slice(source.indexOf(`async function ${chooser}`));
+    assert.match(body.slice(0, body.indexOf('\n  }')), /opening\.checked = null;/, chooser);
+  }
 });
 
-test('OPS-105: a rejected row is shown with the line number, not just a count', () => {
-  const source = codeOf('js/admin/data.js');
+test('OPS-105: a rejected row is shown with its tab and row number, not just a count', () => {
+  const source = codeOf('js/shell/opening.js');
 
   // The only part of the report an owner can act on. Against a 500-row catalogue,
-  // "3 rows are invalid" sends nobody anywhere.
-  assert.match(source, /`Row \$\{p\.line\}: \$\{p\.message\} \(\$\{p\.rule_id\}\)`/);
+  // "3 rows are invalid" sends nobody anywhere — and with eight tabs, "row 7" is eight rows.
+  assert.match(source, /\[entry\.sheet, entry\.line \? `row \$\{entry\.line\}` : null\]/);
+  assert.match(source, /`\$\{where\(entry\)\}: \$\{entry\.message\} \(\$\{entry\.rule_id\}\)`/);
   assert.match(source, /Will load/);
   assert.match(source, /Rejected/);
 });
 
-test('requirement 2: the templates are offered on the screen that needs them', () => {
-  const source = codeOf('js/admin/data.js');
+test('requirement 2: the workbook is offered first, and the CSV templates beside it', () => {
+  const source = codeOf('js/shell/opening.js');
 
+  assert.match(source, /save\('\/data\/opening\/workbook'\)/);
+  assert.match(source, /Download the Excel template/);
   assert.match(source, /\/data\/opening\/template\/\$\{kind\}/);
-  assert.match(source, /Start from a template/);
+  assert.match(source, /Send CSV files instead/);
+  // The upload is the workbook as it is — not "save each tab as CSV", which is where a
+  // date becomes 31/03/2027.
+  assert.match(source, /\{ workbook: opening\.workbook\.base64 \}/);
   // OPS-106 named where the column is asked for, not only where it is refused.
   assert.match(source, /what it cost \(OPS-106\)/);
 });
 
-test('OPS-107: the screen asks for the cutover date, and says what it dates', () => {
-  const source = codeOf('js/admin/data.js');
+test('OPS-107: the panel asks for the cutover date, and says what it dates', () => {
+  const source = codeOf('js/shell/opening.js');
 
   assert.match(source, /Cutover date/);
   assert.match(source, /The day the notebook was closed/);
@@ -1699,13 +1753,14 @@ test('OPS-107: the screen asks for the cutover date, and says what it dates', ()
 });
 
 test('OPS-103: the pre-load backup is named after the load, as the import’s is', () => {
-  const source = codeOf('js/admin/data.js');
+  const source = codeOf('js/shell/opening.js');
 
   assert.match(source, /done\.pre_load_backup\.file_name/);
-  assert.match(source, /A full backup is taken first/);
+  assert.match(source, /Loading takes a full backup first/);
   // Requirement 8: the reconciliation verdict is shown as the sentence it was written
   // as, because somebody signing off a cutover is not looking for `true`.
   assert.match(source, /done\.reconciliation\.statement/);
+  assert.match(codeOf('js/admin/data.js'), /A full backup is taken first/, 'and the import still says it too');
 });
 
 test('a served BOM survives the download helper, which text() would eat', () => {
@@ -1725,7 +1780,7 @@ test('the object-URL save lives in the shell, once, and every caller uses it', (
   // builds and silently produces an empty file.
   assert.match(api, /setTimeout\(\(\) => URL\.revokeObjectURL\(url\), 0\)/);
 
-  for (const view of ['js/admin/data.js', 'js/admin/audit.js', 'js/reports/report.js']) {
+  for (const view of ['js/admin/data.js', 'js/admin/audit.js', 'js/reports/report.js', 'js/shell/opening.js']) {
     const source = codeOf(view);
     assert.match(source, /api\.saveAs\(/, `${view} saves through the shell`);
     assert.equal(/URL\.createObjectURL/.test(source), false,

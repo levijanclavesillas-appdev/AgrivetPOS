@@ -184,6 +184,11 @@ confirm) → **Recovery code** (generated, displayed once, "I have written this 
 *States*: cannot be skipped; killing the app resumes at step 1; completion is a single
 transaction.
 
+**Then an optional sixth step, *Your data*** (`TASK-047`): after the recovery code has been
+shown, the wizard signs in as the new owner and offers the opening-data panel `SCR-706` shows —
+download the Excel template, choose the filled-in workbook, check, load. It can be skipped; an
+empty store is a store. The card fits 1366×768 on every step, and a long step scrolls inside it.
+
 ### `SCR-101` — Login · `SCR-102` — PIN unlock · `FT-103`
 
 `SCR-101`: username, password, store name, version. Failure says "Incorrect username or

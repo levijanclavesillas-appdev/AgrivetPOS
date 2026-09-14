@@ -355,6 +355,27 @@ somebody will notice. None of them is added to `04_UX_SPEC.md` §3 yet, on purpo
 reads that section and requires a view for every screen in it, so a screen enters the spec in the
 commit that builds it and the guard stays green in between.
 
+## Pharmacy edition — branch `pharmacy`
+
+The same product for an over-the-counter drugstore, plus what the client asked for once they
+saw it: a proper onboarding path, a subscription model and an Android build. The first two are
+closed on the branch; the last two are recorded so their decisions are made before their code. Read [`PHARMACY_EDITION.md`](../PHARMACY_EDITION.md) first — it holds the
+recorded decisions `P-1`–`P-6`, the client questions `PQ-1`–`PQ-5`, and **the migration-number
+warning that has to be acted on before the first pharmacy install.**
+
+| ID | Task | Status | Waiting on |
+| :--- | :--- | :--- | :--- |
+| [TASK-046](TASK-046-pharmacy-edition-otc.md) | Pharmacy edition: an OTC drugstore on the same product | Closed, `40e7fb2` | Merging `018` and `INV-207` to `main` (§3); `PQ-1`–`PQ-5` from the client |
+| [TASK-047](TASK-047-onboarding-and-excel-workbook.md) | Onboarding: a wizard that fits, and the store's data from one Excel workbook | Closed, *this commit* | A workbook saved by Excel itself, at UAT |
+| [TASK-048](TASK-048-google-sign-in-and-subscription.md) | Google sign-in and a subscription checked online once a month | Not started | `L-1` owner only and `L-2` read-only from the next shift are answered; `L-3`–`L-6` (grace, payment, hosting, per machine or per store) and a licence server are not |
+| [TASK-049](TASK-049-android-app.md) | An Android build the client compiles themselves | Not started | `A-1` answered: a **standalone store** on the tablet |
+
+**`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
+100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription
+check is compatible with both only as a signed licence that lives on the machine and is renewed
+when the internet happens to be there — never as a login a sale has to wait for. The task file
+carries the design and the amendments it needs.
+
 <a id="status"></a>
 ## Status — 2026-09-10
 

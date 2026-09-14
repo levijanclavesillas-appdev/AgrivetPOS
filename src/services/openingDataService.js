@@ -58,18 +58,87 @@ const productRepository = require('../repositories/productRepository');
 const customerRepository = require('../repositories/customerRepository');
 const referenceRepository = require('../repositories/referenceRepository');
 const supplierRepository = require('../repositories/supplierRepository');
+const referenceService = require('./referenceService');
+const supplierService = require('./supplierService');
 
 /**
- * The three files `OPS-105` names, and the columns a store would name them by.
+ * The files `OPS-105` names, and the columns a store would name them by.
  *
  * Requirement 2 asks for a downloadable template per file. It is generated from this
  * table rather than kept as three files on disk, so a column can never be added to the
  * validator and forgotten in the template — which would produce a template that fails
  * its own validation, and an owner with no way to tell which of the two was wrong.
+ *
+ * **The order is the load order**, and `sheet` is the workbook tab each kind is read
+ * from (`openingWorkbookService`).
+ *
+ * The first four are the reference data everything else points at. Until the pharmacy
+ * edition these had to be keyed in by hand before a load would pass — a category, the
+ * load said, "is not something to invent from a spreadsheet". That still holds: nothing
+ * here is *inferred* from a product row. A category arrives only because the store
+ * wrote it on the Categories sheet, where it can see all of them at once, and a product
+ * naming one that is on neither that sheet nor the store is refused exactly as before.
+ * What changed is that an empty store can be onboarded in one pass.
  */
 const KINDS = Object.freeze({
+  categories: {
+    label: 'Categories',
+    sheet: 'Categories',
+    required: ['name'],
+    // PR-202's ceiling, in percent because that is how a person says it. Stored in
+    // basis points; blank is no ceiling.
+    optional: ['max_discount_percent'],
+    example: [
+      ['name', 'max_discount_percent'],
+      ['Medicines', ''],
+      ['Vitamins', ''],
+      ['Personal Care', '10'],
+    ],
+  },
+  units: {
+    label: 'Units',
+    sheet: 'Units',
+    required: ['code', 'name'],
+    // UOM-004: whether a quantity in this unit may carry decimals. Millilitres may;
+    // tablets may not, and a counter that lets a cashier key 2.5 tablets has invented
+    // half a tablet.
+    optional: ['fractions'],
+    example: [
+      ['code', 'name', 'fractions'],
+      ['TAB', 'Tablet', ''],
+      ['CAP', 'Capsule', ''],
+      ['BOX', 'Box', ''],
+      ['PC', 'Piece', ''],
+      ['ML', 'Millilitre', 'yes'],
+    ],
+  },
+  brands: {
+    label: 'Brands',
+    sheet: 'Brands',
+    required: ['name'],
+    optional: [],
+    example: [
+      ['name'],
+      ['Sample Pharma'],
+      ['Sample Health'],
+    ],
+  },
+  suppliers: {
+    label: 'Suppliers',
+    sheet: 'Suppliers',
+    required: ['name'],
+    // `code` is what the Opening stock sheet may name a supplier by instead of its full
+    // name — INV-202 needs a supplier on every batch, and typing "Mindanao Pharma
+    // Supply" four hundred times is how it gets typed wrong once.
+    optional: ['code', 'contact_person', 'contact_no', 'terms_days', 'address'],
+    example: [
+      ['name', 'code', 'contact_person', 'contact_no', 'terms_days', 'address'],
+      ['Mindanao Pharma Supply', 'MPS', 'Ana Cruz', '09171234567', '30', 'Koronadal City'],
+    ],
+  },
   products: {
     label: 'Products',
+    sheet: 'Products',
     required: ['sku', 'name', 'category', 'base_unit', 'retail_price'],
     // `batch_tracked` (TASK-029): the store's answer to Q-2 is per category, but it is
     // stored per product, and a cutover is the one moment the whole catalogue is being
@@ -82,13 +151,29 @@ const KINDS = Object.freeze({
     optional: ['generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd'],
     example: [
       ['sku', 'name', 'category', 'base_unit', 'retail_price', 'generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd'],
-      ['PARA-500', 'Paracetamol 500mg tablet', 'Medicines', 'TAB', '4.50', 'Paracetamol', '', '', '', 'VATABLE', '200', '4800012345678', 'yes', 'yes'],
+      ['PARA-500', 'Paracetamol 500mg tablet', 'Medicines', 'TAB', '4.50', 'Paracetamol', 'Sample Pharma', '', '', 'VATABLE', '200', '4800012345678', 'yes', 'yes'],
       ['ASC-500', 'Ascorbic Acid 500mg capsule', 'Vitamins', 'CAP', '6.00', 'Ascorbic acid', '', '', '', 'VATABLE', '100', '', 'yes', 'yes'],
       ['COTTON-50', 'Cotton balls 50s', 'Personal Care', 'PC', '35.00', '', '', '', '', 'VATABLE', '10', '', '', ''],
     ],
   },
+  // UOM-002 for a whole catalogue: "1 BOX = 100 TAB", one row each. A drugstore sells
+  // the same paracetamol loose, by the strip and by the box, and a pack is how the
+  // counter does that without a second product and a second stock figure. `contains` is
+  // how many base units one pack holds, as a person says it — 100, not 100000.
+  packs: {
+    label: 'Packs',
+    sheet: 'Packs',
+    required: ['sku', 'unit', 'contains'],
+    optional: ['default_sell'],
+    example: [
+      ['sku', 'unit', 'contains', 'default_sell'],
+      ['PARA-500', 'BOX', '100', ''],
+      ['ASC-500', 'BOX', '100', ''],
+    ],
+  },
   stock: {
     label: 'Opening stock',
+    sheet: 'Opening stock',
     // OPS-106, as one line of configuration: `unit_cost` is in `required` and not in
     // `optional`, and that is the whole rule.
     required: ['sku', 'quantity', 'unit_cost'],
@@ -106,6 +191,7 @@ const KINDS = Object.freeze({
   },
   balances: {
     label: 'Opening credit balances',
+    sheet: 'Credit balances',
     required: ['customer', 'balance'],
     optional: ['code', 'contact_no', 'credit_limit', 'terms_days', 'note'],
     example: [
@@ -173,27 +259,57 @@ function parseQuantity(raw) {
  * it and refuses on anything it reports, so validate-only and the load can never
  * disagree about whether a spreadsheet is loadable.
  */
-function validate({ products = null, stock = null, balances = null } = {}) {
+function validate({
+  categories = null, units = null, brands = null, suppliers = null,
+  products = null, packs = null, stock = null, balances = null,
+} = {}) {
   const problems = [];
   const warnings = [];
   const summary = {};
 
-  const parsedProducts = products === null ? null : checkProducts(products, problems, warnings);
+  // Every problem and warning says which file it is on as well as which row. With one
+  // file, "row 7" was enough; with a workbook of eight tabs it names eight rows, and the
+  // owner has to be told which tab to open.
+  const on = (kind, source, check) => {
+    if (source === null) return null;
+    const [p0, w0] = [problems.length, warnings.length];
+    const parsed = check();
+    for (const entry of [...problems.slice(p0), ...warnings.slice(w0)]) {
+      entry.kind = kind;
+      entry.sheet = KINDS[kind].sheet;
+    }
+    return parsed;
+  };
+
+  // The reference sheets first, because every other sheet may point at a row in one of
+  // them — a category that does not exist yet, three tabs to the left, in the same file.
+  const parsedCategories = on('categories', categories, () => checkCategories(categories, problems, warnings));
+  const parsedUnits = on('units', units, () => checkUnits(units, problems, warnings));
+  const parsedBrands = on('brands', brands, () => checkBrands(brands, problems, warnings));
+  const parsedSuppliers = on('suppliers', suppliers, () => checkSuppliers(suppliers, problems, warnings));
+  const declared = declaredFrom({ parsedCategories, parsedUnits, parsedBrands, parsedSuppliers });
+
+  const parsedProducts = on('products', products, () => checkProducts(products, problems, warnings, declared));
 
   // The stock file is checked against the product file *and* the catalogue, because at
   // cutover most of its SKUs do not exist yet — they are three rows above, in the other
   // file, in the same upload.
   // A map rather than a set (TASK-029): the stock file has to know whether a product
-  // arriving in the *same* load is batch-tracked, and that product does not exist in
-  // the catalogue yet to be asked.
+  // arriving in the *same* load is batch-tracked, and the Packs sheet what its base unit
+  // is — and that product does not exist in the catalogue yet to be asked.
   const arriving = new Map(parsedProducts
-    ? parsedProducts.accepted.map((row) => [row.sku.toUpperCase(), row.input])
+    ? parsedProducts.accepted.map((row) => [row.sku.toUpperCase(), row])
     : []);
 
   const parsed = {
+    categories: parsedCategories,
+    units: parsedUnits,
+    brands: parsedBrands,
+    suppliers: parsedSuppliers,
     products: parsedProducts,
-    stock: stock === null ? null : checkStock(stock, problems, warnings, arriving),
-    balances: balances === null ? null : checkBalances(balances, problems, warnings),
+    packs: on('packs', packs, () => checkPacks(packs, problems, warnings, arriving, declared)),
+    stock: on('stock', stock, () => checkStock(stock, problems, warnings, arriving, declared)),
+    balances: on('balances', balances, () => checkBalances(balances, problems, warnings)),
   };
 
   for (const kind of KIND_NAMES) {
@@ -222,6 +338,182 @@ function validate({ products = null, stock = null, balances = null } = {}) {
   };
 }
 
+// ── The reference sheets ─────────────────────────────────────────────────────
+//
+// Each of the four has the same three answers for a row: load it, refuse it, or leave
+// it alone because the store already has it. The third is a warning and not a refusal:
+// a store re-sending its workbook after fixing row 40 of the products still has
+// "Medicines" on row 2 of the categories, and the category it already made from that
+// row is the one it means.
+
+/** yes / y / true / 1 — anything else is no, so a typo never turns a switch on. */
+const yes = (value) => /^(y|yes|true|1)$/i.test(text(value, { max: 8 }));
+
+function checkCategories(source, problems, warnings) {
+  const table = csv.parseWithHeader(source);
+  const accepted = [];
+  if (!checkHeaders('categories', table, problems)) return { rows: table.rows, accepted };
+  const seen = new Map();
+
+  for (const { line, values } of table.rows) {
+    const reject = (message, ruleId = 'VR-209') => problems.push({ line, rule_id: ruleId, message });
+    const name = text(values.name, { max: 80 });
+    if (name.length < 2) { reject(name ? `"${name}" is too short for a category name.` : 'No category name.'); continue; }
+    const key = name.toLowerCase();
+    if (seen.has(key)) { reject(`${name} is also on line ${seen.get(key)}.`); continue; }
+    seen.set(key, line);
+
+    const percentRaw = text(values.max_discount_percent, { max: 10 }).replace(/%$/, '');
+    let maxDiscountBp = null;
+    if (percentRaw !== '') {
+      if (!/^\d{1,3}(\.\d{1,2})?$/.test(percentRaw) || Number(percentRaw) > 100) {
+        reject(`${name}: "${values.max_discount_percent}" is not a percentage from 0 to 100.`, 'PR-202');
+        continue;
+      }
+      maxDiscountBp = Math.round(Number(percentRaw) * 100);
+    }
+
+    if (referenceRepository.findByLabel('categories', name)) {
+      warnings.push({ line, rule_id: 'VR-209', message: `${name} is already a category in this store, so this row is left as it is.` });
+      continue;
+    }
+    accepted.push({ line, name, maxDiscountBp });
+  }
+  return { rows: table.rows, accepted };
+}
+
+function checkUnits(source, problems, warnings) {
+  const table = csv.parseWithHeader(source);
+  const accepted = [];
+  if (!checkHeaders('units', table, problems)) return { rows: table.rows, accepted };
+  const seen = new Map();
+
+  for (const { line, values } of table.rows) {
+    const reject = (message, ruleId = 'VR-209') => problems.push({ line, rule_id: ruleId, message });
+    const code = text(values.code, { max: 12 }).toUpperCase();
+    if (!code) { reject('No unit code.'); continue; }
+    if (!/^[A-Z0-9]+$/.test(code)) {
+      reject(`"${values.code}" is not a unit code. A code is letters and digits only, such as TAB or BOX — it is what every quantity is labelled with.`);
+      continue;
+    }
+    if (seen.has(code)) { reject(`${code} is also on line ${seen.get(code)}.`); continue; }
+    seen.set(code, line);
+
+    const name = text(values.name, { max: 60 });
+    if (!name) { reject(`${code}: no name. Write it out — Tablet, Box, Millilitre.`); continue; }
+    const allowsFraction = yes(values.fractions);
+
+    const existing = referenceRepository.findByLabel('units', code);
+    if (existing) {
+      const differs = Boolean(existing.allows_fraction) !== allowsFraction;
+      warnings.push({
+        line,
+        rule_id: 'VR-209',
+        message: `${code} is already a unit in this store, so this row is left as it is`
+          + (differs ? ` — and it ${existing.allows_fraction ? 'can' : 'cannot'} be sold in fractions there, whatever this row says.` : '.'),
+      });
+      continue;
+    }
+    accepted.push({ line, code, name, allowsFraction });
+  }
+  return { rows: table.rows, accepted };
+}
+
+function checkBrands(source, problems, warnings) {
+  const table = csv.parseWithHeader(source);
+  const accepted = [];
+  if (!checkHeaders('brands', table, problems)) return { rows: table.rows, accepted };
+  const seen = new Map();
+
+  for (const { line, values } of table.rows) {
+    const reject = (message, ruleId = 'VR-209') => problems.push({ line, rule_id: ruleId, message });
+    const name = text(values.name, { max: 80 });
+    if (name.length < 2) { reject(name ? `"${name}" is too short for a brand name.` : 'No brand name.'); continue; }
+    const key = name.toLowerCase();
+    if (seen.has(key)) { reject(`${name} is also on line ${seen.get(key)}.`); continue; }
+    seen.set(key, line);
+    if (referenceRepository.findByLabel('brands', name)) {
+      warnings.push({ line, rule_id: 'VR-209', message: `${name} is already a brand in this store, so this row is left as it is.` });
+      continue;
+    }
+    accepted.push({ line, name });
+  }
+  return { rows: table.rows, accepted };
+}
+
+function checkSuppliers(source, problems, warnings) {
+  const table = csv.parseWithHeader(source);
+  const accepted = [];
+  if (!checkHeaders('suppliers', table, problems)) return { rows: table.rows, accepted };
+  const seenName = new Map();
+  const seenCode = new Map();
+
+  for (const { line, values } of table.rows) {
+    const reject = (message, ruleId = 'VR-401') => problems.push({ line, rule_id: ruleId, message });
+    const name = text(values.name, { max: 120 });
+    if (name.length < 2) { reject(name ? `"${name}" is too short for a supplier name.` : 'No supplier name.'); continue; }
+    const key = name.toLowerCase();
+    if (seenName.has(key)) { reject(`${name} is also on line ${seenName.get(key)}.`); continue; }
+    seenName.set(key, line);
+
+    // Upper-cased because that is how the stock sheet's supplier column is matched
+    // (`batchDetails`), and a code that only matched in one case would be a trap.
+    const code = text(values.code, { max: 24 }).toUpperCase() || null;
+    if (code && seenCode.has(code)) { reject(`${name}: the code ${code} is also on line ${seenCode.get(code)}.`); continue; }
+    if (code) seenCode.set(code, line);
+
+    const termsRaw = text(values.terms_days, { max: 10 });
+    const termsDays = termsRaw === '' ? 0 : Number(termsRaw);
+    if (!Number.isInteger(termsDays) || termsDays < 0 || termsDays > 365) {
+      reject(`${name}: "${termsRaw}" is not a number of days from 0 to 365.`);
+      continue;
+    }
+
+    const byName = supplierRepository.findByName(name);
+    if (byName) {
+      warnings.push({ line, rule_id: 'VR-401', message: `${name} is already a supplier in this store, so this row is left as it is.` });
+      continue;
+    }
+    const byCode = code ? supplierRepository.findByCode(code) : null;
+    if (byCode) { reject(`${name}: the code ${code} already belongs to ${byCode.name}.`); continue; }
+
+    accepted.push({
+      line,
+      name,
+      code,
+      contactPerson: text(values.contact_person, { max: 120 }) || null,
+      contactNo: text(values.contact_no, { max: 40 }) || null,
+      termsDays,
+      address: text(values.address, { max: 300 }) || null,
+    });
+  }
+  return { rows: table.rows, accepted };
+}
+
+/**
+ * What the reference sheets are about to create, as the other sheets look it up.
+ *
+ * Lower-cased names and upper-cased codes, because that is how the store's own tables
+ * collate (VR-209's NOCASE) — a sheet may say "medicines" for the category the
+ * Categories sheet spelled "Medicines", exactly as it could for one already in the store.
+ */
+function declaredFrom({ parsedCategories, parsedUnits, parsedBrands, parsedSuppliers }) {
+  const accepted = (parsed) => (parsed ? parsed.accepted : []);
+  return {
+    categories: new Set(accepted(parsedCategories).map((r) => r.name.toLowerCase())),
+    units: new Set(accepted(parsedUnits).map((r) => r.code)),
+    fractionUnits: new Set(accepted(parsedUnits).filter((r) => r.allowsFraction).map((r) => r.code)),
+    brands: new Set(accepted(parsedBrands).map((r) => r.name.toLowerCase())),
+    supplierNames: new Set(accepted(parsedSuppliers).map((r) => r.name.toLowerCase())),
+    supplierCodes: new Set(accepted(parsedSuppliers).filter((r) => r.code).map((r) => r.code)),
+  };
+}
+
+const NOTHING_DECLARED = Object.freeze({
+  categories: new Set(), units: new Set(), fractionUnits: new Set(),
+  brands: new Set(), supplierNames: new Set(), supplierCodes: new Set(),
+});
+
 /** A missing or misspelled column, reported once rather than once per row. */
 function checkHeaders(kind, table, problems) {
   const declared = KINDS[kind];
@@ -238,12 +530,13 @@ function checkHeaders(kind, table, problems) {
   return false;
 }
 
-function checkProducts(source, problems, warnings) {
+function checkProducts(source, problems, warnings, declared = NOTHING_DECLARED) {
   const table = csv.parseWithHeader(source);
   const accepted = [];
   if (!checkHeaders('products', table, problems)) return { rows: table.rows, accepted };
 
   const seenSku = new Map();
+  const seenBarcode = new Map();
 
   for (const { line, values } of table.rows) {
     const reject = (message, ruleId = 'OPS-105') => problems.push({ line, rule_id: ruleId, message });
@@ -269,12 +562,16 @@ function checkProducts(source, problems, warnings) {
     // UOM-001: resolved by code, and it must exist. Requirement 5 asks for the row
     // number and the unit by name — "unknown unit" against a 500-row file is not
     // something anybody can act on.
+    //
+    // Each of the three may also be on its own sheet of the same workbook, arriving in
+    // this load. Such a row is accepted with a null id; `run()` creates the reference
+    // rows first and checks everything again, so the null never reaches the catalogue.
     const unitCode = text(values.base_unit, { max: 20 }).toUpperCase();
     const unit = unitCode ? referenceRepository.findByLabel('units', unitCode) : null;
-    if (!unit) {
+    if (!unit && !declared.units.has(unitCode)) {
       reject(
-        `${sku}: this store has no unit "${unitCode || '(blank)'}". Add it under Products → `
-        + 'Units first, or correct the spelling.',
+        `${sku}: this store has no unit "${unitCode || '(blank)'}". Add it to the Units sheet, `
+        + 'or correct the spelling.',
         'UOM-001'
       );
       continue;
@@ -282,11 +579,11 @@ function checkProducts(source, problems, warnings) {
 
     const categoryName = text(values.category, { max: 60 });
     const category = categoryName ? referenceRepository.findByLabel('categories', categoryName) : null;
-    if (!category) {
+    if (!category && !declared.categories.has(categoryName.toLowerCase())) {
       reject(
-        `${sku}: this store has no category "${categoryName || '(blank)'}". Add it first — a `
-        + 'category carries its own discount ceiling (PR-204), so it is not something to invent '
-        + 'from a spreadsheet.',
+        `${sku}: this store has no category "${categoryName || '(blank)'}". Add it to the `
+        + 'Categories sheet — a category carries its own discount ceiling (PR-204), so it is '
+        + 'written down once there rather than invented from a product row.',
         'VR-209'
       );
       continue;
@@ -294,7 +591,10 @@ function checkProducts(source, problems, warnings) {
 
     const brandName = text(values.brand, { max: 60 });
     const brand = brandName ? referenceRepository.findByLabel('brands', brandName) : null;
-    if (brandName && !brand) { reject(`${sku}: this store has no brand "${brandName}".`, 'VR-209'); continue; }
+    if (brandName && !brand && !declared.brands.has(brandName.toLowerCase())) {
+      reject(`${sku}: this store has no brand "${brandName}". Add it to the Brands sheet, or correct the spelling.`, 'VR-209');
+      continue;
+    }
 
     const retail = parseMoney(values.retail_price);
     if (retail === null) {
@@ -349,17 +649,27 @@ function checkProducts(source, problems, warnings) {
       if (!classified.ok) { reject(`${sku}: ${classified.reason}`, classified.ruleId); continue; }
       const clash = productRepository.findByBarcode(classified.barcode);
       if (clash) { reject(`${sku}: barcode ${classified.barcode} is already on ${clash.sku}.`, 'VR-205'); continue; }
+      // And against the rows above it: two new products with one barcode would pass the
+      // catalogue check above and be refused by the second insert, mid-transaction.
+      if (seenBarcode.has(classified.barcode)) {
+        reject(`${sku}: barcode ${classified.barcode} is also on line ${seenBarcode.get(classified.barcode)}.`, 'VR-205');
+        continue;
+      }
+      seenBarcode.set(classified.barcode, line);
     }
 
     accepted.push({
       line,
       sku,
+      // What the Packs sheet checks a pack's unit against (UOM-002), for a product that
+      // is not in the catalogue yet to be asked.
+      baseUnitCode: unitCode,
       input: {
         sku,
         name,
-        categoryId: category.id,
+        categoryId: category ? category.id : null,
         brandId: brand ? brand.id : null,
-        baseUnitId: unit.id,
+        baseUnitId: unit ? unit.id : null,
         taxClass,
         retailPriceCentavos: retail,
         minStockMilli: minStock === null ? 0 : minStock,
@@ -389,7 +699,7 @@ const REJECTED = Symbol('rejected');
  * let `INV-205` refuse to sell it, rather than to make the opening figure lie by
  * leaving it out.
  */
-function batchDetails({ values, sku, batchTracked, reject, warnings, line }) {
+function batchDetails({ values, sku, batchTracked, reject, warnings, line, declared = NOTHING_DECLARED }) {
   const batchNo = text(values.batch_no, { max: 60 });
   const expiry = text(values.expiry_date, { max: 10 });
   const supplierName = text(values.supplier, { max: 120 });
@@ -426,9 +736,11 @@ function batchDetails({ values, sku, batchTracked, reject, warnings, line }) {
 
   const supplier = supplierRepository.findByCode(supplierName.toUpperCase())
     || supplierRepository.findByName(supplierName);
-  if (!supplier) {
-    reject(`${sku}: this store has no supplier "${supplierName}". Add it under Buying → `
-      + 'Suppliers first, or correct the spelling.', 'VR-401');
+  const supplierArriving = declared.supplierCodes.has(supplierName.toUpperCase())
+    || declared.supplierNames.has(supplierName.toLowerCase());
+  if (!supplier && !supplierArriving) {
+    reject(`${sku}: this store has no supplier "${supplierName}". Add it to the Suppliers `
+      + 'sheet, or correct the spelling.', 'VR-401');
     return REJECTED;
   }
 
@@ -441,10 +753,12 @@ function batchDetails({ values, sku, batchTracked, reject, warnings, line }) {
     });
   }
 
-  return { batchNo, expiryDate: expiry, supplierId: supplier.id };
+  // Null for a supplier arriving on the Suppliers sheet; `run()` checks again once it
+  // exists, and the second reading is the one that is written.
+  return { batchNo, expiryDate: expiry, supplierId: supplier ? supplier.id : null };
 }
 
-function checkStock(source, problems, warnings, arriving) {
+function checkStock(source, problems, warnings, arriving, declared = NOTHING_DECLARED) {
   const table = csv.parseWithHeader(source);
   const accepted = [];
   if (!checkHeaders('stock', table, problems)) return { rows: table.rows, accepted };
@@ -464,14 +778,14 @@ function checkStock(source, problems, warnings, arriving) {
     }
     seenSku.set(sku.toUpperCase(), line);
 
-    const arrivingInput = arriving.get(sku.toUpperCase()) || null;
-    const existing = arrivingInput ? null : productRepository.findBySku(sku);
-    if (!arrivingInput && !existing) {
+    const arrivingRow = arriving.get(sku.toUpperCase()) || null;
+    const existing = arrivingRow ? null : productRepository.findBySku(sku);
+    if (!arrivingRow && !existing) {
       reject(`${sku} is not in the catalogue and not in the product file.`, 'OPS-105');
       continue;
     }
-    const batchTracked = arrivingInput
-      ? Boolean(arrivingInput.isBatchTracked)
+    const batchTracked = arrivingRow
+      ? Boolean(arrivingRow.input.isBatchTracked)
       : Boolean(existing.is_batch_tracked);
 
     const qty = parseQuantity(values.quantity);
@@ -479,6 +793,17 @@ function checkStock(source, problems, warnings, arriving) {
     if (Number.isNaN(qty) || qty <= 0) {
       reject(`${sku}: "${values.quantity}" is not an opening quantity. A product the store has `
         + 'none of is simply left out of this file.', 'MON-002');
+      continue;
+    }
+
+    // The counter refuses 2.5 tablets (UOM-002, `saleService`), so the shelf cannot start
+    // with them either: half a tablet on hand is stock no sale can ever take to zero.
+    const baseCode = arrivingRow ? arrivingRow.baseUnitCode : existing.base_unit_code;
+    const baseUnit = referenceRepository.findByLabel('units', baseCode);
+    const allowsFraction = baseUnit ? Boolean(baseUnit.allows_fraction) : declared.fractionUnits.has(baseCode);
+    if (!allowsFraction && qty % 1000 !== 0) {
+      reject(`${sku}: ${values.quantity} is not a whole number of ${baseCode}, and ${baseCode} `
+        + 'cannot be sold in parts.', 'UOM-002');
       continue;
     }
 
@@ -518,7 +843,7 @@ function checkStock(source, problems, warnings, arriving) {
     // and a load that then refused half way through would leave the store with part of
     // its shelf in the system and no way to tell which part. The message names the
     // columns, because a store filling in its first opening file has not met them.
-    const batch = batchDetails({ values, sku, batchTracked, reject, warnings, line });
+    const batch = batchDetails({ values, sku, batchTracked, reject, warnings, line, declared });
     if (batch === REJECTED) continue;
 
     accepted.push({
@@ -527,6 +852,75 @@ function checkStock(source, problems, warnings, arriving) {
     });
   }
 
+  return { rows: table.rows, accepted };
+}
+
+/**
+ * UOM-002, a sheet at a time: "1 BOX = 100 TAB".
+ *
+ * The product is the one arriving on the Products sheet or one already in the store,
+ * and its base unit is read from whichever of the two it is. The checks are the
+ * editor's — a pack in the base unit itself is refused, a pack unit the product already
+ * has is refused, a factor of zero is refused — made here, before the load, so that
+ * `productService` cannot refuse half way through a transaction the check called clean.
+ */
+function checkPacks(source, problems, warnings, arriving, declared = NOTHING_DECLARED) {
+  const table = csv.parseWithHeader(source);
+  const accepted = [];
+  if (!checkHeaders('packs', table, problems)) return { rows: table.rows, accepted };
+  const seen = new Map();
+  const defaultFor = new Map();
+
+  for (const { line, values } of table.rows) {
+    const reject = (message, ruleId = 'UOM-002') => problems.push({ line, rule_id: ruleId, message });
+
+    const sku = text(values.sku, { max: 40 });
+    if (!sku) { reject('No SKU.', 'OPS-105'); continue; }
+    const arrivingRow = arriving.get(sku.toUpperCase()) || null;
+    const existing = arrivingRow ? null : productRepository.findBySku(sku);
+    if (!arrivingRow && !existing) {
+      reject(`${sku} is not in the catalogue and not on the Products sheet.`, 'OPS-105');
+      continue;
+    }
+    const baseCode = arrivingRow ? arrivingRow.baseUnitCode : existing.base_unit_code;
+
+    const unitCode = text(values.unit, { max: 12 }).toUpperCase();
+    if (!unitCode) { reject(`${sku}: no pack unit.`); continue; }
+    if (!referenceRepository.findByLabel('units', unitCode) && !declared.units.has(unitCode)) {
+      reject(`${sku}: this store has no unit "${unitCode}". Add it to the Units sheet, or correct the spelling.`, 'UOM-001');
+      continue;
+    }
+    if (unitCode === baseCode) {
+      reject(`${sku}: a pack cannot be in the base unit itself. ${baseCode} is already how its stock is counted.`);
+      continue;
+    }
+
+    const key = `${sku.toUpperCase()}|${unitCode}`;
+    if (seen.has(key)) { reject(`${sku} already has a ${unitCode} pack on line ${seen.get(key)}.`); continue; }
+    seen.set(key, line);
+    if (existing && productRepository.packsFor(existing.id).some((p) => p.unit_code === unitCode)) {
+      reject(`${sku} already has a ${unitCode} pack in the store.`);
+      continue;
+    }
+
+    const factor = parseQuantity(values.contains);
+    if (factor === null || Number.isNaN(factor) || factor <= 0) {
+      reject(`${sku}: "${values.contains}" is not how many ${baseCode} one ${unitCode} holds. `
+        + `Write the number — 100 for a box of a hundred.`, 'VR-207');
+      continue;
+    }
+
+    const isDefaultSell = yes(values.default_sell);
+    if (isDefaultSell) {
+      if (defaultFor.has(sku.toUpperCase())) {
+        reject(`${sku}: only one pack is the default sell unit, and line ${defaultFor.get(sku.toUpperCase())} already is.`);
+        continue;
+      }
+      defaultFor.set(sku.toUpperCase(), line);
+    }
+
+    accepted.push({ line, sku, unitCode, factorMilli: factor, isDefaultSell, arriving: Boolean(arrivingRow) });
+  }
   return { rows: table.rows, accepted };
 }
 
@@ -642,7 +1036,11 @@ function checkBalances(source, problems, warnings) {
  * looking which products got their stock and which did not — and the only way to find
  * out is to count eight hundred products.
  */
-function run({ products = null, stock = null, balances = null, cutoverAt = null, reason = null } = {}, actor) {
+function run({
+  categories = null, units = null, brands = null, suppliers = null,
+  products = null, packs = null, stock = null, balances = null,
+  cutoverAt = null, reason = null,
+} = {}, actor) {
   if (!permissions.can(actor, 'TX-427')) {
     throw errors.forbidden(
       'You do not have permission to load opening data.',
@@ -650,7 +1048,7 @@ function run({ products = null, stock = null, balances = null, cutoverAt = null,
     );
   }
 
-  const checked = validate({ products, stock, balances });
+  const checked = validate({ categories, units, brands, suppliers, products, packs, stock, balances });
   if (!checked.ok) {
     throw errors.badRequest(
       `${checked.problems.length} row${checked.problems.length === 1 ? '' : 's'} cannot be loaded. `
@@ -676,17 +1074,72 @@ function run({ products = null, stock = null, balances = null, cutoverAt = null,
   const cutover = cutoverAt ? `${String(cutoverAt).slice(0, 10)}T00:00:00.000Z` : now;
 
   const loaded = db.transaction(() => {
-    const counts = { products: 0, stock: 0, customers: 0, balances: 0 };
+    const counts = {
+      categories: 0, units: 0, brands: 0, suppliers: 0,
+      products: 0, packs: 0, stock: 0, customers: 0, balances: 0,
+    };
     const bySku = new Map();
+    const acceptedOf = (parsed) => (parsed ? parsed.accepted : []);
 
-    for (const row of checked.parsed.products ? checked.parsed.products.accepted : []) {
-      const created = productService.createWithin(row.input, actor);
+    // ── The reference sheets, before anything that points at them ──
+    for (const row of acceptedOf(checked.parsed.categories)) {
+      referenceService.createWithin('categories', { name: row.name, maxDiscountBp: row.maxDiscountBp }, actor);
+      counts.categories += 1;
+    }
+    for (const row of acceptedOf(checked.parsed.units)) {
+      referenceService.createWithin('units', { code: row.code, name: row.name, allowsFraction: row.allowsFraction }, actor);
+      counts.units += 1;
+    }
+    for (const row of acceptedOf(checked.parsed.brands)) {
+      referenceService.createWithin('brands', { name: row.name }, actor);
+      counts.brands += 1;
+    }
+    for (const row of acceptedOf(checked.parsed.suppliers)) {
+      supplierService.create(row, actor);
+      counts.suppliers += 1;
+    }
+
+    // Everything that points at them, read again now that they exist — inside this
+    // transaction, so the new rows are visible to it and to nothing else. This second
+    // reading is what is written: the first accepted a category by the name on the
+    // Categories sheet, and only now is there an id to write. It cannot find a new
+    // problem that the first missed (the first already allowed for every row created
+    // above), and if it ever did, throwing here rolls back the reference rows too.
+    const dependents = validate({ products, packs, stock, balances });
+    if (!dependents.ok) {
+      throw errors.conflict(
+        `${dependents.problems[0].message} Nothing has been written.`,
+        { ruleId: dependents.problems[0].rule_id }
+      );
+    }
+    const unitIdOf = (code) => referenceRepository.findByLabel('units', code).id;
+    const packsFor = new Map();
+    for (const pack of acceptedOf(dependents.parsed.packs)) {
+      const key = pack.sku.toUpperCase();
+      if (!packsFor.has(key)) packsFor.set(key, []);
+      packsFor.get(key).push({ unitId: unitIdOf(pack.unitCode), factorMilli: pack.factorMilli, isDefaultSell: pack.isDefaultSell });
+    }
+
+    for (const row of acceptedOf(dependents.parsed.products)) {
+      const packsOfRow = packsFor.get(row.sku.toUpperCase()) || [];
+      const created = productService.createWithin({ ...row.input, packs: packsOfRow }, actor);
       bySku.set(row.sku.toUpperCase(), created.id);
       counts.products += 1;
+      counts.packs += packsOfRow.length;
+      packsFor.delete(row.sku.toUpperCase());
+    }
+    // Packs for products the store already had. What is left in the map after the loop
+    // above is exactly those.
+    for (const [sku, list] of packsFor) {
+      const productId = productRepository.findBySku(sku).id;
+      for (const pack of list) {
+        productService.addPackWithin(productId, pack, actor);
+        counts.packs += 1;
+      }
     }
 
     // ── OPS-106 — one OPENING movement per row, carrying its own cost ──
-    const stockRows = checked.parsed.stock ? checked.parsed.stock.accepted : [];
+    const stockRows = acceptedOf(dependents.parsed.stock);
     for (const row of stockRows) {
       const productId = bySku.get(row.sku.toUpperCase()) || productRepository.findBySku(row.sku).id;
 
@@ -734,7 +1187,7 @@ function run({ products = null, stock = null, balances = null, cutoverAt = null,
     }
 
     // ── OPS-107 — one credit transaction per balance, dated at cutover ──
-    const balanceRows = checked.parsed.balances ? checked.parsed.balances.accepted : [];
+    const balanceRows = acceptedOf(dependents.parsed.balances);
     for (const row of balanceRows) {
       let customerId = row.existingId;
       if (!customerId) {
@@ -789,7 +1242,12 @@ function run({ products = null, stock = null, balances = null, cutoverAt = null,
       before: { pre_load_backup: backup.file_name },
       after: {
         cutover_at: cutover,
+        categories: counts.categories,
+        units: counts.units,
+        brands: counts.brands,
+        suppliers: counts.suppliers,
         products: counts.products,
+        packs: counts.packs,
         opening_stock_rows: counts.stock,
         customers_created: counts.customers,
         opening_balances: counts.balances,

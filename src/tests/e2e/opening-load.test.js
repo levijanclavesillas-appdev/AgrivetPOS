@@ -227,7 +227,12 @@ test('TC-E2E-21: the load runs once, after its backup, and reports both reconcil
   }));
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.loaded, { products: 3, stock: 3, customers: 2, balances: 2 });
+  // The three CSV files, with no reference tabs: the store's categories and units were
+  // keyed in by hand, so the load creates none (TASK-047 added those counts).
+  assert.deepEqual(result.loaded, {
+    categories: 0, units: 0, brands: 0, suppliers: 0,
+    products: 3, packs: 0, stock: 3, customers: 2, balances: 2,
+  });
   assert.equal(result.cutover_at, `${CUTOVER}T00:00:00.000Z`);
 
   // OPS-103: the way back is named before anything was written.

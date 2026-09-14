@@ -45,7 +45,13 @@ function assertLabelFree(kind, label, { exceptId = null } = {}) {
   }
 }
 
-function create(kind, input, actor) {
+/**
+ * Split into `createWithin` and `create` the way `productService` is, and for its
+ * reason: the opening load (`OPS-105`) makes a store's categories, units and brands
+ * inside the one transaction that loads its catalogue, and §8.3 makes a nested
+ * transaction a hard error. Every existing caller keeps calling `create`.
+ */
+function createWithin(kind, input, actor) {
   assertKind(kind);
   const at = clock.nowUtc();
   const row = { id: ids.uuidv7(), is_active: 1, created_at: at };
@@ -76,19 +82,19 @@ function create(kind, input, actor) {
     }
   }
 
-  return db.transaction(() => {
-    const created = referenceRepository.insert(kind, row);
-    auditService.write({
-      actor,
-      action: 'REFERENCE_DATA_CHANGED',
-      entityType: kind,
-      entityId: created.id,
-      after: created,
-      reason: `${KINDS[kind].singular} created`,
-    });
-    return created;
+  const created = referenceRepository.insert(kind, row);
+  auditService.write({
+    actor,
+    action: 'REFERENCE_DATA_CHANGED',
+    entityType: kind,
+    entityId: created.id,
+    after: created,
+    reason: `${KINDS[kind].singular} created`,
   });
+  return created;
 }
+
+const create = (kind, input, actor) => db.transaction(() => createWithin(kind, input, actor));
 
 function normaliseCeiling(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -182,4 +188,4 @@ function deactivate(kind, id, actor) {
   return update(kind, id, { isActive: false }, actor);
 }
 
-module.exports = { KINDS, assertKind, list, get, create, update, deactivate, assertDeactivatable };
+module.exports = { KINDS, assertKind, list, get, create, createWithin, update, deactivate, assertDeactivatable };

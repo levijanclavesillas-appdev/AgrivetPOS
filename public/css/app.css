@@ -13,33 +13,72 @@ dl { margin: 0; border-top: 1px solid var(--md-outline-variant); }
 dt { flex: 0 0 11rem; color: var(--md-on-surface-muted); margin: 0; }
 dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
 
-/* ── SCR-001 setup wizard (TASK-004) ─────────────────────────────────────── */
+/* ── SCR-001 setup wizard (TASK-004, TASK-047) ────────────────────────────── */
 
-.wizard { max-width: 38rem; margin: 0 auto; padding: var(--space-6) var(--space-5); }
-.wizard-head h1 { margin-bottom: var(--space-1); }
+/* One card on the canvas: a rail that says where you are, and the step itself. Sized so
+   every step fits 1366×768 without the document scrolling (TASK-045 requirement 5) — the
+   owner step, the tallest, is why the fields go two to a row. Below 56rem the rail stacks
+   on top and the page is allowed to scroll, because a narrow window has no other choice. */
+/* Padding on the body rather than margin on the card: a margin collapses through `body`
+   and pushes the document 2rem past the viewport, which is a scrollbar for nothing. */
+.wizard-page { background: var(--md-surface-container); padding: var(--space-6) var(--space-5); }
+
+/* A fixed height, so a long step — the sixth, with its report — scrolls inside the card
+   and the action bar stays on the glass, rather than the card growing off the screen. */
+.wizard { display: grid; grid-template-columns: 17rem minmax(0, 1fr);
+  max-width: 64rem; height: min(44rem, 100%); margin: 0 auto; background: var(--md-surface);
+  border-radius: var(--shape-xl); box-shadow: var(--elev-2); overflow: hidden; }
+
+.wizard-rail { display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-6) var(--space-5); background: var(--md-surface-container-low);
+  border-right: 1px solid var(--md-outline-variant); }
+.wizard-rail h1 { font-size: var(--type-title-md-size); margin: var(--space-4) 0 0; }
+.wizard-brand { display: flex; align-items: center; gap: var(--space-2); margin: 0;
+  font-weight: 600; color: var(--md-on-surface); font-size: var(--type-label-lg-size); }
+.wizard-mark { display: inline-grid; place-items: center; width: 2rem; height: 2rem;
+  border-radius: var(--shape-md); background: var(--md-primary); color: var(--md-on-primary);
+  font-weight: 700; }
+.wizard-foot { margin-top: auto; font-size: var(--type-body-sm-size); line-height: 1.5; }
+
+.wizard-body { display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  padding: var(--space-6) var(--space-6) 0; overflow: auto; }
+.wizard-body > form { display: flex; flex-direction: column; flex: 1; }
 
 /* M3's stepper is not in the specification as a component; this is its own list, using
-   the system's shape and state tokens so it belongs to the same family. */
-.steps { display: flex; flex-wrap: wrap; gap: var(--space-3); list-style: none;
-  margin: var(--space-5) 0 var(--space-6); padding: 0;
-  font-size: var(--type-body-sm-size); color: var(--md-on-surface-muted); }
-.steps li span { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem;
-  margin-right: var(--space-1); border: 1px solid var(--md-outline);
-  border-radius: var(--shape-full); font-size: var(--type-label-md-size); }
+   the system's shape and state tokens so it belongs to the same family. Vertical, with
+   the line between the numbers that makes it read as a path rather than a menu. */
+.steps { list-style: none; margin: var(--space-4) 0 0; padding: 0;
+  font-size: var(--type-body-md-size); color: var(--md-on-surface-muted); }
+.steps li { position: relative; display: flex; align-items: center; gap: var(--space-3);
+  min-height: 2.75rem; }
+.steps li + li::before { content: ''; position: absolute; left: calc(0.875rem - 1px);
+  top: -0.875rem; height: 1.25rem; border-left: 2px solid var(--md-outline-variant); }
+.steps li.done + li::before { border-color: var(--md-primary); }
+.steps li span { display: inline-grid; place-items: center; flex: none; width: 1.75rem; height: 1.75rem;
+  border: 1px solid var(--md-outline); border-radius: var(--shape-full);
+  background: var(--md-surface); font-size: var(--type-label-md-size); }
+.steps li small { font-size: var(--type-label-sm-size); color: var(--md-on-surface-muted); }
 .steps li.current { color: var(--md-on-surface); font-weight: 600; }
-.steps li.current span { border-color: var(--md-primary); color: var(--md-primary); }
+.steps li.current span { border: 2px solid var(--md-primary); color: var(--md-primary); }
 .steps li.done span { background: var(--md-primary); border-color: var(--md-primary); color: var(--md-on-primary); }
 
-.step h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-3); }
+.step h2 { font-size: var(--type-title-lg-size); margin: 0 0 var(--space-2); }
+.step h2 .muted { font-size: var(--type-body-md-size); font-weight: 400; }
 .step p { margin: 0 0 var(--space-4); line-height: 1.5; }
 .req { color: var(--md-error); }
+
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-4); }
+.field-grid > label { margin: 0; }
+.field-grid .span-2 { grid-column: 1 / -1; }
+.step p.field-note { margin: var(--space-3) 0 0; font-size: var(--type-body-sm-size); }
 
 .check, .choice { display: flex; gap: var(--space-3); align-items: flex-start; }
 .choices { display: grid; gap: var(--space-2); }
 /* M3's card, used as a radio container: the selected one takes the primary outline
    and its container tone, which is the same treatment a selected chip gets. */
-.choice { padding: var(--space-3); border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-md); background: var(--md-surface); }
+.choice { padding: var(--space-3) var(--space-4); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md); background: var(--md-surface); cursor: pointer; }
 .choice:has(input:checked) { border-color: var(--md-primary); background: var(--md-primary-container); }
 .choice-body { display: grid; gap: var(--space-1); }
 
@@ -52,6 +91,72 @@ dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--md-on-surface);
   border: 1px dashed var(--md-primary); border-radius: var(--shape-md);
   text-align: center; user-select: all; color: var(--md-on-surface); }
 
-.wizard-nav { display: flex; gap: var(--space-3); justify-content: flex-end;
-  margin-top: var(--space-6); padding-top: var(--space-4);
+.wizard-nav, .wizard-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: flex-end;
+  margin-top: auto; padding: var(--space-4) 0 var(--space-5);
+  position: sticky; bottom: 0; background: var(--md-surface);
   border-top: 1px solid var(--md-outline-variant); }
+.step[data-step="done"] .wizard-actions { margin-top: var(--space-5); position: static; }
+.wizard-body > .step[data-step="data"] { display: flex; flex-direction: column; flex: 1; }
+.wizard-body > .step[data-step="data"][hidden] { display: none; }
+
+@media (max-width: 56rem) {
+  .wizard-page { padding: 0; }
+  .wizard { grid-template-columns: 1fr; height: auto; min-height: 100%; border-radius: 0; box-shadow: none; }
+  .wizard-body { overflow: visible; }
+  .wizard-rail { border-right: 0; border-bottom: 1px solid var(--md-outline-variant); }
+  .steps { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+  .steps li + li::before { display: none; }
+  .wizard-foot { display: none; }
+}
+@media (max-width: 34rem) {
+  .field-grid { grid-template-columns: 1fr; }
+}
+
+/* ── The opening load panel — SCR-706 and SCR-001 step 6 (TASK-047) ─────────
+   Here rather than in reports.css because both pages load this file, and the wizard
+   loads nothing else. */
+
+.opening-load { max-width: 52rem; }
+.opening-load p { line-height: 1.5; }
+.opening-steps { list-style: none; counter-reset: opening; margin: var(--space-4) 0; padding: 0;
+  display: grid; gap: var(--space-3); }
+.opening-steps > li { counter-increment: opening; position: relative; display: grid; gap: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-3) calc(var(--space-4) + 2.25rem);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-md); background: var(--md-surface); }
+.opening-steps > li::before { content: counter(opening); position: absolute; left: var(--space-4); top: var(--space-3);
+  display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: var(--shape-full);
+  background: var(--md-primary-container); color: var(--md-on-primary-container);
+  font-size: var(--type-label-md-size); font-weight: 600; }
+.opening-steps strong { color: var(--md-on-surface); }
+.opening-date { display: grid; gap: var(--space-1); margin: 0; }
+.opening-date input { max-width: 14rem; }
+.opening-load input[type="file"] { max-width: 100%; color: var(--md-on-surface-muted); }
+/* The browser's own file button, dressed as the system's outlined one. It cannot take
+   the whole `button` rule — it is not a button element — so the parts that show. */
+.opening-load input[type="file"]::file-selector-button {
+  min-height: var(--touch); margin-right: var(--space-3); padding: 0 var(--space-4);
+  border: 1px solid var(--md-outline); border-radius: var(--shape-full);
+  background: var(--md-surface); color: var(--md-primary); font: inherit;
+  font-size: var(--type-label-lg-size); font-weight: 500; cursor: pointer; }
+.opening-load input[type="file"]:disabled::file-selector-button { color: var(--md-on-surface-disabled); cursor: not-allowed; }
+.opening-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0; }
+
+.opening-csv { margin: 0 0 var(--space-4); }
+.opening-csv summary { cursor: pointer; color: var(--md-primary); min-height: var(--touch);
+  display: flex; align-items: center; }
+.opening-csv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-3); }
+.opening-csv-kind { display: grid; gap: var(--space-1); align-content: start; padding: var(--space-3);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-sm); }
+.opening-csv-kind .row-action { justify-self: start; }
+
+.opening-status { margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); border-radius: var(--shape-sm); }
+.opening-status.error { background: var(--md-error-container); color: var(--md-on-error-container); }
+.opening-status.success { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+
+.opening-summary { margin-top: var(--space-4); }
+.opening-problems { margin: 0 0 var(--space-3); padding-left: var(--space-5); color: var(--md-error); line-height: 1.5; }
+.opening-warnings { margin: 0 0 var(--space-3); }
+.opening-warnings summary { cursor: pointer; color: var(--md-on-warning-container); min-height: var(--touch);
+  display: flex; align-items: center; }
+.opening-warnings ul { margin: 0; padding-left: var(--space-5); line-height: 1.5; }
+.opening-table tr.is-rejected td { color: var(--md-error); }
