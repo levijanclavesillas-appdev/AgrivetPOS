@@ -26,7 +26,7 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | Opening-data spreadsheet | Three CSV files, emailed as a workbook; categories and units keyed in by hand first | **One `.xlsx`**, downloaded from the app and uploaded back unchanged, with its own tabs for categories, units, brands, suppliers and packs; `generic_name` and `senior_pwd` columns (`TASK-047`) | `openingWorkbookService`, `config/xlsx.js`, `openingDataService` |
 | Setup wizard (`SCR-001`) | Unstyled (it never loaded `tokens.css`); five steps | Styled and fitting 1366×768; an optional **step 6** loads the workbook as the new owner (`TASK-047`) | `setup.html`, `setup.js`, `shell/opening.js` |
 | Customers created by the opening balance load | `FARM` | `REGULAR` | `openingDataService` |
-| Subscription (`TASK-048`) | None | A signed licence, renewed online at least every 30 days; no new shift opens once it lapses (`LIC-001`–`LIC-004`, §6). **Off until the build names a licence server** | `licenceService`, `901_licence.sql`, `licence-server/` |
+| Subscription (`TASK-048`) | None | A signed licence, renewed online at least every 30 days; no new shift opens once it lapses (`LIC-001`–`LIC-004`, §6). **On**: the build names `pos.chachisoftware.store` | `licenceService`, `901_licence.sql`, `licence-server/` |
 
 ## 2. Recorded decisions
 
@@ -106,9 +106,9 @@ legal advice. Confirm them with the store's accountant and the FDA licensing req
 | `LIC-004` | Only the owner links the POS or asks for a check; linking is audited |
 
 **`NFR_3.1` is amended on this branch:** every core operation works with no internet for the
-licence's validity plus grace, 37 days after the last check. **`TC-E2E-08` is unchanged** while
-`src/config/licence.js` names no server, which is every build so far. The gate runs with
-`AGRIVET_LICENSING=off` either way.
+licence's validity plus grace, 37 days after the last check. **`TC-E2E-08` runs with licensing
+on** and a licence 20 days old, the network cut: the day trades and nothing reaches out. The
+rest of the gate runs with `AGRIVET_LICENSING=off`.
 
 **The linking needs no Google code on the POS.** The owner approves a code on
 `pos.chachisoftware.store/link` in any browser. So the Electron and Android builds link the

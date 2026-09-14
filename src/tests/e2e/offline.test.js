@@ -19,6 +19,12 @@
 // What is automated here is the stronger-in-one-way half: the machine keeps its
 // network and the *application* is denied it, so a passing run says the code reaches
 // for nothing rather than that nothing answered.
+//
+// **With the subscription on (TASK-048).** The build names a licence server, so this day
+// is traded the way a linked store trades it: licensing on, a licence last checked 20
+// days ago, and the server out of reach. The licence is checked offline against its
+// signature and the shift opens (NFR_3.1 as amended). The key is this test's own, so
+// the production server's private key is not needed to sign it.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -62,6 +68,15 @@ globalThis.fetch = (...args) => {
   throw Object.assign(new Error('this machine has no network (fetch)'), { code: 'ENETDOWN' });
 };
 
+// ── The subscription: on, and a licence already here ────────────────────────
+
+const crypto = require('crypto');
+const licenceSigning = require('../../../licence-server/src/licence');
+
+const licenceKey = crypto.generateKeyPairSync('ed25519').privateKey;
+process.env.AGRIVET_LICENSING = 'on';
+process.env.AGRIVET_LICENCE_PUBLIC_KEY = licenceSigning.publicPem(licenceKey);
+
 // ── Now the application ─────────────────────────────────────────────────────
 
 const db = require('../../config/database');
@@ -77,6 +92,9 @@ const reportService = require('../../services/reportService');
 const backupService = require('../../services/backupService');
 const settingsService = require('../../services/settingsService');
 const documentService = require('../../services/documentService');
+const licenceConfig = require('../../config/licence');
+const licenceService = require('../../services/licenceService');
+const licenceRepository = require('../../repositories/licenceRepository');
 const temp = require('../helpers/tempdb');
 
 const PASSWORD = 'correct-horse-battery';
@@ -123,6 +141,21 @@ test.before(() => {
   }, owner);
 
   today = clock.manilaDate(clock.nowUtc());
+
+  // Linked three weeks ago, paid well ahead, and not reached since.
+  const DAY = 86400e3;
+  const now = Date.now();
+  const iso = (days) => new Date(now + days * DAY).toISOString();
+  const installationId = crypto.randomUUID();
+  licenceRepository.ensure(installationId, iso(-20));
+  licenceRepository.update({
+    installation_secret: crypto.randomBytes(32).toString('base64url'),
+    licence: licenceSigning.sign({
+      v: 1, store_id: 'store-offline', store_name: 'Chachi Agrivet', installation_id: installationId,
+      owner_email: 'owner@example.com', plan: 'MONTHLY', paid_until: iso(60),
+      checked_at: iso(-20), valid_until: iso(10), grace_days: 7, warning_days: 7,
+    }, licenceKey),
+  }, iso(-20));
 });
 
 test.after(() => {
@@ -143,6 +176,13 @@ test('TC-E2E-08: the network really is gone', () => {
 
   // The probes above are this test's own; the ledger starts empty for the day's work.
   attempts.length = 0;
+});
+
+test('TC-E2E-08: the subscription is on, and its licence is checked with no network', () => {
+  assert.ok(licenceConfig.server(), 'this build names a licence server');
+  const status = licenceService.state();
+  assert.equal(status.state, 'ACTIVE', status.message);
+  assert.equal(status.ends_because, 'OFFLINE', '20 days since the last check, 10 to go');
 });
 
 test('TC-E2E-08: the shift opens', () => {

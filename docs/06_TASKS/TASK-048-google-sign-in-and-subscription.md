@@ -1,7 +1,7 @@
 # TASK-048 — Google sign-in and a subscription checked online once a month
 
 **Priority:** **P2**, a commercial decision rather than a store's need · **Blocks release:**
-no · **Decided:** `L-1`–`L-6` (client, 2026-09-14) · **Status:** built; the licence server is deployed ·
+no · **Decided:** `L-1`–`L-6` (client, 2026-09-14) · **Status:** live since 2026-09-14 ·
 **Going live waits on:** the prerequisites the owner provides (below) · **Rules:**
 `LIC-001`–`LIC-004` · **Requirement:** amends `NFR_3.1`, `TC-E2E-08`
 
@@ -87,11 +87,13 @@ shape a TV uses to sign in (OAuth's device grant):
 | `LIC-003` | A licence not signed by the build's key is no licence. The POS keeps the latest time it has seen (`max_seen_at`), so setting the clock back does not undo a lapse |
 | `LIC-004` | Only the owner links the POS or asks for a check; any user can read the state. Linking is audited (`LICENCE_LINKED`) |
 
-**Off until the build names a server.** `src/config/licence.js` holds `PRODUCTION_SERVER` and
-`PRODUCTION_PUBLIC_KEY`, both empty. Until they are filled in (or `AGRIVET_LICENCE_SERVER` and
-`AGRIVET_LICENCE_PUBLIC_KEY` are set), the POS enforces nothing and `SCR-707` says so. The test
-suite and the browser smoke run with `AGRIVET_LICENSING=off`, so `TC-E2E-08` (no network)
-stands as written for every build without a server.
+**On since 2026-09-14.** `src/config/licence.js` names `https://pos.chachisoftware.store` and
+carries its public key, so every build from that commit enforces the subscription: a POS opens
+no shift until the owner links it. `AGRIVET_LICENCE_SERVER` and `AGRIVET_LICENCE_PUBLIC_KEY`
+point a build at a staging server; `AGRIVET_LICENSING=off` turns the production default off,
+and the test runner and the browser smoke set it. **`TC-E2E-08` runs with licensing on**: a
+licence last checked 20 days ago, signed with the test's own key, the network cut, and a full
+trading day.
 
 **What leaves the machine:** the store name typed at linking, the app version, the installation
 id and the renewal secret. **No customer, sale or stock data**, so `SEC-10` holds as written.
@@ -133,13 +135,14 @@ id and the renewal secret. **No customer, sale or stock data**, so `SEC-10` hold
 Google Play's policy requires Play Billing for a digital subscription bought inside an app
 installed from Play. Manual payment is for stores on Windows or a sideloaded APK.
 
-**Status — 2026-09-14:** **built, tested, and the licence server is live** at
-`https://pos.chachisoftware.store` (Docker, behind nginx; the admin page signs in). The POS
-builds do not use it yet. **Remaining:**
+**Status — 2026-09-14:** **live.** The licence server runs at `https://pos.chachisoftware.store`
+(Docker, behind nginx; Google sign-in and the admin page configured), and the POS builds name it
+and its key. A fresh POS against production: *not linked*, the shift refused (`LIC-001`), and a
+link code issued by the server. **Remaining:**
 
-1. Fill `PRODUCTION_SERVER` (`https://pos.chachisoftware.store`) and `PRODUCTION_PUBLIC_KEY`
-   (from `/api/v1/public-key`) in one commit — licensing starts with the builds from that
-   commit. Google sign-in is configured, so a POS from that build can be linked.
+1. **Before a store's next update:** the owner links each POS under Admin → Subscription, or
+   it opens no shift after the update. A store already trading needs this done the day the
+   update goes in.
 2. If the Google consent screen is still in *Testing*, publish it, or only its listed test
    users can sign in on `/link`.
 3. **Play Billing in the Android app** (the Play Billing library, a *Subscribe* button on

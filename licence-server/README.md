@@ -72,11 +72,11 @@ For a first install elsewhere: create the data folder owned by uid 1000, write
 `.env.production`, `docker compose up -d --build`, then add an nginx site (a copy of this host's
 `pos.chachisoftware.store.conf` without its Certbot lines) and run `certbot --nginx -d <host>`.
 
-**Going live with the POS.** Once Google sign-in is configured (before that, no POS can be
-linked, so none could open a shift), put the server's address and the output of
-`GET /api/v1/public-key` into `src/config/licence.js` (`PRODUCTION_SERVER`,
-`PRODUCTION_PUBLIC_KEY`) in one commit. Builds from that commit enforce the subscription. The
-test suite does not: it runs with `AGRIVET_LICENSING=off`.
+**The POS side.** `src/config/licence.js` names this server and carries the output of
+`GET /api/v1/public-key` (since 2026-09-14). **The signing key and that constant change together
+or not at all**: a new key on the server makes every licence it signs invalid on every POS
+until a build carries the new public key. The gate runs with `AGRIVET_LICENSING=off`, except
+`TC-E2E-08`, which signs its own licence.
 
 ## Tests
 
