@@ -105,7 +105,7 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
           ? `Hand back ${money(voided.reversal.drawer.cash_out_centavos)}. The drawer is open.`
           : 'Nothing was paid in cash, so there is nothing to hand back.' }),
         h('div', { class: 'receipt-actions' }, [
-          h('button', { class: 'primary', text: 'New sale  Enter', onclick: onNewSale }),
+          h('button', { class: 'primary', icon: 'plus', text: 'New sale  Enter', onclick: onNewSale }),
         ]),
       ]);
     }
@@ -113,8 +113,8 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
     if (voiding) return voidPanel();
 
     return h('div', { class: 'receipt-actions' }, [
-      h('button', { class: 'primary', text: 'New sale  Enter', onclick: onNewSale }),
-      h('button', { text: 'Reprint', onclick: reprint }),
+      h('button', { class: 'primary', icon: 'plus', text: 'New sale  Enter', onclick: onNewSale }),
+      h('button', { icon: 'printer', text: 'Reprint', onclick: reprint }),
       voidButton(),
     ]);
   }
@@ -250,7 +250,7 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
       // Only where there is somewhere to go back to. Reached from a completed sale this
       // screen has one way on — the next customer — and a back button would offer to
       // return to a cart that has already been paid for.
-      onBack ? h('button', { class: 'report-back', text: '← Receipts', onclick: () => onBack() }) : null,
+      onBack ? h('button', { class: 'report-back', icon: 'arrow-left', text: 'Receipts', onclick: () => onBack() }) : null,
       h('h1', { text: sale.sale.sale_no }),
       h('div', { class: 'receipt-figures' }, [
         h('div', { class: 'summary-line total' }, [

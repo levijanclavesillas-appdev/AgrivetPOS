@@ -20,7 +20,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
   const rowsHost = h('div', { class: 'tender-rows' });
   const summaryHost = h('div', { class: 'payment-summary' });
   const creditHost = h('div', { class: 'credit-block', hidden: true });
-  const completeButton = h('button', { class: 'primary complete', text: 'Complete  Enter' });
+  const completeButton = h('button', { class: 'primary complete', icon: 'check', text: 'Complete  Enter' });
   const blockedNote = h('p', { class: 'blocked-note' });
   // Its own host: which tenders may be offered depends on the customer's credit, which
   // the server has not answered when the screen is first drawn.
@@ -106,7 +106,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
           : null,
         h('button', {
           class: 'tender-remove', 'aria-label': `Remove ${row.method}`,
-          text: '×', onclick: () => { tenders.remove(row.key); renderRows(); renderSummary(); },
+          icon: 'x', onclick: () => { tenders.remove(row.key); renderRows(); renderSummary(); },
         }),
       ]));
     }

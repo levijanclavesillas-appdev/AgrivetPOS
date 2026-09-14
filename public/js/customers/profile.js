@@ -108,17 +108,17 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
   function render() {
     clear(root).append(h('section', { class: 'customers profile' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Customers', onclick: () => onBack() }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Customers', onclick: () => onBack() }),
         h('h1', { text: customer.name }),
         customer.is_active ? null : h('span', { class: 'tag', text: 'inactive' }),
         credit
-          ? h('button', { class: 'primary', text: 'Take payment', onclick: () => onCollect(customerId) })
+          ? h('button', { class: 'primary', icon: 'banknote', text: 'Take payment', onclick: () => onCollect(customerId) })
           : null,
         // CR-302: the document a customer asks for when they query the balance. Beside
         // the payment, because "what do I owe" and "here is some of it" are the two
         // halves of the same conversation.
         onStatement
-          ? h('button', { class: 'row-action', text: 'Statement', onclick: () => onStatement(customerId) })
+          ? h('button', { class: 'row-action', icon: 'file-text', text: 'Statement', onclick: () => onStatement(customerId) })
           : null,
         // CR-303 / TX-417: the owner's alone, and hidden rather than disabled for
         // everybody else — §2's rule, and a greyed-out "write off" is an invitation to
@@ -226,7 +226,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
       ]),
       h('div', { class: 'field-row' }, [
         reason,
-        h('button', { type: 'submit', class: 'row-action', text: 'Save limit' }),
+        h('button', { type: 'submit', class: 'row-action', icon: 'save', text: 'Save limit' }),
         h('button', { type: 'button', text: 'Cancel', onclick: () => { editingLimit = false; render(); } }),
       ]),
       h('p', { class: 'refusal-rule', text: 'CR-106 · TX-414' }),

@@ -55,7 +55,7 @@ export function createSuppliers({ root, onBack }) {
 
   function header() {
     return h('header', { class: 'admin-head' }, [
-      h('button', { class: 'report-back', text: '← Orders', onclick: () => onBack() }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Orders', onclick: () => onBack() }),
       h('h1', { text: 'Suppliers' }),
       h('button', {
         class: 'primary', text: 'New supplier',
@@ -185,7 +185,7 @@ export function createSuppliers({ root, onBack }) {
       field('Address', 'address'),
       field('Notes', 'notes'),
       h('div', { class: 'editor-actions' }, [
-        h('button', { type: 'submit', class: 'primary', text: 'Save' }),
+        h('button', { type: 'submit', class: 'primary', icon: 'save', text: 'Save' }),
         h('button', { type: 'button', text: 'Cancel', onclick: () => { editing = null; refresh(); } }),
       ]),
     ]);

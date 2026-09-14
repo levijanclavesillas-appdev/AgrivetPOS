@@ -13,6 +13,7 @@
 
 import * as api from './shell/api.js';
 import { createOpeningLoad } from './shell/opening.js';
+import { iconSvg } from './shell/icons.js';
 
 const STEPS = ['store', 'tax', 'owner', 'recovery', 'backup'];
 const LABELS = { store: 'Store', tax: 'Tax', owner: 'Owner', recovery: 'Recovery code', backup: 'Backup', data: 'Your data' };
@@ -41,15 +42,19 @@ function showError(message) {
   if (message) errorBox.scrollIntoView({ block: 'nearest' });
 }
 
+/** A finished step shows a check, as M3's stepper does; the number stays for the rest. */
+const mark = (state, n) => (state === 'done' ? `${iconSvg('check')}<span class="sr-only">${n}</span>` : n);
+
 function renderProgress() {
   const saved = phase !== 'steps';
   const five = STEPS.map((name, i) => {
     const state = saved || i < index ? 'done' : i === index ? 'current' : 'todo';
-    return `<li class="${state}"${state === 'current' ? ' aria-current="step"' : ''}><span>${i + 1}</span> ${LABELS[name]}</li>`;
+    return `<li class="${state}"${state === 'current' ? ' aria-current="step"' : ''}>`
+      + `<span>${mark(state, i + 1)}</span> ${LABELS[name]}</li>`;
   });
   const sixth = loaded ? 'done' : phase === 'data' ? 'current' : 'todo';
   five.push(`<li class="${sixth} optional"${sixth === 'current' ? ' aria-current="step"' : ''}>`
-    + `<span>6</span> ${LABELS.data} <small>optional</small></li>`);
+    + `<span>${mark(sixth, 6)}</span> ${LABELS.data} <small>optional</small></li>`);
   stepList.innerHTML = five.join('');
 }
 
@@ -254,6 +259,8 @@ for (const id of ['#go-to-app', '#skip-data']) {
     window.location.href = '/';
   });
 }
+
+document.querySelector('.wizard-mark').innerHTML = iconSvg('pill');
 
 try {
   const res = await fetch('/api/v1/setup');

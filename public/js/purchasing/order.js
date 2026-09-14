@@ -88,16 +88,16 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
 
   function header() {
     return h('header', { class: 'admin-head' }, [
-      h('button', { class: 'report-back', text: '← Orders', onclick: () => onBack() }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Orders', onclick: () => onBack() }),
       h('h1', { text: isNew() ? 'New purchase order' : order.reference_label }),
       order
         ? h('span', { class: `status status-${order.status.toLowerCase()}`, text: order.status_label })
         : null,
       order && order.can_submit
-        ? h('button', { class: 'primary', text: 'Send to supplier', onclick: submit })
+        ? h('button', { class: 'primary', icon: 'send', text: 'Send to supplier', onclick: submit })
         : null,
       order && order.can_receive
-        ? h('button', { class: 'primary', text: 'Receive delivery', onclick: () => onReceive(order.id) })
+        ? h('button', { class: 'primary', icon: 'package-check', text: 'Receive delivery', onclick: () => onReceive(order.id) })
         : null,
       order && order.can_cancel
         ? h('button', { class: 'row-action danger', text: 'Cancel order', onclick: cancel })
@@ -169,7 +169,7 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
         ]),
       ]),
       h('div', { class: 'editor-actions' }, [
-        h('button', { type: 'button', text: 'Add a line', onclick: () => { lines.push(blankLine()); render(); } }),
+        h('button', { type: 'button', icon: 'plus', text: 'Add a line', onclick: () => { lines.push(blankLine()); render(); } }),
         h('strong', { class: 'po-total', text: `Total ${money(total())}` }),
       ]),
 

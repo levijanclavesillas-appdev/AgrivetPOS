@@ -43,9 +43,9 @@ export function createRecall({ root, batchId, onClose }) {
 
     clear(root).append(h('section', { class: 'catalogue recall' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Batches', onclick: () => onClose() }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Batches', onclick: () => onClose() }),
         h('h1', { text: `Recall — batch ${batch.batch_no}` }),
-        h('button', { class: 'row-action', text: 'Export CSV', onclick: exportCsv }),
+        h('button', { class: 'row-action', icon: 'download', text: 'Export CSV', onclick: exportCsv }),
       ]),
 
       h('dl', { class: 'admin-meta' }, [

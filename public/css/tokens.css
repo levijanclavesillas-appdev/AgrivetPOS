@@ -6,6 +6,8 @@
  * framework and no build step here (`05_TECH_SPEC.md` §2), and `index.html` declares a
  * same-origin CSP with no exception — so Material Web Components, the Material icon
  * font and Roboto from Google Fonts are all unavailable, and none of them is needed.
+ * The icons are Lucide's (TASK-050), vendored as SVG by `tools/icons/build.js`: only
+ * the ones used, no font, and nothing fetched.
  * What Material 3 actually specifies is a set of decisions — colour roles, a type
  * scale, a shape scale, elevation, state layers, motion and density — and those are
  * tokens. They are written here once and consumed by every screen.
@@ -325,6 +327,36 @@ button[disabled][aria-busy="true"] { cursor: progress; }
 .danger { background: var(--md-error); color: var(--md-on-error); border-color: transparent; }
 .danger:hover:not(:disabled) { background: color-mix(in srgb, var(--md-error) 88%, black); }
 .danger:disabled { background: var(--md-surface-container-highest); color: var(--md-on-surface-disabled); }
+
+/* ── Icons (Lucide, TASK-050) ──────────────────────────────────────────────
+   Vendored by tools/icons/build.js — only the icons used, no font, nothing remote. M3
+   sizes: 18 px inside a button, 24 px in the navigation rail. Drawn in currentColor,
+   so an icon is always the colour of the words it sits beside. */
+
+.icon { width: 1.25rem; height: 1.25rem; flex: none; }
+button .icon, .row-action .icon, a .icon { width: 1.125rem; height: 1.125rem; }
+
+/* Status icons, drawn by the stylesheet from `icons.css`'s masks, so a status class
+   carries its icon wherever a screen uses it. 04_UX_SPEC.md §8: colour is never the
+   only signal — a verdict, an overdue account, a low or expired line each has a shape
+   as well as a colour. */
+.close-verdict::before, .tag.overdue::before, .opening-status::before,
+tr.is-low > td:first-child::before, td.is-low::before,
+tr.is-expired > td:first-child::before, tr.is-overdue-row > td:first-child::before {
+  content: ''; display: inline-block; flex: none;
+  width: 1.125em; height: 1.125em; margin-right: 0.375em; vertical-align: -0.2em;
+  background-color: currentColor;
+  mask: var(--status-icon) center / contain no-repeat;
+}
+.close-verdict.balanced::before, .opening-status.success::before { --status-icon: var(--icon-circle-check); }
+.close-verdict.within::before, tr.is-low > td:first-child::before, td.is-low::before {
+  --status-icon: var(--icon-triangle-alert); }
+.close-verdict.beyond::before, .opening-status.error::before, tr.is-expired > td:first-child::before {
+  --status-icon: var(--icon-circle-x); }
+.tag.overdue::before, tr.is-overdue-row > td:first-child::before { --status-icon: var(--icon-clock-alert); }
+/* Low and overdue rows keep their own colour for the text; the icon takes the role's. */
+tr.is-low > td:first-child::before, td.is-low::before { background-color: var(--md-warning); }
+tr.is-expired > td:first-child::before, tr.is-overdue-row > td:first-child::before { background-color: var(--md-error); }
 
 /* ── Text fields (M3 outlined) ─────────────────────────────────────────────
    The label sits above the box rather than floating in it — see the header. What is

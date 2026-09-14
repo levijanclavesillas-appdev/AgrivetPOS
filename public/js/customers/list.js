@@ -140,7 +140,7 @@ export function createCustomerList({ root, onOpen, onCollect }) {
         h('td', {}, [
           customer.credit
             ? h('button', {
-              class: 'row-action', text: 'Take payment',
+              class: 'row-action', icon: 'banknote', text: 'Take payment',
               onclick: (event) => { event.stopPropagation(); onCollect(customer.id); },
             })
             : null,
@@ -242,12 +242,12 @@ export function createCustomerList({ root, onOpen, onCollect }) {
     if (data.total <= PAGE) return null;
     return h('div', { class: 'pager' }, [
       h('button', {
-        text: '← Previous', disabled: offset === 0,
+        icon: 'chevron-left', text: 'Previous', disabled: offset === 0,
         onclick: () => { offset = Math.max(0, offset - PAGE); refresh(); },
       }),
       h('span', { text: `${offset + 1}–${Math.min(offset + PAGE, data.total)} of ${data.total}` }),
       h('button', {
-        text: 'Next →', disabled: offset + PAGE >= data.total,
+        iconEnd: 'chevron-right', text: 'Next', disabled: offset + PAGE >= data.total,
         onclick: () => { offset += PAGE; refresh(); },
       }),
     ]);

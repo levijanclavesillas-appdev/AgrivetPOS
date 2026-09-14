@@ -2564,7 +2564,7 @@ app.whenReady().then(async () => {
   })()`);
   log(foundAgain, 'the sale from before the last customer is findable by its number', soldNo);
   await waitFor(`!!document.querySelector('.receipt')`, { label: 'the receipt again' });
-  log(await run(`/← Receipts/.test(document.body.textContent)`),
+  log(await run(`[...document.querySelectorAll('.report-back')].some(b => b.textContent.trim() === 'Receipts' && b.querySelector('svg.icon-arrow-left'))`),
     'and it opens with a way back, which a completed sale does not have');
 
   // POS-402: the shift is still open, so the void is still the right correction.

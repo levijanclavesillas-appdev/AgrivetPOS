@@ -71,7 +71,7 @@ export function createStatement({ root, customerId, onBack }) {
     const to = h('input', { type: 'date', value: params.to, 'aria-label': 'To' });
 
     return h('header', { class: 'report-head' }, [
-      h('button', { class: 'report-back', text: '← Customer', onclick: () => onBack() }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Customer', onclick: () => onBack() }),
       h('h1', { text: 'Statement of account' }),
       h('form', {
         class: 'report-range',
@@ -81,8 +81,8 @@ export function createStatement({ root, customerId, onBack }) {
           load();
         },
       }, [from, to, h('button', { type: 'submit', class: 'row-action', text: 'Show' })]),
-      h('button', { class: 'row-action', text: 'Print', onclick: print }),
-      h('button', { class: 'row-action', text: 'Export CSV', onclick: exportCsv }),
+      h('button', { class: 'row-action', icon: 'printer', text: 'Print', onclick: print }),
+      h('button', { class: 'row-action', icon: 'download', text: 'Export CSV', onclick: exportCsv }),
     ]);
   }
 

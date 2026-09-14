@@ -71,7 +71,7 @@ export function createCollection({ root, customerId, onDone, onBack }) {
 
     clear(root).append(h('section', { class: 'customers collection' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Customer', onclick: () => onBack() }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Customer', onclick: () => onBack() }),
         h('h1', { text: `Payment from ${customer.name}` }),
       ]),
 

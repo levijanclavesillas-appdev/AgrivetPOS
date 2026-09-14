@@ -59,12 +59,12 @@ export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSupplie
   function header() {
     return h('header', { class: 'admin-head' }, [
       h('h1', { text: 'Purchase orders' }),
-      h('button', { class: 'row-action', text: 'Suppliers', onclick: () => onSuppliers() }),
+      h('button', { class: 'row-action', icon: 'factory', text: 'Suppliers', onclick: () => onSuppliers() }),
       // FT-504's counter purchase: a delivery with no order behind it. Offered from
       // here because that is where somebody who has just been handed a delivery note
       // starts looking, and PO-207 makes it a normal case rather than an exception.
-      h('button', { class: 'row-action', text: 'Receive without an order', onclick: () => onReceive(null) }),
-      h('button', { class: 'primary', text: 'New order', onclick: () => onNew() }),
+      h('button', { class: 'row-action', icon: 'package-plus', text: 'Receive without an order', onclick: () => onReceive(null) }),
+      h('button', { class: 'primary', icon: 'plus', text: 'New order', onclick: () => onNew() }),
     ]);
   }
 
@@ -109,7 +109,7 @@ export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSupplie
           ? 'Nothing is on order. Raise one, or record a delivery that arrived without an order.'
           : 'No purchase orders match that.',
       }),
-      h('button', { class: 'primary', text: 'New order', onclick: () => onNew() }),
+      h('button', { class: 'primary', icon: 'plus', text: 'New order', onclick: () => onNew() }),
     ]);
   }
 

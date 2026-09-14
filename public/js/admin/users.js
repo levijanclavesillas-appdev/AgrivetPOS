@@ -55,7 +55,7 @@ export function createUsers({ root }) {
           }),
           h('span', { text: 'Show deactivated' }),
         ]),
-        h('button', { class: 'primary', text: 'New user', onclick: () => { editing = 'new'; render(); } }),
+        h('button', { class: 'primary', icon: 'user-plus', text: 'New user', onclick: () => { editing = 'new'; render(); } }),
       ]),
 
       h('p', { class: 'muted', text: 'Give every person who works the till their own login. '

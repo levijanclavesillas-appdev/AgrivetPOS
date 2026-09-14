@@ -48,9 +48,9 @@ export function createReceiptList({ root, onOpenSale, onBack = null }) {
   function render() {
     clear(root).append(h('section', { class: 'receipts' }, [
       h('header', { class: 'admin-head' }, [
-        onBack ? h('button', { class: 'report-back', text: '← Back', onclick: () => onBack() }) : null,
+        onBack ? h('button', { class: 'report-back', icon: 'arrow-left', text: 'Back', onclick: () => onBack() }) : null,
         h('h1', { text: 'Receipts' }),
-        h('button', { class: 'row-action', text: 'Refresh', onclick: load }),
+        h('button', { class: 'row-action', icon: 'refresh-cw', text: 'Refresh', onclick: load }),
       ]),
 
       // What this list is, in the words that stop somebody looking for last week here.

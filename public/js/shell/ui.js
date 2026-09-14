@@ -2,19 +2,32 @@
 // built. A view that hand-rolls its own empty state is a view whose empty state says
 // something different from every other one.
 
+import { icon as iconOf } from './icons.js';
+
+/**
+ * An element. `icon` puts a Lucide icon before the text, `iconEnd` after everything
+ * (TASK-050) — so a button gains its icon with one attribute, and the icon is always
+ * beside the words, never instead of them.
+ */
 export const h = (tag, attrs = {}, children = []) => {
   const el = document.createElement(tag);
+  let lead = null;
+  let trail = null;
   for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined || value === false) continue;
     if (key === 'class') el.className = value;
     else if (key === 'text') el.textContent = value;
+    else if (key === 'icon') lead = value;
+    else if (key === 'iconEnd') trail = value;
     else if (key.startsWith('on')) el.addEventListener(key.slice(2).toLowerCase(), value);
     else el.setAttribute(key, value === true ? '' : String(value));
   }
+  if (lead) el.prepend(iconOf(lead));
   for (const child of [].concat(children)) {
     if (child === null || child === undefined) continue;
     el.append(typeof child === 'string' ? document.createTextNode(child) : child);
   }
+  if (trail) el.append(iconOf(trail));
   return el;
 };
 
@@ -38,7 +51,7 @@ export function empty(el, { title, action = null, onAction = null }) {
 export function error(el, { message, retry = null }) {
   clear(el).append(h('div', { class: 'state state-error', role: 'alert' }, [
     h('p', { text: message }),
-    retry ? h('button', { text: 'Try again', onclick: retry }) : null,
+    retry ? h('button', { icon: 'rotate-ccw', text: 'Try again', onclick: retry }) : null,
   ]));
 }
 
@@ -57,7 +70,7 @@ export function refused(el, apiError, { onAuthorise = null } = {}) {
       : null,
     apiError.ruleId ? h('p', { class: 'refusal-rule', text: apiError.ruleId }) : null,
     onAuthorise && apiError.requiresRole
-      ? h('button', { class: 'primary', text: 'Get authorisation', onclick: onAuthorise })
+      ? h('button', { class: 'primary', icon: 'shield-check', text: 'Get authorisation', onclick: onAuthorise })
       : null,
   ]));
 }
@@ -77,9 +90,13 @@ function host() {
 
 /** Success auto-dismisses in 3 s; an error persists until dismissed (§4). */
 export function toast(message, { kind = 'success' } = {}) {
-  const node = h('div', { class: `toast toast-${kind}`, role: kind === 'success' ? 'status' : 'alert' }, [
+  // @icons circle-check circle-alert
+  const node = h('div', {
+    class: `toast toast-${kind}`, role: kind === 'success' ? 'status' : 'alert',
+    icon: kind === 'success' ? 'circle-check' : 'circle-alert',
+  }, [
     h('span', { text: message }),
-    h('button', { class: 'toast-close', 'aria-label': 'Dismiss', text: '×', onclick: () => node.remove() }),
+    h('button', { class: 'toast-close', 'aria-label': 'Dismiss', icon: 'x', onclick: () => node.remove() }),
   ]);
   host().append(node);
   if (kind === 'success') setTimeout(() => node.remove(), 3000);
@@ -121,7 +138,7 @@ export function authorisationPanel({ message, ruleId, requiresRole, onApprove, o
     h('label', { text: 'Password' }, [password]),
     problem,
     h('div', { class: 'authorisation-actions' }, [
-      h('button', { type: 'submit', class: 'primary', text: 'Approve' }),
+      h('button', { type: 'submit', class: 'primary', icon: 'shield-check', text: 'Approve' }),
       h('button', { type: 'button', text: 'Cancel', onclick: onCancel }),
     ]),
   ]);

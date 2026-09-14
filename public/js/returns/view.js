@@ -66,7 +66,7 @@ export function createReturn({ root, saleId = null, onBack, onDone }) {
   function renderLookup() {
     clear(root).append(h('section', { class: 'returns return-lookup' }, [
       h('header', { class: 'admin-head' }, [
-        onBack ? h('button', { class: 'report-back', text: '← Back', onclick: () => onBack() }) : null,
+        onBack ? h('button', { class: 'report-back', icon: 'arrow-left', text: 'Back', onclick: () => onBack() }) : null,
         h('h1', { text: 'Return goods' }),
       ]),
 
@@ -83,7 +83,7 @@ export function createReturn({ root, saleId = null, onBack, onDone }) {
               'aria-label': 'Receipt number or customer name',
               oninput: (event) => { query = event.target.value; },
             }),
-            h('button', { type: 'submit', class: 'primary', text: 'Find' }),
+            h('button', { type: 'submit', class: 'primary', icon: 'search', text: 'Find' }),
           ]),
           h('small', { class: 'muted', text:
             'A return is always against the sale the goods came off (POS-301). '
@@ -191,7 +191,7 @@ export function createReturn({ root, saleId = null, onBack, onDone }) {
   function render() {
     clear(root).append(h('section', { class: 'returns return-form' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Another sale', onclick: () => { view = null; renderLookup(); } }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Another sale', onclick: () => { view = null; renderLookup(); } }),
         h('h1', { text: `Return against ${view.sale.sale_no}` }),
       ]),
 

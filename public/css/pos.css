@@ -82,6 +82,13 @@
   font-weight: 600;
 }
 .rail-user { margin-top: var(--space-3); }
+/* M3's navigation-rail icon: 24 px, the item's own colour. */
+.rail-item .icon, .rail-brand .icon { width: 1.5rem; height: 1.5rem; }
+.rail-brand { display: flex; align-items: center; gap: var(--space-2); }
+/* The brand's words are the gradient showing through transparent text, and an icon
+   drawn in currentColor would be transparent with them. It takes the gradient's
+   leading colour instead. */
+.rail-brand .icon { color: var(--md-inverse-primary); }
 
 /* The one scroll container. A screen taller than the viewport scrolls here, under a
    rail that does not move. */
@@ -147,6 +154,7 @@
 @media (max-width: 1023px) {
   .shell { grid-template-columns: 4rem 1fr; }
   .rail-label, .rail-brand { display: none; }
+  .rail-item { gap: 0; }
   .rail-item { justify-content: center; padding: 0; }
 }
 

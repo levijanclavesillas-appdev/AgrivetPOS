@@ -107,10 +107,10 @@ export function createProductList({
       // SCR-604 hangs off here rather than off the dashboard's low-stock tile: that
       // tile is a count of products and now opens this list, which left the valuation
       // report with nothing pointing at it.
-      h('button', { class: 'row-action', text: 'Valuation', onclick: () => onValuation() }),
+      h('button', { class: 'row-action', icon: 'coins', text: 'Valuation', onclick: () => onValuation() }),
       // SCR-205. Beside the valuation because they answer the two halves of the same
       // question: what the system thinks is here, and what actually is.
-      onCount ? h('button', { class: 'row-action', text: 'Stock count', onclick: () => onCount() }) : null,
+      onCount ? h('button', { class: 'row-action', icon: 'clipboard-list', text: 'Stock count', onclick: () => onCount() }) : null,
       // SCR-204, from the list it is a filter of.
       //
       // It used to hang off the dashboard's low-stock tile and nowhere else, and the
@@ -128,7 +128,7 @@ export function createProductList({
       lowStockOnly()
         ? null
         : h('button', {
-          class: 'primary', text: 'New product',
+          class: 'primary', icon: 'plus', text: 'New product',
           onclick: () => onOpen(null),
         }),
     ]);
@@ -258,12 +258,12 @@ export function createProductList({
     if (data.total <= PAGE) return null;
     return h('div', { class: 'pager' }, [
       h('button', {
-        text: '← Previous', disabled: offset === 0,
+        icon: 'chevron-left', text: 'Previous', disabled: offset === 0,
         onclick: () => { offset = Math.max(0, offset - PAGE); refresh(); },
       }),
       h('span', { text: `${offset + 1}–${Math.min(offset + PAGE, data.total)} of ${data.total}` }),
       h('button', {
-        text: 'Next →', disabled: offset + PAGE >= data.total,
+        iconEnd: 'chevron-right', text: 'Next', disabled: offset + PAGE >= data.total,
         onclick: () => { offset += PAGE; refresh(); },
       }),
     ]);

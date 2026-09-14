@@ -65,7 +65,7 @@ export function createAudit({ root }) {
     clear(root).append(h('section', { class: 'admin audit' }, [
       h('header', { class: 'admin-head' }, [
         h('h1', { text: 'Audit trail' }),
-        h('button', { class: 'row-action', text: 'Export CSV', onclick: exportCsv }),
+        h('button', { class: 'row-action', icon: 'download', text: 'Export CSV', onclick: exportCsv }),
       ]),
 
       h('p', { class: 'muted', text: 'Every price change, cost change, credit limit, adjustment, '
@@ -132,7 +132,7 @@ export function createAudit({ root }) {
       labelled('Entity', entity),
       labelled('From', from),
       labelled('To', to),
-      h('button', { type: 'submit', class: 'row-action', text: 'Filter' }),
+      h('button', { type: 'submit', class: 'row-action', icon: 'funnel', text: 'Filter' }),
       h('button', {
         type: 'button', text: 'Clear',
         onclick: () => {
@@ -234,12 +234,12 @@ export function createAudit({ root }) {
     }
     return h('div', { class: 'pager' }, [
       h('button', {
-        text: '← Newer', disabled: offset === 0,
+        icon: 'chevron-left', text: 'Newer', disabled: offset === 0,
         onclick: () => { offset = Math.max(0, offset - PAGE); refresh(); },
       }),
       h('span', { text: `${offset + 1}–${Math.min(offset + PAGE, page.total)} of ${page.total}` }),
       h('button', {
-        text: 'Older →', disabled: offset + PAGE >= page.total,
+        iconEnd: 'chevron-right', text: 'Older', disabled: offset + PAGE >= page.total,
         onclick: () => { offset += PAGE; refresh(); },
       }),
     ]);

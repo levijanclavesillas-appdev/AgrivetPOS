@@ -102,7 +102,7 @@ export function createSettings({ root }) {
         field('Contact number', fields.contactNo),
         field('TIN', fields.tin, 'Optional. It appears on printed documents when it is set.'),
         h('div', { class: 'editor-actions' }, [
-          h('button', { type: 'submit', class: 'primary', text: 'Save the store' }),
+          h('button', { type: 'submit', class: 'primary', icon: 'save', text: 'Save the store' }),
         ]),
       ]),
 
@@ -183,7 +183,7 @@ export function createSettings({ root }) {
 
       h('div', { class: 'editor-actions' }, [
         h('button', {
-          class: 'primary', text: 'Save this section',
+          class: 'primary', icon: 'save', text: 'Save this section',
           onclick: () => save(rows),
         }),
       ]),

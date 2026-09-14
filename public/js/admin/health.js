@@ -28,7 +28,7 @@ export function createHealth({ root, session }) {
     clear(root).append(h('section', { class: 'admin health' }, [
       h('header', { class: 'admin-head' }, [
         h('h1', { text: 'Health' }),
-        h('button', { text: 'Check the database now', onclick: check }),
+        h('button', { icon: 'database', text: 'Check the database now', onclick: check }),
       ]),
       problems(data),
       h('dl', { class: 'admin-meta health-figures' }, [

@@ -86,7 +86,7 @@ export function createAnalysis({ root, onBack, tab = 'by-category', range = null
     const to = h('input', { type: 'date', value: params.to, 'aria-label': 'To' });
 
     return h('header', { class: 'report-head' }, [
-      h('button', { class: 'report-back', text: '← Dashboard', onclick: () => onBack() }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Dashboard', onclick: () => onBack() }),
       h('h1', { text: 'Sales analysis' }),
       h('form', {
         class: 'report-range',
@@ -102,6 +102,7 @@ export function createAnalysis({ root, onBack, tab = 'by-category', range = null
       ]),
       h('a', {
         class: 'report-export',
+        icon: 'download',
         href: `/api/v1/reports/${active}/export.csv?from=${params.from}&to=${params.to}`,
         // The token lives in memory only (SEC-7), so a plain link cannot carry it.
         onclick: (event) => { event.preventDefault(); exportCsv(); },

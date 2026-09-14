@@ -98,7 +98,7 @@ export function createOpeningLoad({ root, heading = 'Load opening data', onLoade
             'One tab each for categories, units, brands, suppliers, products, packs, opening stock '
             + 'and credit balances. The Read me tab explains every column.' }),
           h('div', { class: 'opening-actions' }, [
-            h('button', { type: 'button', text: 'Download the Excel template', disabled: busy, onclick: downloadWorkbook }),
+            h('button', { type: 'button', icon: 'file-spreadsheet', text: 'Download the Excel template', disabled: busy, onclick: downloadWorkbook }),
           ]),
         ]),
         h('li', {}, [
@@ -139,7 +139,7 @@ export function createOpeningLoad({ root, heading = 'Load opening data', onLoade
 
       h('div', { class: 'opening-actions' }, [
         h('button', {
-          type: 'button', class: 'primary', text: doing === 'checking' ? 'Checking…' : 'Check',
+          type: 'button', class: 'primary', icon: 'list-checks', text: doing === 'checking' ? 'Checking…' : 'Check',
           disabled: busy || !chosen, 'aria-busy': busy ? 'true' : null,
           onclick: () => validateOpening(),
         }),
@@ -166,7 +166,7 @@ export function createOpeningLoad({ root, heading = 'Load opening data', onLoade
           onchange: (event) => chooseOpeningFile(kind.key, event.target.files[0]),
         }),
         opening.files[kind.key] ? h('small', { class: 'muted', text: `${opening.files[kind.key].name} chosen` }) : null,
-        h('button', { type: 'button', class: 'row-action', text: 'Template', disabled: busy, onclick: () => downloadTemplate(kind.key) }),
+        h('button', { type: 'button', class: 'row-action', icon: 'download', text: 'Template', disabled: busy, onclick: () => downloadTemplate(kind.key) }),
       ]))),
     ]);
   }
@@ -293,7 +293,7 @@ export function createOpeningLoad({ root, heading = 'Load opening data', onLoade
 
       h('div', { class: 'opening-actions' }, [
         h('button', {
-          type: 'button', class: 'danger', text: doing === 'loading' ? 'Loading…' : 'Load this data',
+          type: 'button', class: 'danger', icon: 'upload', text: doing === 'loading' ? 'Loading…' : 'Load this data',
           // Requirement 7 in one expression: the load is unreachable until a check that
           // wrote nothing says every row is loadable.
           disabled: busy || !report.ok,
@@ -358,7 +358,7 @@ export function createOpeningLoad({ root, heading = 'Load opening data', onLoade
         : null,
 
       h('div', { class: 'opening-actions' }, [
-        h('button', { type: 'button', text: 'Load more', onclick: reset }),
+        h('button', { type: 'button', icon: 'plus', text: 'Load more', onclick: reset }),
       ]),
     ]);
   }

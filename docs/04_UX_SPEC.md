@@ -790,6 +790,9 @@ no modal is open.
 - Contrast ≥ 4.5:1 for body text, ≥ 3:1 for large text; the brand tokens already satisfy this.
 - **Colour is never the only signal**: variance, overdue and low stock each carry an icon or a
   word beside the colour.
+- **Icons are Lucide's** (`TASK-050`), vendored as SVG with only the ones used. An icon sits beside
+  the word it illustrates. Where a control is icon-only (the collapsed rail, a dismiss ×), it
+  carries its name as `aria-label`.
 - Full keyboard operability for POS, payment and collection; visible focus ring at all times.
 - Errors are announced to assistive technology via a live region.
 

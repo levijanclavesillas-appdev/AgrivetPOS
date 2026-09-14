@@ -87,7 +87,7 @@ export function createProductEditor({ root, productId, onClose }) {
         // Wrapped, deliberately: `onclick: onClose` would hand the handler a
         // MouseEvent, and onClose reads its first argument as a newly created product
         // id — so the back button reopened the editor instead of returning to the list.
-        h('button', { class: 'report-back', text: '← Products', onclick: () => onClose() }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Products', onclick: () => onClose() }),
         h('h1', { text: isNew ? 'New product' : product.name }),
         product && !product.is_active
           ? h('span', { class: 'tag', text: 'inactive' })
@@ -506,7 +506,7 @@ export function createProductEditor({ root, productId, onClose }) {
         ])),
         h('p', { class: 'muted', text: 'A product with no retail price cannot be sold (PR-102).' }),
         h('div', { class: 'editor-actions' }, [
-          h('button', { type: 'submit', class: 'primary', text: 'Save prices' }),
+          h('button', { type: 'submit', class: 'primary', icon: 'save', text: 'Save prices' }),
         ]),
       ]),
 
@@ -645,7 +645,7 @@ export function createProductEditor({ root, productId, onClose }) {
             + 'and in the alert centre (INV-109). Zero turns the alert off.' }),
         ]),
         h('div', { class: 'editor-actions' }, [
-          h('button', { type: 'submit', class: 'primary', text: 'Save' }),
+          h('button', { type: 'submit', class: 'primary', icon: 'save', text: 'Save' }),
         ]),
       ]),
     ]);
@@ -703,7 +703,7 @@ export function createProductEditor({ root, productId, onClose }) {
         },
       }, [
         h('div', { class: 'field-row' }, [
-          code, h('button', { type: 'submit', class: 'row-action', text: 'Add' }),
+          code, h('button', { type: 'submit', class: 'row-action', icon: 'plus', text: 'Add' }),
         ]),
       ]),
       h('p', { class: 'muted', text: 'A barcode belongs to one product only (VR-205). '

@@ -50,23 +50,23 @@ const LANDING = { CASHIER: 'pos', INVENTORY: 'products', MANAGER: 'reports', OWN
 
 /** The rail, with the TX-* each item needs. Hidden without it; refused regardless. */
 const RAIL = [
-  { id: 'pos', label: 'POS', tx: 'TX-401', screen: 'SCR-301' },
+  { id: 'pos', label: 'POS', tx: 'TX-401', screen: 'SCR-301', icon: 'shopping-cart' },
   // TX-406 — "process a return". Its own rail item rather than a corner of the POS,
   // because a return is a different conversation from a sale and starts with a
   // receipt in somebody's hand, not a barcode.
-  { id: 'returns', label: 'Returns', tx: 'TX-406', screen: 'SCR-305' },
+  { id: 'returns', label: 'Returns', tx: 'TX-406', screen: 'SCR-305', icon: 'undo-2' },
   // TX-401 — the counter's own. SCR-304 appears when a sale completes and nowhere else,
   // and Enter on it starts the next customer, so a cashier who notices a mis-scan three
   // customers later held POS-402's right to void with no screen to exercise it from.
-  { id: 'receipts', label: 'Receipts', tx: 'TX-401', screen: 'SCR-306' },
-  { id: 'customers', label: 'Customers', tx: 'TX-413', screen: 'SCR-401' },
-  { id: 'products', label: 'Products', tx: 'TX-422', screen: 'SCR-201' },
-  { id: 'shift', label: 'Shift', tx: 'TX-418', screen: 'SCR-501' },
+  { id: 'receipts', label: 'Receipts', tx: 'TX-401', screen: 'SCR-306', icon: 'receipt' },
+  { id: 'customers', label: 'Customers', tx: 'TX-413', screen: 'SCR-401', icon: 'users' },
+  { id: 'products', label: 'Products', tx: 'TX-422', screen: 'SCR-201', icon: 'package' },
+  { id: 'shift', label: 'Shift', tx: 'TX-418', screen: 'SCR-501', icon: 'clock' },
   // TX-409 is §10's "receive goods", and purchasing sits behind it whole: owner,
   // manager and the inventory clerk, and never a cashier.
-  { id: 'buying', label: 'Buying', tx: 'TX-409', screen: 'SCR-801' },
-  { id: 'reports', label: 'Reports', tx: 'TX-421', screen: 'SCR-601' },
-  { id: 'admin', label: 'Admin', tx: 'TX-423', screen: 'SCR-701' },
+  { id: 'buying', label: 'Buying', tx: 'TX-409', screen: 'SCR-801', icon: 'truck' },
+  { id: 'reports', label: 'Reports', tx: 'TX-421', screen: 'SCR-601', icon: 'chart-column' },
+  { id: 'admin', label: 'Admin', tx: 'TX-423', screen: 'SCR-701', icon: 'settings' },
 ];
 
 /**
@@ -142,7 +142,7 @@ export function createApp({ root }) {
         h('label', { text: 'Username' }, [username]),
         h('label', { text: 'Password' }, [password]),
         problem,
-        h('button', { type: 'submit', class: 'primary', text: 'Sign in' }),
+        h('button', { type: 'submit', class: 'primary', icon: 'log-in', text: 'Sign in' }),
       ]),
       h('p', {
         class: 'signin-version',
@@ -209,7 +209,7 @@ export function createApp({ root }) {
               pin.focus();
             }
           },
-        }, [h('label', { text: 'PIN' }, [pin]), problem, h('button', { type: 'submit', class: 'primary', text: 'Unlock' })]),
+        }, [h('label', { text: 'PIN' }, [pin]), problem, h('button', { type: 'submit', class: 'primary', icon: 'lock-open', text: 'Unlock' })]),
         h('button', {
           class: 'lock-different',
           text: 'Different user',
@@ -750,21 +750,29 @@ export function createApp({ root }) {
 
   function renderRail(activeId) {
     clear(railHost).append(
-      h('div', { class: 'rail-brand', text: 'Chachi Pharmacy' }),
+      h('div', { class: 'rail-brand', icon: 'pill', text: 'Chachi Pharmacy' }),
       ...RAIL
         // §2: items the role cannot reach are hidden, not disabled.
         .filter((item) => may(session.role, item.tx))
         .map((item) => h('button', {
           class: `rail-item${item.id === activeId ? ' is-active' : ''}`,
           'aria-current': item.id === activeId ? 'page' : null,
+          // §8: below 1024 px the label is hidden and the icon is what shows. The name
+          // stays on the button, so the collapsed rail is still read out and still
+          // tells a mouse what each icon is.
+          'aria-label': item.label,
+          title: item.label,
+          icon: item.icon,
           onclick: () => show(item.id),
         }, [h('span', { class: 'rail-label', text: item.label })])),
       h('div', { class: 'rail-spacer' }),
       h('button', {
         class: 'rail-item rail-user',
-        text: session.username,
+        'aria-label': `${session.username} — lock or change user`,
+        title: session.username,
+        icon: 'circle-user-round',
         onclick: () => (session.has_pin ? lock({ username: session.username }) : signIn()),
-      })
+      }, [h('span', { class: 'rail-label', text: session.username })])
     );
   }
 

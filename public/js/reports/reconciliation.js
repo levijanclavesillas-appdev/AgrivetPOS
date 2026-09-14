@@ -94,7 +94,7 @@ export function createReconciliation({ root, onBack, range = null }) {
     const to = h('input', { type: 'date', value: params.to, 'aria-label': 'To' });
 
     return h('header', { class: 'report-head' }, [
-      h('button', { class: 'report-back', text: '← Dashboard', onclick: () => onBack() }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Dashboard', onclick: () => onBack() }),
       h('h1', { text: 'Reconciliation' }),
       h('form', {
         class: 'report-range',
@@ -180,7 +180,7 @@ export function createReconciliation({ root, onBack, range = null }) {
           ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
         }
       },
-    }, [amount, reference, reason, h('button', { type: 'submit', class: 'row-action', text: 'Record' })]);
+    }, [amount, reference, reason, h('button', { type: 'submit', class: 'row-action', icon: 'save', text: 'Record' })]);
   }
 
   async function showTenders(method) {

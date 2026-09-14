@@ -262,8 +262,10 @@ test('TC-E2E-08: and the renderer carries no remote asset either', () => {
       .filter((line) => !line.trim().startsWith('//'))
       .join('\n');
 
+    // The SVG namespace is an identifier, not an address. icons.css (TASK-050) draws its
+    // icons from data: URIs, and an SVG image is only an SVG image if it names it.
     assert.equal(
-      /https?:\/\/(?!127\.0\.0\.1|localhost)/.test(source), false,
+      /https?:\/\/(?!127\.0\.0\.1|localhost|www\.w3\.org\/2000\/svg['"])/.test(source), false,
       `${path.basename(file)} loads something from off the machine`
     );
     assert.equal(/@import\s+url\(/.test(source), false, `${path.basename(file)} imports a remote stylesheet`);

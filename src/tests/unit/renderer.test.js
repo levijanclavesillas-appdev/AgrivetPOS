@@ -603,8 +603,10 @@ test('the shell declares a same-origin CSP, and nothing in it needs an exception
   for (const file of walkFiles(path.join(root, 'public'))) {
     if (!/\.(js|html|css)$/.test(file)) continue;
     const source = codeOf(path.relative(path.join(root, 'public'), file));
+    // The SVG namespace is an identifier, not an address: the icon masks in icons.css
+    // are data: URIs, and an SVG image is only an SVG image if it names its namespace.
     assert.equal(
-      /https?:\/\/(?!127\.0\.0\.1|localhost)/.test(source), false,
+      /https?:\/\/(?!127\.0\.0\.1|localhost|www\.w3\.org\/2000\/svg['"])/.test(source), false,
       `${path.relative(root, file)} reaches off the machine`
     );
   }
@@ -1659,6 +1661,64 @@ test('SEC-1: the export screen says what an archive does not contain', () => {
   assert.match(source, /before anybody can sign in/);
 });
 
+// ── Lucide icons (TASK-050) ──────────────────────────────────────────────────
+
+test('TASK-050: every icon the renderer names is vendored, and nothing else is', () => {
+  const tool = require('../../../tools/icons/build');
+  const { js, css } = tool.namesUsed();
+  const icons = fs.readFileSync(tool.GENERATED_JS, 'utf8');
+  const vendoredJs = [...icons.matchAll(/^ {2}'([a-z0-9-]+)': '/gm)].map((m) => m[1]);
+  const vendoredCss = [...fs.readFileSync(tool.GENERATED_CSS, 'utf8').matchAll(/--icon-([a-z0-9-]+):/g)].map((m) => m[1]);
+
+  // A screen that names an icon the module does not have throws at render time — the
+  // fix is `node tools/icons/build.js …`, and this says so before a screen does.
+  assert.deepEqual(vendoredJs, js, 'icons.js is out of date: run tools/icons/build.js');
+  assert.deepEqual(vendoredCss, css, 'icons.css is out of date: run tools/icons/build.js');
+
+  // Vendored, not fetched: the CSP allows nothing remote, and a data: URI is not remote.
+  assert.equal(/url\((?!"data:)/.test(fs.readFileSync(tool.GENERATED_CSS, 'utf8')), false);
+  assert.match(icons, /ISC License\. Copyright \(c\) 2026 Lucide Icons and Contributors/);
+});
+
+test('TASK-050: an icon is beside a word, never instead of one', () => {
+  // The glyphs the icons replaced. A text arrow or a × on a button is the old way.
+  for (const file of fs.readdirSync(path.join(root, 'public', 'js'), { recursive: true })) {
+    if (!file.endsWith('.js')) continue;
+    const source = codeOf(path.join('js', file));
+    assert.equal(/h\('button', \{[^}]*text: '(← [^']*|[^']* →|×)'/.test(source), false,
+      `${file} still draws an arrow or a cross in a button's text`);
+  }
+  // An icon-only control carries its name: the collapsed rail (§8) and the two ×s.
+  const app = codeOf('js/shell/app.js');
+  assert.match(app, /'aria-label': item\.label,\s*\n\s*title: item\.label,\s*\n\s*icon: item\.icon/);
+  for (const [file, pattern] of [['js/shell/ui.js', /'aria-label': 'Dismiss', icon: 'x'/], ['js/reports/dashboard.js', /'aria-label': 'Dismiss', icon: 'x'/]]) {
+    assert.match(codeOf(file), pattern, file);
+  }
+});
+
+test('TASK-050: every rail section has an icon, which is all the collapsed rail shows', () => {
+  const app = codeOf('js/shell/app.js');
+  const rail = app.slice(app.indexOf('const RAIL = ['), app.indexOf('];', app.indexOf('const RAIL = [')));
+  const items = [...rail.matchAll(/\{ id: '([a-z]+)'[^}]*\}/g)];
+  assert.ok(items.length >= 9);
+  for (const [item, id] of items) assert.match(item, /icon: '[a-z0-9-]+'/, `${id} has no icon`);
+});
+
+test('TASK-050: status is a shape as well as a colour (04_UX_SPEC.md §8)', () => {
+  const tokens = fs.readFileSync(path.join(root, 'public', 'css', 'tokens.css'), 'utf8');
+  for (const [selector, iconName] of [
+    ['.close-verdict.balanced::before', 'circle-check'],
+    ['.close-verdict.within::before', 'triangle-alert'],
+    ['.close-verdict.beyond::before', 'circle-x'],
+    ['.tag.overdue::before', 'clock-alert'],
+  ]) {
+    const rule = [...tokens.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .find((m) => m[1].split(',').map((x) => x.trim()).includes(selector) && m[2].includes('--status-icon:'));
+    assert.ok(rule, `${selector} has a rule`);
+    assert.match(rule[2], new RegExp(`--status-icon:\\s*var\\(--icon-${iconName}\\)`), selector);
+  }
+});
+
 // ── SCR-001, the setup wizard (TASK-004, TASK-047) ──────────────────────────
 
 test('SCR-001 loads the design system, before the stylesheet that reads it', () => {
@@ -1667,7 +1727,7 @@ test('SCR-001 loads the design system, before the stylesheet that reads it', () 
   // installed a store — the one page every store sees first.
   const html = fs.readFileSync(path.join(root, 'public', 'setup.html'), 'utf8');
   const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(sheets, ['/css/tokens.css', '/css/app.css']);
+  assert.deepEqual(sheets, ['/css/tokens.css', '/css/icons.css', '/css/app.css']);
 });
 
 test('[hidden] hides, whatever display the element was given', () => {
@@ -2084,7 +2144,7 @@ test('TC-UI-13: no operation is more than three screen transitions away', () => 
   // restated here: a spec that names a rail item the renderer does not render, or gives
   // a role a door the matrix closes, is a spec that proves nothing.
   const shell = codeOf('js/shell/app.js');
-  const rail = [...shell.matchAll(/\{ id: '[^']+', label: '[^']+', tx: '(TX-\d{3})', screen: '(SCR-\d{3})' \}/g)]
+  const rail = [...shell.matchAll(/\{ id: '[^']+', label: '[^']+', tx: '(TX-\d{3})', screen: '(SCR-\d{3})'[^}]*\}/g)]
     .map(([, tx, screen]) => ({ tx, screen }));
   assert.equal(rail.length, 9, 'the nine rail items are parsed');
   assert.deepEqual([...railScreens].sort(), rail.map((item) => item.screen).sort(),

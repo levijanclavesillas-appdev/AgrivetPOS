@@ -67,7 +67,7 @@ export function createStockCount({ root, session: user, countId = null, onBack }
   function renderList() {
     clear(root).append(h('section', { class: 'catalogue stock-counts' }, [
       h('header', { class: 'admin-head' }, [
-        onBack ? h('button', { class: 'report-back', text: '← Products', onclick: () => onBack() }) : null,
+        onBack ? h('button', { class: 'report-back', icon: 'arrow-left', text: 'Products', onclick: () => onBack() }) : null,
         h('h1', { text: 'Stock counts' }),
       ]),
 
@@ -97,7 +97,7 @@ export function createStockCount({ root, session: user, countId = null, onBack }
           ]),
         ]),
         h('div', { class: 'editor-actions' }, [
-          h('button', { type: 'submit', class: 'primary', text: 'Open a count' }),
+          h('button', { type: 'submit', class: 'primary', icon: 'clipboard-list', text: 'Open a count' }),
         ]),
       ]),
 
@@ -245,7 +245,7 @@ export function createStockCount({ root, session: user, countId = null, onBack }
     const s = view.session;
     clear(root).append(h('section', { class: 'catalogue stock-count' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Counts', onclick: () => { view = null; loadList(); } }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Counts', onclick: () => { view = null; loadList(); } }),
         h('h1', { text: s.count_no }),
       ]),
 

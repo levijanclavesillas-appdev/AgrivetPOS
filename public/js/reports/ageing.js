@@ -40,9 +40,9 @@ export function createAgeing({ root, onBack, onOpenCustomer = null }) {
   function render() {
     clear(root).append(h('section', { class: 'report report-ageing' }, [
       h('header', { class: 'report-head' }, [
-        h('button', { class: 'report-back', text: '← Dashboard', onclick: () => onBack() }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Dashboard', onclick: () => onBack() }),
         h('h1', { text: 'Ageing' }),
-        h('button', { class: 'row-action', text: 'Export CSV', onclick: exportCsv }),
+        h('button', { class: 'row-action', icon: 'download', text: 'Export CSV', onclick: exportCsv }),
       ]),
 
       h('dl', { class: 'report-meta' }, [

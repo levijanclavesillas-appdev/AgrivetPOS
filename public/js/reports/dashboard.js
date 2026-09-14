@@ -92,7 +92,7 @@ export function createDashboard({ root, session, onOpenReport, onOpenBatches = n
         data.scope === 'OWN_SHIFT'
           ? h('p', { class: 'dash-scope', text: 'Your shift only' })
           : null,
-        h('button', { class: 'dash-refresh', text: 'Refresh', onclick: load }),
+        h('button', { class: 'dash-refresh', icon: 'refresh-cw', text: 'Refresh', onclick: load }),
       ]),
       alertList(data.alerts),
       h('div', { class: 'tiles' }, data.tiles.map(tile)),
@@ -158,7 +158,7 @@ export function createDashboard({ root, session, onOpenReport, onOpenBatches = n
       alertAction(a),
       a.dismissible
         ? h('button', {
-          class: 'alert-dismiss', 'aria-label': 'Dismiss', text: '×',
+          class: 'alert-dismiss', 'aria-label': 'Dismiss', icon: 'x',
           onclick: () => { dismissed.add(key(a)); load(); },
         })
         : null,

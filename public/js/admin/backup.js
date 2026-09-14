@@ -116,7 +116,7 @@ export function createBackup({ root, session }) {
         h('td', { class: 'file', text: b.file_name || '—' }),
         h('td', {}, [
           b.verified && b.on_disk && session.role === 'OWNER'
-            ? h('button', { class: 'restore', text: 'Restore…', onclick: () => askToRestore(b) })
+            ? h('button', { class: 'restore', icon: 'archive-restore', text: 'Restore…', onclick: () => askToRestore(b) })
             : null,
           !b.on_disk && b.pruned_at ? h('span', { class: 'muted', text: 'pruned' }) : null,
           !b.on_disk && !b.pruned_at ? h('span', { class: 'muted', text: 'not in folder' }) : null,
@@ -158,7 +158,7 @@ export function createBackup({ root, session }) {
       type: 'text', class: 'confirm-filename', autocomplete: 'off', spellcheck: 'false',
       'aria-label': 'Type the backup filename to confirm',
     });
-    const go = h('button', { class: 'danger', text: 'Restore', disabled: true });
+    const go = h('button', { class: 'danger', icon: 'archive-restore', text: 'Restore', disabled: true });
     typed.addEventListener('input', () => { go.disabled = typed.value.trim() !== backup.file_name; });
 
     const overlay = h('div', { class: 'lock-overlay' }, [

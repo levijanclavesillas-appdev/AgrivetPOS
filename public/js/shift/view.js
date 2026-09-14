@@ -119,7 +119,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
           confirmed, h('span', { text: 'I have counted this and it is correct' }),
         ]),
         h('div', { class: 'editor-actions' }, [
-          h('button', { type: 'submit', class: 'primary', text: 'Open shift' }),
+          h('button', { type: 'submit', class: 'primary', icon: 'lock-open', text: 'Open shift' }),
         ]),
       ]),
     ]));
@@ -135,9 +135,9 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
       h('header', { class: 'admin-head' }, [
         h('h1', { text: 'Shift' }),
         mine
-          ? h('button', { class: 'row-action', text: 'Cash in / out', onclick: () => { mode = 'till'; render(); } })
+          ? h('button', { class: 'row-action', icon: 'arrow-left-right', text: 'Cash in / out', onclick: () => { mode = 'till'; render(); } })
           : null,
-        h('button', { class: 'primary', text: 'Close shift', onclick: () => { mode = 'close'; render(); } }),
+        h('button', { class: 'primary', icon: 'lock', text: 'Close shift', onclick: () => { mode = 'close'; render(); } }),
       ]),
       notMine(),
       h('p', { class: 'muted', text: `Open since ${manila(state.shift.opened_at)}.` }),
@@ -200,7 +200,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
 
     clear(root).append(h('section', { class: 'shift' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Shift', onclick: () => { mode = 'drawer'; render(); } }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Shift', onclick: () => { mode = 'drawer'; render(); } }),
         h('h1', { text: 'Cash in and out' }),
       ]),
       h('p', { class: 'muted', text: `The drawer expects ${money(state.expected.expected_cash_centavos)} `
@@ -246,7 +246,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
         ]),
         h('div', { class: 'editor-field' }, [h('label', { text: 'Notes' }), notes]),
         h('div', { class: 'editor-actions' }, [
-          h('button', { type: 'submit', class: 'primary', text: 'Record' }),
+          h('button', { type: 'submit', class: 'primary', icon: 'save', text: 'Record' }),
           h('button', { type: 'button', text: 'Cancel', onclick: () => { mode = 'drawer'; render(); } }),
         ]),
       ]),
@@ -261,7 +261,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
 
     clear(root).append(h('section', { class: 'shift closing' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Shift', onclick: () => { mode = 'drawer'; render(); } }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Shift', onclick: () => { mode = 'drawer'; render(); } }),
         h('h1', { text: 'Close the shift' }),
       ]),
       notMine(),

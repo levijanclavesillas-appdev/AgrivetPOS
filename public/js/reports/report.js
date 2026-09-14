@@ -54,7 +54,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
     const to = h('input', { type: 'date', value: params.to, 'aria-label': 'To' });
 
     return h('header', { class: 'report-head' }, [
-      h('button', { class: 'report-back', text: '← Dashboard', onclick: onBack }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Dashboard', onclick: onBack }),
       h('h1', { text: TITLES[report] }),
       report === 'valuation' ? null : h('form', {
         class: 'report-range',
@@ -70,6 +70,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
       ]),
       h('a', {
         class: 'report-export',
+        icon: 'download',
         href: `/api/v1/reports/${report}/export.csv?from=${params.from}&to=${params.to}`,
         // The token lives in memory only (SEC-7), so a plain link cannot carry it.
         // The click fetches with the header and hands the browser a blob instead.
@@ -80,7 +81,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
       // statement arrives: this report is the recorded figure, and reconciliation is
       // the question about it. It changes nothing here — SCR-606 writes no figure back.
       report === 'payments' && onReconcile
-        ? h('button', { class: 'row-action', text: 'Reconcile', onclick: () => onReconcile(params) })
+        ? h('button', { class: 'row-action', icon: 'scale', text: 'Reconcile', onclick: () => onReconcile(params) })
         : null,
       // SCR-607 (TASK-033), from the screen that shows the total somebody is asking
       // about. The range travels, so the breakdown is of the week on the screen.
@@ -90,7 +91,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
       // SCR-608. TX-422's report, offered from TX-422's other one: what is on the shelf
       // and how it got there are the same question from two sides.
       report === 'valuation' && onMovements
-        ? h('button', { class: 'row-action', text: 'Movement analysis', onclick: () => onMovements(params) })
+        ? h('button', { class: 'row-action', icon: 'chart-line', text: 'Movement analysis', onclick: () => onMovements(params) })
         : null,
     ]);
   }

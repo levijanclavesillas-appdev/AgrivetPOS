@@ -68,7 +68,7 @@ export function createAdjustment({ root, productId, onClose }) {
 
     clear(root).append(h('section', { class: 'catalogue adjustment' }, [
       h('header', { class: 'admin-head' }, [
-        h('button', { class: 'report-back', text: '← Products', onclick: () => onClose() }),
+        h('button', { class: 'report-back', icon: 'arrow-left', text: 'Products', onclick: () => onClose() }),
         h('h1', { text: 'Adjust stock' }),
       ]),
 

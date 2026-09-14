@@ -151,7 +151,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
 
         h('div', { class: 'editor-actions' }, [
           direct()
-            ? h('button', { type: 'button', text: 'Add a line', onclick: () => { lines.push(blankLine()); render(); } })
+            ? h('button', { type: 'button', icon: 'plus', text: 'Add a line', onclick: () => { lines.push(blankLine()); render(); } })
             : null,
           h('strong', { class: 'gr-total', text: `Into stock: ${money(total())}` }),
         ]),
@@ -181,7 +181,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
 
   function header() {
     return h('header', { class: 'admin-head' }, [
-      h('button', { class: 'report-back', text: '← Back', onclick: () => onBack() }),
+      h('button', { class: 'report-back', icon: 'arrow-left', text: 'Back', onclick: () => onBack() }),
       h('h1', { text: direct() ? 'Receive a delivery' : `Receive against ${order.reference_label}` }),
     ]);
   }

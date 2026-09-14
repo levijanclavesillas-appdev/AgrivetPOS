@@ -250,7 +250,7 @@ export function createPos({ root, session, onPay }) {
           disabled: cart.isEmpty || !priced || priced.requires_authorisation,
           onclick: () => pay(),
         }),
-        h('button', { class: 'rail-action', text: 'Park & new  F12', onclick: () => park({ andNew: true }) }),
+        h('button', { class: 'rail-action', icon: 'circle-pause', text: 'Park & new  F12', onclick: () => park({ andNew: true }) }),
       ]),
       // PR-105 and PR-203 surfaced where they happen (§6), not at Complete.
       priced?.requires_authorisation ? authorisations() : null,
@@ -271,7 +271,7 @@ export function createPos({ root, session, onPay }) {
       ...priced.authorisations.map((auth) => h('div', { class: 'authorisation-needed' }, [
         h('p', { text: auth.message }),
         h('p', { class: 'refusal-rule', text: `${auth.rule_id} · ${auth.requires_role}` }),
-        h('button', { text: 'Authorise', onclick: () => authorise(auth) }),
+        h('button', { icon: 'shield-check', text: 'Authorise', onclick: () => authorise(auth) }),
       ])),
     ]);
   }
