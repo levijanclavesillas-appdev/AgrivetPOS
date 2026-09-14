@@ -51,6 +51,17 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 // ── Range and scope ─────────────────────────────────────────────────────────
 
+/**
+ * Names in a stable, case-insensitive order, without `localeCompare`. That needs ICU's
+ * collation data, which the Node inside the Android app does not have (config/clock.js).
+ */
+const byText = (a, b) => {
+  const x = String(a).toLowerCase();
+  const y = String(b).toLowerCase();
+  if (x !== y) return x < y ? -1 : 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+};
+
 function assertDate(date, what) {
   if (!DATE_ONLY.test(String(date || ''))) {
     throw errors.badRequest(`${what} is a date in the form YYYY-MM-DD`, { ruleId: 'VR-102' });
@@ -662,7 +673,7 @@ function movers({
   const sold = all.filter((row) => row.line_count > 0);
 
   const byRevenue = [...sold]
-    .sort((a, b) => b.revenue_centavos - a.revenue_centavos || a.product_name.localeCompare(b.product_name))
+    .sort((a, b) => b.revenue_centavos - a.revenue_centavos || byText(a.product_name, b.product_name))
     .slice(0, cappedTop);
 
   // One ranking per base unit, in the order the store sells most money of — so the unit
@@ -678,12 +689,12 @@ function movers({
   }
 
   const byUnits = [...units.values()]
-    .sort((a, b) => b.revenue_centavos - a.revenue_centavos || a.unit_code.localeCompare(b.unit_code))
+    .sort((a, b) => b.revenue_centavos - a.revenue_centavos || byText(a.unit_code, b.unit_code))
     .map((group) => ({
       unit_code: group.unit_code,
       revenue_centavos: group.revenue_centavos,
       products: group.rows
-        .sort((a, b) => b.qty_milli - a.qty_milli || a.product_name.localeCompare(b.product_name))
+        .sort((a, b) => b.qty_milli - a.qty_milli || byText(a.product_name, b.product_name))
         .slice(0, cappedTop)
         .map((row, index) => ({ rank: index + 1, ...presentProductRow(row) })),
     }));
@@ -695,7 +706,7 @@ function movers({
     .filter((row) => row.is_active === 1 && row.revenue_centavos <= threshold)
     .sort((a, b) => a.revenue_centavos - b.revenue_centavos
       || b.qty_on_hand_milli - a.qty_on_hand_milli
-      || a.product_name.localeCompare(b.product_name))
+      || byText(a.product_name, b.product_name))
     .slice(0, cappedSlow);
 
   return {
