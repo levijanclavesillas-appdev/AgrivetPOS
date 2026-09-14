@@ -1,0 +1,12 @@
+# Downloaded by the build (the Node runtime for Android, ~57 MB) and verified by hash.
+/app/libnode/
+.gradle/
+build/
+/app/build/
+/app/.cxx/
+local.properties
+*.iml
+.idea/
+/keystore.properties
+*.jks
+*.keystore

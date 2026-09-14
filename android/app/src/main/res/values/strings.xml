@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chachi Pharmacy POS</string>
+    <string name="storage_title">Where should backups go?</string>
+    <string name="storage_message">The store backs itself up at every shift close and once a day. To keep those backups safe if the app is removed, allow it to save them in Documents on the tablet.\n\nOn the next screen, turn on \"Allow access to manage all files\", then come back.</string>
+    <string name="storage_allow">Allow</string>
+    <string name="storage_later">Not now</string>
+    <string name="saved_to_downloads">Saved %1$s to Downloads</string>
+    <string name="save_failed">Could not save the file: %1$s</string>
+</resources>

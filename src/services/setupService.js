@@ -103,6 +103,9 @@ function assertNotComplete() {
  * the same failed disk and the same uninstaller as the thing it was backing up.
  */
 function suggestBackupFolder() {
+  // On Android the app knows where shared storage is and the server does not, so the
+  // app says (TASK-049). The rule the wizard enforces is the same: outside the data folder.
+  if (process.env.AGRIVET_BACKUP_SUGGESTION) return process.env.AGRIVET_BACKUP_SUGGESTION;
   return path.join(os.homedir(), 'Documents', 'ChachiPharmacyPOS Backups');
 }
 

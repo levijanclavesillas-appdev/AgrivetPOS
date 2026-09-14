@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- branding.md §3, as tokens.css has them. -->
+    <color name="brand">#FF2563EB</color>
+    <color name="canvas">#FFF8FAFC</color>
+</resources>

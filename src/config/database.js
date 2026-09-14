@@ -5,7 +5,7 @@
 // is the whole of the SQLite -> PostgreSQL portability requirement, and TC-UT-99
 // enforces it mechanically.
 
-const Database = require('better-sqlite3');
+const { openDatabase } = require('./sqlite');
 const fs = require('fs');
 const paths = require('./paths');
 
@@ -32,7 +32,7 @@ function open({ path: overridePath, readonly = false } = {}) {
   if (db) return db;
   dbPath = overridePath || paths.databasePath();
   if (!overridePath) paths.ensureDataDir();
-  db = new Database(dbPath, { readonly });
+  db = openDatabase(dbPath, { readonly });
   applyPragmas(db);
   return db;
 }

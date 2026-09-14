@@ -179,6 +179,18 @@ export async function download(path, { method = 'GET', body = null } = {}) {
  */
 export function saveAs({ text, blob, filename, type }) {
   const payload = blob || new Blob([text], { type: type || 'text/plain;charset=utf-8' });
+
+  // Android (TASK-049): a WebView has no download manager for a blob URL, so the app
+  // saves the bytes to the tablet's Downloads itself, through the bridge it exposes.
+  if (typeof window !== 'undefined' && window.ChachiAndroid) {
+    payload.arrayBuffer().then((buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      window.ChachiAndroid.saveFile(filename, payload.type || type || '', btoa(binary));
+    });
+    return filename;
+  }
   const url = URL.createObjectURL(payload);
   const link = document.createElement('a');
   link.href = url;

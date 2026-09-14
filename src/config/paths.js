@@ -15,8 +15,9 @@ const fs = require('fs');
 const APP_DIR_NAME = 'ChachiPharmacyPOS';
 
 function dataDir() {
-  // AGRIVET_DATA_DIR is how the test suite gets a throwaway database. It is never
-  // set in a packaged build.
+  // AGRIVET_DATA_DIR is how the test suite gets a throwaway database, and how the
+  // Android app (TASK-049) points the server at its own private storage. The Windows
+  // build never sets it.
   if (process.env.AGRIVET_DATA_DIR) return process.env.AGRIVET_DATA_DIR;
 
   if (process.platform === 'win32') {

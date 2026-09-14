@@ -15,7 +15,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const Database = require('better-sqlite3');
+const { openDatabase } = require('../config/sqlite');
 const db = require('../config/database');
 const ids = require('../config/ids');
 const zip = require('../config/zip');
@@ -98,7 +98,7 @@ function verify(filePath) {
     staged = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-verify-')), 'copy.db');
     extract(filePath, staged);
 
-    copy = new Database(staged, { readonly: true, fileMustExist: true });
+    copy = openDatabase(staged, { readonly: true, fileMustExist: true });
 
     const integrity = copy.pragma('integrity_check').map((row) => row.integrity_check);
     if (integrity.length !== 1 || integrity[0] !== 'ok') {
