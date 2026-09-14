@@ -365,7 +365,7 @@ warning that has to be acted on before the first pharmacy install.**
 
 | ID | Task | Status | Waiting on |
 | :--- | :--- | :--- | :--- |
-| [TASK-046](TASK-046-pharmacy-edition-otc.md) | Pharmacy edition: an OTC drugstore on the same product | Closed, `40e7fb2` | Merging `018` and `INV-207` to `main` (§3); `PQ-1`–`PQ-5` from the client |
+| [TASK-046](TASK-046-pharmacy-edition-otc.md) | Pharmacy edition: an OTC drugstore on the same product | Closed, `40e7fb2` | `PQ-1`–`PQ-5` from the client. `018` stays on this branch, so `main`'s next migration is `019` (§3) |
 | [TASK-047](TASK-047-onboarding-and-excel-workbook.md) | Onboarding: a wizard that fits, and the store's data from one Excel workbook | Closed, `0dccd58` | A workbook saved by Excel itself, at UAT |
 | [TASK-048](TASK-048-google-sign-in-and-subscription.md) | Google sign-in and a subscription checked online once a month | Not started | `L-1` owner only and `L-2` read-only from the next shift are answered; `L-3`–`L-6` (grace, payment, hosting, per machine or per store) and a licence server are not |
 | [TASK-049](TASK-049-android-app.md) | An Android build the client compiles themselves | Built, *this commit*; not yet run on a tablet | The first install on the store's tablet |

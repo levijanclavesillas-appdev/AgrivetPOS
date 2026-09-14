@@ -57,10 +57,10 @@ change to batch tracking after stock had moved, which leaves stock that nothing 
 
 | Area | Detail |
 | :--- | :--- |
-| Schema | `018_generic_name.sql`: `products.generic_name TEXT`, nullable and not indexed. **See the migration-number warning in `PHARMACY_EDITION.md` §3** |
+| Schema | `018_generic_name.sql`: `products.generic_name TEXT`, nullable and not indexed. **The number is shared with `main`: see `PHARMACY_EDITION.md` §3** |
 | Files | `package.json`, `src/config/paths.js`, `productRepository`, `productService`, `settingsService`, `setupService`, `backupService`, `openingDataService`, `public/js/catalogue/editor.js`, `list.js`, `public/js/pos/view.js`, `public/index.html`, `setup.html`, `shell/app.js` |
 | API | No new endpoint. `genericName`, `isBatchTracked` and `statutoryDiscountEligible` are accepted on product create and update |
-| Constraints | Branding and defaults only, apart from `018` and `INV-207`. Both of those belong on `main` (§3) |
+| Constraints | Branding and defaults only, apart from `018` and `INV-207`, which stay on this branch by the owner's decision (§3) |
 
 ## Acceptance Criteria
 
@@ -70,8 +70,11 @@ change to batch tracking after stock had moved, which leaves stock that nothing 
 - [x] Changing batch tracking after a movement is refused with `INV-207`
 - [x] `TAX-004` is on in a fresh install, and switching it stays owner-only and audited
 - [x] The full suite and the browser smoke are green on the branch
-- [ ] `018` and `INV-207` merged to `main` before the first pharmacy install (§3). **Not
-      done: this needs the owner's decision on the merge**
+- [x] Where `018` and `INV-207` live: **on this branch only**. `main` is the base and is merged
+      into `pharmacy`, never the reverse (owner, 2026-09-14; `PHARMACY_EDITION.md` §3)
+- [ ] The shared migration sequence enforces itself. **Not done:** today `main`'s next
+      migration must be `019` by agreement, and a clash would be skipped silently on pharmacy
+      stores (§3)
 - [ ] The client's answers to `PQ-1`–`PQ-5` (`PHARMACY_EDITION.md` §4). **Not done: they are
       questions for the client, not code**
 

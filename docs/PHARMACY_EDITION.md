@@ -38,17 +38,28 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | P-5 | **Separate data folder and Windows app id.** | A pharmacy install can never open an agrivet database by accident, and uninstalling one never touches the other. |
 | P-6 | **Internal names are kept**: `agrivet.db`, the `AGRIVET_*` environment variables, and the export format id `chachi-agrivet-pos-export`. | No owner sees them. Renaming them would change the backup, restore and import code without benefiting any user. |
 
-## 3. The migration number — act on this before the first pharmacy install
+## 3. Branches, and the migration number
 
-`018_generic_name.sql` exists only on this branch. Migrations are forward-only and
-numbered (`05_TECH_SPEC.md` §3.5). If `main` later ships its own `018`, the two cannot
-both be applied under that number. And once a store has run this branch's `018`, the
-number cannot be taken back.
+**Decision (owner, 2026-09-14): `main` is the base product and the pharmacy features stay on
+this branch.** `main` is merged into `pharmacy` and never the other way. `018_generic_name.sql`,
+`INV-207` and the editor fields are not merged to `main`. This replaces the earlier
+recommendation to merge them, and it means the `INV-207` fault (batch tracking can be changed
+after stock has moved) remains on `main`, where agrivet stores run.
 
-**Recommendation:** merge `018_generic_name.sql`, `INV-207` and the editor fields to
-`main` before any pharmacy goes live. None of them is pharmacy-specific: veterinary
-medicines have generic names too, and the `INV-207` fault exists on `main` today. The
-branch then differs only in branding and defaults (§1), which never collide.
+**What the decision requires of migration numbers.** Migrations are forward-only and numbered
+(`05_TECH_SPEC.md` §3.5). A store records each number it has applied, and on launch
+`upgradeService` compares only the *highest* applied number with the highest file number: if
+they are equal, nothing runs. Two consequences follow.
+
+- If `main` ships its own `018` and it is merged into this branch, a pharmacy store has already
+  recorded 018, so `main`'s change is **skipped without an error**.
+- A pharmacy-only file in a separate high range (say `900_…`) does not avoid that: a store at
+  900 would treat `main`'s later `019` as already covered and never run it either.
+
+So **one number sequence is shared across both branches**. Until the runner is changed, every
+migration on either branch takes the next number above everything on *both*, and **`main`'s next
+migration is `019`**, because `018` is taken here. `TASK-046`'s open box tracks making that rule
+enforce itself rather than depend on memory.
 
 ## 4. Open questions for the client
 
