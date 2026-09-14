@@ -164,6 +164,7 @@ of them to three.
 | `SCR-704` Backups | `SCR-701` | 2 |
 | `SCR-705` Health | `SCR-701` | 2 |
 | `SCR-706` Export / import | `SCR-701` | 2 |
+| `SCR-707` Subscription | `SCR-701` | 2 |
 
 `SCR-001` is the first run and `SCR-101`/`SCR-102` are before the shell, so none of the three is in
 the table. `SCR-302` is the park list — a panel on `SCR-301`, not a screen of its own.
@@ -692,6 +693,16 @@ while an order is still outstanding.
 with its rule ID in a tooltip — **Audit** (filter by actor, action, entity, date; export),
 **Backup** (last backup and its verification status, manual backup, restore behind typed
 confirmation per `OPS-004`), **Health** (`OPS-006`).
+
+### `SCR-707` — Subscription · `TASK-048` — pharmacy edition
+
+The store's subscription in words: its state (active, ending soon, grace period, lapsed, not
+linked), the store and owner it belongs to, the date paid to and the date it must next reach the
+licence server. The owner links this POS here — the screen shows a code and a button that opens
+`pos.chachisoftware.store/link` in the device's browser; the owner signs in with Google there and
+approves, and the screen finishes on its own — and can **Check now**. Everyone else sees the state
+and is told only the owner manages it (`LIC-004`). Off entirely when the build names no licence
+server. The dashboard carries the same sentence whenever the state is not simply active.
 
 ### `SCR-706` — Export and import · `FT-705`, `FT-706` — v1.1
 

@@ -16,6 +16,7 @@ import { createDashboard } from '../reports/dashboard.js';
 import { createReport } from '../reports/report.js';
 import { createBackup } from '../admin/backup.js';
 import { createHealth } from '../admin/health.js';
+import { createLicence } from '../admin/licence.js';
 import { createUsers } from '../admin/users.js';
 import { createSettings } from '../admin/settings.js';
 import { createAudit } from '../admin/audit.js';
@@ -584,6 +585,8 @@ export function createApp({ root }) {
     // sides: how a store's data survives this machine.
     { id: 'data', label: 'Export / import', screen: 'SCR-706', create: createData },
     { id: 'health', label: 'Health', screen: 'SCR-705', create: createHealth },
+    // SCR-707 (TASK-048): the store's subscription — linking this POS, and its state.
+    { id: 'subscription', label: 'Subscription', screen: 'SCR-707', create: createLicence },
   ];
   // Users first: on the day a store is installed it is the first thing anybody needs,
   // and leaving it further in is how a store ends up trading on the owner login.

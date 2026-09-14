@@ -12,6 +12,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-ui-'));
 const backupRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-ui-backups-'));
 process.env.AGRIVET_DATA_DIR = root;
 process.env.AGRIVET_BCRYPT_COST = '6';
+process.env.AGRIVET_LICENSING = 'off'; // the smoke walks the product, not its subscription
 
 const PORT = Number(process.env.UI_PORT || 47897);
 const API = `http://127.0.0.1:${PORT}/api/v1`;

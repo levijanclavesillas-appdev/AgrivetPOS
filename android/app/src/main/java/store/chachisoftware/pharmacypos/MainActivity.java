@@ -211,8 +211,25 @@ public class MainActivity extends Activity {
         if (web != null && web.canGoBack()) web.goBack();
     }
 
-    /** What the renderer may ask of Android — window.ChachiAndroid. Downloads, and nothing else. */
+    /** What the renderer may ask of Android — window.ChachiAndroid: saving a download, and opening a web page. */
     private final class Bridge {
+        /**
+         * Open a page in the phone's own browser — the subscription's link page
+         * (TASK-048), where the owner signs in with Google. https only: whatever the page
+         * asks, this never hands the system a scheme it could turn into something else.
+         */
+        @JavascriptInterface
+        public void openExternal(String url) {
+            if (url == null || !url.startsWith("https://")) return;
+            main.post(() -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, url, Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
         /**
          * Save a file the renderer produced — an export, a template, a statement — to the
          * tablet's Downloads. A WebView has no download manager for a blob, which is what

@@ -58,7 +58,7 @@ test('every migration below 900 is a base migration this branch has recorded, by
 
 test('this edition\'s own migrations are numbered from 900', () => {
   const edition = migrate.available().filter((m) => m.version >= migrate.EDITION_FLOOR);
-  assert.deepEqual(edition.map((m) => m.file), ['900_generic_name.sql']);
+  assert.deepEqual(edition.map((m) => m.file), ['900_generic_name.sql', '901_licence.sql']);
 });
 
 /** A database built from a chosen set of this build's migration files. */
@@ -80,7 +80,7 @@ test('a base migration merged in below an edition one still runs', () => {
   fs.writeFileSync(path.join(dir, `${next}_from_main.sql`), 'CREATE TABLE merged_from_main (x INTEGER);\n');
 
   const behind = migrate.status({ dir });
-  assert.equal(behind.current, 900, 'the highest applied number already covers it');
+  assert.equal(behind.current, migrate.available().slice(-1)[0].version, 'the highest applied number already covers it');
   assert.deepEqual(behind.pending, [top + 1], '…and it is pending all the same');
 
   const result = migrate.migrate({ dir });

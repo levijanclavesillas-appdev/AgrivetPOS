@@ -72,6 +72,10 @@ function open({ actor, openingFloatCentavos, confirmed = false }) {
     return { shift: present(existing), resumed: true };
   }
 
+  // LIC-001 (TASK-048): a new shift needs a licence that has not lapsed. A shift already
+  // open was returned above, so one that is open when the licence lapses runs to its close.
+  require('./licenceService').assertMayOpenShift();
+
   const float = normaliseAmount(openingFloatCentavos, 'The opening float');
   if (confirmed !== true) {
     throw errors.badRequest(

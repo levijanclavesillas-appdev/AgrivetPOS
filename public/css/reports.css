@@ -375,3 +375,28 @@
 .report-link-why { font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
 .report-link-rule { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
   color: var(--md-on-surface-muted); }
+
+/* SCR-707 — the subscription (TASK-048). The state is a word and a colour; the code is
+   big enough to read from the other side of the counter while typing it into a phone. */
+.licence { max-width: 46rem; }
+.licence-card { padding: var(--space-4); border: 1px solid var(--md-outline-variant); border-left: 4px solid var(--md-outline);
+  border-radius: var(--shape-md); background: var(--md-surface); margin: 0 0 var(--space-4); }
+.licence-card.tone-ok { border-left-color: var(--md-tertiary); }
+.licence-card.tone-warn { border-left-color: var(--md-warning); }
+.licence-card.tone-err { border-left-color: var(--md-error); }
+.licence-state { font-size: var(--type-title-md-size); font-weight: 600; color: var(--md-on-surface); margin: 0 0 var(--space-2); }
+.tag.licence-ok { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.tag.licence-warn { background: var(--md-warning-container); color: var(--md-on-warning-container); }
+.tag.licence-err { background: var(--md-error-container); color: var(--md-on-error-container); }
+.licence-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-3); border: 0; }
+.licence-facts .meta-field { display: grid; gap: 2px; }
+.licence-facts dt { flex: none; font-size: var(--type-label-md-size); }
+.licence-facts dd { overflow-wrap: anywhere; color: var(--md-on-surface); }
+.licence-link { padding: var(--space-4); border: 1px dashed var(--md-primary); border-radius: var(--shape-md); background: var(--md-surface); }
+.licence-link ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); line-height: 1.6; }
+.licence-code { font-family: var(--font-mono); font-size: 2rem; letter-spacing: .15em; text-align: center;
+  margin: var(--space-3) 0; color: var(--md-on-surface); user-select: all; }
+.licence-banner { display: flex; gap: var(--space-2); align-items: flex-start; margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3); border-radius: var(--shape-sm); line-height: 1.5; }
+.licence-banner.tone-warn { background: var(--md-warning-container); color: var(--md-on-warning-container); }
+.licence-banner.tone-err { background: var(--md-error-container); color: var(--md-on-error-container); }

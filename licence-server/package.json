@@ -1,0 +1,17 @@
+{
+  "name": "chachi-licence-server",
+  "version": "1.0.0",
+  "description": "Subscription licences for Chachi Pharmacy POS — pos.chachisoftware.store (TASK-048)",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2"
+  },
+  "engines": { "node": ">=18" }
+}

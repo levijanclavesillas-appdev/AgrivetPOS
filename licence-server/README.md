@@ -1,0 +1,95 @@
+# Chachi POS licence server — pos.chachisoftware.store
+
+**TASK-048.** The one online piece of Chachi Pharmacy POS. It knows which stores exist, who owns
+each, what each has paid until, and which devices belong to it, and it signs the licences the POS
+checks offline. The POS works for 30 days between checks, plus 7 days' grace.
+
+| Path | Who | What |
+| :--- | :--- | :--- |
+| `/link` | a store owner | Enter the code the POS shows, sign in with Google, approve the device |
+| `/admin` | Chachi's | Stores, devices, the date each is paid to; record a manual payment (GCash, bank transfer); remove a device |
+| `POST /api/v1/device/start`, `/device/poll` | the POS | The device link |
+| `POST /api/v1/licence/renew` | the POS | The silent check, with the device's renewal secret |
+| `POST /api/v1/play/purchase` | the Android app | A Google Play subscription, verified with Google before it counts |
+| `GET /api/v1/public-key` | the build | The key the POS verifies licences with |
+
+## How a store gets a licence
+
+1. On the POS, the owner opens **Admin → Subscription → Link this POS**. The POS shows a code.
+2. The owner opens `pos.chachisoftware.store/link` (the POS has a button for it, or any phone
+   works), signs in with the Google account that owns the store, and approves the device. A new
+   store starts on the trial (`TRIAL_DAYS`, 14 by default).
+3. The POS collects its licence and a renewal secret. From then on it renews silently, at most every
+   12 hours, whenever it has the internet. Nobody signs in with Google again.
+4. Payment extends `paid_until`: a Google Play subscription on Android, verified with Google, or a
+   manual payment recorded on `/admin`.
+
+## Configuration (environment)
+
+| Variable | Default | |
+| :--- | :--- | :--- |
+| `PORT` | `8790` | Listens on `127.0.0.1` only; nginx is in front |
+| `BASE_URL` | `http://127.0.0.1:8790` | `https://pos.chachisoftware.store` in production |
+| `BEHIND_PROXY` | — | `1` behind nginx |
+| `LICENCE_DATA_DIR` | `./data` | The database **and the signing key**. Back it up; losing the key means rebuilding every POS |
+| `TRIAL_DAYS` | `14` | A new store's trial |
+| `VALIDITY_DAYS`, `GRACE_DAYS`, `WARNING_DAYS` | `30`, `7`, `7` | TASK-048's L-3 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | A **Web** OAuth client; redirect URI `https://pos.chachisoftware.store/auth/google/callback` |
+| `PLAY_SERVICE_ACCOUNT_FILE` | — | Service-account JSON with access to the Play Developer API |
+| `PLAY_PACKAGE_NAME`, `PLAY_PRODUCTS` | `store.chachisoftware.pharmacypos`, `pos_monthly` | The app and its subscription product id(s) |
+| `ADMIN_PASSWORD_HASH` | — | `node src/tools/hash-password.js`, then paste the hash |
+
+Until Google is configured, `/link` says sign-in is not set up. Until Play is configured,
+`/api/v1/play/purchase` answers 503. Until the admin hash is set, `/admin` cannot be signed into.
+Nothing else waits on them.
+
+## Deploying on this server
+
+This host runs its Node apps under **pm2**, behind **nginx** with **Certbot**. DNS for
+`pos.chachisoftware.store` already points here.
+
+Node 20.6 or later (for `--env-file`); this host has 20.20.
+
+```sh
+cd /root/AdWebsite/AgrivetPOS/licence-server && npm ci --omit=dev
+cat > .env.production <<'ENV'      # chmod 600; never committed
+PORT=8790
+BASE_URL=https://pos.chachisoftware.store
+BEHIND_PROXY=1
+LICENCE_DATA_DIR=/var/lib/chachi-licence
+GOOGLE_CLIENT_ID=…
+GOOGLE_CLIENT_SECRET=…
+ADMIN_PASSWORD_HASH=…
+ENV
+pm2 start src/server.js --name chachi-licence --node-args="--env-file=.env.production" && pm2 save
+```
+
+nginx site `/etc/nginx/sites-available/pos.chachisoftware.store.conf`, then
+`certbot --nginx -d pos.chachisoftware.store`:
+
+```nginx
+server {
+    server_name pos.chachisoftware.store;
+    client_max_body_size 64k;
+    location / {
+        proxy_pass http://127.0.0.1:8790;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    listen 80;
+}
+```
+
+**Going live with the POS.** Once the server is up, put its address and the output of
+`GET /api/v1/public-key` into `src/config/licence.js` (`PRODUCTION_SERVER`,
+`PRODUCTION_PUBLIC_KEY`) in one commit. Builds from that commit enforce the subscription. The
+test suite does not: it runs with `AGRIVET_LICENSING=off`.
+
+## Tests
+
+`npm test` here: the device link end to end, one-time pickup, code expiry, renewal and removal,
+manual and Play payments, admin sign-in and CSRF, page security headers, and Google ID-token
+verification (signature, issuer, audience, expiry, nonce). The POS's own
+`src/tests/integration/licence.test.js` runs this server in-process and drives it from the POS.

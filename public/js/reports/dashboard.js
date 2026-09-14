@@ -10,6 +10,7 @@ import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { manila } from '../shell/format.js';
+import { licenceBanner } from '../admin/licence.js';
 
 /** Which report a tile opens. Credit and inventory are v1.1 screens; say so. */
 const OPENS = {
@@ -75,14 +76,20 @@ export function createDashboard({ root, session, onOpenReport, onOpenBatches = n
   async function load() {
     ui.loading(root, { rows: 4 });
     try {
-      render(await api.get('/reports/dashboard'));
+      // The subscription's state beside the day's figures (TASK-048): a store in its
+      // warning or grace week is told where everyone looks first, not only on a tab.
+      const [data, licence] = await Promise.all([
+        api.get('/reports/dashboard'),
+        api.get('/licence').catch(() => null),
+      ]);
+      render(data, licence);
     } catch (err) {
       if (err.isRefusal) ui.refused(root, err);
       else ui.error(root, { message: err.message, retry: load });
     }
   }
 
-  function render(data) {
+  function render(data, licence = null) {
     clear(root).append(h('div', { class: 'dashboard' }, [
       h('header', { class: 'dash-head' }, [
         h('h1', { text: 'Today' }),
@@ -94,6 +101,7 @@ export function createDashboard({ root, session, onOpenReport, onOpenBatches = n
           : null,
         h('button', { class: 'dash-refresh', icon: 'refresh-cw', text: 'Refresh', onclick: load }),
       ]),
+      licenceBanner(licence),
       alertList(data.alerts),
       h('div', { class: 'tiles' }, data.tiles.map(tile)),
       reportIndex(),

@@ -147,6 +147,10 @@ const ACTIONS = Object.freeze({
   // OPS-009: the clock moved backwards past the last recorded transaction.
   CLOCK_ANOMALY: { what: 'System clock earlier than the last recorded transaction', rule: 'OPS-009' },
   AUDIT_EXPORTED: { what: 'Audit trail exported', rule: 'AUD-601' },
+  // TASK-048: the store's subscription. Linking is recorded; a renewal only when it
+  // changed the date paid to, or a row a day would drown the trail.
+  LICENCE_LINKED: { what: 'POS linked to its store\'s subscription', rule: 'LIC-004' },
+  LICENCE_RENEWED: { what: 'Subscription renewed', rule: 'LIC-002' },
 
   // ── AUD-602: the till ─────────────────────────────────────────────────────
   SHIFT_CLOSED_WITH_VARIANCE: { what: 'Shift closed with a variance beyond tolerance', rule: 'AUD-602' },

@@ -72,6 +72,9 @@ function due({ now = clock.nowUtc() } = {}) {
 /** One tick. Never throws — a scheduler that dies takes the daily backup with it. */
 function tick({ now = clock.nowUtc() } = {}) {
   lastTickAt = now;
+  // LIC-002: the silent daily licence check, when licensing is on and the internet is
+  // there. Asynchronous and never awaited: a slow network must not hold up the backup.
+  require('./licenceService').renewIfDue({ at: now });
   try {
     const check = due({ now });
     if (!check.due) return { ran: false, ...check };

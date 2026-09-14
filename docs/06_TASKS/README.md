@@ -358,8 +358,8 @@ commit that builds it and the guard stays green in between.
 ## Pharmacy edition — branch `pharmacy`
 
 The same product for an over-the-counter drugstore, plus what the client asked for once they
-saw it: a proper onboarding path, a subscription model and an Android build. The first two are
-closed on the branch; the last two are recorded so their decisions are made before their code. Read [`PHARMACY_EDITION.md`](../PHARMACY_EDITION.md) first — it holds the
+saw it: a proper onboarding path, a subscription model and an Android build. All four are built on
+the branch; the subscription waits on deployment and the Android build on its first tablet. Read [`PHARMACY_EDITION.md`](../PHARMACY_EDITION.md) first — it holds the
 recorded decisions `P-1`–`P-6`, the client questions `PQ-1`–`PQ-5`, and **the migration-number
 warning that has to be acted on before the first pharmacy install.**
 
@@ -367,7 +367,7 @@ warning that has to be acted on before the first pharmacy install.**
 | :--- | :--- | :--- | :--- |
 | [TASK-046](TASK-046-pharmacy-edition-otc.md) | Pharmacy edition: an OTC drugstore on the same product | Closed, `40e7fb2` | `PQ-1`–`PQ-5` from the client. Edition migrations are 900 and up, so `main` numbers its own freely (§3) |
 | [TASK-047](TASK-047-onboarding-and-excel-workbook.md) | Onboarding: a wizard that fits, and the store's data from one Excel workbook | Closed, `0dccd58` | A workbook saved by Excel itself, at UAT |
-| [TASK-048](TASK-048-google-sign-in-and-subscription.md) | Google sign-in and a subscription checked online once a month | Not started; all decisions made | The owner's prerequisites: DNS for `pos.chachisoftware.store`, a Google OAuth client, a Play Console subscription and service account |
+| [TASK-048](TASK-048-google-sign-in-and-subscription.md) | Google sign-in and a subscription checked online once a month | Built, *this commit*; not deployed, and off until the build names a licence server | Approval to deploy `licence-server/` at `pos.chachisoftware.store` (DNS is done), a Google OAuth web client, a Play Console subscription and service account; Play Billing in the Android app |
 | [TASK-049](TASK-049-android-app.md) | An Android build the client compiles themselves | Built, *this commit*; not yet run on a tablet | The first install on the store's tablet |
 | [TASK-050](TASK-050-lucide-icons.md) | Lucide icons, vendored, beside the words they illustrate | Closed, `c6cd9b4` | — |
 | [TASK-051](TASK-051-responsive-layout.md) | Every screen fits a phone, a tablet and a desktop | Built | Use on the client's phone |
