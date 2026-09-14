@@ -49,7 +49,9 @@ function panel() {
       binary_version: migrate.binaryVersion(),
       // A database older than the binary is a migration that has not run, which is a
       // different problem from a corrupt one and needs saying differently.
-      up_to_date: migrate.schemaVersion() === migrate.binaryVersion(),
+      // Every shipped migration applied and none unknown: not "the highest numbers
+      // match", which a base migration merged in below an edition one would fool.
+      up_to_date: (({ pending, unknown }) => pending.length === 0 && unknown.length === 0)(migrate.status()),
     },
 
     // 2 and 3 — database size and row counts.

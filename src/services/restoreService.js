@@ -213,7 +213,7 @@ function restore({ backupId, confirmFilename, actor }) {
   // The restored database is older than this build whenever a migration has landed
   // since. Bringing it forward is the same thing a fresh install does on launch, and
   // leaving it behind would mean a restored store that the application cannot open.
-  const migrated = after.schema_version < migrate.binaryVersion()
+  const migrated = migrate.status().pending.length > 0
     ? migrate.migrate()
     : null;
 

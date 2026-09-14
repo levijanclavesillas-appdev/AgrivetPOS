@@ -1,0 +1,26 @@
+# The base product's migrations this branch carries — config/migrate.js, PHARMACY_EDITION.md §3.
+#
+# Numbers 001–899 belong to `main`. Every file below 900 in src/migrations must be listed
+# here with this exact hash, so a pharmacy change written into the base range fails
+# migration-ranges.test.js instead of colliding, later, with main's file of that number.
+#
+# When a merge from main brings a new base migration, add its line in the same merge:
+#   sha256sum src/migrations/0NN_name.sql
+# If the new file did NOT come from main, it is an edition migration: renumber it to 9NN.
+001_foundation.sql  10cbe33c3046c602941786fdb967ce2c1b1d90ae06b418084355f686ec6c5903
+002_catalog.sql  923c57a0a3487a90f6a3660f1dccbca103c86633bbad0c3044b4bc69daca09f0
+003_inventory.sql  0662c46ff906efa07a40895e3d01beb4730bb75c876309bc1e8bd95c61d48be0
+004_customers_credit.sql  7bda8582c61f38788941cb09792ccf1644de1e503c921d45b6eaa2e5007c1e8f
+005_shifts.sql  be936b41ed8824d6e1662d3761cfad0686d19ae8af8cfb072e592804297bc871
+006_sales.sql  02f04b486e62647252c81a72d86fef266670120feb34a3cbb9cecbe363678061
+007_carts.sql  96df630750480a8ee4ef788028888d678fb32618d293f20e2ebfde8843f21df7
+008_report_indexes.sql  20d6d02ce28d940e60fa022dac89ddfd7f0dc9dcfa80152bc15df4e374eb4e6a
+009_backups_alerts.sql  ce54356bda03b786588c3e5ffa69adb1b8f0f5bbfb40dbee9191fb4b838a60ac
+010_purchasing.sql  52005536fc1bf2028759485bb23d0315923e58b83c2f3a541a65457b69b2c213
+011_returns.sql  9639f79be4f29b0b2a9ee48cfa7b8be126e3f9a4677fa5a29f45ed456270bd15
+012_stock_counts.sql  1d55f012a01f69a196704aa1e55eb1de59472edab7d68fddad1650ede5436652
+013_negotiated_pricing.sql  528ce12fd0ecc53ce04fe9b7cd403da985b8e6d835079ee24339f1b691bbad21
+014_batches.sql  a243b3f8d5ca4c5132ab80989d72e1f1e5753c66ecd19467ba1894cf0b43a616
+015_count_by_batch.sql  0cca95f858e989ece569d2b6b20d2eec05bc824520eefbffdf86fd8f8405af24
+016_reconciliation.sql  f60cec16cf0462681d6966d567c7ebdbb057ece26f806c8a304e2b6214d88125
+017_analysis_indexes.sql  1d1b181edffd47b620fa151813b715453780fd19a0b463936288330d5d318a97

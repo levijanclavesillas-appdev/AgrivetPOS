@@ -248,11 +248,20 @@ test('TC-INT-94: every invalid archive refuses before a single row is written', 
       return rebuild(withEntry(entries, 'products.json', products));
     }, /checksum does not match/],
 
-    ['a future schema version', () => {
+    ['a future schema version, from an archive that lists only the highest', () => {
       const m = jsonOf(entries, 'manifest.json');
       m.schema_version = 999;
+      delete m.schema_versions;
       return rebuild(withEntry(entries, 'manifest.json', m));
     }, /only knows up to/],
+
+    // Since the edition has its own range (config/migrate.js), an archive lists every
+    // migration it has. One this build lacks is refused even when it is not the highest.
+    ['a migration this build does not have', () => {
+      const m = jsonOf(entries, 'manifest.json');
+      m.schema_versions = [...m.schema_versions, 19];
+      return rebuild(withEntry(entries, 'manifest.json', m));
+    }, /migration 19, which this version of Chachi Pharmacy POS does not have/],
 
     ['a dangling reference', () => {
       const items = jsonOf(entries, 'sale_items.json');

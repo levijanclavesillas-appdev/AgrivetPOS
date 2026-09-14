@@ -25,22 +25,29 @@ const migrate = require('../config/migrate');
 
 /** What the database is, relative to this binary, before anything is done to it. */
 function inspect() {
-  const binary = migrate.binaryVersion();
-  let current = 0;
-
+  let status;
   try {
-    current = migrate.schemaVersion();
+    status = migrate.status();
   } catch {
     // An unreadable schema table is a fresh or a broken database; migrate() will say
     // which, and this is only deciding whether to take a backup first.
-    current = 0;
+    status = { current: 0, binary: migrate.binaryVersion(), applied: [], pending: [], unknown: [] };
   }
 
+  // By the set of migrations, not the highest number (config/migrate.js): a base
+  // migration merged in from `main` can land below one of this edition's, and the store
+  // is behind until it has run it.
+  const state = status.applied.length === 0 ? 'FRESH'
+    : status.unknown.length ? 'AHEAD'
+      : status.pending.length ? 'BEHIND'
+        : 'CURRENT';
+
   return {
-    current,
-    binary,
-    state: current === 0 ? 'FRESH' : (current < binary ? 'BEHIND' : (current > binary ? 'AHEAD' : 'CURRENT')),
-    pending: Math.max(0, binary - current),
+    current: status.current,
+    binary: status.binary,
+    state,
+    pending: status.pending.length,
+    unknown: status.unknown,
   };
 }
 

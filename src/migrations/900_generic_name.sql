@@ -1,4 +1,4 @@
--- 018_generic_name.sql — a product's generic name (pharmacy edition)
+-- 900_generic_name.sql — a product's generic name (pharmacy edition)
 -- Source of truth: docs/PHARMACY_EDITION.md. Conventions in 05_TECH_SPEC.md §3.1 are binding.
 --
 -- Forward-only. Once this file has been applied anywhere it is never edited (§8.9).

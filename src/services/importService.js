@@ -116,7 +116,29 @@ function validate(archiveBuffer, { collisionMode = 'SKIP' } = {}) {
   // Refused in the words upgradeService already uses, because it is the same fact
   // about the same kind of file: something newer than this build wrote it.
   const binary = migrate.binaryVersion();
-  if (Number.isInteger(manifest.schema_version) && manifest.schema_version > binary) {
+  // Compared by the list of migrations when the archive carries one (exports since the
+  // edition had its own range, config/migrate.js), and by the highest number otherwise.
+  const listed = Array.isArray(manifest.schema_versions) && manifest.schema_versions.every(Number.isInteger)
+    ? manifest.schema_versions : null;
+  const shipped = migrate.available().map((m) => m.version);
+  const unknownMigrations = listed ? listed.filter((v) => !shipped.includes(v)) : [];
+  const missingMigrations = listed ? shipped.filter((v) => !listed.includes(v)) : [];
+  if (listed && unknownMigrations.length) {
+    problems.push({
+      rule_id: 'OPS-102',
+      message: `This archive was written by a database with migration ${unknownMigrations.join(', ')}, which `
+        + 'this version of Chachi Pharmacy POS does not have. It was written by a newer '
+        + 'installation. Install the current version before importing it — running an older '
+        + 'build against newer data loses data.',
+    });
+  } else if (listed && missingMigrations.length) {
+    warnings.push({
+      rule_id: 'OPS-102',
+      message: `The archive is from a database without migration ${missingMigrations.join(', ')}, which this `
+        + 'build has. Tables added since will be empty after the import.',
+    });
+  }
+  if (!listed && Number.isInteger(manifest.schema_version) && manifest.schema_version > binary) {
     problems.push({
       rule_id: 'OPS-102',
       message: `This archive is at schema version ${manifest.schema_version}, but this version `
@@ -125,7 +147,7 @@ function validate(archiveBuffer, { collisionMode = 'SKIP' } = {}) {
         + 'build against newer data loses data.',
     });
   }
-  if (Number.isInteger(manifest.schema_version) && manifest.schema_version < binary) {
+  if (!listed && Number.isInteger(manifest.schema_version) && manifest.schema_version < binary) {
     warnings.push({
       rule_id: 'OPS-102',
       message: `The archive is from schema version ${manifest.schema_version} and this build is `

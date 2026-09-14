@@ -75,7 +75,9 @@ test('GET /api/v1/health/panel reports OPS-006’s six figures, behind TX-428', 
     'store_profile', 'suppliers', 'system_events', 'system_settings',
     'till_movements', 'units', 'users',
   ]);
-  assert.equal(body.database.row_counts.schema_migrations, body.schema.binary_version);
+  // One row per migration file, not "the highest version": the edition's own are
+  // numbered from 900 (config/migrate.js), so the two stopped being the same number.
+  assert.equal(body.database.row_counts.schema_migrations, require('../../config/migrate').available().length);
 
   // OPS-006's six, all present and honest about being empty on a fresh install.
   assert.equal(body.backup.last_successful_at, null, 'nothing has been backed up yet');

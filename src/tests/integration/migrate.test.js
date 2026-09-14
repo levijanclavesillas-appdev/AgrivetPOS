@@ -37,8 +37,14 @@ test('TC-INT-01: a fresh database applies every migration and records each one',
   ]);
 
   const rows = migrate.applied();
-  assert.equal(rows.length, migrate.binaryVersion());
-  assert.deepEqual(rows.map((r) => r.version), rows.map((_, i) => i + 1), 'contiguous, ascending');
+  assert.equal(rows.length, migrate.available().length);
+  // Contiguous within each range: the base product's from 001, this edition's from 900
+  // (config/migrate.js, PHARMACY_EDITION.md §3). A gap inside either is a lost file.
+  const base = rows.filter((r) => r.version < migrate.EDITION_FLOOR);
+  const edition = rows.filter((r) => r.version >= migrate.EDITION_FLOOR);
+  assert.deepEqual(base.map((r) => r.version), base.map((_, i) => i + 1), 'the base range is contiguous, ascending');
+  assert.deepEqual(edition.map((r) => r.version), edition.map((_, i) => migrate.EDITION_FLOOR + i),
+    'the edition range is contiguous from 900');
   assert.equal(rows[0].name, 'foundation');
   assert.equal(rows[1].name, 'catalog');
   assert.equal(rows[2].name, 'inventory');
@@ -66,13 +72,13 @@ test('TC-INT-01: a database ahead of the binary refuses to start, with a clear m
   temp.openMigrated('migrate-ahead');
 
   // A database written by a newer installation. Stamped directly because no
-  // application path can produce one.
+  // application path can produce one. (One below the highest is migration-ranges.test.js.)
+  const future = migrate.binaryVersion() + 1;
   db.get()
     .prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
-    .run(99, 'from_the_future', new Date().toISOString());
+    .run(future, 'from_the_future', new Date().toISOString());
 
-  assert.equal(migrate.schemaVersion(), 99);
-  assert.ok(migrate.binaryVersion() < 99, 'the binary is behind this database');
+  assert.equal(migrate.schemaVersion(), future);
 
   let err;
   try {
@@ -82,11 +88,11 @@ test('TC-INT-01: a database ahead of the binary refuses to start, with a clear m
   }
   const binary = migrate.binaryVersion();
   assert.ok(err instanceof migrate.SchemaAheadOfBinaryError, 'it must refuse, not proceed');
-  assert.equal(err.dbVersion, 99);
+  assert.equal(err.dbVersion, future);
   assert.equal(err.binaryVersion, binary);
   // The message is read by a store owner, not a developer.
-  assert.match(err.message, /schema version 99/);
-  assert.match(err.message, new RegExp(`only knows up to ${binary}`));
+  assert.match(err.message, new RegExp(`schema version ${future}`));
+  assert.match(err.message, new RegExp(`only knows up to ${binary}\\.`));
   assert.match(err.message, /newer installation/);
   assert.ok(!/stack|undefined|\[object/i.test(err.message), 'no developer debris in the message');
 });

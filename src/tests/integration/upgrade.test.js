@@ -67,6 +67,13 @@ function priorInstall(toVersion) {
   return { dir, dbPath, oldMigrations };
 }
 
+/**
+ * The schema the previous release shipped: the second-to-last migration file. Not
+ * `binaryVersion() - 1` — this edition's own migrations are numbered from 900
+ * (config/migrate.js), so the number below the newest is usually not a file at all.
+ */
+const previousVersion = () => migrate.available().slice(-2)[0].version;
+
 test.after(() => temp.cleanup());
 
 // ── TC-INST-01 ──────────────────────────────────────────────────────────────
@@ -76,7 +83,7 @@ test('TC-INST-01: an upgrade preserves the data, backs up first, and migrates on
   const version = migrate.binaryVersion();
   assert.ok(version >= 9, 'there is at least one migration to apply');
 
-  const prior = priorInstall(version - 1);
+  const prior = priorInstall(previousVersion());
 
   temp.seedStore({ withOwner: false, taxMode: 'NONE' });
   const ref = temp.seedCatalog();
@@ -84,7 +91,7 @@ test('TC-INST-01: an upgrade preserves the data, backs up first, and migrates on
   const owner = authService.verifyToken(authService.login({ username: 'owner', password: PASSWORD }).token);
   // Written with the columns 002 declared rather than through productService, which
   // speaks the *current* schema: the day the newest migration adds a product column
-  // (018 did), the service cannot write a row into the previous release's table, and
+  // (900, the generic name, did), the service cannot write a row into the previous release's table, and
   // this case would fail on its own fixture instead of on the upgrade it is about.
   db.get().prepare(`
     INSERT INTO products (id, sku, name, category_id, base_unit_id, created_at)
@@ -99,7 +106,7 @@ test('TC-INST-01: an upgrade preserves the data, backs up first, and migrates on
     products: db.get().prepare('SELECT COUNT(*) AS n FROM products').get().n,
     users: db.get().prepare('SELECT COUNT(*) AS n FROM users').get().n,
   };
-  assert.equal(before.version, version - 1, 'the fixture really is a version behind');
+  assert.equal(before.version, previousVersion(), 'the fixture really is a version behind');
   assert.equal(before.products, 1);
 
   db.close();
@@ -168,7 +175,7 @@ test('TC-INST-01: a second launch is a no-op — no backup, no migration', async
 
 test('TC-INST-01: a failed pre-migration backup stops the upgrade and changes nothing', async () => {
   const version = migrate.binaryVersion();
-  const prior = priorInstall(version - 1);
+  const prior = priorInstall(previousVersion());
   temp.seedStore({ withOwner: true, taxMode: 'NONE' });
 
   // No backup folder: the shape of an unplugged drive or a full disk.

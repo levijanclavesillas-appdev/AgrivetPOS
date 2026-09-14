@@ -1139,8 +1139,17 @@ rest is worth at today's average, labelled per row.
 ### 3.5 Migrations
 
 Numbered, forward-only, one file per migration, applied in a transaction, recorded in
-`schema_migrations`. The app refuses to start when the database version exceeds the binary's
-known version — a newer database opened by an older `.exe` is a data-loss event, not a warning.
+`schema_migrations`. The app refuses to start when the database has recorded a migration the
+binary does not ship — a newer database opened by an older `.exe` is a data-loss event, not a
+warning.
+
+**Two ranges, on the pharmacy branch** (`PHARMACY_EDITION.md` §3). `001`–`899` are the base
+product's and are written on `main`; `900`–`999` are the pharmacy edition's and exist only on
+`pharmacy`. Because `main` is merged into `pharmacy`, a base migration can arrive after an
+edition one has run, with a lower number — so "pending" is **every shipped file the database
+has not recorded**, never "everything above its highest number" (`migrate.status()`).
+`migration-ranges.test.js` holds the rule, and `src/tests/fixtures/base-migrations.sha256`
+lists the base files the branch carries.
 
 ```text
 migrations/001_foundation.sql       users, settings, store_profile, audit
@@ -1160,6 +1169,7 @@ migrations/014_batches.sql          batches, ledger batch_id, sale_item_batches 
 migrations/015_count_by_batch.sql   stock_count_lines.batch_id — counting by batch (INV-110, INV-201)
 migrations/016_reconciliation.sql   payment_reconciliations — RPT-105, and no column on sale_tenders
 migrations/017_analysis_indexes.sql indexes only — the ledger's date access path (TASK-033)
+migrations/900_generic_name.sql     products.generic_name — pharmacy edition only (TASK-046)
 ```
 
 

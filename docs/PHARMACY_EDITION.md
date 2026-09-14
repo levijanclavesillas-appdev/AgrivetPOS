@@ -17,7 +17,7 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | Product name, installer, shortcut, Windows app id | Chachi Agrivet POS · `store.chachisoftware.agrivetpos` | Chachi Pharmacy POS · `store.chachisoftware.pharmacypos` | `package.json`, `public/` |
 | Data folder | `%LOCALAPPDATA%\ChachiAgrivetPOS` | `%LOCALAPPDATA%\ChachiPharmacyPOS` | `src/config/paths.js` |
 | Default backup folder, backup file names | `ChachiAgrivetPOS Backups`, `agrivet_backup_….zip` | `ChachiPharmacyPOS Backups`, `pharmacy_backup_….zip` | `setupService`, `backupService` |
-| Generic name on a product | — | Optional, searched at the counter, shown under the brand name | `018_generic_name.sql` |
+| Generic name on a product | — | Optional, searched at the counter, shown under the brand name | `900_generic_name.sql` |
 | Batch tracking, senior/PWD eligibility in the product editor | Not editable on screen | Both on the Identity tab; new products start with both ticked | `public/js/catalogue/editor.js` |
 | Changing batch tracking after stock has moved | Accepted by the API, and breaks the product | Refused — `INV-207` | `productService` |
 | Senior citizen / PWD discount (`TAX-004`) | Ships **off** | Ships **on** | `settingsService` |
@@ -41,25 +41,30 @@ kept small on purpose, so `main` can be merged into it without a fight.
 ## 3. Branches, and the migration number
 
 **Decision (owner, 2026-09-14): `main` is the base product and the pharmacy features stay on
-this branch.** `main` is merged into `pharmacy` and never the other way. `018_generic_name.sql`,
-`INV-207` and the editor fields are not merged to `main`. This replaces the earlier
+this branch.** `main` is merged into `pharmacy` and never the other way. The generic-name
+migration, `INV-207` and the editor fields are not merged to `main`. This replaces the earlier
 recommendation to merge them, and it means the `INV-207` fault (batch tracking can be changed
 after stock has moved) remains on `main`, where agrivet stores run.
 
-**What the decision requires of migration numbers.** Migrations are forward-only and numbered
-(`05_TECH_SPEC.md` §3.5). A store records each number it has applied, and on launch
-`upgradeService` compares only the *highest* applied number with the highest file number: if
-they are equal, nothing runs. Two consequences follow.
+**Migration numbers, enforced in code (owner's choice, 2026-09-14).** Keeping the branches apart
+made the numbers a shared resource: if `main` shipped a `018` of its own, a pharmacy store that
+had recorded this branch's `018` would skip it without an error. So:
 
-- If `main` ships its own `018` and it is merged into this branch, a pharmacy store has already
-  recorded 018, so `main`'s change is **skipped without an error**.
-- A pharmacy-only file in a separate high range (say `900_…`) does not avoid that: a store at
-  900 would treat `main`'s later `019` as already covered and never run it either.
-
-So **one number sequence is shared across both branches**. Until the runner is changed, every
-migration on either branch takes the next number above everything on *both*, and **`main`'s next
-migration is `019`**, because `018` is taken here. `TASK-046`'s open box tracks making that rule
-enforce itself rather than depend on memory.
+- **Two ranges.** `001`–`899` are the base product's and are written on `main`. `900`–`999` are
+  this edition's and exist only here. The generic name is `900_generic_name.sql`, renumbered
+  from `018` before any store ran it. `main`'s next migration is simply its next number.
+- **Pending means "not yet recorded", not "above the highest".** A store runs every shipped
+  file it has not recorded, so `main`'s `018` merged in later still runs on a store already at
+  `900`. A recorded migration the build does not ship is refused as "written by a newer build",
+  whatever its number (`config/migrate.js`, `migrate.status()`). Upgrade, restore, the health
+  panel and import all ask the same question. Exports list every applied migration
+  (`schema_versions`); an older archive without the list is judged by its highest number, as
+  before.
+- **Held by a test on this branch alone.** `migration-ranges.test.js` needs no `main` and no
+  git. Every file below 900 must be listed, with its SHA-256, in
+  `src/tests/fixtures/base-migrations.sha256`. A pharmacy change written into the base range,
+  or an edited base migration, fails the suite. When a merge from `main` brings a new base
+  migration, its line is added to that list in the same merge.
 
 ## 4. Open questions for the client
 

@@ -563,7 +563,7 @@ test('a product carries whether it is sellable at all (PR-102)', async () => {
   assert.equal(chick.retail_price_centavos, null, 'null, not zero');
 });
 
-// ── Pharmacy edition — generic name (018) and INV-207 ───────────────────────
+// ── Pharmacy edition — generic name (900) and INV-207 ───────────────────────
 
 test('a generic name is optional, stored trimmed, and blank reads as none', () => {
   const branded = productService.create(productInput({
