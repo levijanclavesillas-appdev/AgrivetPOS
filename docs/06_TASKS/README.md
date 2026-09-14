@@ -367,7 +367,7 @@ warning that has to be acted on before the first pharmacy install.**
 | :--- | :--- | :--- | :--- |
 | [TASK-046](TASK-046-pharmacy-edition-otc.md) | Pharmacy edition: an OTC drugstore on the same product | Closed, `40e7fb2` | `PQ-1`–`PQ-5` from the client. Edition migrations are 900 and up, so `main` numbers its own freely (§3) |
 | [TASK-047](TASK-047-onboarding-and-excel-workbook.md) | Onboarding: a wizard that fits, and the store's data from one Excel workbook | Closed, `0dccd58` | A workbook saved by Excel itself, at UAT |
-| [TASK-048](TASK-048-google-sign-in-and-subscription.md) | Google sign-in and a subscription checked online once a month | Built, *this commit*; not deployed, and off until the build names a licence server | Approval to deploy `licence-server/` at `pos.chachisoftware.store` (DNS is done), a Google OAuth web client, a Play Console subscription and service account; Play Billing in the Android app |
+| [TASK-048](TASK-048-google-sign-in-and-subscription.md) | Google sign-in and a subscription checked online once a month | Built, `aaacc82`; licence server live at `pos.chachisoftware.store` (Docker); off in the POS until the build names it | The build naming the server (Google sign-in is configured); a Play Console subscription and service account; Play Billing in the Android app |
 | [TASK-049](TASK-049-android-app.md) | An Android build the client compiles themselves | Built, *this commit*; not yet run on a tablet | The first install on the store's tablet |
 | [TASK-050](TASK-050-lucide-icons.md) | Lucide icons, vendored, beside the words they illustrate | Closed, `c6cd9b4` | — |
 | [TASK-051](TASK-051-responsive-layout.md) | Every screen fits a phone, a tablet and a desktop | Built | Use on the client's phone |

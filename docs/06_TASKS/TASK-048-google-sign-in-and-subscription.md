@@ -1,7 +1,7 @@
 # TASK-048 — Google sign-in and a subscription checked online once a month
 
 **Priority:** **P2**, a commercial decision rather than a store's need · **Blocks release:**
-no · **Decided:** `L-1`–`L-6` (client, 2026-09-14) · **Status:** built, not deployed ·
+no · **Decided:** `L-1`–`L-6` (client, 2026-09-14) · **Status:** built; the licence server is deployed ·
 **Going live waits on:** the prerequisites the owner provides (below) · **Rules:**
 `LIC-001`–`LIC-004` · **Requirement:** amends `NFR_3.1`, `TC-E2E-08`
 
@@ -125,21 +125,23 @@ id and the renewal secret. **No customer, sale or stock data**, so `SEC-10` hold
 | Needed | Why | State |
 | :--- | :--- | :--- |
 | DNS for `pos.chachisoftware.store` | The licence server and the admin page answer there | **Done** — it resolves to this server |
-| Approval to deploy on this server: a pm2 process, an nginx site, a Certbot certificate, and an admin password | Outward-facing; `licence-server/README.md` has the exact steps | Waiting |
-| A Google Cloud **OAuth client of type Web application**, redirect URI `https://pos.chachisoftware.store/auth/google/callback` | Google sign-in on `/link`. One client serves Windows and Android, because the sign-in happens in a browser | Waiting |
+| Deploying on this server | The licence server and the admin page | **Done** 2026-09-14 — Docker Compose project `chachi-licence` behind the host's nginx, HTTPS by Certbot (`licence-server/README.md`) |
+| A Google Cloud **OAuth client of type Web application**, redirect URI `https://pos.chachisoftware.store/auth/google/callback` | Google sign-in on `/link`. One client serves Windows and Android, because the sign-in happens in a browser | **Done** 2026-09-14 — on the server, in `.env.production`; Google accepts the client and the redirect |
 | A **Play Console** subscription product (`pos_monthly` unless named otherwise) and a service account with the Play Developer API | Play purchases verified with Google, never by trusting the phone | Waiting |
 | The trial length | A new store's first days; 14 until the owner says otherwise (`TRIAL_DAYS`) | To confirm |
 
 Google Play's policy requires Play Billing for a digital subscription bought inside an app
 installed from Play. Manual payment is for stores on Windows or a sideloaded APK.
 
-**Status — 2026-09-14:** **built and tested, not deployed.** The licence server, the POS client,
-`LIC-001`–`LIC-004` and `SCR-707` are in; the Android APK builds with the new bridge.
-**Remaining:**
+**Status — 2026-09-14:** **built, tested, and the licence server is live** at
+`https://pos.chachisoftware.store` (Docker, behind nginx; the admin page signs in). The POS
+builds do not use it yet. **Remaining:**
 
-1. Deploy the licence server here, then fill `PRODUCTION_SERVER` and `PRODUCTION_PUBLIC_KEY`
-   in one commit — licensing starts with the builds from that commit.
-2. The Google OAuth client credentials on the server.
+1. Fill `PRODUCTION_SERVER` (`https://pos.chachisoftware.store`) and `PRODUCTION_PUBLIC_KEY`
+   (from `/api/v1/public-key`) in one commit — licensing starts with the builds from that
+   commit. Google sign-in is configured, so a POS from that build can be linked.
+2. If the Google consent screen is still in *Testing*, publish it, or only its listed test
+   users can sign in on `/link`.
 3. **Play Billing in the Android app** (the Play Billing library, a *Subscribe* button on
    `SCR-707`, posting the purchase token to `/api/v1/play/purchase`) — the server side is
    built; the app side needs the Play Console product first.

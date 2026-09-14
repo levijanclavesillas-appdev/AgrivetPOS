@@ -1,0 +1,25 @@
+# Chachi POS licence server — `docker compose up -d --build` in this folder.
+# Secrets are in .env.production (chmod 600, never committed); see README.md.
+
+name: chachi-licence
+
+services:
+  licence:
+    build: .
+    image: chachi-licence:latest
+    container_name: chachi-licence
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8790
+      LICENCE_DATA_DIR: /data
+    ports:
+      - "127.0.0.1:8790:8790"
+    volumes:
+      # The database and the Ed25519 signing key. Back this folder up: losing the key
+      # means every POS has to be rebuilt with a new one.
+      - /var/lib/chachi-licence:/data
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

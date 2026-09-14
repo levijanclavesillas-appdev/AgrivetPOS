@@ -28,7 +28,7 @@ checks offline. The POS works for 30 days between checks, plus 7 days' grace.
 
 | Variable | Default | |
 | :--- | :--- | :--- |
-| `PORT` | `8790` | Listens on `127.0.0.1` only; nginx is in front |
+| `HOST`, `PORT` | `127.0.0.1`, `8790` | The container sets `HOST=0.0.0.0` and publishes the port on the host's loopback only |
 | `BASE_URL` | `http://127.0.0.1:8790` | `https://pos.chachisoftware.store` in production |
 | `BEHIND_PROXY` | — | `1` behind nginx |
 | `LICENCE_DATA_DIR` | `./data` | The database **and the signing key**. Back it up; losing the key means rebuilding every POS |
@@ -45,44 +45,35 @@ Nothing else waits on them.
 
 ## Deploying on this server
 
-This host runs its Node apps under **pm2**, behind **nginx** with **Certbot**. DNS for
-`pos.chachisoftware.store` already points here.
+**Deployed 2026-09-14** as the Docker Compose project `chachi-licence`, like the other apps on
+this host: the container publishes `127.0.0.1:8790` only, and the host's nginx terminates HTTPS
+(Certbot) for `pos.chachisoftware.store` and proxies to it.
 
-Node 20.6 or later (for `--env-file`); this host has 20.20.
+| What | Where |
+| :--- | :--- |
+| Container | `chachi-licence` (`docker compose` in this folder; `restart: unless-stopped`, health-checked) |
+| Secrets | `licence-server/.env.production`, mode 600, git-ignored |
+| Admin password (plain text, for the owner) | `/root/.config/chachi-licence/admin-password`, mode 600 |
+| Database and signing key — **back this up** | `/var/lib/chachi-licence` (owned by uid 1000, the container's `node` user) |
+| nginx site | `/etc/nginx/sites-available/pos.chachisoftware.store.conf`, certificate by Certbot |
 
 ```sh
-cd /root/AdWebsite/AgrivetPOS/licence-server && npm ci --omit=dev
-cat > .env.production <<'ENV'      # chmod 600; never committed
-PORT=8790
-BASE_URL=https://pos.chachisoftware.store
-BEHIND_PROXY=1
-LICENCE_DATA_DIR=/var/lib/chachi-licence
-GOOGLE_CLIENT_ID=…
-GOOGLE_CLIENT_SECRET=…
-ADMIN_PASSWORD_HASH=…
-ENV
-pm2 start src/server.js --name chachi-licence --node-args="--env-file=.env.production" && pm2 save
+cd /root/AdWebsite/AgrivetPOS/licence-server
+docker compose up -d --build          # after a code change, or after editing .env.production
+docker compose logs -f                # the first line says what is configured
+node src/tools/hash-password.js       # a new admin password's hash, for ADMIN_PASSWORD_HASH
 ```
 
-nginx site `/etc/nginx/sites-available/pos.chachisoftware.store.conf`, then
-`certbot --nginx -d pos.chachisoftware.store`:
+In `.env.production`, quote the bcrypt hash in single quotes, or Compose reads its `$` signs as
+variables. A Play service-account file goes in `/var/lib/chachi-licence/` and is named as
+`PLAY_SERVICE_ACCOUNT_FILE=/data/<file>.json`.
 
-```nginx
-server {
-    server_name pos.chachisoftware.store;
-    client_max_body_size 64k;
-    location / {
-        proxy_pass http://127.0.0.1:8790;
-        proxy_set_header Host              $host;
-        proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    listen 80;
-}
-```
+For a first install elsewhere: create the data folder owned by uid 1000, write
+`.env.production`, `docker compose up -d --build`, then add an nginx site (a copy of this host's
+`pos.chachisoftware.store.conf` without its Certbot lines) and run `certbot --nginx -d <host>`.
 
-**Going live with the POS.** Once the server is up, put its address and the output of
+**Going live with the POS.** Once Google sign-in is configured (before that, no POS can be
+linked, so none could open a shift), put the server's address and the output of
 `GET /api/v1/public-key` into `src/config/licence.js` (`PRODUCTION_SERVER`,
 `PRODUCTION_PUBLIC_KEY`) in one commit. Builds from that commit enforce the subscription. The
 test suite does not: it runs with `AGRIVET_LICENSING=off`.

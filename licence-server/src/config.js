@@ -10,6 +10,8 @@ function fromEnv(env = process.env) {
   const dataDir = env.LICENCE_DATA_DIR || path.join(__dirname, '..', 'data');
   return {
     port: Number(env.PORT) || 8790,
+    // Loopback only, unless in a container whose port is published on the host's loopback.
+    host: env.HOST || '127.0.0.1',
     // Where the server is reached from outside: links in pages and the Google redirect.
     baseUrl: (env.BASE_URL || 'http://127.0.0.1:8790').replace(/\/$/, ''),
     dataDir,
