@@ -159,7 +159,7 @@ export function createAudit({ root }) {
   }
 
   function table() {
-    return h('table', { class: 'catalogue-list audit-list' }, [
+    return h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list audit-list' }, [
       h('thead', {}, [h('tr', {}, [
         h('th', { text: 'When' }), h('th', { text: 'Who' }), h('th', { text: 'What' }),
         h('th', { text: 'On' }), h('th', { text: 'Why' }), h('th', { text: '' }),
@@ -190,7 +190,7 @@ export function createAudit({ root }) {
         ]),
         expanded.has(row.id) ? detail(row) : null,
       ])),
-    ]);
+    ])]);
   }
 
   const short = (id) => (id.length > 12 ? `${id.slice(0, 8)}…` : id);

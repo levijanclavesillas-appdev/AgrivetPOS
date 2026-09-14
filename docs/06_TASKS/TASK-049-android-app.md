@@ -96,6 +96,23 @@ asset, because Android's asset packager drops the dot-files and `_`-directories 
 Pairing, revocation, and refusal of unpaired LAN clients (integration); the renderer at 390 px
 and 800 px widths (browser smoke); a sale from the device reconciles on the PC.
 
+## The first run on a phone, and what it found
+
+The client installed the build on a phone. Two things came back.
+
+**A red error straight after sign-in.** nodejs-mobile's Node is built **without ICU data**: no
+time-zone database and no collation, which the build machine's Node has. `config/clock.js` asked
+`Intl.DateTimeFormat` for `Asia/Manila`, which throws `RangeError: Invalid time zone specified`
+there. Signing in formats no date, but the dashboard does, on its first request. Manila time is
+now arithmetic, since Philippine time has been a constant UTC+8 since 1990. The one server
+`localeCompare` (sales analysis) is a plain comparison. `no-icu.test.js` holds the arithmetic to
+Intl's answer on 20,000 instants, runs it in a Node whose Intl knows no time zones, and fails if
+any server file uses `Intl`, `localeCompare` or `toLocale…` again. The whole integration and e2e
+suite also passes with time zones and collation disabled, as on the phone. The old clock, under
+the same conditions, throws exactly the phone's error.
+
+**The screens did not fit a phone**, and the app was locked to landscape. `TASK-051`.
+
 ## What was verified, and what was not
 
 - **Built**: `./gradlew assembleDebug` succeeds from a clean checkout on a Linux build machine,

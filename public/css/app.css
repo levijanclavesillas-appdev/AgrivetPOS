@@ -113,6 +113,13 @@ dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--md-on-surface);
 }
 @media (max-width: 34rem) {
   .field-grid { grid-template-columns: 1fr; }
+  /* On a phone the rail is a header above the step: it says where you are, and the
+     step starts on the first screen rather than half-way down it. */
+  .wizard-rail { padding: var(--space-4); gap: var(--space-1); }
+  .wizard-rail h1 { margin-top: var(--space-2); }
+  .steps { margin-top: var(--space-2); }
+  .steps li { min-height: 2.25rem; }
+  .wizard-body { padding: var(--space-4) var(--space-4) 0; }
 }
 
 /* ── The opening load panel — SCR-706 and SCR-001 step 6 (TASK-047) ─────────

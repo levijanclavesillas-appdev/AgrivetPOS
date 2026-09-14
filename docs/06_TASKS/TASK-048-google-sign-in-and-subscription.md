@@ -1,8 +1,8 @@
 # TASK-048 — Google sign-in and a subscription checked online once a month
 
 **Priority:** **P2**, a commercial decision rather than a store's need · **Blocks release:**
-no · **Blocked by:** decisions `L-3`–`L-6` below, a licence server that does not exist yet, and
-a Google Cloud OAuth client · **Requirement:** amends `NFR_3.1`, `SEC-8`, `SEC-10`, `TC-E2E-08`
+no · **Decided:** `L-1`–`L-6` (client, 2026-09-14) · **Blocked by:** the prerequisites the
+owner provides (below) · **Requirement:** amends `NFR_3.1`, `SEC-8`, `SEC-10`, `TC-E2E-08`
 
 ---
 
@@ -61,15 +61,23 @@ with no internet, must still be able to open a shift.
 | `L-1` | Does only the **owner** sign in with Google, or every user? | **Owner only** (client, 2026-09-14). Google activates and renews the store's subscription; every user, the owner included, still signs in to the till with their local username, password or PIN |
 | `L-2` | What does a **lapsed** licence do? | **Read-only from the next shift open** (client, 2026-09-14). A sale in progress and a shift already open are never interrupted. From the next shift open: reports, export, backup and restore still work, and no new sale, return or collection can be recorded |
 
-Still to decide:
+| `L-3` | Grace period after 30 days offline | **7 days**, warned daily from day 23. Read-only from the next shift open after day 37 |
+| `L-4` | How is the subscription paid? | **Google Play Store subscriptions** (Android, Play Billing) **and manual payment** (GCash, bank transfer), marked paid on an **admin page at `pos.chachisoftware.store`** |
+| `L-5` | Where does the licence server run? | **On this server**, served at `pos.chachisoftware.store` |
+| `L-6` | One licence per machine or per store? | **Per store.** A reinstall or a replacement device re-activates under the same subscription |
 
-| # | Question | Why it matters |
-| :-: | :--- | :--- |
-| `L-3` | Grace period after 30 days offline | Recommended: 7 days, warned daily |
-| `L-4` | How is the subscription **paid**: PayMongo, Xendit, GCash manual, bank transfer? | Decides what the licence server integrates with, and who marks a store paid |
-| `L-5` | Where is the licence server hosted, and who runs it? | It is a second product with its own uptime, backups and security |
-| `L-6` | One licence per **machine** or per **store**? | Decides whether a reinstall or a second till needs a new activation |
+## What the owner provides before the build can finish
 
+| Needed | Why |
+| :--- | :--- |
+| DNS for `pos.chachisoftware.store` pointing at this server, and approval to add its HTTPS site | The licence server and the admin page answer there |
+| A Google Cloud project with an **OAuth client** (Desktop, and Android with the app's signing SHA-1) | Google sign-in on Windows (loopback + PKCE) and in the Android app |
+| A **Play Console** listing for the Android app with a **subscription product**, and a **service account** with access to the Play Developer API | The licence server verifies Play purchases and renewals with Google, never by trusting the phone |
+| The Ed25519 signing key is generated on the server and never leaves it | Licences are verified offline with the public key compiled into the app |
+
+Google Play's policy requires Play Billing for a digital subscription bought inside an app
+installed from Play. Manual payment is for stores on Windows or a sideloaded APK, and is
+marked on the admin page.
 ## Requirements (once decided)
 
 1. `NFR_3.1` is amended to: every core operation works with no internet **for the licence's
@@ -85,5 +93,5 @@ Licence verification (valid, expired, tampered, wrong key, clock rolled back); t
 OAuth flow against a stub; lapse at shift open but not mid-shift; `TC-E2E-08` rewritten to
 allow only the named endpoints.
 
-**Status — 2026-09-14:** **not started.** `L-1` and `L-2` are answered; `L-3`–`L-6` and the
-licence server are what stand between this and code.
+**Status — 2026-09-14:** **not started; every decision is made.** What stands between this and
+code is the owner's prerequisites above.

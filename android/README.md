@@ -67,8 +67,9 @@ and build with `./gradlew assembleRelease`. The APK is
   ESC/POS's raw port. A USB printer on the PC's print share is a Windows arrangement and does
   not exist on a tablet. Bluetooth printers are not supported yet.
 - **Barcode scanner**: any USB or Bluetooth scanner in keyboard mode works, as on the PC.
-- **Screen**: designed for a 10-inch tablet in landscape (1280×800 and up). Phones are not
-  supported.
+- **Screen**: phones and tablets, in either orientation (`TASK-051`). On a phone the menu is
+  behind the ☰ button at the top; on a tablet it is the icon rail down the side. The POS
+  puts the cart on top and the total and **PAY** under it when the screen is narrow.
 
 ## How it fits together
 

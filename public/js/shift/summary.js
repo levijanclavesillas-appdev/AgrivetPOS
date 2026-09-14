@@ -42,7 +42,7 @@ export function createShiftSummary({ root, result, onDone }) {
         ? h('p', { class: 'close-reason', text: `Recorded reason: “${result.variance_reason}”` })
         : null,
 
-      h('table', { class: 'shift-close' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'shift-close' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'Method' }), h('th', { text: 'Expected' }),
           h('th', { text: 'Counted' }), h('th', { text: 'Variance' }),
@@ -61,7 +61,7 @@ export function createShiftSummary({ root, result, onDone }) {
             text: line.reconcilable ? money(line.variance_centavos) : '—',
           }),
         ]))),
-      ]),
+      ])]),
 
       h('p', { class: 'muted', text: `Closed ${manila(result.shift.closed_at || result.shift.opened_at)}. `
         + 'A closed shift cannot be changed (POS-511).' }),

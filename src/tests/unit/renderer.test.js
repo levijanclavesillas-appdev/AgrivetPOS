@@ -512,9 +512,18 @@ test('the POS keeps the cart and the rail visible without scrolling the page', (
   assert.match(cssRule(css, '.screen'), /overflow-y:\s*auto/);
   assert.match(cssRule(css, '.screen'), /overflow-x:\s*hidden/, 'and never sideways (§4)');
 
-  // §8: below 1024 px the rail collapses to icons rather than disappearing.
-  assert.match(css, /@media \(max-width: 1023px\)/);
-  assert.match(css.split('@media (max-width: 1023px)')[1], /\.rail-label[^}]*display:\s*none/);
+  // §8's three window sizes. From 600 to 1023 px the rail collapses to icons rather than
+  // disappearing; below 600 px — a phone — it is a drawer the top app bar opens, so it
+  // slides away rather than being removed, and nothing becomes unreachable.
+  const medium = css.split('@media (min-width: 600px) and (max-width: 1023px)')[1];
+  assert.ok(medium, 'a medium window size');
+  assert.match(medium, /\.rail-label[^}]*display:\s*none/);
+  const compact = css.split('@media (max-width: 599px)')[1];
+  assert.ok(compact, 'a compact window size');
+  assert.match(compact, /\.appbar\s*\{[^}]*display:\s*flex/);
+  assert.match(compact, /\.rail\s*\{[^}]*position:\s*fixed[^}]*transform:\s*translateX\(-105%\)/);
+  assert.match(compact, /\.shell\.nav-open \.rail\s*\{\s*transform:\s*none/);
+  assert.equal(/\.rail[^{]*\{[^}]*display:\s*none/.test(compact), false, 'the rail is never removed');
 });
 
 test('there is no offline indicator anywhere in the renderer', () => {

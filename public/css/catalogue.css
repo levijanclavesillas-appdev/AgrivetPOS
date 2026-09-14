@@ -86,7 +86,10 @@
 
 @media (max-width: 1023px) {
   .catalogue-controls { flex-direction: column; align-items: stretch; }
+  /* In a column the 22rem basis above would be a height: the search box grew 350 px tall. */
+  .catalogue-search { flex: none; }
   .editor-form { max-width: none; }
+  .editor-form.two-column { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── SCR-206 the batch list (TASK-043) ───────────────────────────────────── */

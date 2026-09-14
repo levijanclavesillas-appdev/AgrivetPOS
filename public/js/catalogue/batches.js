@@ -118,7 +118,7 @@ export function createBatchList({ root, productId, session, onClose, onRecall = 
   }
 
   function table() {
-    return h('table', { class: 'catalogue-list batch-list' }, [
+    return h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list batch-list' }, [
       h('thead', {}, [h('tr', {}, [
         h('th', { text: 'Batch' }), h('th', { text: 'Supplier' }), h('th', { text: 'Expires' }),
         h('th', { text: 'Status' }), h('th', { text: 'Held' }), h('th', { text: '' }),
@@ -157,7 +157,7 @@ export function createBatchList({ root, productId, session, onClose, onRecall = 
           writeOff(batch),
         ]),
       ]))),
-    ]);
+    ])]);
   }
 
   /** INV-205's one exit, offered only where there is something to write off. */

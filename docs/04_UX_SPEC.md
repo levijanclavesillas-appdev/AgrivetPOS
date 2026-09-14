@@ -765,7 +765,15 @@ no modal is open.
 - **1366×768 minimum**, designed at that width. **The shell is exactly the viewport and clips; one
   element scrolls — the screen pane** — so the rail, the screen header and the tab strip never
   scroll away from the content they belong to. The POS keeps the cart and totals visible without
-  scrolling at that size. Below 1024 px the drawer collapses to M3's navigation rail — icons only.
+  scrolling at that size.
+- **Three window sizes, M3's** (`TASK-051`). *Expanded*, 1024 px and up: the labelled drawer.
+  *Medium*, 600–1023 px: the drawer collapses to M3's navigation rail — icons only, each named.
+  *Compact*, under 600 px — a phone: a top app bar names the section, and its ☰ opens the same
+  navigation as a drawer over the screen, so the screen has the whole width. Under 900 px the
+  POS stacks: the cart on top, and under it the total and **PAY** first. Every list table sits in
+  a `.table-scroll` and scrolls sideways inside itself; on a phone its rows stay one line. On a
+  touch screen the F-key hints are hidden. The document never scrolls sideways at any size, from
+  360 px up — measured on eighteen screens at six sizes.
 - **The document never scrolls, in either direction, on any screen.** Five of them did before the
   Material 3 pass: `SCR-702` at 6,941 px — nine viewports of settings in one column, with the tab
   strip somewhere above the fold — then `SCR-705`, `SCR-703`, `SCR-706` and `SCR-602`. The browser

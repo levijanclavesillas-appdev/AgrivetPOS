@@ -86,7 +86,7 @@ export function createReceiptList({ root, onOpenSale, onBack = null }) {
   }
 
   function table() {
-    return h('table', { class: 'catalogue-list receipt-list' }, [
+    return h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list receipt-list' }, [
       h('thead', {}, [h('tr', {}, [
         h('th', { text: 'Receipt' }), h('th', { text: 'Time' }),
         h('th', { text: 'Customer' }), h('th', { class: 'money', text: 'Total' }),
@@ -111,7 +111,7 @@ export function createReceiptList({ root, onOpenSale, onBack = null }) {
         h('td', { text: sale.customer_name || 'Walk-in' }),
         h('td', { class: 'money', text: money(sale.total_centavos) }),
       ]))),
-    ]);
+    ])]);
   }
 
   return {

@@ -108,7 +108,7 @@ export function createCustomerList({ root, onOpen, onCollect }) {
   }
 
   function table(data) {
-    return h('table', { class: 'catalogue-list customer-list' }, [
+    return h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list customer-list' }, [
       h('thead', {}, [h('tr', {}, [
         h('th', { text: 'Name' }), h('th', { text: 'Code' }), h('th', { text: 'Type' }),
         h('th', { text: 'Price level' }), h('th', { text: 'Balance' }),
@@ -146,7 +146,7 @@ export function createCustomerList({ root, onOpen, onCollect }) {
             : null,
         ]),
       ]))),
-    ]);
+    ])]);
   }
 
   /** CR-107, in the error colour with the day count. */

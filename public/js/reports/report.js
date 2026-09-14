@@ -144,7 +144,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
     const r = data.reconciliation;
 
     return h('div', { class: 'report-body' }, [
-      h('table', { class: 'totals' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'totals' }, [
         h('tbody', {}, [
           row('Gross', t.gross_centavos),
           row('Line discounts', -t.line_discount_centavos),
@@ -158,7 +158,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
           row('Change given', -t.change_centavos),
           h('tr', {}, [h('th', { text: 'Transactions' }), h('td', { text: String(t.sale_count) })]),
         ]),
-      ]),
+      ])]),
 
       // FR_6.2: the reconciliation is printed, not merely checked.
       h('div', { class: `reconciliation ${r.reconciles ? 'balances' : 'does-not-balance'}` }, [
@@ -187,7 +187,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
 
       data.lines.length === 0
         ? h('p', { class: 'muted', text: 'Nothing was sold in this range.' })
-        : h('table', { class: 'lines' }, [
+        : h('div', { class: 'table-scroll' }, [h('table', { class: 'lines' }, [
           h('thead', {}, [h('tr', {}, [
             h('th', { text: 'Product' }), h('th', { text: 'Quantity' }),
             h('th', { text: 'Revenue' }), h('th', { text: 'Cost' }), h('th', { text: 'Gross profit' }),
@@ -199,7 +199,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
             h('td', { class: 'money', text: money(line.cost_centavos) }),
             h('td', { class: 'money', text: money(line.gross_profit_centavos) }),
           ]))),
-        ]),
+        ])]),
 
       voidsBlock(data.sales),
     ]);
@@ -231,7 +231,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
     }
 
     return h('div', {}, [
-      h('table', { class: 'methods' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'methods' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'Method' }), h('th', { text: 'Status' }), h('th', { text: 'Sales' }),
           h('th', { text: 'Tenders' }), h('th', { text: 'Tendered' }),
@@ -256,7 +256,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
           h('td', { class: 'money', text: money(data.total_centavos) }),
           h('td', { text: '100.0%' }),
         ])]),
-      ]),
+      ])]),
       // Why there are two columns and not one: the tendered figure is what crossed the
       // counter, the net is what stayed in the drawer, and only the second reconciles
       // to the daily report (RPT-101).
@@ -273,7 +273,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
         h('span', { class: 'money', text: money(data.total_value_centavos) }),
         h('span', { class: 'muted', text: ` across ${data.product_count} products` }),
       ]),
-      h('table', { class: 'valuation' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'valuation' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'SKU' }), h('th', { text: 'Product' }), h('th', { text: 'On hand' }),
           h('th', { text: 'Average cost' }), h('th', { text: 'Value' }),
@@ -285,7 +285,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
           h('td', { class: 'money', text: money(p.avg_cost_centavos) }),
           h('td', { class: 'money', text: money(p.value_centavos) }),
         ]))),
-      ]),
+      ])]),
     ]);
   }
 

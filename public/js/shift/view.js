@@ -144,7 +144,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
 
       // POS-509's terms, one per row. A single "expected" figure is a number to be
       // believed; the terms are arithmetic somebody can check against the drawer.
-      h('table', { class: 'shift-expected' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'shift-expected' }, [
         h('tbody', {}, [
           row('Opening float', e.opening_float_centavos),
           row('Cash sales', e.cash_sales_centavos),
@@ -158,10 +158,10 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
             h('td', { class: 'money', text: money(e.expected_cash_centavos) }),
           ]),
         ]),
-      ]),
+      ])]),
 
       h('h2', { text: 'Taken today, by method' }),
-      h('table', { class: 'shift-methods' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'shift-methods' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'Method' }), h('th', { text: 'Sales' }),
           h('th', { text: 'Collections' }), h('th', { text: 'Total' }),
@@ -172,7 +172,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
           h('td', { class: 'money', text: money(m.collections_centavos) }),
           h('td', { class: 'money', text: money(m.expected_centavos) }),
         ]))),
-      ]),
+      ])]),
     ]));
   }
 
@@ -268,13 +268,13 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
       h('p', { class: 'muted', text: 'Count each one and type what you actually have. '
         + 'Nothing is filled in for you — a figure the system typed is not a count.' }),
 
-      h('table', { class: 'shift-close' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'shift-close' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'Method' }), h('th', { text: 'Expected' }),
           h('th', { text: 'Counted' }), h('th', { text: 'Variance' }),
         ])]),
         h('tbody', {}, Object.values(e.by_method).map((m) => closeRow(m, e))),
-      ]),
+      ])]),
 
       h('div', { class: 'editor-field' }, [
         h('label', { text: 'Reason for the variance' }),

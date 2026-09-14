@@ -54,14 +54,14 @@ export function createHealth({ root, session }) {
 
       // 3 — the row counts, last because they are the longest and the least urgent.
       h('h2', { text: 'Rows' }),
-      h('table', { class: 'row-counts' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'row-counts' }, [
         h('tbody', {}, Object.entries(data.database.row_counts)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([table, count]) => h('tr', {}, [
             h('td', { text: table }),
             h('td', { class: 'money', text: String(count) }),
           ]))),
-      ]),
+      ])]),
 
       h('h2', { text: 'Storage settings' }),
       h('dl', { class: 'admin-meta' }, Object.entries(data.database.pragmas).map(

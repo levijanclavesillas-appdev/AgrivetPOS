@@ -98,7 +98,36 @@ export function createApp({ root }) {
   // the first thing a support call needs and the last thing anyone can find.
   let installation = { store_name: null, app_version: null };
   const main = h('main', { class: 'screen' });
-  const railHost = h('nav', { class: 'rail', 'aria-label': 'Sections' });
+  const railHost = h('nav', { class: 'rail', id: 'rail', 'aria-label': 'Sections' });
+
+  // On a phone (under 600 px, 04_UX_SPEC.md §8) the rail is a drawer that slides over the
+  // screen, and a top bar says where you are and opens it. On anything wider both are
+  // hidden by the stylesheet and the rail is the rail. One set of elements either way,
+  // so there is one navigation to keep right, not two.
+  const appbarTitle = h('span', { class: 'appbar-title' });
+  const menuButton = h('button', {
+    class: 'appbar-menu', icon: 'menu', 'aria-label': 'Open navigation',
+    'aria-controls': 'rail', 'aria-expanded': 'false',
+    onclick: () => setNavigation(true),
+  });
+  const appbar = h('header', { class: 'appbar' }, [menuButton, appbarTitle]);
+  const scrim = h('div', { class: 'nav-scrim', 'aria-hidden': 'true', onclick: () => setNavigation(false) });
+  const shellEl = h('div', { class: 'shell' }, [appbar, railHost, scrim, main]);
+
+  function setNavigation(open) {
+    const wasOpen = shellEl.classList.contains('nav-open');
+    shellEl.classList.toggle('nav-open', open);
+    menuButton.setAttribute('aria-expanded', String(open));
+    if (open) {
+      const active = railHost.querySelector('.rail-item.is-active') || railHost.querySelector('.rail-item');
+      if (active) active.focus();
+    } else if (wasOpen) {
+      menuButton.focus();
+    }
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && shellEl.classList.contains('nav-open')) setNavigation(false);
+  });
 
   // What the shell last learned about this user's shift (POS-501). Null until the POS
   // has been opened once — unknown is not the same as closed, and a lock screen that
@@ -763,7 +792,7 @@ export function createApp({ root }) {
           'aria-label': item.label,
           title: item.label,
           icon: item.icon,
-          onclick: () => show(item.id),
+          onclick: () => { setNavigation(false); show(item.id); },
         }, [h('span', { class: 'rail-label', text: item.label })])),
       h('div', { class: 'rail-spacer' }),
       h('button', {
@@ -771,13 +800,16 @@ export function createApp({ root }) {
         'aria-label': `${session.username} — lock or change user`,
         title: session.username,
         icon: 'circle-user-round',
-        onclick: () => (session.has_pin ? lock({ username: session.username }) : signIn()),
+        onclick: () => { setNavigation(false); return session.has_pin ? lock({ username: session.username }) : signIn(); },
       }, [h('span', { class: 'rail-label', text: session.username })])
     );
+    const active = RAIL.find((item) => item.id === activeId);
+    appbarTitle.textContent = active ? active.label : 'Chachi Pharmacy';
   }
 
   function start() {
-    clear(root).append(h('div', { class: 'shell' }, [railHost, main]));
+    setNavigation(false);
+    clear(root).append(shellEl);
     show(LANDING[session.role] || 'pos');
   }
 

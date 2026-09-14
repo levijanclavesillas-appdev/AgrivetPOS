@@ -66,7 +66,7 @@ export function createUsers({ root }) {
 
       users.length === 0
         ? h('p', { class: 'muted', text: 'No users yet.' })
-        : h('table', { class: 'catalogue-list users-list' }, [
+        : h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list users-list' }, [
           h('thead', {}, [h('tr', {}, [
             h('th', { text: 'Username' }), h('th', { text: 'Name' }), h('th', { text: 'Role' }),
             h('th', { text: 'PIN' }), h('th', { text: 'Status' }), h('th', { text: '' }),
@@ -89,7 +89,7 @@ export function createUsers({ root }) {
               ? h('tr', {}, [h('td', { colspan: '6' }, [form(user)])])
               : null,
           ])),
-        ]),
+        ])]),
     ]));
   }
 

@@ -211,7 +211,7 @@ export function createPos({ root, session, onPay }) {
     // the Pay button, on the one screen this product is for. The payment screen already
     // filters for the same reason; this call site did not.
     clear(railHost).append(...[
-      h('div', { class: 'rail-block' }, [
+      h('div', { class: 'rail-block rail-customer-block' }, [
         h('h2', { text: 'Customer' }),
         h('p', { class: 'rail-customer', text: customer ? customer.name : 'Walk-in' }),
         h('button', { class: 'rail-action', text: 'Change  F2', onclick: () => chooseCustomer() }),
@@ -244,7 +244,7 @@ export function createPos({ root, session, onPay }) {
         h('hr'),
         row('TOTAL', priced ? money(priced.total_centavos) : money(0), 'total'),
       ]),
-      h('div', { class: 'rail-block' }, [
+      h('div', { class: 'rail-block rail-pay' }, [
         h('button', {
           class: 'primary pay', text: 'PAY  F9',
           disabled: cart.isEmpty || !priced || priced.requires_authorisation,

@@ -189,7 +189,7 @@ export function createProductList({
   }
 
   function table(data) {
-    return h('table', { class: 'catalogue-list' }, [
+    return h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
       h('thead', {}, [h('tr', {}, [
         // 04_UX_SPEC.md §3's columns, with brand beside the name it qualifies: a shelf
         // holds four makes of the same feed, and the name alone does not say which.
@@ -251,7 +251,7 @@ export function createProductList({
             : null,
         ]),
       ]))),
-    ]);
+    ])]);
   }
 
   function pager(data) {

@@ -101,7 +101,7 @@ export function createBackup({ root, session }) {
       return ui.empty(h('div', {}), { title: 'No backup has been taken yet.' });
     }
 
-    return h('table', { class: 'backup-list' }, [
+    return h('div', { class: 'table-scroll' }, [h('table', { class: 'backup-list' }, [
       h('thead', {}, [h('tr', {}, [
         h('th', { text: 'Taken' }), h('th', { text: 'Trigger' }), h('th', { text: 'Verified' }),
         h('th', { text: 'Size' }), h('th', { text: 'File' }), h('th', { text: '' }),
@@ -122,7 +122,7 @@ export function createBackup({ root, session }) {
           !b.on_disk && !b.pruned_at ? h('span', { class: 'muted', text: 'not in folder' }) : null,
         ]),
       ]))),
-    ]);
+    ])]);
   }
 
   async function runBackup() {

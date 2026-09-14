@@ -479,6 +479,24 @@ th.money, td.money { text-align: right; }
 
 .table-scroll { overflow: auto; border-radius: var(--shape-sm); }
 
+/* Every list table sits in a `.table-scroll`, so a table wider than its pane scrolls
+   sideways inside itself and the page never does (04_UX_SPEC.md §8). On a phone a list
+   keeps each row to one line rather than squeezing eight columns into single words, and
+   the first columns — the SKU, the name — are what shows. */
+@media (max-width: 599px) {
+  .table-scroll > table:has(> thead) th, .table-scroll > table:has(> thead) td { white-space: nowrap; }
+}
+
+/* A touch screen: no keyboard to press F9 on, and no mouse to drag a scrollbar with. The
+   key hints go (ui.js wraps them in `.key-hint`), and tab strips scroll by swiping. */
+@media (hover: none) and (pointer: coarse) {
+  .key-hint, .pos-help { display: none; }
+  .admin-tabs { scrollbar-width: none; }
+}
+@media (max-width: 599px) {
+  .admin-tabs { scrollbar-width: none; }
+}
+
 /* ── Dialogs (M3 basic dialog) ─────────────────────────────────────────── */
 
 .ask-overlay, .lock-overlay {

@@ -149,13 +149,66 @@
   background: var(--md-background);
 }
 
-/* Below 1024 px the drawer collapses to M3's navigation rail — icons only (§8). The
-   label is hidden rather than the item, so nothing becomes unreachable. */
-@media (max-width: 1023px) {
-  .shell { grid-template-columns: 4rem 1fr; }
+/* ── The three window sizes (04_UX_SPEC.md §8, M3's window size classes) ──────
+ *
+ *   expanded  ≥ 1024 px   the drawer above, labelled
+ *   medium    600–1023    M3's navigation rail — icons only. The label is hidden
+ *                         rather than the item, so nothing becomes unreachable.
+ *   compact   < 600 px    a phone: a top app bar, and the drawer slides over the
+ *                         screen from it, so the screen has the whole width
+ */
+.appbar, .nav-scrim { display: none; }
+
+@media (min-width: 600px) and (max-width: 1023px) {
+  .shell { grid-template-columns: 4rem minmax(0, 1fr); }
   .rail-label, .rail-brand { display: none; }
   .rail-item { gap: 0; }
   .rail-item { justify-content: center; padding: 0; }
+}
+
+@media (max-width: 599px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100vh; height: 100dvh;
+  }
+  /* M3's small top app bar, on the drawer's own surface so the two read as one piece. */
+  .appbar {
+    display: flex; align-items: center; gap: var(--space-1);
+    min-height: 3.5rem; padding: 0 var(--space-2);
+    background: var(--md-inverse-surface); color: var(--md-on-inverse-surface);
+  }
+  .appbar-menu {
+    min-width: var(--touch); padding: 0; border: 0; border-radius: var(--shape-full);
+    background: transparent; color: inherit;
+  }
+  .appbar-menu .icon { width: 1.5rem; height: 1.5rem; }
+  .appbar-title { font-size: var(--type-title-md-size); font-weight: 600; }
+
+  /* M3's modal navigation drawer: over the screen, with a scrim behind it. */
+  .rail {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 30;
+    width: min(20rem, 85vw);
+    transform: translateX(-105%);
+    transition: transform var(--motion-medium) var(--easing-standard);
+    box-shadow: var(--elev-3);
+  }
+  .shell.nav-open .rail { transform: none; }
+  .nav-scrim {
+    display: block; position: fixed; inset: 0; z-index: 29;
+    background: color-mix(in srgb, var(--md-inverse-surface) 45%, transparent);
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--motion-medium) var(--easing-standard);
+  }
+  .shell.nav-open .nav-scrim { opacity: 1; pointer-events: auto; }
+
+  /* The vertical padding stays --space-4: the sticky bars' offsets are measured from it. */
+  .screen { padding: var(--space-4) var(--space-3); }
+
+  /* On a phone the title row wraps onto two or three lines, so the bar under it cannot be
+     pinned at one row's height without sliding over them. The title row stays pinned;
+     the search or tab strip under it scrolls with the list. */
+  .catalogue-controls, .catalogue > .admin-tabs { position: static; }
 }
 
 /* ── SCR-301 ───────────────────────────────────────────────────────────── */
@@ -283,6 +336,32 @@
 .rail-row.total { font-size: var(--type-headline-size); line-height: var(--type-headline-line);
   font-weight: 700; color: var(--md-on-surface); }
 
+/* A narrow counter — a phone, or a tablet held upright — has no room for a 20 rem column
+   beside the cart. The cart takes the top and scrolls in itself; the totals sit under it
+   in a panel capped at half the height, and inside that panel the total and PAY come
+   first, because they are what the cashier is looking for. Anything waiting for an
+   authorisation comes before even those. */
+@media (max-width: 899px) {
+  .pos { display: flex; flex-direction: column; gap: var(--space-3); }
+  .pos-main { flex: 1 1 auto; min-height: 10rem; }
+  .pos-rail {
+    flex: 0 1 auto; max-height: 50%; gap: var(--space-3);
+    padding: var(--space-3) 0 0; border-left: 0; border-top: 1px solid var(--md-outline-variant);
+  }
+  .pos-rail .rail-authorisations { order: 0; }
+  .pos-rail .rail-totals { order: 1; }
+  .pos-rail .rail-pay { order: 2; display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-2); align-items: end; }
+  .pos-rail .rail-pay .rail-action { margin-top: 0; min-height: 3.5rem; }
+  .pos-rail .rail-customer-block { order: 3; }
+  .rail-row.total { font-size: var(--type-title-lg-size); }
+}
+@media (max-width: 599px) {
+  /* The pane under the top app bar, less its own padding. */
+  .pos { height: calc(100vh - 5.5rem); height: calc(100dvh - 5.5rem); }
+  /* The F-keys, on a device with no keyboard to press them on. */
+  .pos-help { display: none; }
+}
+
 /* The one action the screen exists for: M3's filled button, at the size a thumb finds
    without looking (NFR_4.3 is 44 px; this is 56). */
 .pay { width: 100%; min-height: 3.5rem; font-size: var(--type-body-lg-size); font-weight: 600; }
@@ -344,12 +423,12 @@
 .tender-method { min-width: 5rem; font-weight: 600; color: var(--md-on-surface); }
 .tender-amount, .tender-reference { min-height: var(--touch); }
 .tender-amount { width: 9rem; text-align: right; font-variant-numeric: tabular-nums; }
-.tender-reference { flex: 1; min-width: 12rem; }
+.tender-reference { flex: 1 1 12rem; min-width: 0; }
 /* POS-206: RECORDED on the screen, the receipt and the report alike. */
 .tender-status { font-size: var(--type-label-sm-size); letter-spacing: var(--tracking-overline);
   color: var(--md-on-surface-muted); }
 .tender-remove { min-width: var(--touch); min-height: var(--touch); padding: 0; }
-.tender-add { display: flex; gap: var(--space-2); margin: var(--space-3) 0; }
+.tender-add { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
 .tender-add-button { min-height: var(--touch); min-width: 5.5rem; }
 .duplicate-accept { display: flex; gap: var(--space-1); align-items: center; width: 100%;
   color: var(--md-on-warning-container); font-size: var(--type-body-sm-size); }

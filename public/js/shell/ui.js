@@ -5,6 +5,22 @@
 import { icon as iconOf } from './icons.js';
 
 /**
+ * "PAY  F9", "Complete  Enter": a label, two spaces, then the key that does the same
+ * thing. The key goes in its own span so a touch screen with no keyboard can hide it
+ * (tokens.css), and the element's text stays exactly what it was.
+ */
+const KEY_HINT = /^(.*\S)(\s{2,}(?:F\d{1,2}|Enter|Esc|Del|Tab))$/;
+const setText = (el, value) => {
+  const hinted = typeof value === 'string' ? KEY_HINT.exec(value) : null;
+  if (!hinted) { el.textContent = value; return; }
+  el.textContent = hinted[1];
+  const key = document.createElement('span');
+  key.className = 'key-hint';
+  key.textContent = hinted[2];
+  el.append(key);
+};
+
+/**
  * An element. `icon` puts a Lucide icon before the text, `iconEnd` after everything
  * (TASK-050) — so a button gains its icon with one attribute, and the icon is always
  * beside the words, never instead of them.
@@ -16,7 +32,7 @@ export const h = (tag, attrs = {}, children = []) => {
   for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined || value === false) continue;
     if (key === 'class') el.className = value;
-    else if (key === 'text') el.textContent = value;
+    else if (key === 'text') setText(el, value);
     else if (key === 'icon') lead = value;
     else if (key === 'iconEnd') trail = value;
     else if (key.startsWith('on')) el.addEventListener(key.slice(2).toLowerCase(), value);

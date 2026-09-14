@@ -387,7 +387,7 @@ export function createProductEditor({ root, productId, onClose }) {
 
       product.packs.length === 0
         ? h('p', { class: 'muted', text: 'No packs. The product is sold in its base unit only.' })
-        : h('table', { class: 'catalogue-list' }, [
+        : h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
           h('thead', {}, [h('tr', {}, [
             h('th', { text: 'Pack' }), h('th', { text: 'Is' }), h('th', { text: '' }),
           ])]),
@@ -402,7 +402,7 @@ export function createProductEditor({ root, productId, onClose }) {
               onclick: () => removePack(pack.id),
             })]),
           ]))),
-        ]),
+        ])]),
 
       h('form', {
         class: 'editor-form inline',
@@ -590,13 +590,13 @@ export function createProductEditor({ root, productId, onClose }) {
           }
         },
       }, [
-        h('table', { class: 'catalogue-list breaks-table' }, [
+        h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list breaks-table' }, [
           h('thead', {}, [h('tr', {}, [
             h('th', { text: `From (${product.base_unit.code})` }),
             h('th', { text: 'Price (₱)' }),
           ])]),
           body,
-        ]),
+        ])]),
         h('div', { class: 'editor-actions' }, [
           h('button', {
             type: 'button', text: 'Add a band',
@@ -666,7 +666,7 @@ export function createProductEditor({ root, productId, onClose }) {
     return h('div', {}, [
       product.barcodes.length === 0
         ? h('p', { class: 'muted', text: 'No barcodes. Scan the item into the box below.' })
-        : h('table', { class: 'catalogue-list' }, [
+        : h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
           h('tbody', {}, product.barcodes.map((barcode) => h('tr', {}, [
             h('td', { class: 'sku', text: barcode.barcode }),
             h('td', {}, [h('button', {
@@ -681,7 +681,7 @@ export function createProductEditor({ root, productId, onClose }) {
               },
             })]),
           ]))),
-        ]),
+        ])]),
 
       h('form', {
         class: 'editor-form inline',

@@ -318,7 +318,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
 
     return h('div', {}, [
       h('h2', { text: 'Unpaid invoices' }),
-      h('table', { class: 'catalogue-list' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'Document' }), h('th', { text: 'Due' }),
           h('th', { text: 'Outstanding' }), h('th', { text: '' }),
@@ -329,7 +329,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
           h('td', { class: 'money', text: money(sale.outstanding_centavos) }),
           h('td', { text: sale.is_overdue ? `${sale.days_overdue} days late` : '' }),
         ]))),
-      ]),
+      ])]),
       // CR-203, said before the payment rather than explained afterwards.
       h('p', { class: 'muted', text: 'A payment settles these oldest first (CR-203).' }),
     ]);
@@ -340,7 +340,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
 
     return h('div', {}, [
       h('h2', { text: 'Statement' }),
-      h('table', { class: 'catalogue-list statement' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list statement' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'When' }), h('th', { text: 'Document' }), h('th', { text: 'What' }),
           h('th', { text: 'Amount' }), h('th', { text: 'Balance after' }),
@@ -358,7 +358,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
           // CR-103: the running balance the ledger recorded, not one added up here.
           h('td', { class: 'money', text: money(row.balance_after_centavos) }),
         ]))),
-      ]),
+      ])]),
       statement.total > statement.rows.length
         ? h('p', { class: 'muted', text: `Showing the most recent ${statement.rows.length} of `
           + `${statement.total}.` })
@@ -371,7 +371,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
 
     return h('div', {}, [
       h('h2', { text: 'Payments received' }),
-      h('table', { class: 'catalogue-list' }, [
+      h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'When' }), h('th', { text: 'Document' }), h('th', { text: 'Method' }),
           h('th', { text: 'Amount' }), h('th', { text: 'Settled' }),
@@ -392,7 +392,7 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
               : row.allocations.map((a) => `${a.sale_document_no} ${money(a.amount_centavos)}`).join(', '),
           }),
         ]))),
-      ]),
+      ])]),
     ]);
   }
 
