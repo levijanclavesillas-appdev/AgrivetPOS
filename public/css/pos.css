@@ -200,6 +200,7 @@
 }
 .result-sku, .result-level, .parked-count { color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size); }
 .result-price, .result-credit { font-variant-numeric: tabular-nums; }
+.result-generic { display: block; color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size); }
 
 /* FR_3.1: an unknown barcode is never a silent no-op. */
 .attach-bar {

@@ -137,7 +137,7 @@ export function createProductList({
   function controls() {
     const search = h('input', {
       type: 'search', class: 'catalogue-search', value: query,
-      placeholder: 'Name, SKU, barcode or brand', 'aria-label': 'Search products',
+      placeholder: 'Name, generic, SKU, barcode or brand', 'aria-label': 'Search products',
       oninput: (event) => {
         query = event.target.value;
         offset = 0;
@@ -210,6 +210,7 @@ export function createProductList({
         h('td', {}, [
           h('span', { text: p.name }),
           p.is_active ? null : h('span', { class: 'tag', text: 'inactive' }),
+          p.generic_name ? h('small', { class: 'generic-name', text: p.generic_name }) : null,
           p.retail_price_centavos === null && !lowStockOnly()
             // PR-102: a product with no price cannot be sold, and that is worth seeing
             // in the list rather than at the counter with a customer waiting.

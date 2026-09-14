@@ -67,10 +67,16 @@ export function createProductEditor({ root, productId, onClose }) {
     }
   }
 
+  // Pharmacy edition: a new product starts batch-tracked and eligible for the senior
+  // citizen / PWD discount, because on a drugstore shelf that is nearly everything —
+  // and the costly mistake runs one way. Forgetting batch tracking cannot be undone once
+  // stock arrives (INV-207); forgetting eligibility denies a statutory discount at the
+  // counter. Unticking the cotton balls is the cheaper chore.
   const blank = () => ({
-    id: null, sku: '', name: '', description: '',
+    id: null, sku: '', name: '', generic_name: null, description: '',
     category: { id: null }, brand: null, base_unit: { id: null },
     tax_class: 'VATABLE', min_stock_milli: 0, is_active: true,
+    is_batch_tracked: true, statutory_discount_eligible: true,
     qty_on_hand_milli: 0, has_moved: false, base_unit_locked: false,
     barcodes: [], packs: [], prices: { RETAIL: null, WHOLESALE: null, DEALER: null },
   });
@@ -114,6 +120,10 @@ export function createProductEditor({ root, productId, onClose }) {
   function identityTab() {
     const sku = field('SKU', h('input', { type: 'text', value: product.sku, required: true }));
     const name = field('Name', h('input', { type: 'text', value: product.name, required: true }));
+    const genericName = field('Generic name', h('input', {
+      type: 'text', value: product.generic_name || '', maxlength: 120,
+      placeholder: 'Paracetamol — leave blank if it has none',
+    }));
     const category = referenceSelect('categories', 'Category', product.category.id, true);
     const brand = referenceSelect('brands', 'Brand', product.brand ? product.brand.id : null, false);
     const unit = baseUnitField();
@@ -121,6 +131,13 @@ export function createProductEditor({ root, productId, onClose }) {
       TAX_CLASSES.map((c) => h('option', {
         value: c, text: c.replace(/_/g, ' ').toLowerCase(), selected: c === product.tax_class,
       }))));
+    const batchTracked = batchTrackedField();
+    const statutory = checkField(
+      product.statutory_discount_eligible,
+      'The senior citizen / PWD discount applies to this product',
+      'Medicines, vitamins and supplements for the buyer’s own use. Untick for goods the '
+        + 'discount does not cover (TAX-004).'
+    );
 
     // A product is created with a retail price, because the API requires one (VR-203)
     // and PR-102 makes a product without one unsellable anyway. Asking here rather
@@ -139,11 +156,16 @@ export function createProductEditor({ root, productId, onClose }) {
         const changes = {
           sku: sku.input.value.trim(),
           name: name.input.value.trim(),
+          genericName: genericName.input.value.trim(),
           categoryId: category.input.value || null,
           brandId: brand.input.value || null,
           baseUnitId: unit.input ? unit.input.value : product.base_unit.id,
           taxClass: taxClass.input.value,
+          statutoryDiscountEligible: statutory.input.checked,
         };
+        // Sent only while it can still change; once locked the server would refuse a
+        // different answer, and resending the same one is noise in the audit trail.
+        if (batchTracked.input) changes.isBatchTracked = batchTracked.input.checked;
         if (retail) {
           const pesos = Number.parseFloat(retail.input.value);
           if (!Number.isFinite(pesos) || pesos < 0) {
@@ -155,7 +177,8 @@ export function createProductEditor({ root, productId, onClose }) {
         await save(changes);
       },
     }, [
-      sku.el, name.el, category.el, brand.el, unit.el, taxClass.el,
+      sku.el, name.el, genericName.el, category.el, brand.el, unit.el, taxClass.el,
+      batchTracked.el, statutory.el,
       retail ? retail.el : null,
       h('div', { class: 'editor-actions' }, [
         h('button', { type: 'submit', class: 'primary', text: isNew ? 'Create product' : 'Save' }),
@@ -186,6 +209,42 @@ export function createProductEditor({ root, productId, onClose }) {
     return referenceSelect('units', 'Base unit', product.base_unit.id, true);
   }
 
+  /** A ticked-or-not field with its sentence beside the box and a hint under it. */
+  function checkField(checked, sentence, hint) {
+    const input = h('input', { type: 'checkbox', checked: Boolean(checked) });
+    return {
+      input,
+      el: h('div', { class: 'editor-field' }, [
+        h('label', { class: 'check' }, [input, h('span', { text: sentence })]),
+        hint ? h('small', { class: 'muted', text: hint }) : null,
+      ]),
+    };
+  }
+
+  /** INV-207: offered until the first movement, then stated and explained, like UOM-003. */
+  function batchTrackedField() {
+    if (product.has_moved) {
+      return {
+        input: null,
+        el: h('div', { class: 'editor-field locked' }, [
+          h('label', { text: 'Batch and expiry' }),
+          h('p', { class: 'locked-value', text: product.is_batch_tracked
+            ? 'Tracked by batch and expiry date' : 'Not tracked by batch' }),
+          h('p', { class: 'locked-why', text: 'This cannot be changed: stock has moved for this '
+            + 'product and is already recorded this way. To change it, create a new product set '
+            + 'up the right way and move the stock across with an adjustment.' }),
+          h('p', { class: 'refusal-rule', text: 'INV-207' }),
+        ]),
+      };
+    }
+    return checkField(
+      product.is_batch_tracked,
+      'Track this product by batch and expiry date',
+      'Stock is received against the batch number and expiry on the box, sold earliest-expiry '
+        + 'first, and an expired batch cannot be sold. This is fixed once stock arrives.'
+    );
+  }
+
   const unitName = (id) => {
     const unit = reference.units.find((u) => u.id === id);
     return unit ? `${unit.name} (${unit.code})` : '—';
@@ -211,13 +270,13 @@ export function createProductEditor({ root, productId, onClose }) {
       title: `New ${label.toLowerCase()}`,
       fields: kind === 'units'
         ? [
-          { name: 'name', label: 'Name', maxLength: 60, hint: 'Kilogram, Sack, Piece' },
+          { name: 'name', label: 'Name', maxLength: 60, hint: 'Tablet, Box, Bottle' },
           { name: 'code', label: 'Short code', maxLength: 12,
-            hint: 'As it appears on a receipt — KG, SACK, PC.' },
+            hint: 'As it appears on a receipt — TAB, BOX, BOT.' },
           // UOM-004 in a sentence: a unit that cannot be halved must say so here, or a
           // cashier keys 2.5 pieces and the store has invented half a sack of feed.
           { name: 'allowsFraction', label: 'This can be sold in fractions — 1.5 of them',
-            type: 'checkbox', value: false, hint: 'Kilos and litres can. Sacks and pieces cannot.' },
+            type: 'checkbox', value: false, hint: 'Millilitres can. Tablets and boxes cannot.' },
         ]
         : [{ name: 'name', label: 'Name', maxLength: 80 }],
     });
@@ -315,7 +374,7 @@ export function createProductEditor({ root, productId, onClose }) {
     const emptyNote = h('p', {
       class: 'muted', hidden: available().length > 0,
       text: 'Every unit this store has is already this product’s base unit or one of '
-        + 'its packs. Make a new one to sell it by the sack, the box or the bottle.',
+        + 'its packs. Make a new one to sell it by the strip, the box or the bottle.',
     });
     const factor = h('input', {
       type: 'text', inputmode: 'decimal', placeholder: 'How many base units',
@@ -648,7 +707,7 @@ export function createProductEditor({ root, productId, onClose }) {
         ]),
       ]),
       h('p', { class: 'muted', text: 'A barcode belongs to one product only (VR-205). '
-        + 'A product may have several — a sack and a repack often carry different codes.' }),
+        + 'A product may have several — a box and a loose strip often carry different codes.' }),
     ]);
   }
 

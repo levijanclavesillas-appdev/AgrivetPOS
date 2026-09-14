@@ -46,7 +46,7 @@ const path = require('path');
 const zip = require('../../src/config/zip');
 const openingDataService = require('../../src/services/openingDataService');
 
-const OUT = path.join(__dirname, '..', '..', 'dist', 'agrivet_opening_template.xlsx');
+const OUT = path.join(__dirname, '..', '..', 'dist', 'pharmacy_opening_template.xlsx');
 
 /** XML text, escaped. A store called "Sy & Sons" is not a parse error. */
 const xml = (value) => String(value)
@@ -154,7 +154,7 @@ function readMe() {
   const H = (text) => [{ value: text, style: S.TITLE }];
 
   const rows = [
-    H('Opening data for Chachi Agrivet POS'),
+    H('Opening data for Chachi Pharmacy POS'),
     P('Three tabs. Fill in what the store has today; leave a tab empty if it has none of that.'),
     [],
     H('Products — everything the shop sells'),
@@ -162,7 +162,11 @@ function readMe() {
     P('Category and base unit must already exist in the system — the shop creates those first, in'),
     P('Products → New product. The load will not invent a category, because a category carries its own'),
     P('discount ceiling and is not something to guess from a spreadsheet.'),
-    P('batch_tracked: write yes for goods sold by expiry date — vaccines, medicines. Leave blank for feed.'),
+    P('generic_name: the generic on the box — Paracetamol for Biogesic. Leave blank if it has none.'),
+    P('batch_tracked: write yes for goods sold by expiry date — medicines, vitamins. Leave blank for'),
+    P('goods with no expiry, like cotton balls. This cannot be changed once the stock is loaded.'),
+    P('senior_pwd: write yes for goods the senior citizen / PWD 20% discount covers — medicines and'),
+    P('vitamins for the buyer’s own use. Leave blank for the rest.'),
     [],
     H('Opening stock — what is on the shelf at cutover'),
     P('One row per product that has stock. A product the store has none of is simply left out.'),

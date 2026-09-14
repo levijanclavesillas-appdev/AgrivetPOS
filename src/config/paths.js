@@ -1,7 +1,10 @@
 'use strict';
 
 // Filesystem locations. 05_TECH_SPEC.md §7 fixes the runtime layout on the store PC:
-//   %LOCALAPPDATA%\ChachiAgrivetPOS\{agrivet.db, session.key, logs\}
+//   %LOCALAPPDATA%\ChachiPharmacyPOS\{agrivet.db, session.key, logs\}
+// The pharmacy edition has its own folder, so it can never open an agrivet store's
+// database by accident. The file inside keeps its name: it is not something an owner
+// sees, and renaming it would fork the backup and restore code for no one's benefit.
 // A non-Windows path exists only so the suite runs on a developer machine; the
 // product targets one Windows PC (01_PRODUCT_BRIEF.md D-2).
 
@@ -9,7 +12,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const APP_DIR_NAME = 'ChachiAgrivetPOS';
+const APP_DIR_NAME = 'ChachiPharmacyPOS';
 
 function dataDir() {
   // AGRIVET_DATA_DIR is how the test suite gets a throwaway database. It is never

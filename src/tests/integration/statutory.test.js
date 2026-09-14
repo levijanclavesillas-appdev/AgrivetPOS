@@ -96,21 +96,27 @@ test.after(async () => {
   temp.cleanup();
 });
 
-// ── TC-INT-101 — TAX-004: off, refused while off, and owner-only to turn on ──
+// ── TC-INT-101 — TAX-004: on, refused while off, and owner-only to switch ──
+//
+// Pharmacy edition: the switch ships ON (settingsService, TAX-004). The agrivet build
+// shipped it off and asserted so here; what survives unchanged is that a claim while
+// it is off is refused rather than priced at nothing, and that only the owner moves it,
+// audited, in either direction.
 
-test('TC-INT-101: it ships off, and the counter is told so before it is offered', async () => {
-  assert.equal(settingsService.get('statutory_discount_enabled'), false,
-    'TAX-004 ships OFF: whether an agrivet’s stock qualifies is a question for the store’s accountant');
+test('TC-INT-101: it ships on in a pharmacy, and the counter is told so', async () => {
+  assert.equal(settingsService.get('statutory_discount_enabled'), true,
+    'TAX-004 ships ON: medicines for the beneficiary’s own use are what RA 9994 covers first');
 
   // The counter reads the switch from the server rather than deciding for itself, so
   // SCR-301 can hide the key in a store that does not grant the discount.
   const policy = await (await call('/sales/pricing-policy', { token: tokens.CASHIER })).json();
-  assert.equal(policy.statutory.enabled, false);
+  assert.equal(policy.statutory.enabled, true);
   assert.equal(policy.statutory.discount_bp, 2000, 'the rate is the server’s, never the screen’s (OPS-005)');
   assert.deepEqual(policy.statutory.id_types.map((t) => t.id), ['SENIOR_CITIZEN', 'PWD']);
 });
 
 test('TC-INT-101: a claim while off is refused — not quietly priced at nothing', async () => {
+  enable(false);
   const product = stocked({ eligible: true });
 
   const res = await call('/sales/price-check', {
@@ -139,7 +145,9 @@ test('TC-INT-101: a claim while off is refused — not quietly priced at nothing
   assert.equal(saleRepository.countAll(), 0, 'and nothing was written');
 });
 
-test('TC-INT-101: turning it on is owner-only, and the trail says who and when', async () => {
+test('TC-INT-101: switching it is owner-only, and the trail says who and when', async () => {
+  // Left off by the case above. Turned on here the way an owner would, then off again,
+  // so both directions are shown to be the owner's alone.
   const refused = await call('/settings', {
     token: tokens.MANAGER, method: 'PUT', body: { statutory_discount_enabled: true },
   });
@@ -149,20 +157,26 @@ test('TC-INT-101: turning it on is owner-only, and the trail says who and when',
   const res = await call('/settings', {
     token: tokens.OWNER,
     method: 'PUT',
-    body: { statutory_discount_enabled: true, reason: 'Accountant confirmed the household lines qualify' },
+    body: { statutory_discount_enabled: true, reason: 'Re-enabled after the stock take' },
   });
   assert.equal(res.status, 200);
   assert.deepEqual((await res.json()).changed, ['statutory_discount_enabled']);
   assert.equal(settingsService.get('statutory_discount_enabled'), true);
 
-  // AUD-601: before, after, actor and reason. "Who decided to start granting this, and
-  // on whose advice" is the question an assessment asks years later.
+  // AUD-601: before, after, actor and reason. "Who decided to stop or start granting
+  // this" is the question an assessment asks years later.
   const [row] = auditService.list({ entityId: 'statutory_discount_enabled' });
   assert.equal(row.action, 'SETTING_CHANGED');
   assert.equal(row.actor_username, 'owner');
   assert.deepEqual(JSON.parse(row.before_value), { statutory_discount_enabled: false });
   assert.deepEqual(JSON.parse(row.after_value), { statutory_discount_enabled: true });
-  assert.match(row.reason, /Accountant confirmed/);
+  assert.match(row.reason, /Re-enabled/);
+
+  const managerOff = await call('/settings', {
+    token: tokens.MANAGER, method: 'PUT', body: { statutory_discount_enabled: false },
+  });
+  assert.equal(managerOff.status, 403, 'nor may a manager switch it off');
+  assert.equal(settingsService.get('statutory_discount_enabled'), true);
 
   enable(false);
 });

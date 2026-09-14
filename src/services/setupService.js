@@ -103,7 +103,7 @@ function assertNotComplete() {
  * the same failed disk and the same uninstaller as the thing it was backing up.
  */
 function suggestBackupFolder() {
-  return path.join(os.homedir(), 'Documents', 'ChachiAgrivetPOS Backups');
+  return path.join(os.homedir(), 'Documents', 'ChachiPharmacyPOS Backups');
 }
 
 /**
@@ -125,7 +125,7 @@ function validateBackupFolder(folder) {
 
   const probe = path.join(text, `.agrivet-write-test-${Date.now()}`);
   try {
-    fs.writeFileSync(probe, 'chachi agrivet pos backup folder check');
+    fs.writeFileSync(probe, 'chachi pharmacy pos backup folder check');
     fs.rmSync(probe, { force: true });
   } catch (err) {
     throw errors.badRequest(

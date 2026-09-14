@@ -6,7 +6,7 @@
 const db = require('../config/database');
 
 const COLUMNS = `
-  p.id, p.sku, p.name, p.category_id, p.brand_id, p.base_unit_id, p.description,
+  p.id, p.sku, p.name, p.generic_name, p.category_id, p.brand_id, p.base_unit_id, p.description,
   p.tax_class, p.statutory_discount_eligible, p.avg_cost_centavos, p.avg_cost_as_of,
   p.min_stock_milli, p.is_batch_tracked, p.is_active,
   p.created_at, p.created_by, p.updated_at, p.updated_by
@@ -55,7 +55,7 @@ function countAll() {
 }
 
 /**
- * Search across name, SKU, barcode and brand (FR_2.1, NFR_1.3).
+ * Search across name, generic name, SKU, barcode and brand (FR_2.1, NFR_1.3).
  *
  * One statement rather than four queries merged in the service: the counter types into
  * a single box and expects one ranked answer inside 500 ms, and four round trips plus
@@ -63,7 +63,9 @@ function countAll() {
  *
  * Ordering puts an exact SKU or barcode first, then a name that starts with the term,
  * then anything else that contains it. A scan and a half-typed name are the two real
- * uses, and they want opposite orderings from the same box.
+ * uses, and they want opposite orderings from the same box. A generic name ranks with
+ * the name: "parac" typed at a drugstore counter means every paracetamol on the shelf,
+ * whichever brand is printed biggest on the box.
  *
  * Both barcode clauses are written to run **once**, not once per candidate row. The
  * obvious shape — a correlated `EXISTS (... WHERE bc.product_id = p.id AND ...)` — makes
@@ -83,6 +85,7 @@ function search({ q = null, categoryId = null, includeInactive = false, limit = 
        AND (@q IS NULL
             OR p.sku LIKE @like COLLATE NOCASE
             OR p.name LIKE @like COLLATE NOCASE
+            OR p.generic_name LIKE @like COLLATE NOCASE
             OR b.name LIKE @like COLLATE NOCASE
             OR p.id IN (SELECT bc.product_id FROM product_barcodes bc WHERE bc.barcode LIKE @like))
      ORDER BY
@@ -90,6 +93,7 @@ function search({ q = null, categoryId = null, includeInactive = false, limit = 
             WHEN p.sku = @q COLLATE NOCASE THEN 0
             WHEN barcode_exact THEN 0
             WHEN p.name LIKE @prefix COLLATE NOCASE THEN 1
+            WHEN p.generic_name LIKE @prefix COLLATE NOCASE THEN 1
             ELSE 2 END,
        p.name COLLATE NOCASE
      LIMIT @limit OFFSET @offset
@@ -109,6 +113,7 @@ function countSearch({ q = null, categoryId = null, includeInactive = false } = 
        AND (@q IS NULL
             OR p.sku LIKE @like COLLATE NOCASE
             OR p.name LIKE @like COLLATE NOCASE
+            OR p.generic_name LIKE @like COLLATE NOCASE
             OR b.name LIKE @like COLLATE NOCASE
             OR p.id IN (SELECT bc.product_id FROM product_barcodes bc WHERE bc.barcode LIKE @like))
   `).get({ q, like, categoryId, includeInactive: includeInactive ? 1 : 0 }).n;
@@ -123,7 +128,7 @@ function insert(row) {
 }
 
 const UPDATABLE = [
-  'sku', 'name', 'category_id', 'brand_id', 'base_unit_id', 'description', 'tax_class',
+  'sku', 'name', 'generic_name', 'category_id', 'brand_id', 'base_unit_id', 'description', 'tax_class',
   'statutory_discount_eligible', 'avg_cost_centavos', 'avg_cost_as_of', 'min_stock_milli',
   'is_batch_tracked', 'is_active', 'updated_at', 'updated_by',
 ];

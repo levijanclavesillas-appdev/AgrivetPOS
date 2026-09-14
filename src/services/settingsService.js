@@ -144,7 +144,8 @@ const REGISTRY = Object.freeze({
       'Wrong item bought',
       'Damaged on arrival',
       'Expired stock',
-      'Animal refused the feed',
+      'Seal broken or packaging tampered',
+      'Adverse reaction reported',
       'Duplicate purchase',
       'Customer changed their mind',
     ]),
@@ -159,16 +160,19 @@ const REGISTRY = Object.freeze({
   // against `categories.name` — which is UNIQUE NOCASE (VR-209), so a name is an
   // unambiguous handle.
   //
-  // The default is what an agrivet in Sultan Kudarat stocks. A store that files its
-  // vaccines under "Biologics" edits this list on SCR-702; a store that files them
-  // under "Feeds" has a bigger problem than this setting.
+  // Pharmacy edition: the names a drugstore files its shelves under. A medicine that
+  // left the counter is one whose storage nobody can vouch for — the heat of a jeepney,
+  // a bathroom cabinet — so everything taken internally defaults to write-off. A store
+  // that files paracetamol under "Analgesics" edits this list on SCR-702.
   return_write_off_categories: {
     type: 'JSON', group: 'SALES', ruleId: 'POS-304', ownerOnly: true,
     what: 'Categories whose returns default to write-off rather than restock',
     value: Object.freeze([
-      'Veterinary',
-      'Veterinary Medicines',
       'Medicines',
+      'OTC Medicines',
+      'Vitamins',
+      'Supplements',
+      'Vitamins & Supplements',
       'Vaccines',
       'Biologics',
     ]),
@@ -198,18 +202,19 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 10000, group: 'PRICING', ruleId: 'PR-201', ownerOnly: true,
     what: 'Highest discount an owner may apply, in basis points', min: 0, max: 10000,
   },
-  // TAX-004 — the one figure in this file that is a *question for an accountant*
-  // rather than a preference. RA 9994 and RA 10754 grant the discount on goods for the
-  // beneficiary's own use, and whether an agrivet's stock qualifies — feed for a farm
-  // does not, a sack for a household's chickens might be argued either way — is not a
-  // thing this backlog may decide for a store. So it ships off, the code that grants it
-  // is built and tested, and turning it on is the owner's decision with their
-  // accountant, recorded with who turned it on and when (AUD-601).
+  // TAX-004 — pharmacy edition: this ships **on**. RA 9994 and RA 10754 name
+  // medicines for the beneficiary's own use as the first thing the 20% and the VAT
+  // exemption cover, so for a drugstore it is not a question for an accountant but an
+  // obligation from the day it opens. The agrivet default was off because feed for a
+  // farm is not for the beneficiary's own use; nothing on a pharmacy shelf is that
+  // ambiguous. Which products it reaches is still per product
+  // (`statutory_discount_eligible`), and the owner can still turn it off, audited
+  // (AUD-601).
   //
   // The 20% itself is not here: it is statute, and it lives in taxService beside the
   // VAT rate for the same reason.
   statutory_discount_enabled: {
-    type: 'BOOL', value: false, group: 'PRICING', ruleId: 'TAX-004', ownerOnly: true,
+    type: 'BOOL', value: true, group: 'PRICING', ruleId: 'TAX-004', ownerOnly: true,
     what: 'Grant the senior citizen and PWD statutory discount on eligible products',
   },
   cash_rounding_centavos: {

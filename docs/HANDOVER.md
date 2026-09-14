@@ -1,4 +1,4 @@
-# Handover — Chachi Agrivet POS v1.0
+# Handover — Chachi Pharmacy POS v1.0
 
 **For:** the store owner · **From:** Chachi's Software Development Service
 **Installed on:** ______________________  **Handed over:** ______________________
@@ -34,7 +34,7 @@ supplier. **If it is lost and the password is forgotten, the data cannot be reac
   fails the check is deleted and does not count — because a backup nobody has opened is a
   hope, and the day you need it is the worst day to find out.
 - The last thirty are kept. Older ones are removed only after a newer one has been checked.
-- Backups are written to your backup folder as `agrivet_backup_….zip`. You can open one by
+- Backups are written to your backup folder as `pharmacy_backup_….zip`. You can open one by
   double-clicking it; the database is inside, called `agrivet.db`.
 
 **What only you can do — and this is the important part:**
@@ -89,7 +89,7 @@ from the period you just undid is in it.
 
 ## 4. If the PC dies
 
-1. Install Chachi Agrivet POS on the replacement machine.
+1. Install Chachi Pharmacy POS on the replacement machine.
 2. Copy your most recent backup from the USB stick to the new machine.
 3. Set the backup folder in **Settings**, open **Admin → Backups**, and restore from it.
 4. Re-key any sales made after that backup, from the receipts.

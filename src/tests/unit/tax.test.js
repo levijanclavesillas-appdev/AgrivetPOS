@@ -242,8 +242,9 @@ test('TAX-004: the 20% is statute, and the ID type is one of two', () => {
   assert.equal(taxService.STATUTORY_DISCOUNT_BP, 2000);
   assert.equal(Object.keys(settingsService.REGISTRY).some((k) => /statutory.*(bp|rate|percent)/i.test(k)), false);
 
-  // What *is* configurable is whether the store grants it at all — and it ships off.
-  assert.equal(settingsService.REGISTRY.statutory_discount_enabled.value, false);
+  // What *is* configurable is whether the store grants it at all — and in the pharmacy
+  // edition it ships on, because medicines are what the statute covers first.
+  assert.equal(settingsService.REGISTRY.statutory_discount_enabled.value, true);
   assert.equal(settingsService.REGISTRY.statutory_discount_enabled.ownerOnly, true);
 
   assert.deepEqual(Object.keys(taxService.STATUTORY_ID_TYPES), ['SENIOR_CITIZEN', 'PWD']);

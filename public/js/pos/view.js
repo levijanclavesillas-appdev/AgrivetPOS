@@ -381,7 +381,12 @@ export function createPos({ root, session, onPay }) {
           class: 'search-result',
           onclick: async () => { results.hidden = true; search.value = ''; await addProduct(product); },
         }, [
-          h('span', { class: 'result-name', text: product.name }),
+          // The generic under the brand name: "parac" finds six boxes, and the
+          // generic is how the cashier tells the customer which of them is which.
+          h('span', { class: 'result-name' }, [
+            product.name,
+            product.generic_name ? h('small', { class: 'result-generic', text: product.generic_name }) : null,
+          ]),
           h('span', { class: 'result-sku', text: product.sku }),
           h('span', { class: 'result-price', text: money(product.retail_price_centavos) }),
         ]));

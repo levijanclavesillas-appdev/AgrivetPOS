@@ -31,7 +31,8 @@ const backupService = require('../../services/backupService');
 const backupRepository = require('../../repositories/backupRepository');
 const settingsService = require('../../services/settingsService');
 const authService = require('../../services/authService');
-const productService = require('../../services/productService');
+const ids = require('../../config/ids');
+const clock = require('../../config/clock');
 const temp = require('../helpers/tempdb');
 
 const PASSWORD = 'correct-horse-battery';
@@ -81,10 +82,14 @@ test('TC-INST-01: an upgrade preserves the data, backs up first, and migrates on
   const ref = temp.seedCatalog();
   temp.seedUser({ username: 'owner', role: 'OWNER', password: PASSWORD });
   const owner = authService.verifyToken(authService.login({ username: 'owner', password: PASSWORD }).token);
-  productService.create({
-    sku: 'FEED-001', name: 'Hog Grower Pellets',
-    categoryId: ref.category.id, baseUnitId: ref.kg.id, retailPriceCentavos: 6000,
-  }, owner);
+  // Written with the columns 002 declared rather than through productService, which
+  // speaks the *current* schema: the day the newest migration adds a product column
+  // (018 did), the service cannot write a row into the previous release's table, and
+  // this case would fail on its own fixture instead of on the upgrade it is about.
+  db.get().prepare(`
+    INSERT INTO products (id, sku, name, category_id, base_unit_id, created_at)
+    VALUES (?, 'FEED-001', 'Hog Grower Pellets', ?, ?, ?)
+  `).run(ids.uuidv7(), ref.category.id, ref.kg.id, clock.nowUtc());
 
   const backups = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-upgrade-backups-'));
   db.transaction(() => settingsService.set('backup_folder', backups, owner));
@@ -204,7 +209,7 @@ test('TC-INST-02: a database ahead of the binary refuses to start, plainly', asy
   await assert.rejects(
     () => server.start({ listenPort: 0 }),
     (err) => {
-      assert.match(err.message, /newer version of Chachi Agrivet POS/);
+      assert.match(err.message, /newer version of Chachi Pharmacy POS/);
       assert.match(err.message, /Install the newer version again/);
       assert.match(err.message, /Nothing has been changed/);
       // Running an older binary against a newer schema is how a column that exists

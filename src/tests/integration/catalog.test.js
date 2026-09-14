@@ -562,3 +562,78 @@ test('a product carries whether it is sellable at all (PR-102)', async () => {
   assert.equal(chick.is_sellable, false, 'its prices were deleted above');
   assert.equal(chick.retail_price_centavos, null, 'null, not zero');
 });
+
+// ── Pharmacy edition — generic name (018) and INV-207 ───────────────────────
+
+test('a generic name is optional, stored trimmed, and blank reads as none', () => {
+  const branded = productService.create(productInput({
+    sku: 'RX-PARA-01', name: 'Biogesic 500mg', genericName: '  Paracetamol  ',
+  }), sessions.OWNER);
+  assert.equal(branded.generic_name, 'Paracetamol');
+
+  const plain = productService.create(productInput({ sku: 'RX-COTTON', name: 'Cotton balls 50s' }), sessions.OWNER);
+  assert.equal(plain.generic_name, null, 'absent is null');
+
+  const cleared = productService.update(branded.id, { genericName: '   ' }, sessions.OWNER);
+  assert.equal(cleared.generic_name, null, 'blank clears it rather than storing an empty string');
+
+  const restored = productService.update(branded.id, { genericName: 'Paracetamol' }, sessions.OWNER);
+  assert.equal(restored.generic_name, 'Paracetamol');
+  const [row] = auditService.browse({ action: 'PRODUCT_MODIFIED', entityId: branded.id }).rows;
+  assert.equal(row.after.generic_name, 'Paracetamol', 'the change is audited like any other field');
+});
+
+test('search finds a product by its generic name, and ranks a generic prefix with a name prefix', async () => {
+  productService.create(productInput({
+    sku: 'RX-PARA-02', name: 'Tempra 500mg', genericName: 'Paracetamol',
+  }), sessions.OWNER);
+
+  const res = await (await call('/products?q=parac', { token: tokens.OWNER })).json();
+  const skus = res.products.map((p) => p.sku);
+  assert.ok(skus.includes('RX-PARA-01') && skus.includes('RX-PARA-02'),
+    'every brand of the generic, whichever name is on the box');
+  assert.ok(res.products.every((p) => 'generic_name' in p), 'the list carries it for the counter to show');
+  assert.equal(res.total, 2);
+});
+
+test('INV-207: batch tracking can be switched before any movement, and is fixed after', () => {
+  const product = productService.create(productInput({
+    sku: 'RX-AMOX', name: 'Amoxicillin 500mg', baseUnitId: ref.piece.id,
+  }), sessions.OWNER);
+  assert.equal(product.is_batch_tracked, false);
+
+  const tracked = productService.update(product.id, { isBatchTracked: true }, sessions.OWNER);
+  assert.equal(tracked.is_batch_tracked, true, 'a draft product may still be set up either way');
+  productService.update(product.id, { isBatchTracked: false }, sessions.OWNER);
+
+  inventoryService.postStandalone({
+    productId: product.id, type: 'RECEIPT', qtyMilli: 100000, unitCostCentavos: 800, actor: sessions.OWNER,
+  });
+
+  let err;
+  try {
+    productService.update(product.id, { isBatchTracked: true }, sessions.OWNER);
+  } catch (caught) {
+    err = caught;
+  }
+  assert.ok(err, 'refused once stock has moved');
+  assert.equal(err.status, 409);
+  assert.equal(err.ruleId, 'INV-207');
+  assert.match(err.message, /create a new product/i, 'and the correction path');
+  assert.equal(productService.get(product.id, sessions.OWNER).is_batch_tracked, false, 'unchanged');
+
+  // Sending the value it already has is not a change, so an editor that resubmits the
+  // whole form does not trip the lock.
+  const same = productService.update(product.id, { isBatchTracked: false, name: 'Amoxicillin 500mg cap' }, sessions.OWNER);
+  assert.equal(same.name, 'Amoxicillin 500mg cap');
+});
+
+test('TAX-004 eligibility is editable on a product at any time', () => {
+  const product = productService.create(productInput({
+    sku: 'RX-ASC', name: 'Ascorbic Acid 500mg', statutoryDiscountEligible: true,
+  }), sessions.OWNER);
+  assert.equal(product.statutory_discount_eligible, true);
+
+  const off = productService.update(product.id, { statutoryDiscountEligible: false }, sessions.OWNER);
+  assert.equal(off.statutory_discount_eligible, false);
+});

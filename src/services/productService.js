@@ -47,6 +47,15 @@ function validateName(name) {
   return trimmed;
 }
 
+/**
+ * A generic name is optional and free text — "Paracetamol", "Ascorbic acid + zinc".
+ * Blank is null, not an empty string, so "has no generic" is one state and not two.
+ */
+function validateGenericName(value) {
+  const trimmed = text(value, { max: 120 });
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function validateTaxClass(taxClass) {
   // VR-208 / TAX-003: required in *every* tax mode, not only VAT. The column is
   // populated in NONE and NON_VAT too, so switching mode is configuration rather than
@@ -115,7 +124,7 @@ function classifyBarcode(raw) {
       ruleId: 'VR-205',
       reason:
         'This is a weight-embedded barcode — the kind a scale prints, where part of the '
-        + 'number is the weight. Chachi Agrivet POS cannot read those yet, and storing it as '
+        + 'number is the weight. Chachi Pharmacy POS cannot read those yet, and storing it as '
         + 'an ordinary code would make every weighing scan as a different product. Use the '
         + "product's own barcode, or search for it by name.",
     };
@@ -148,6 +157,7 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
     id: row.id,
     sku: row.sku,
     name: row.name,
+    generic_name: row.generic_name ?? null,
     category: { id: row.category_id, name: row.category_name },
     brand: row.brand_id ? { id: row.brand_id, name: row.brand_name } : null,
     base_unit: {
@@ -350,6 +360,7 @@ function createWithin(input, actor, session = actor) {
     id: ids.uuidv7(),
     sku,
     name,
+    generic_name: validateGenericName(input.genericName),
     category_id: category.id,
     brand_id: input.brandId || null,
     base_unit_id: baseUnit.id,
@@ -419,12 +430,17 @@ function update(id, changes, actor, session = actor) {
     move('sku', sku);
   }
   if (changes.name !== undefined) move('name', validateName(changes.name));
+  if (changes.genericName !== undefined) move('generic_name', validateGenericName(changes.genericName));
   if (changes.description !== undefined) move('description', text(changes.description, { max: 500 }) || null);
   if (changes.taxClass !== undefined) move('tax_class', validateTaxClass(changes.taxClass));
   if (changes.statutoryDiscountEligible !== undefined) {
     move('statutory_discount_eligible', changes.statutoryDiscountEligible ? 1 : 0);
   }
-  if (changes.isBatchTracked !== undefined) move('is_batch_tracked', changes.isBatchTracked ? 1 : 0);
+  if (changes.isBatchTracked !== undefined) {
+    const tracked = changes.isBatchTracked ? 1 : 0;
+    if (tracked !== current.is_batch_tracked) assertBatchTrackingChangeable(id);
+    move('is_batch_tracked', tracked);
+  }
   if (changes.minStockMilli !== undefined) {
     move('min_stock_milli', validateMilli(changes.minStockMilli, 'Minimum stock', 'VR-204'));
   }
@@ -477,6 +493,30 @@ function assertBaseUnitChangeable(productId) {
     + 'and changing it now would silently reinterpret all of them. To correct it, create a new '
     + 'product with the right unit and move the stock across with an adjustment.',
     { ruleId: 'UOM-003' }
+  );
+}
+
+/**
+ * INV-207 — whether a product is batch-tracked is fixed once any movement exists.
+ *
+ * UOM-003's reasoning, one column over. INV-201 refuses an unbatched movement of a
+ * batch-tracked product and a batched movement of one that is not, so flipping the flag
+ * on a product with history strands that history on the wrong side of the rule: stock
+ * received without a batch becomes stock nothing can sell, and a sale made before the
+ * flip becomes a sale no return can restock. The editor offers the switch until the
+ * first movement and locks it after, with the same correction path as the base unit.
+ */
+function assertBatchTrackingChangeable(productId) {
+  const movements = productRepository.countMovements(productId);
+  if (movements === 0) return;
+
+  throw errors.conflict(
+    `This product has ${movements} stock movement${movements === 1 ? '' : 's'} recorded, so `
+    + 'whether it is tracked by batch is fixed. Its stock is already recorded one way, and '
+    + 'switching now would leave that stock unsellable or its sales unreturnable. To change '
+    + 'it, create a new product set up the right way and move the stock across with an '
+    + 'adjustment.',
+    { ruleId: 'INV-207' }
   );
 }
 

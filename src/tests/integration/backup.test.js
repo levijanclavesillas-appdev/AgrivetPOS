@@ -83,7 +83,7 @@ test('the archive is a real zip, readable by something that did not write it', (
   // and a store's recovery path is someone double-clicking the file in Explorer.
   const result = backupService.run({ trigger: 'MANUAL', actor: owner });
   assert.equal(result.ok, true, result.error);
-  assert.match(result.file_name, /^agrivet_backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_manual_[0-9a-f]{6}\.zip$/);
+  assert.match(result.file_name, /^pharmacy_backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_manual_[0-9a-f]{6}\.zip$/);
 
   const { spawnSync } = require('child_process');
   const unzip = spawnSync('unzip', ['-t', result.file_path], { encoding: 'utf8' });
@@ -427,7 +427,7 @@ test('TC-INT-74: a restore is owner-only', () => {
 test('TC-INT-74: a restore needs the filename typed, exactly', () => {
   const backup = backupService.run({ trigger: 'MANUAL', actor: owner });
 
-  for (const typed of ['', null, 'agrivet_backup.zip', backup.file_name.slice(0, -1), backup.file_name.toUpperCase()]) {
+  for (const typed of ['', null, 'pharmacy_backup.zip', backup.file_name.slice(0, -1), backup.file_name.toUpperCase()]) {
     assert.throws(
       () => restoreService.restore({ backupId: backup.id, confirmFilename: typed, actor: owner }),
       (err) => err.status === 400 && err.ruleId === 'OPS-004',

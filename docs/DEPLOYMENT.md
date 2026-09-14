@@ -1,4 +1,7 @@
-# Deployment — Chachi Agrivet POS v1.0
+# Deployment — Chachi Pharmacy POS v1.0
+
+> Pharmacy edition (`pharmacy` branch). What differs from the agrivet build, and why, is in
+> `PHARMACY_EDITION.md`.
 
 **For the person installing the system**, not for the store owner. The owner's document is
 [`HANDOVER.md`](HANDOVER.md), and the two are handed over together.
@@ -52,7 +55,7 @@ git clone <repo> && cd AgrivetPOS
 npm ci
 npm run test:all                 # the release gate — 07_TEST_PLAN.md §10
 ./tools/installer/check.sh       # the NSIS macros compile and say what they must
-npm run build:exe                # -> dist/ChachiAgrivetPOS-Setup-1.0.0.exe
+npm run build:exe                # -> dist/ChachiPharmacyPOS-Setup-1.0.0.exe
 ```
 
 Signing is configured through electron-builder's standard environment variables and is not
@@ -73,7 +76,7 @@ is exactly the moment you want them to trust the thing you just handed them.
 
 ### What the build produces
 
-`dist/ChachiAgrivetPOS-Setup-1.0.0.exe` — an NSIS installer with `oneClick: false`, a
+`dist/ChachiPharmacyPOS-Setup-1.0.0.exe` — an NSIS installer with `oneClick: false`, a
 selectable install directory, desktop and start-menu shortcuts, and
 `requestedExecutionLevel: asInvoker`. It carries no updater and no publish target: the
 application can never update itself, because a store PC that self-updates mid-shift is an
@@ -92,7 +95,7 @@ outage at the counter with a queue in front of it (`NFR_5.1`).
 It creates, on first run:
 
 ```text
-%LOCALAPPDATA%\ChachiAgrivetPOS\
+%LOCALAPPDATA%\ChachiPharmacyPOS\
   agrivet.db  agrivet.db-wal  agrivet.db-shm
   session.key
 ```
@@ -127,8 +130,8 @@ server, not just in the browser — you cannot click past it.
 
 ### The backup folder
 
-Default it to `Documents\ChachiAgrivetPOS Backups`. It must be **outside**
-`%LOCALAPPDATA%\ChachiAgrivetPOS` (`OPS-001`) — a backup inside the folder being backed up
+Default it to `Documents\ChachiPharmacyPOS Backups`. It must be **outside**
+`%LOCALAPPDATA%\ChachiPharmacyPOS` (`OPS-001`) — a backup inside the folder being backed up
 survives a mistake and none of the things a backup is actually for. The application refuses a
 folder inside its own data directory and says so.
 
@@ -217,16 +220,21 @@ The category and the unit are creatable from inside the editor, so an empty cata
 send you looking for another screen before the first product.
 
 The **base unit** is the one decision that is hard to undo — it is immutable once any stock
-movement exists (`UOM-003`), and the correction is a new product. For feed sold both ways,
-the base unit is **KG**, and a sack is a *pack* on top of it with factor 50,000 (`UOM-002`).
-Not the other way round.
+movement exists (`UOM-003`), and the correction is a new product. For a tablet sold loose, by
+the strip and by the box, the base unit is **TAB**, and the strip and the box are *packs* on top
+of it — factor 10 and 100 (`UOM-002`). Not the other way round.
+
+**Batch tracking** is the second decision that is fixed once stock arrives (`INV-207`). A new
+product starts with it ticked; untick it only for goods with no expiry date. The same tab has the
+**senior citizen / PWD** tick and the **generic name** — fill in the generic, because it is what
+customers ask for and what the counter searches.
 
 Add barcodes on the **Barcodes** tab by scanning them into the field rather than typing them —
 the box keeps focus, so a run of products goes at scanner speed. A barcode belongs to one
 product only (`VR-205`) and the screen refuses a clash rather than moving the code.
 
-Packs go on the **Units** tab, and the screen states each one in words — `1 SACK = 50 KG` — so
-a factor typed as 5,000 instead of 50,000 is visible rather than arithmetic nobody checks.
+Packs go on the **Units** tab, and the screen states each one in words — `1 BOX = 100 TAB` — so
+a factor typed as 10 instead of 100 is visible rather than arithmetic nobody checks.
 
 ### Opening stock (`OPS-106`)
 
@@ -311,11 +319,11 @@ is the pre-migration one you just took.
 
 ## 9. Uninstalling
 
-Windows **Settings → Apps → Chachi Agrivet POS → Uninstall**.
+Windows **Settings → Apps → Chachi Pharmacy POS → Uninstall**.
 
 It removes the application. It does **not** remove:
 
-- `%LOCALAPPDATA%\ChachiAgrivetPOS\` — the database lives here;
+- `%LOCALAPPDATA%\ChachiPharmacyPOS\` — the database lives here;
 - the backup folder, whose location the installer has never been told.
 
 The uninstaller says both on screen before it does anything. Reinstalling finds the same data

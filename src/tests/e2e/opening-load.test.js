@@ -118,7 +118,7 @@ test('TC-E2E-21: the operator downloads a template per file', async () => {
   for (const kind of ['products', 'stock', 'balances']) {
     const response = await call(`/data/opening/template/${kind}`);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get('content-disposition'), new RegExp(`agrivet_opening_${kind}\\.csv`));
+    assert.match(response.headers.get('content-disposition'), new RegExp(`pharmacy_opening_${kind}\\.csv`));
 
     const rows = csv.parse(await response.text());
     assert.ok(rows.length >= 2, 'a header and at least one example row to copy');

@@ -113,9 +113,9 @@ export function createApp({ root }) {
     const problem = h('p', { class: 'error', role: 'alert', hidden: true });
 
     clear(root).append(h('div', { class: 'signin' }, [
-      h('h1', { text: installation.store_name || 'Chachi Agrivet POS' }),
+      h('h1', { text: installation.store_name || 'Chachi Pharmacy POS' }),
       installation.store_name
-        ? h('p', { class: 'signin-store', text: 'Chachi Agrivet POS' })
+        ? h('p', { class: 'signin-store', text: 'Chachi Pharmacy POS' })
         : null,
       note ? h('p', { class: 'signin-note', text: note }) : null,
       h('form', {
@@ -750,7 +750,7 @@ export function createApp({ root }) {
 
   function renderRail(activeId) {
     clear(railHost).append(
-      h('div', { class: 'rail-brand', text: 'Chachi Agrivet' }),
+      h('div', { class: 'rail-brand', text: 'Chachi Pharmacy' }),
       ...RAIL
         // §2: items the role cannot reach are hidden, not disabled.
         .filter((item) => may(session.role, item.tx))

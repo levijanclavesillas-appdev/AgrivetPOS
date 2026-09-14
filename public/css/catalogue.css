@@ -24,6 +24,7 @@
 .catalogue-list tbody tr:hover, .catalogue-list tbody tr:focus-visible {
   background: var(--md-primary-container); }
 .catalogue-list .sku { font-family: var(--font-mono); font-size: var(--type-body-sm-size); }
+.catalogue-list .generic-name { display: block; color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size); }
 .catalogue-list .qty, .catalogue-list .money { font-variant-numeric: tabular-nums; }
 /* UOM-005: the base unit is a code, and codes read as codes. */
 .catalogue-list .unit { font-size: var(--type-label-md-size); letter-spacing: var(--tracking-label);

@@ -236,6 +236,30 @@ test('the opening load creates the batch, and INV-201 holds from the first movem
   assert.equal(inventoryRepository.movementsFor(loaded.id, { limit: 5 })[0].batch_id, batches[0].id);
 });
 
+test('pharmacy edition: the product file carries the generic name and TAX-004 eligibility', () => {
+  const products = file(
+    ['sku', 'name', 'category', 'base_unit', 'retail_price', 'generic_name', 'senior_pwd'],
+    [
+      ['OPR-PARA', 'Biogesic 500mg', 'Veterinary', 'PC', '5.00', 'Paracetamol', 'yes'],
+      ['OPR-COTTON', 'Cotton balls 50s', 'Veterinary', 'PC', '35.00', '', ''],
+      // A typo is not a yes: a statutory discount is not granted by accident.
+      ['OPR-TYPO', 'Mefenamic 500mg', 'Veterinary', 'PC', '6.00', 'Mefenamic acid', 'yse'],
+    ]
+  );
+  const result = openingDataService.run({ products }, sessions.OWNER);
+  assert.equal(result.ok, true, JSON.stringify(result.problems));
+
+  const para = productRepository.findBySku('OPR-PARA');
+  assert.equal(para.generic_name, 'Paracetamol');
+  assert.equal(para.statutory_discount_eligible, 1);
+
+  const cotton = productRepository.findBySku('OPR-COTTON');
+  assert.equal(cotton.generic_name, null, 'a blank cell is no generic name');
+  assert.equal(cotton.statutory_discount_eligible, 0);
+
+  assert.equal(productRepository.findBySku('OPR-TYPO').statutory_discount_eligible, 0);
+});
+
 test('opening stock that is already expired loads with a warning, not a refusal', () => {
   temp.seedSupplier({ name: 'Expired Stock Supplier', code: 'ESS' }, sessions.OWNER);
   const products = file(
@@ -331,6 +355,7 @@ test('TC-INT-99: an opening balance is the first line of the statement, and reco
 
   const customer = customerRepository.findByName('Sitio Maligaya Farm');
   assert.ok(customer, 'the customer was created by the load');
+  assert.equal(customer.customer_type, 'REGULAR', 'a pharmacy’s account customers are regulars, not farms');
   const view = creditService.creditFor(customer.id);
 
   // CR-103: the balance is *derived*, not written. It equals the transaction.
@@ -494,7 +519,7 @@ test('requirement 2: each template downloads, and passes its own validation', as
     const response = await call(`/data/opening/template/${kind}`, { token: tokens.OWNER });
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type'), /text\/csv/);
-    assert.match(response.headers.get('content-disposition'), new RegExp(`agrivet_opening_${kind}\\.csv`));
+    assert.match(response.headers.get('content-disposition'), new RegExp(`pharmacy_opening_${kind}\\.csv`));
 
     // Asserted on the bytes, not on `text()`: the fetch standard strips a leading BOM
     // when it decodes, so the string would pass this whether the bytes were there or

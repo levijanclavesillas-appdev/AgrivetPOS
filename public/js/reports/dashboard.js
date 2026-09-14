@@ -54,7 +54,7 @@ const REPORTS = [
   { id: 'analysis', label: 'Sales analysis', rule: 'RPT-104', screen: true, why: 'By category, cashier, product and mover' },
   { id: 'valuation', label: 'Inventory valuation', rule: 'RPT-103', why: 'What the shelves are worth' },
   { id: 'movements', label: 'Movement analysis', rule: 'INV-102', screen: true, why: 'Received, sold, damaged, expired' },
-  { id: 'ageing', label: 'Ageing', rule: 'CR-301', screen: true, why: 'What the farms owe, by age' },
+  { id: 'ageing', label: 'Ageing', rule: 'CR-301', screen: true, why: 'What account customers owe, by age' },
 ];
 
 /**

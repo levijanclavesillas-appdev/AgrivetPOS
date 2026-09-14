@@ -75,11 +75,16 @@ const KINDS = Object.freeze({
     // stored per product, and a cutover is the one moment the whole catalogue is being
     // typed anyway. Optional and defaulting to no, because a store that tracks nothing
     // by batch should not have to write "no" five hundred times.
-    optional: ['brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked'],
+    //
+    // `generic_name` and `senior_pwd` (pharmacy edition): the two things a drugstore
+    // catalogue carries that an agrivet's did not. `senior_pwd` is the product's
+    // TAX-004 eligibility, read the way `batch_tracked` is — yes or blank.
+    optional: ['generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd'],
     example: [
-      ['sku', 'name', 'category', 'base_unit', 'retail_price', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked'],
-      ['HG-50', 'Hog Grower Pellets', 'Feeds', 'KG', '52.00', 'B-MEG', '50.00', '', 'VATABLE', '100', '4800012345678', ''],
-      ['VET-AMOX', 'Amoxicillin 100ml', 'Veterinary', 'PC', '320.00', '', '', '', 'VATABLE', '5', '', 'yes'],
+      ['sku', 'name', 'category', 'base_unit', 'retail_price', 'generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd'],
+      ['PARA-500', 'Paracetamol 500mg tablet', 'Medicines', 'TAB', '4.50', 'Paracetamol', '', '', '', 'VATABLE', '200', '4800012345678', 'yes', 'yes'],
+      ['ASC-500', 'Ascorbic Acid 500mg capsule', 'Vitamins', 'CAP', '6.00', 'Ascorbic acid', '', '', '', 'VATABLE', '100', '', 'yes', 'yes'],
+      ['COTTON-50', 'Cotton balls 50s', 'Personal Care', 'PC', '35.00', '', '', '', '', 'VATABLE', '10', '', '', ''],
     ],
   },
   stock: {
@@ -94,8 +99,9 @@ const KINDS = Object.freeze({
     optional: ['note', 'batch_no', 'expiry_date', 'supplier'],
     example: [
       ['sku', 'quantity', 'unit_cost', 'note', 'batch_no', 'expiry_date', 'supplier'],
-      ['HG-50', '250', '39.00', 'Counted 1 Sep', '', '', ''],
-      ['VET-AMOX', '12', '210.00', '', 'A-2291', '2027-03-31', 'Mindanao Vet Supply'],
+      ['PARA-500', '1000', '2.80', 'Counted 1 Sep', 'P24091', '2027-08-31', 'Mindanao Pharma Supply'],
+      ['ASC-500', '500', '3.60', '', 'AC2291', '2027-03-31', 'Mindanao Pharma Supply'],
+      ['COTTON-50', '24', '22.00', '', '', '', ''],
     ],
   },
   balances: {
@@ -104,7 +110,7 @@ const KINDS = Object.freeze({
     optional: ['code', 'contact_no', 'credit_limit', 'terms_days', 'note'],
     example: [
       ['customer', 'balance', 'code', 'contact_no', 'credit_limit', 'terms_days', 'note'],
-      ['Sitio Maligaya Farm', '12500.00', 'MALIGAYA', '09171234567', '50000.00', '30', 'From the blue notebook'],
+      ['Barangay Health Center', '12500.00', 'BHC', '09171234567', '50000.00', '30', 'From the blue notebook'],
       ['Aling Nena', '850.00', '', '', '5000.00', '15', ''],
     ],
   },
@@ -122,7 +128,7 @@ function template(kind) {
   return {
     kind,
     label: declared.label,
-    file_name: `agrivet_opening_${kind}.csv`,
+    file_name: `pharmacy_opening_${kind}.csv`,
     required: declared.required,
     optional: declared.optional,
     csv: csv.stringify(declared.example),
@@ -314,6 +320,12 @@ function checkProducts(source, problems, warnings) {
     // a sack of feed and demand an expiry date the store cannot give.
     const batchTracked = /^(y|yes|true|1)$/i.test(text(values.batch_tracked, { max: 8 }));
     if (batchTracked) extra.isBatchTracked = true;
+    // TAX-004 eligibility, by the same reading: anything but a yes is no, because a typo
+    // must not silently grant a statutory discount the product does not carry.
+    const seniorPwd = /^(y|yes|true|1)$/i.test(text(values.senior_pwd, { max: 8 }));
+    if (seniorPwd) extra.statutoryDiscountEligible = true;
+    const genericName = text(values.generic_name, { max: 120 });
+    if (genericName) extra.genericName = genericName;
 
     const taxClass = text(values.tax_class, { max: 20 }).toUpperCase() || 'VATABLE';
     if (!productService.TAX_CLASSES.includes(taxClass)) {
@@ -730,7 +742,10 @@ function run({ products = null, stock = null, balances = null, cutoverAt = null,
           name: row.name,
           code: row.code,
           contactNo: row.contactNo,
-          customerType: 'FARM',
+          // A drugstore's account customers are regulars — a clinic, a health centre,
+          // a family on a tab — not farms. FARM stays a valid type (004's CHECK), it is
+          // just not what a pharmacy's notebook is full of.
+          customerType: 'REGULAR',
           priceLevel: 'RETAIL',
           isCreditEligible: true,
           creditLimitCentavos: row.creditLimitCentavos,

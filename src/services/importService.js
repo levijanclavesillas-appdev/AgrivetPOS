@@ -120,7 +120,7 @@ function validate(archiveBuffer, { collisionMode = 'SKIP' } = {}) {
     problems.push({
       rule_id: 'OPS-102',
       message: `This archive is at schema version ${manifest.schema_version}, but this version `
-        + `of Chachi Agrivet POS only knows up to ${binary}. It was written by a newer `
+        + `of Chachi Pharmacy POS only knows up to ${binary}. It was written by a newer `
         + 'installation. Install the current version before importing it — running an older '
         + 'build against newer data loses data.',
     });

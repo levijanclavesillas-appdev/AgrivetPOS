@@ -18,7 +18,7 @@ class SchemaAheadOfBinaryError extends Error {
   constructor(dbVersion, binaryVersion) {
     super(
       `This database is at schema version ${dbVersion}, but this version of Chachi ` +
-      `Agrivet POS only knows up to ${binaryVersion}. It was written by a newer ` +
+      `Pharmacy POS only knows up to ${binaryVersion}. It was written by a newer ` +
       `installation. Install the current version before opening it — running an older ` +
       `build against a newer database loses data.`
     );

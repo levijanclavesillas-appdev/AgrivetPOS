@@ -44,7 +44,7 @@ const TRIGGERS = Object.freeze([
   'SCHEDULED', 'SHIFT_CLOSE', 'MANUAL', 'PRE_RESTORE', 'PRE_IMPORT', 'PRE_MIGRATION',
 ]);
 
-const FILE_PREFIX = 'agrivet_backup';
+const FILE_PREFIX = 'pharmacy_backup';
 
 function assertTrigger(trigger) {
   if (!TRIGGERS.includes(trigger)) {

@@ -1510,11 +1510,13 @@ app.whenReady().then(async () => {
 
   console.log('\n— SCR-301: the statutory discount (TAX-004, TAX-005) —');
 
-  // The one feature in this product that ships **off**, so the walk is in two halves:
-  // what the counter does before an owner switches it on, and what it does after.
-  const offPolicy = (await api('/sales/pricing-policy')).json;
-  log(offPolicy.statutory.enabled === false,
-    'TAX-004: it ships off, and the counter is told so rather than deciding for itself');
+  // Pharmacy edition: it ships **on** (PHARMACY_EDITION.md P-1). The walk keeps its two
+  // halves — a store that does not grant it, then one that does — by having the owner
+  // switch it off first, because what the counter says while it is off still matters.
+  const onPolicy = (await api('/sales/pricing-policy')).json;
+  log(onPolicy.statutory.enabled === true,
+    'TAX-004: it ships on in a pharmacy, and the counter is told so rather than deciding for itself');
+  await api('/settings', { method: 'PUT', body: { statutory_discount_enabled: false } });
 
   await run(OPEN_POS);
   await waitFor(`!!document.querySelector('.pos')`, { label: 'SCR-301' });
@@ -2166,7 +2168,12 @@ app.whenReady().then(async () => {
   log(dialogOpen && await run(`document.querySelector('.restore-dialog .danger').disabled === true`),
     'and Restore is disabled until the filename is typed');
 
-  const name = backups.json.backups[0].file_name;
+  // The name the dialog shows, not the newest one the API listed a moment ago: a second
+  // backup can land while the panel reloads, the first row is then a different file from
+  // `backups[0]`, and typing the wrong name fails this step on timing alone. A person
+  // types what the dialog shows them, so the walk does too.
+  const name = (await run(`(document.querySelector('.restore-dialog .file') || {}).textContent || ''`))
+    || backups.json.backups[0].file_name;
   await run(`(() => {
     const el = document.querySelector('.confirm-filename');
     el.value = ${JSON.stringify(name.slice(0, -1))};

@@ -86,7 +86,7 @@ test('GET /api/v1/health/panel reports OPS-006’s six figures, behind TX-428', 
 test('the renderer is served from the same origin as the API', async () => {
   const res = await fetch(`${BASE}/`);
   assert.equal(res.status, 200);
-  assert.match(await res.text(), /Chachi Agrivet POS/);
+  assert.match(await res.text(), /Chachi Pharmacy POS/);
 });
 
 test('an unknown API route returns the documented error shape (05_TECH_SPEC.md §4)', async () => {
