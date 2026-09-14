@@ -606,6 +606,9 @@ export function createApp({ root }) {
 
     clear(main).append(screen);
     screen.append(tabs, panelHost);
+    // On a phone the strip scrolls; the chosen tab is brought into it, not left off the edge.
+    const active = tabs.querySelector('.is-active');
+    if (active && tabs.scrollWidth > tabs.clientWidth) active.scrollIntoView({ block: 'nearest', inline: 'center' });
 
     const chosen = ADMIN_PANELS.find((panel) => panel.id === adminPanel);
     if (current?.unmount) current.unmount();

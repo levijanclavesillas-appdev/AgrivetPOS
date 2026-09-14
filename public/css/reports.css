@@ -42,7 +42,10 @@
 /* M3 cards, and the only thing on the dashboard that is touched: filled cards at
    elevation 1, with the system's state layer on hover. */
 .tiles { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
-.tile { display: grid; gap: 2px; align-content: start; text-align: left;
+/* One full-width column: a grid inside a <button> otherwise sizes its track to the text
+   and centres it, so on a phone every tile's figures started at a different place. */
+.tile { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-content: start;
+  justify-content: stretch; text-align: left;
   padding: var(--space-3) var(--space-4); min-height: 5.5rem;
   background: var(--md-surface); border: 1px solid var(--md-outline-variant);
   border-radius: var(--shape-md); box-shadow: var(--elev-1); cursor: pointer;

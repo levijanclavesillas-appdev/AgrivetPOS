@@ -56,6 +56,13 @@ function renderProgress() {
   five.push(`<li class="${sixth} optional"${sixth === 'current' ? ' aria-current="step"' : ''}>`
     + `<span>${mark(sixth, 6)}</span> ${LABELS.data} <small>optional</small></li>`);
   stepList.innerHTML = five.join('');
+
+  // The compact header's version of the same thing: one line and a bar (app.css).
+  const [text, reached] = phase === 'steps' ? [`Step ${index + 1} of 5 · ${LABELS[STEPS[index]]}`, index + 1]
+    : phase === 'done' ? ['Saved', 5]
+      : [`Step 6 · ${LABELS.data}`, loaded ? 6 : 5.5];
+  document.querySelector('#wizard-progress').textContent = text;
+  document.querySelector('#wizard-bar').style.width = `${(reached / 6) * 100}%`;
 }
 
 const current = () => (phase === 'steps' ? STEPS[index] : phase);

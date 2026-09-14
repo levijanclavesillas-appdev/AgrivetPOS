@@ -105,7 +105,12 @@ export function createLicence({ root, session }) {
     const linked = !['UNLINKED', 'MISCONFIGURED'].includes(status.state);
     return h('div', { class: `licence-card tone-${words.tone}` }, [
       h('p', { class: 'licence-state' }, [h('span', { class: `tag licence-${words.tone}`, text: words.tag }), status.store_name ? ` ${status.store_name}` : '']),
-      h('p', { text: status.message }),
+      // The server's sentence says where to go; on this screen, say what to press.
+      h('p', { text: status.state === 'UNLINKED' && !status.pending
+        ? (status.message.startsWith('This POS is not linked')
+          ? 'This POS is not linked to a store yet, so no shift can be opened. Press Link this POS and approve the code from any browser.'
+          : status.message)
+        : status.message }),
       linked ? h('dl', { class: 'licence-facts' }, [
         fact('Owner', status.owner_email),
         fact('Paid until', date(status.paid_until)),

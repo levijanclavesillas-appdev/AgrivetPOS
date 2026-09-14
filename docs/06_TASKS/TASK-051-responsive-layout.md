@@ -65,3 +65,27 @@ cart beside a fixed 20 rem totals column, and the app was locked to landscape.
 | browser smoke | 1366×768, unchanged |
 
 **Status — 2026-09-14:** built on the `pharmacy` branch.
+
+**Follow-up — 2026-09-14, the setup wizard (client: "still not responsive … on the set up
+screens").** The first pass checked the wizard for sideways overflow, and it had none, so it
+passed. What was wrong was the layout:
+
+- **The header ballooned.** The stacked wizard was a grid with a minimum height, so the rail
+  row stretched: half of a tablet portrait screen was an empty header, and a third of a phone's.
+  It is a flex column now.
+- **Next was a scroll away.** The action bar is sticky, but the card's `overflow: hidden` made
+  it stick to nothing. On anything narrower than the card, the page scrolls, nothing clips, and
+  Back/Next stay on the bottom of the screen, above the Android navigation bar
+  (`safe-area-inset-bottom`).
+- **Phones and landscape phones get a one-line header**: the brand, *Step 3 of 5 · Owner*, and
+  a progress bar. The step list and title stay for a screen reader. Fields go one to a row,
+  Back and Next share the bar at thumb width, and the two choices after setup stack.
+- After setup, three things on the first screens: dashboard tiles on a phone centred their
+  figures at a different place each (a grid inside a `<button>` sized to its text); the admin
+  tab strip scrolls the chosen tab into view; and Subscription, when unlinked, says what to
+  press rather than where to go.
+
+Walked at 360×640, 390×844, 844×390, 800×1280, 1280×800 and 1366×768 through all six steps,
+an error, the recovery code, sign-in, the dashboard and Subscription: no sideways overflow at
+any size, and the desktop card unchanged. The browser smoke passes at 1366×768.
+
