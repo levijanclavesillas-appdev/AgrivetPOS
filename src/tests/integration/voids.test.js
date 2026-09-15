@@ -581,8 +581,11 @@ test('AUD-603: an approver is proved by their own password, for one session and 
   }
   assert.equal(statusOf(first), 'COMPLETED');
 
-  // The password is checked like a sign-in's, lockout included.
-  assert.equal((await approve('manager', 'not-the-password')).status, 401);
+  // The password is checked like a sign-in's, lockout included — but refused as 403,
+  // not 401: the cashier is still signed in, and the renderer signs out on a 401.
+  const typo = await approve('manager', 'not-the-password');
+  assert.equal(typo.status, 403);
+  assert.equal((await call('/auth/session', { token: tokens.CASHIER })).status, 200, 'the cashier is still signed in');
   // Approving is for somebody signed in — it is not a way in.
   assert.equal((await call('/auth/approve', { method: 'POST', body: { username: 'manager', password: PASSWORD } })).status, 401);
 

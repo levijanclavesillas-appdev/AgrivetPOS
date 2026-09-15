@@ -393,7 +393,16 @@ const spentApprovals = new Map();
 
 /** POST /auth/approve: the approver's own password, for the session that asks. */
 function approve({ username, password }, requester) {
-  const approver = checkPassword({ username, password });
+  let approver;
+  try {
+    approver = checkPassword({ username, password });
+  } catch (err) {
+    // The person asking is signed in; it is the approver's password that is wrong. A
+    // 401 says the session is gone, and the renderer signs out on one — so a manager's
+    // typo at the panel would sign the cashier out mid-sale. It is a refusal instead.
+    if (err.status === 401) throw errors.forbidden(err.message, { ruleId: err.ruleId });
+    throw err;
+  }
   const token = jwt.sign(
     { sub: approver.id, scope: APPROVAL_SCOPE, for: requester.id, jti: crypto.randomUUID() },
     secrets.sessionSecret(),
