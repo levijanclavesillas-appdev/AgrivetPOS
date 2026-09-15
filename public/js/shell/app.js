@@ -553,6 +553,7 @@ export function createApp({ root }) {
     current = createRecall({
       root: host(),
       batchId,
+      session,
       onClose: () => showBatches(productId),
     });
     current.mount();

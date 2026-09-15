@@ -19,13 +19,21 @@
 // the stock and the goods may still have left with the customer; a partly returned line
 // has the unreturned part in somebody's shed. Both are decisions for the store, and a
 // report that made them silently would be deciding who does not get a telephone call.
+//
+// **The other half is the shelf (INV-208).** Putting the batch on recall holds it: from
+// that moment the counter will not sell it, and a sale that would need it is refused
+// naming the batch. What is left goes back to the supplier from here, by a
+// SUPPLIER_RETURN movement. A recall placed in error can be lifted, with a reason; the
+// trail keeps both.
 
 import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 
-export function createRecall({ root, batchId, onClose }) {
+export function createRecall({ root, batchId, session = null, onClose }) {
   let report = null;
+  // TX-407, as the batch list decides its write-off button: the route re-checks (SEC-6).
+  const mayAct = Boolean(session) && ['OWNER', 'MANAGER', 'INVENTORY'].includes(session.role);
 
   async function load() {
     ui.loading(root, { rows: 5 });
@@ -57,6 +65,8 @@ export function createRecall({ root, batchId, onClose }) {
         metaField('Still in the shop', summary.on_hand_display),
       ]),
 
+      holdPanel(),
+
       h('div', { class: 'recall-figures' }, [
         figure('Still out there', summary.outstanding_display, 'the quantity to chase'),
         figure('People to ring', String(summary.customers_count),
@@ -72,6 +82,84 @@ export function createRecall({ root, batchId, onClose }) {
 
       report.sales.length === 0 ? emptyState() : table(),
     ]));
+  }
+
+  /** INV-208: whether the batch is held, and the actions that go with it. */
+  function holdPanel() {
+    const { batch, summary } = report;
+    if (!batch.is_recalled) {
+      return h('div', { class: 'recall-hold' }, [
+        h('p', {}, [
+          h('strong', { text: 'Not on recall. ' }),
+          h('span', { text: 'This batch can still be sold. Put it on recall to stop the counter selling it.' }),
+        ]),
+        mayAct ? h('button', { class: 'danger', icon: 'shield-check', text: 'Put on recall', onclick: placeRecall }) : null,
+      ]);
+    }
+    return h('div', { class: 'recall-hold is-held' }, [
+      h('p', {}, [
+        h('strong', { text: 'On recall — cannot be sold. ' }),
+        h('span', { text: `Since ${batch.recall.at_manila}${batch.recall.by ? ` by ${batch.recall.by}` : ''}: ${batch.recall.reason}` }),
+      ]),
+      h('div', { class: 'recall-actions' }, [
+        mayAct && summary.on_hand_milli > 0
+          ? h('button', { class: 'primary', icon: 'truck', text: `Return ${summary.on_hand_display} to the supplier`, onclick: sendBack })
+          : null,
+        mayAct ? h('button', { text: 'Lift the recall', onclick: lift }) : null,
+      ]),
+    ]);
+  }
+
+  async function act(path, body, done) {
+    try {
+      await api.post(path, body);
+      ui.toast(done, { kind: 'success' });
+      await load();
+    } catch (err) {
+      ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+    }
+  }
+
+  async function placeRecall() {
+    const { batch } = report;
+    const answers = await ui.ask({
+      title: `Put batch ${batch.batch_no} on recall`,
+      message: 'From now on the counter will not sell this batch, and a sale that needs it is refused. '
+        + 'Take what is left off the shelf. The customers who bought it are listed below.',
+      fields: [{ name: 'reason', label: 'Why', required: true, maxLength: 200,
+        hint: 'The notice, e.g. “FDA advisory 2026-114” or “Supplier letter of 15 Sept”.' }],
+      submitLabel: 'Put on recall',
+    });
+    if (!answers) return;
+    await act(`/batches/${batchId}/recall`, { reason: answers.reason }, `${batch.batch_no} is on recall and will not be sold`);
+  }
+
+  async function sendBack() {
+    const { batch, summary } = report;
+    const answers = await ui.ask({
+      title: `Return batch ${batch.batch_no} to the supplier`,
+      message: `${summary.on_hand_display} leaves stock as returned to ${batch.supplier_name}. `
+        + 'Do this when the stock is handed over or sent.',
+      fields: [{ name: 'note', label: 'Note (optional)', required: false, maxLength: 200,
+        hint: 'e.g. “Collected by the agent, return slip RS-0412”.' }],
+      submitLabel: 'Return to supplier',
+    });
+    if (!answers) return;
+    await act(`/batches/${batchId}/return-to-supplier`, { note: answers.note || null },
+      `${summary.on_hand_display} of ${batch.batch_no} returned to the supplier`);
+  }
+
+  async function lift() {
+    const { batch } = report;
+    const answers = await ui.ask({
+      title: `Lift the recall on batch ${batch.batch_no}`,
+      message: 'The batch can be sold again at once. Lift a recall only if it was placed by mistake, '
+        + 'or the manufacturer has withdrawn the notice.',
+      fields: [{ name: 'reason', label: 'Why', required: true, maxLength: 200 }],
+      submitLabel: 'Lift the recall',
+    });
+    if (!answers) return;
+    await act(`/batches/${batchId}/recall/lift`, { reason: answers.reason }, `The recall on ${batch.batch_no} is lifted`);
   }
 
   function emptyState() {

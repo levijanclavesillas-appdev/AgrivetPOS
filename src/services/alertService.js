@@ -111,7 +111,20 @@ function lowStockAlerts() {
 function expiryAlerts() {
   const near = batchService.nearExpiry({ limit: 200 });
   const gone = batchService.expired({ limit: 200 });
+  const recalled = batchService.recalledOnShelf({ limit: 200 });
   const out = [];
+
+  // INV-208, first and CRITICAL: a recalled lot on the shelf is one a customer can
+  // still pick up, and the counter refuses it at every attempt until it is sent back.
+  if (recalled.length > 0) {
+    const first = recalled[0];
+    out.push(alert(
+      'RECALLED_STOCK', 'CRITICAL', 'INV-208',
+      `${recalled.length} recalled batch${recalled.length === 1 ? ' is' : 'es are'} still on the shelf `
+      + `— ${first.product_name} ${first.batch_no}, ${first.qty_display}. Take it off the shelf and send it back.`,
+      { count: recalled.length, batch_id: first.id, product_id: first.product_id }
+    ));
+  }
 
   if (gone.length > 0) {
     const worst = gone[0];

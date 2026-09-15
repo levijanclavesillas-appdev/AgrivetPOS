@@ -25,6 +25,7 @@
 // expired batch and there is no parameter that would let it. Expired stock leaves by
 // `expire`, which posts INV-103's EXPIRY movement.
 
+const db = require('../config/database');
 const clock = require('../config/clock');
 const csv = require('../config/csv');
 const ids = require('../config/ids');
@@ -105,6 +106,14 @@ function present(row, { asOfDate = null, nearDays = null } = {}) {
     qty_display: row.qty_milli === undefined || !row.base_unit_code
       ? undefined
       : quantity.format(row.qty_milli, row.base_unit_code),
+    // INV-208: held, and why. Null when the batch is not on recall.
+    is_recalled: Boolean(row.recalled_at),
+    recall: row.recalled_at ? {
+      at: row.recalled_at,
+      at_manila: clock.toManila(row.recalled_at),
+      by: row.recalled_by_username || null,
+      reason: row.recall_reason,
+    } : null,
   };
 }
 
@@ -227,15 +236,28 @@ function allocate(productId, qtyMilli, { asOfDate = null, product = null } = {})
     const name = p.name || 'this product';
     const unit = p.base_unit_code || 'units';
     const qty = (milli) => quantity.format(milli, unit);
+    const recalledHere = batchRepository.recalledWithStock({ productId });
+    const recalledIds = new Set(recalledHere.map((b) => b.id));
     const expiredHere = batchRepository.expiredWithStock(asOf)
-      .filter((b) => b.product_id === productId);
-    const held = expiredHere.reduce((sum, b) => sum + b.qty_milli, 0);
+      .filter((b) => b.product_id === productId && !recalledIds.has(b.id));
+    const heldExpired = expiredHere.reduce((sum, b) => sum + b.qty_milli, 0);
+    const heldRecalled = recalledHere.reduce((sum, b) => sum + b.qty_milli, 0);
 
-    // INV-205, said out loud. Stock that exists and may not be sold is a different
-    // answer from stock that is not there, and the clerk needs to be told which.
-    if (held > 0) {
+    // INV-205 and INV-208, said out loud. Stock that exists and may not be sold is a
+    // different answer from stock that is not there, and the clerk needs to be told
+    // which — and a recalled lot is one to take off the shelf, not to go looking for.
+    if (heldRecalled > 0) {
       throw errors.conflict(
-        `${name}: ${qty(remaining)} short. ${qty(held)} is on the shelf but expired `
+        `${name}: ${qty(remaining)} short. ${qty(heldRecalled)} is on the shelf but recalled `
+        + `(batch ${recalledHere.map((b) => b.batch_no).join(', ')}) and may not be sold. `
+        + 'Take it off the shelf.'
+        + (heldExpired > 0 ? ` A further ${qty(heldExpired)} has expired.` : ''),
+        { ruleId: 'INV-208' },
+      );
+    }
+    if (heldExpired > 0) {
+      throw errors.conflict(
+        `${name}: ${qty(remaining)} short. ${qty(heldExpired)} is on the shelf but expired `
         + `(${expiredHere.map((b) => `${b.batch_no} on ${b.expiry_date}`).join(', ')}) `
         + 'and may not be sold.',
         { ruleId: 'INV-205' },
@@ -350,6 +372,124 @@ function expire(batchId, { actor, reason = null, occurredAt = null }) {
   });
 
   return { batch: present(batchRepository.withQuantity(batch.id)), movement };
+}
+
+// ── INV-208: a recalled batch is held ──────────────────────────────────────
+//
+// INV-206 says who bought a batch. INV-208 stops anybody else buying it: a batch on
+// recall is never offered to a sale (batchRepository.fefoCandidates), a sale that
+// would need it is refused naming it, and what is left of it leaves the shop by a
+// SUPPLIER_RETURN — the movement INV-103 declared for exactly this and nothing had yet
+// written. Goods a customer brings back return to the batch they came from (POS-303),
+// so they are held too, and can be sent back in turn.
+
+function assertMayActOnStock(actor, what) {
+  if (!permissions.can(actor, 'TX-407')) {
+    throw errors.forbidden(`You do not have permission to ${what}.`, {
+      ruleId: 'TX-407', requiresRole: permissions.rolesHolding('TX-407').join(' or '),
+    });
+  }
+}
+
+function batchOrThrow(batchId) {
+  const batch = batchRepository.withQuantity(batchId);
+  if (!batch) throw errors.notFound('No such batch');
+  return batch;
+}
+
+function reasonOrThrow(reason, what) {
+  const text = typeof reason === 'string' ? reason.trim().slice(0, 200) : '';
+  if (!text) throw errors.badRequest(`Say why ${what} — the notice number, or who asked.`, { ruleId: 'INV-208' });
+  return text;
+}
+
+/** INV-208: put a batch on recall. From this moment it cannot be sold. */
+function recall(batchId, { actor, reason }) {
+  assertMayActOnStock(actor, 'put a batch on recall');
+  const why = reasonOrThrow(reason, 'this batch is recalled');
+  return db.transaction(() => {
+    const batch = batchOrThrow(batchId);
+    if (batch.recalled_at) {
+      throw errors.conflict(`Batch ${batch.batch_no} is already on recall.`, { ruleId: 'INV-208' });
+    }
+    const at = clock.nowUtc();
+    batchRepository.setRecall({
+      id: batch.id, recalledAt: at, recalledBy: actor.id, reason: why, updatedAt: at, updatedBy: actor.id,
+    });
+    auditService.write({
+      actor, action: 'BATCH_RECALLED', entityType: 'product_batch', entityId: batch.id,
+      before: { recalled: false },
+      after: { recalled: true, batch_no: batch.batch_no, product: batch.product_name, qty_milli: batch.qty_milli },
+      reason: why,
+    });
+    return present(batchRepository.withQuantity(batch.id));
+  });
+}
+
+/** INV-208: lift a recall placed in error, or withdrawn by the manufacturer. The batch may be sold again. */
+function liftRecall(batchId, { actor, reason }) {
+  assertMayActOnStock(actor, 'lift a recall');
+  const why = reasonOrThrow(reason, 'the recall is lifted');
+  return db.transaction(() => {
+    const batch = batchOrThrow(batchId);
+    if (!batch.recalled_at) {
+      throw errors.conflict(`Batch ${batch.batch_no} is not on recall.`, { ruleId: 'INV-208' });
+    }
+    const at = clock.nowUtc();
+    batchRepository.setRecall({ id: batch.id, recalledAt: null, recalledBy: null, reason: null, updatedAt: at, updatedBy: actor.id });
+    auditService.write({
+      actor, action: 'BATCH_RECALL_LIFTED', entityType: 'product_batch', entityId: batch.id,
+      before: { recalled: true, recalled_at: batch.recalled_at, recall_reason: batch.recall_reason },
+      after: { recalled: false, batch_no: batch.batch_no },
+      reason: why,
+    });
+    return present(batchRepository.withQuantity(batch.id));
+  });
+}
+
+/**
+ * INV-208: what is left of a recalled batch goes back to the supplier, by a
+ * SUPPLIER_RETURN movement for all of it. Only a recalled batch: returning good stock to
+ * a supplier is a purchasing question this screen does not answer.
+ */
+function returnToSupplier(batchId, { actor, note = null }) {
+  assertMayActOnStock(actor, 'return stock to the supplier');
+  return db.transaction(() => {
+    const batch = batchOrThrow(batchId);
+    if (!batch.recalled_at) {
+      throw errors.conflict(
+        `Batch ${batch.batch_no} is not on recall. Put it on recall first; only recalled stock is sent back from here.`,
+        { ruleId: 'INV-208' },
+      );
+    }
+    if (batch.qty_milli <= 0) {
+      throw errors.conflict(`Batch ${batch.batch_no} holds no stock to send back.`, { ruleId: 'INV-208' });
+    }
+    const extra = typeof note === 'string' && note.trim() ? ` — ${note.trim().slice(0, 200)}` : '';
+    const movement = inventoryService().post({
+      productId: batch.product_id,
+      type: 'SUPPLIER_RETURN',
+      qtyMilli: batch.qty_milli,
+      batchId: batch.id,
+      actor,
+      reason: `Recall of batch ${batch.batch_no}: ${batch.recall_reason}${extra}`,
+      referenceType: 'product_batch',
+      referenceId: batch.id,
+      referenceNo: batch.batch_no,
+    });
+    auditService.write({
+      actor, action: 'BATCH_RETURNED_TO_SUPPLIER', entityType: 'product_batch', entityId: batch.id,
+      before: { qty_milli: batch.qty_milli },
+      after: { qty_milli: 0, batch_no: batch.batch_no, supplier: batch.supplier_name },
+      reason: `${batch.recall_reason}${extra}`,
+    });
+    return { batch: present(batchRepository.withQuantity(batch.id)), movement };
+  });
+}
+
+/** INV-208's alert: recalled batches still on the shelf. */
+function recalledOnShelf({ limit = 200 } = {}) {
+  return batchRepository.recalledWithStock({ limit }).map((row) => present(row));
 }
 
 /**
@@ -499,6 +639,7 @@ function recallCsv(batchId, { actor = null } = {}) {
 }
 
 module.exports = {
+  recall, liftRecall, returnToSupplier, recalledOnShelf,
   STATUS,
   statusOf,
   present,

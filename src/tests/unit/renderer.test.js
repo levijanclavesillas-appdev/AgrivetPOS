@@ -1998,8 +1998,14 @@ test('SCR-207: a recall leads with the people, not the stock (INV-206)', () => {
   assert.match(source, /'Walk-in'/);
   assert.match(source, /no way to reach them/);
 
-  // Nothing on it writes: a recall reads a batch's history and changes nothing.
-  assert.equal(/api\.(post|put|delete)/.test(source), false);
+  // It writes only INV-208's three actions — hold the batch, send what is left back,
+  // lift a mistaken hold. It used to write nothing, and the counter went on selling the
+  // recalled lot while somebody rang the last person who bought it.
+  assert.equal(/api\.(put|delete)/.test(source), false);
+  assert.match(source, /\/batches\/\$\{batchId\}\/recall`, \{ reason/);
+  assert.match(source, /\/batches\/\$\{batchId\}\/return-to-supplier`/);
+  assert.match(source, /\/batches\/\$\{batchId\}\/recall\/lift`/);
+  assert.match(source, /On recall — cannot be sold/);
   // RPT-106: the list says what it includes, from the server rather than a copy here.
   assert.match(source, /report\.basis/);
   // Reached in one step from the batch it is about.

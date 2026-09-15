@@ -69,6 +69,11 @@ const ACTIONS = Object.freeze({
   // action the trail could never carry.
   BATCH_CREATE: { what: 'Batch created', rule: 'INV-202' },
   BATCH_EXPIRE: { what: 'Batch written off as expired', rule: 'INV-205' },
+  // INV-208: a recall holds the batch, and lifting one releases it — both are somebody's
+  // decision about what may be sold, and the trail is the only place that says whose.
+  BATCH_RECALLED: { what: 'Batch put on recall', rule: 'INV-208' },
+  BATCH_RECALL_LIFTED: { what: 'Batch recall lifted', rule: 'INV-208' },
+  BATCH_RETURNED_TO_SUPPLIER: { what: 'Recalled batch returned to the supplier', rule: 'INV-208' },
 
   // ── AUD-601: sales ────────────────────────────────────────────────────────
   SALE_VOIDED: { what: 'Sale voided', rule: 'AUD-601' },

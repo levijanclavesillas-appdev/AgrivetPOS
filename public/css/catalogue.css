@@ -41,6 +41,8 @@
   background: var(--md-surface-container-highest); color: var(--md-on-surface-muted); }
 .tag.warn { background: var(--md-warning-container); color: var(--md-on-warning-container);
   border-color: color-mix(in srgb, var(--md-warning) 30%, transparent); }
+.tag.danger { background: var(--md-error-container); color: var(--md-on-error-container);
+  border-color: color-mix(in srgb, var(--md-error) 30%, transparent); margin-right: var(--space-1); }
 
 .pager { display: flex; align-items: center; gap: var(--space-3); }
 .pager button { min-height: var(--touch); padding: 0 var(--space-4); }
@@ -115,6 +117,13 @@
    The third is the one a store would otherwise never learn — the buyers it cannot
    reach — so it is given the same size as the other two rather than a footnote.
 */
+/* INV-208: whether the batch is held, and what to do about it, above the list of people. */
+.recall-hold { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3);
+  margin: var(--space-4) 0 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md, 12px);
+  background: var(--md-surface-container-highest); border-left: 4px solid var(--md-outline, #94a3b8); }
+.recall-hold p { margin: 0; flex: 1 1 20rem; }
+.recall-hold.is-held { background: var(--md-error-container); color: var(--md-on-error-container); border-left-color: var(--md-error); }
+.recall-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .recall-figures { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-4) 0; }
 .recall-figure { flex: 1 1 12rem; padding: var(--space-3) var(--space-4); background: var(--md-surface);
   border: 1px solid var(--md-outline-variant); border-left: 4px solid var(--md-primary);

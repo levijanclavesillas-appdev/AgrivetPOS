@@ -17,7 +17,8 @@ const db = require('../config/database');
 const COLUMNS = `
   b.id, b.product_id, b.batch_no, b.supplier_id, b.expiry_date, b.received_date,
   b.unit_cost_centavos, b.gr_item_id, b.notes, b.is_active,
-  b.created_at, b.created_by, b.updated_at, b.updated_by
+  b.created_at, b.created_by, b.updated_at, b.updated_by,
+  b.recalled_at, b.recalled_by, b.recall_reason
 `;
 
 const JOINED = `
@@ -27,7 +28,8 @@ const JOINED = `
   p.sku  AS product_sku,
   -- UOM-005: a quantity is never displayed without its unit, so every batch read
   -- carries the product's base unit rather than making each caller fetch it.
-  u.code AS base_unit_code
+  u.code AS base_unit_code,
+  ru.username AS recalled_by_username
 `;
 
 const FROM = `
@@ -35,6 +37,7 @@ const FROM = `
   JOIN suppliers s ON s.id = b.supplier_id
   JOIN products  p ON p.id = b.product_id
   JOIN units     u ON u.id = p.base_unit_id
+  LEFT JOIN users ru ON ru.id = b.recalled_by
 `;
 
 // INV-201. LEFT JOIN, not JOIN: a batch created by a receipt whose movement has not
@@ -112,9 +115,34 @@ function fefoCandidates(productId, asOfDate) {
      WHERE b.product_id = @productId
        AND b.is_active = 1
        AND b.expiry_date >= @asOfDate
+       -- INV-208: a recalled batch is held. It is never offered to a sale, whatever
+       -- its expiry, until the recall is lifted.
+       AND b.recalled_at IS NULL
        AND COALESCE(q.qty_milli, 0) > 0
      ORDER BY b.expiry_date, b.batch_no
   `).all({ productId, asOfDate });
+}
+
+/** INV-208: recalled batches still holding stock — what should be off the shelf and going back. */
+function recalledWithStock({ productId = null, limit = 200 } = {}) {
+  return db.get().prepare(`
+    SELECT ${JOINED}, COALESCE(q.qty_milli, 0) AS qty_milli
+    ${FROM} ${QTY}
+     WHERE b.recalled_at IS NOT NULL AND COALESCE(q.qty_milli, 0) > 0
+       AND (@productId IS NULL OR b.product_id = @productId)
+     ORDER BY b.recalled_at
+     LIMIT @limit
+  `).all({ productId, limit });
+}
+
+/** Put a batch on recall (INV-208), or lift it: `recalledAt` null. */
+function setRecall({ id, recalledAt, recalledBy, reason, updatedAt, updatedBy }) {
+  db.get().prepare(`
+    UPDATE product_batches
+       SET recalled_at = @recalledAt, recalled_by = @recalledBy, recall_reason = @reason,
+           updated_at = @updatedAt, updated_by = @updatedBy
+     WHERE id = @id
+  `).run({ id, recalledAt, recalledBy, reason, updatedAt, updatedBy });
 }
 
 /** Expired batches that still hold stock — what INV-205 expects to leave by EXPIRY. */
@@ -134,6 +162,9 @@ function nearExpiry(asOfDate, throughDate, { limit = 200 } = {}) {
     SELECT ${JOINED}, COALESCE(q.qty_milli, 0) AS qty_milli
     ${FROM} ${QTY}
      WHERE b.expiry_date >= @asOfDate AND b.expiry_date <= @throughDate
+       -- Near-expiry is a selling problem (sell it first); a recalled batch is not for
+       -- sale at all, and has its own alert.
+       AND b.recalled_at IS NULL
        AND COALESCE(q.qty_milli, 0) > 0
      ORDER BY b.expiry_date
      LIMIT @limit
@@ -269,6 +300,8 @@ module.exports = {
   forProduct,
   fefoCandidates,
   expiredWithStock,
+  recalledWithStock,
+  setRecall,
   nearExpiry,
   reconciliationBreaks,
   linkReceiptItem,

@@ -127,7 +127,8 @@ export function createBatchList({ root, productId, session, onClose, onRecall = 
         // The same visual language SCR-201's low-stock row already speaks: amber for
         // something to deal with, and the refusal's colour for stock that may not be
         // sold at all.
-        class: batch.expiry_status === 'EXPIRED' ? 'is-expired'
+        // A recalled batch is held (INV-208) whatever its date says.
+        class: batch.is_recalled || batch.expiry_status === 'EXPIRED' ? 'is-expired'
           : (batch.expiry_status === 'NEAR_EXPIRY' ? 'is-low' : ''),
       }, [
         h('td', { class: 'sku', text: batch.batch_no }),
@@ -138,10 +139,13 @@ export function createBatchList({ root, productId, session, onClose, onRecall = 
           // decision; "2026-09-22" is a date somebody has to work out.
           h('small', { class: 'muted', text: daysPhrase(batch.days_to_expiry) }),
         ]),
-        h('td', {}, [h('span', {
-          class: `tag${batch.expiry_status === 'NORMAL' ? '' : ' warn'}`,
-          text: STATUS_LABEL[batch.expiry_status] || batch.expiry_status,
-        })]),
+        h('td', {}, [
+          batch.is_recalled ? h('span', { class: 'tag danger', text: 'Recalled', title: batch.recall.reason }) : null,
+          h('span', {
+            class: `tag${batch.expiry_status === 'NORMAL' ? '' : ' warn'}`,
+            text: STATUS_LABEL[batch.expiry_status] || batch.expiry_status,
+          }),
+        ]),
         h('td', { class: 'qty', text: batch.qty_display }),
         h('td', {}, [
           // INV-206 in one step from the batch, which is where somebody holding a

@@ -27,6 +27,7 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | Setup wizard (`SCR-001`) | Unstyled (it never loaded `tokens.css`); five steps | Styled and fitting 1366×768; an optional **step 6** loads the workbook as the new owner (`TASK-047`) | `setup.html`, `setup.js`, `shell/opening.js` |
 | Customers created by the opening balance load | `FARM` | `REGULAR` | `openingDataService` |
 | Product pictures (`TASK-052`) | None | One per product: on the editor, beside each name in the list and in the counter's search. In the database, so backups and exports carry them (`IMG-001`–`IMG-002`, §7) | `902_product_images.sql`, `productImageService`, `shell/pictures.js` |
+| A recalled batch (`INV-208`) | A list of who bought it (`INV-206`); the counter goes on selling it | **Held**: put on recall with a reason, never sold until lifted, what is left returned to the supplier; a dashboard alert while it is on the shelf (§8) | `903_batch_recall.sql`, `batchService.recall`, `SCR-207` |
 | Subscription (`TASK-048`) | None | A signed licence, renewed online at least every 30 days; no new shift opens once it lapses (`LIC-001`–`LIC-004`, §6). **On**: the build names `pos.chachisoftware.store` | `licenceService`, `901_licence.sql`, `licence-server/` |
 
 ## 2. Recorded decisions
@@ -128,3 +129,20 @@ photo, shrunk, is roughly 40–80 KB, which leaves an export of several hundred 
 inside the 64 MB an import accepts. The opening workbook (`TASK-047`) carries no pictures: they are
 added per product, from the editor.
 
+## 8. A recalled batch is held (`INV-208`)
+
+| # | Rule |
+| :-: | :--- |
+| `INV-208` | A batch put on recall is **held**: FEFO never offers it to a sale, and a sale that would need it is refused naming the batch, until the recall is lifted. Placing and lifting a recall need `TX-407` and a reason; what is left of a recalled batch leaves the shop by a `SUPPLIER_RETURN` movement for all of it. All three are audited (`BATCH_RECALLED`, `BATCH_RECALL_LIFTED`, `BATCH_RETURNED_TO_SUPPLIER`) |
+
+`INV-206`'s recall said who bought a batch and did nothing to the batch itself, so the counter's
+FEFO allocator went on selling a recalled lot — usually first, since the lot in a notice is often
+the oldest. A drugstore holding a manufacturer's or FDA notice must be able to stop the sale of
+that lot at once, from `SCR-207`, where the list of buyers already is.
+
+Recall is **state**, where expiry is arithmetic (`INV-203`): it is somebody's decision, on a day,
+for a reason. `product_batches.recalled_at`, `recalled_by` and `recall_reason` hold it; a lifted
+recall sets them back to null, and the audit trail keeps both events. Goods a customer brings back
+return to the batch they came from (`POS-303`), so recalled goods returned are held too, and are
+sent back in turn. Only a recalled batch is returned to the supplier from here; returning good
+stock to a supplier is a purchasing question for another screen.

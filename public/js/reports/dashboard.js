@@ -68,6 +68,7 @@ const REPORTS = [
 const ALERT_OPENS = {
   NEAR_EXPIRY: { screen: 'batches', label: 'See the batches' },
   EXPIRED_STOCK: { screen: 'batches', label: 'Write it off' },
+  RECALLED_STOCK: { screen: 'batches', label: 'See the batches' },
 };
 
 export function createDashboard({ root, session, onOpenReport, onOpenBatches = null }) {

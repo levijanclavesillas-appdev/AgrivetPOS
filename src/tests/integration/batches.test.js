@@ -555,6 +555,98 @@ test('INV-202: an order line says it is batch-tracked, and the delivery takes it
   assert.equal(inventoryRepository.qtyOnHand(product.id), 10000);
 });
 
+// ── INV-208: a recalled batch is held ────────────────────────────────────────
+
+test('INV-208: a recalled batch is held — the counter sells around it, and refuses to sell it', async () => {
+  const product = vaccine();
+  receive({ product, qtyMilli: 5000, unitCostCentavos: 21000, batchNo: 'RC-A', expiryDate: days(100) });
+  receive({ product, qtyMilli: 3000, unitCostCentavos: 21000, batchNo: 'RC-B', expiryDate: days(400) });
+  const byNo = (no) => batchesOf(product.id).find((b) => b.batch_no === no);
+  const recallA = (token, body) => call(`/batches/${byNo('RC-A').id}/recall`, { token, method: 'POST', body });
+
+  // Holding stock is a decision about stock: TX-407, and a reason the trail can keep.
+  assert.equal((await recallA(tokens.CASHIER, { reason: 'FDA advisory' })).status, 403);
+  const noReason = await recallA(tokens.INVENTORY, {});
+  assert.equal(noReason.status, 400);
+  assert.equal((await noReason.json()).error.rule_id, 'INV-208');
+
+  const placed = await recallA(tokens.INVENTORY, { reason: 'FDA advisory 2026-114' });
+  assert.equal(placed.status, 200);
+  const held = (await placed.json()).batch;
+  assert.equal(held.is_recalled, true);
+  assert.equal(held.recall.by, 'inventory');
+  assert.equal(held.recall.reason, 'FDA advisory 2026-114');
+  assert.equal((await recallA(tokens.INVENTORY, { reason: 'again' })).status, 409, 'once is enough');
+
+  // Before this, FEFO sold RC-A first — it expires soonest. Now it sells around it.
+  cashSale({ product, qtyMilli: 2000 });
+  assert.equal(byNo('RC-A').qty_milli, 5000, 'the recalled batch is untouched');
+  assert.equal(byNo('RC-B').qty_milli, 1000);
+
+  // And a sale that would need it is refused, naming the batch and what to do.
+  assert.throws(() => cashSale({ product, qtyMilli: 2000 }), (err) => {
+    assert.equal(err.ruleId, 'INV-208');
+    assert.match(err.message, /recalled \(batch RC-A\) and may not be sold\. Take it off the shelf/);
+    return true;
+  });
+  assert.equal(byNo('RC-B').qty_milli, 1000, 'nothing moved on the refusal');
+
+  // The dashboard says so, first, and near-expiry no longer counts a held batch.
+  const alerts = alertService.expiryAlerts();
+  const recalled = alerts.find((a) => a.kind === 'RECALLED_STOCK');
+  assert.ok(recalled, JSON.stringify(alerts));
+  assert.equal(recalled.severity, 'CRITICAL');
+  assert.match(recalled.message, /RC-A/);
+
+  // Lifted — by mistake, or the notice was withdrawn — and it sells first again.
+  const lift = (body) => call(`/batches/${byNo('RC-A').id}/recall/lift`, { token: tokens.MANAGER, method: 'POST', body });
+  assert.equal((await lift({})).status, 400, 'a lift needs its reason too');
+  assert.equal((await lift({ reason: 'Wrong lot number on the notice' })).status, 200);
+  assert.equal(byNo('RC-A').is_recalled, false);
+  cashSale({ product, qtyMilli: 1000 });
+  assert.equal(byNo('RC-A').qty_milli, 4000, 'earliest expiry first, as before');
+
+  const trail = auditService.browse({ entityId: byNo('RC-A').id }).rows.map((row) => row.action);
+  assert.ok(trail.includes('BATCH_RECALLED') && trail.includes('BATCH_RECALL_LIFTED'), trail.join(','));
+});
+
+test('INV-208: what is left goes back to the supplier, and a customer return of it stays held', () => {
+  const product = vaccine();
+  receive({ product, qtyMilli: 6000, unitCostCentavos: 21000, batchNo: 'RS-1', expiryDate: days(200) });
+  const sale = cashSale({ product, qtyMilli: 2000 });
+  const batch = () => batchesOf(product.id).find((b) => b.batch_no === 'RS-1');
+
+  // Only recalled stock is sent back from here.
+  assert.throws(() => batchService.returnToSupplier(batch().id, { actor: sessions.INVENTORY }),
+    (err) => err.ruleId === 'INV-208' && /not on recall/.test(err.message));
+
+  batchService.recall(batch().id, { actor: sessions.INVENTORY, reason: 'Supplier letter of 15 Sept' });
+  const sent = batchService.returnToSupplier(batch().id, { actor: sessions.INVENTORY, note: 'Collected by the agent, RS-0412' });
+  assert.equal(sent.movement.movement.movement_type, 'SUPPLIER_RETURN');
+  assert.equal(sent.movement.movement.qty_milli, -4000);
+  assert.match(sent.movement.movement.reason, /Supplier letter of 15 Sept — Collected by the agent/);
+  assert.equal(batch().qty_milli, 0);
+  assert.equal(inventoryRepository.qtyOnHand(product.id), 0);
+  assert.equal(batched(product.id), inventoryRepository.qtyOnHand(product.id), 'INV-201 still holds');
+  assert.throws(() => batchService.returnToSupplier(batch().id, { actor: sessions.INVENTORY }),
+    (err) => err.ruleId === 'INV-208' && /holds no stock/.test(err.message));
+
+  // A customer brings one back: it returns to the batch it came from (POS-303), which
+  // is held — so it cannot be sold to the next person, and goes back in turn.
+  const item = saleRepository.itemsFor(sale.sale.id)[0];
+  returnService.post({
+    saleId: sale.sale.id, reason: 'Customer changed their mind',
+    lines: [{ saleItemId: item.id, qtyMilli: 1000, disposition: 'RESTOCK' }],
+  }, sessions.MANAGER);
+  assert.equal(batch().qty_milli, 1000);
+  assert.throws(() => cashSale({ product, qtyMilli: 1000 }), (err) => err.ruleId === 'INV-208');
+  batchService.returnToSupplier(batch().id, { actor: sessions.INVENTORY });
+  assert.equal(batch().qty_milli, 0);
+
+  const actions = auditService.browse({ entityId: batch().id }).rows.map((row) => row.action);
+  assert.equal(actions.filter((a) => a === 'BATCH_RETURNED_TO_SUPPLIER').length, 2);
+});
+
 // ── The other two paths that move batch-tracked stock ───────────────────────
 
 test('POS-401: voiding a sale returns each batch exactly what it gave', () => {

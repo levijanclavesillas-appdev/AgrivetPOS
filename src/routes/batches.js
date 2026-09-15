@@ -78,6 +78,36 @@ router.get('/batches/:id/recall', readInventory, (req, res, next) => {
   }
 });
 
+/**
+ * INV-208 — the recall holds the batch. Behind TX-407, the grant that writes stock off:
+ * putting a lot on hold and sending it back are decisions about stock, taken by whoever
+ * may move it, and the trail says who (BATCH_RECALLED, BATCH_RECALL_LIFTED,
+ * BATCH_RETURNED_TO_SUPPLIER).
+ */
+router.post('/batches/:id/recall', writeOffStock, (req, res, next) => {
+  try {
+    res.json({ batch: batchService.recall(req.params.id, { actor: req.session, reason: (req.body || {}).reason }) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/batches/:id/recall/lift', writeOffStock, (req, res, next) => {
+  try {
+    res.json({ batch: batchService.liftRecall(req.params.id, { actor: req.session, reason: (req.body || {}).reason }) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/batches/:id/return-to-supplier', writeOffStock, (req, res, next) => {
+  try {
+    res.json(batchService.returnToSupplier(req.params.id, { actor: req.session, note: (req.body || {}).note || null }));
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** The same figures as the screen, as a file (TX-426 to export, TX-422 to read). */
 router.get('/batches/:id/recall/export.csv',
   [authenticate, requirePermission('TX-426')], (req, res, next) => {
