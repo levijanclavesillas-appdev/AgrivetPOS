@@ -129,6 +129,8 @@ function snapshotLines({ sessionId, categoryId = null, at, idFor }) {
       LEFT JOIN inventory i ON i.product_id = p.id
      WHERE (@categoryId IS NULL OR p.category_id = @categoryId)
        AND p.is_batch_tracked = 0
+       -- INV-114: there is nothing on a shelf to count of what is made to order.
+       AND p.is_stocked = 1
      ORDER BY p.name COLLATE NOCASE
   `).all({ categoryId });
 

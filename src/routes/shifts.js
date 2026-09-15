@@ -34,6 +34,8 @@ router.get('/shifts/current', readOwnShift, (req, res, next) => {
       open: Boolean(shift),
       shift: shift ? shiftService.present(shift) : null,
       expected: shift ? shiftService.computeExpected(shift.id) : null,
+      // POS-109: what the close will leave open for the next shift (TASK-066).
+      open_orders: require('../services/openOrderService').carriedOver(),
     });
   } catch (err) {
     next(err);

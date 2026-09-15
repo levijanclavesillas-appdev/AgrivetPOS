@@ -234,7 +234,10 @@ export function createProductList({
         // labelled with — including the one in the next column.
         h('td', { class: 'unit', text: p.base_unit.code }),
         h('td', { class: 'qty' }, [
-          h('span', { text: p.qty_on_hand_display || quantity(p.qty_on_hand_milli, p.base_unit.code) }),
+          // INV-114: made to order keeps no stock, so there is no figure to show.
+          p.is_stocked === false
+            ? h('span', { class: 'muted', text: 'made to order' })
+            : h('span', { text: p.qty_on_hand_display || quantity(p.qty_on_hand_milli, p.base_unit.code) }),
           p.is_low_stock && !lowStockOnly()
             ? h('span', { class: 'tag warn', text: 'low' })
             : null,
@@ -244,7 +247,8 @@ export function createProductList({
           text: lowStockOnly() ? p.min_stock_display : money(p.retail_price_centavos),
         }),
         h('td', {}, [
-          h('button', {
+          // Nothing to adjust on a product that keeps no stock (INV-114).
+          p.is_stocked === false ? null : h('button', {
             class: 'row-action', text: 'Adjust',
             onclick: (event) => { event.stopPropagation(); onAdjust(p.id); },
           }),

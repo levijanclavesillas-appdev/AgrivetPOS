@@ -209,6 +209,7 @@ function readMe() {
     P(say.generic),
     ...say.batch.map(P),
     ...say.senior.map(P),
+    ...(say.madeToOrder || ['made_to_order: leave blank, unless the product is made when it is ordered, like a meal.']).map(P),
     [],
     H('3. Packs — selling one product in more than one size'),
     P(say.pack),

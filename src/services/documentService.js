@@ -46,6 +46,9 @@ const KINDS = Object.freeze({
   // TAX-006's notice like every other one — it states what is owed, and it is not a
   // receipt for anything.
   STATEMENT: 'Statement of account',
+  // POS-110 (TASK-066). Read by a cook, never handed to a customer — and still an
+  // internal record, so it carries the notice like everything else this prints.
+  KITCHEN_TICKET: 'Kitchen ticket',
 });
 
 const printed = [];
@@ -96,6 +99,24 @@ function assertTaxCompliant(text, { kind = null } = {}) {
 }
 
 /**
+ * Free text a person typed — a note to the kitchen, a table's name — made safe to print.
+ *
+ * TAX-006's phrases are matched on the whole document, and a customer who wants "less
+ * sugar or no sugar" has written, as far as a pattern can tell, "OR No". Refusing to print
+ * their order would be absurd and printing an OR number is forbidden, so the words are
+ * kept and the phrase is broken: a hyphen after its first letter, which a reader passes
+ * over and the pattern does not.
+ */
+function neutralise(text) {
+  let out = String(text ?? '');
+  for (const { pattern } of FORBIDDEN) {
+    const all = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    out = out.replace(all, (match) => `${match[0]}-${match.slice(1)}`);
+  }
+  return out;
+}
+
+/**
  * Queue a document for printing.
  *
  * Never throws for a printer problem (INT-1): printing is best-effort and asynchronous,
@@ -142,5 +163,5 @@ function history() {
 
 module.exports = {
   REQUIRED_NOTICE, FORBIDDEN, KINDS,
-  setDriver, reset, assertTaxCompliant, print, history,
+  setDriver, reset, assertTaxCompliant, neutralise, print, history,
 };

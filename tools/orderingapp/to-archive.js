@@ -13,9 +13,11 @@
 //    backs up first (OPS-102, OPS-103), and every imported user needs a password (SEC-1).
 //
 // How the rows land, and what does not move, is TASK-064's migration table. In short:
-// menu items become products in a Serving unit, each order a sale under its own number
-// (MM-1234), a cancelled order a voided sale, the service fee a "Service charge" line,
-// and each cashier's day a closed shift. An order never paid (pending_payment) is left out.
+// menu items become made-to-order products in a Serving unit (INV-114), each order a sale
+// under its own number (MM-1234) with its table, how it was served and its notes (TASK-066),
+// the service fee the sale's service charge (POS-112), a cancelled order a voided sale, and
+// each cashier's day a closed shift. An order never paid (pending_payment) is left out.
+// The new store must be set up as a Café / Restaurant.
 
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
@@ -25,6 +27,10 @@ const zip = require('../../src/config/zip');
 const exportService = require('../../src/services/exportService');
 
 const METHOD = Object.freeze({ cash: 'CASH', gcash: 'GCASH', qrph: 'QRPH', paymongo: 'OTHER', bank: 'OTHER' });
+// POS-109's three. OrderingApp wrote "take-out" and "take_out" both, and a pickup is a take-out.
+const SERVED = Object.freeze({
+  'dine-in': 'DINE_IN', dine_in: 'DINE_IN', 'take-out': 'TAKE_OUT', take_out: 'TAKE_OUT', pickup: 'TAKE_OUT', delivery: 'DELIVERY',
+});
 
 const cents = (value) => Math.round(Number(value || 0) * 100);
 const iso = (at) => new Date(at).toISOString();
@@ -70,10 +76,13 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
   if (rows.products.length || rows.sales.length) {
     throw new Error('Export a newly set-up store: this one already has products or sales.');
   }
+  if (!rows.store_profile.length || rows.store_profile[0].industry !== 'CAFE') {
+    throw new Error('Set the new store up as a Café / Restaurant: its orders, tables and service charge have nowhere to go in any other kind.');
+  }
   const owner = rows.users.find((u) => u.role === 'OWNER' && u.is_active);
   const summary = {
-    store: source.store.name, orders: source.orders.length, skipped_orders: [], line_notes_dropped: 0,
-    table_labels_dropped: 0, order_types: {}, users_without_password: 0,
+    store: source.store.name, orders: source.orders.length, skipped_orders: [], line_notes: 0,
+    table_labels: 0, order_types: {}, users_without_password: 0,
     completed_centavos: 0, voided_centavos: 0, service_charge_centavos: 0,
   };
 
@@ -118,7 +127,8 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
     rows.products.push({
       id, sku: unique, name, category_id: categoryId, brand_id: null, base_unit_id: unitId, description,
       tax_class: 'VATABLE', statutory_discount_eligible: 1, avg_cost_centavos: 0, avg_cost_as_of: null,
-      min_stock_milli: 0, is_batch_tracked: 0, is_active: active ? 1 : 0,
+      // INV-114: a menu item is made when it is ordered; OrderingApp kept no stock of any.
+      min_stock_milli: 0, is_batch_tracked: 0, is_stocked: 0, is_active: active ? 1 : 0,
       created_at: now, created_by: owner.id, updated_at: null, updated_by: null, generic_name: null,
     });
     rows.product_prices.push({
@@ -127,7 +137,6 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
       effective_from: source.orders.length ? iso(new Date(source.orders[0].created_at).getTime() - 86400e3) : now,
       created_at: now, created_by: owner.id,
     });
-    rows.inventory.push({ product_id: id, qty_on_hand_milli: 0, updated_at: now });
   };
   for (const c of source.categories) category(c.id, c.name);
   for (const m of source.items) {
@@ -135,13 +144,6 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
       id: m.id, sku: String(m.slug || m.id).toUpperCase().slice(0, 40), name: m.name, categoryId: m.category_id,
       description: m.description || null, active: m.available, priceCentavos: cents(m.price),
     });
-  }
-  // Chachi POS has no service charge (TASK-064): OrderingApp's fee becomes a line.
-  const feeProduct = uuid();
-  if (source.orders.some((o) => Number(o.service_fee) > 0)) {
-    const feeCategory = uuid();
-    category(feeCategory, 'Service charge', 0);
-    product({ id: feeProduct, sku: 'SERVICE-CHARGE', name: 'Service charge', categoryId: feeCategory, priceCentavos: 0 });
   }
 
   // ── Customers: in OrderingApp, a name written on an order ──
@@ -185,7 +187,7 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
       summary.skipped_orders.push({ order: o.id, reason: 'never paid' });
       continue;
     }
-    if (o.table_label) summary.table_labels_dropped += 1;
+    if (o.table_label) summary.table_labels += 1;
     const voided = o.status === 'cancelled';
     const createdBy = userOf.get(o.placed_by) || owner.id;
     const saleId = uuid();
@@ -193,10 +195,10 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
     const fee = cents(o.service_fee);
     const discount = cents(o.discount);
     const itemLines = linesOf.get(o.id) || [];
-    const subtotal = itemLines.reduce((sum, l) => sum + cents(l.line_total), 0) + fee;
+    const subtotal = itemLines.reduce((sum, l) => sum + cents(l.line_total), 0);
     const total = cents(o.total);
-    if (subtotal - discount !== total) {
-      throw new Error(`Order ${o.id} does not add up: lines and fee ${subtotal}, discount ${discount}, total ${total} (centavos).`);
+    if (subtotal - discount + fee !== total) {
+      throw new Error(`Order ${o.id} does not add up: lines ${subtotal}, discount ${discount}, fee ${fee}, total ${total} (centavos).`);
     }
     const method = METHOD[o.pay_method] || 'OTHER';
     // Cash is recorded as handed over, with the change taken off (MON-007). OrderingApp
@@ -213,23 +215,26 @@ function convert({ base, source, customers: withCustomers = true, now = new Date
       voided_at: voided ? at : null, voided_by: voided ? createdBy : null,
       void_reason: voided ? 'Cancelled in OrderingApp' : null,
       occurred_at: at, created_by: createdBy,
+      // TASK-066: how it was served, where, and the fee as the sale's service charge.
+      order_type: SERVED[String(o.order_type || '').toLowerCase()] || null,
+      table_label: o.table_label ? String(o.table_label).trim().slice(0, 30) || null : null,
+      service_charge_bp: fee > 0 ? Math.round(Number(o.service_fee_rate) * 10000) : 0,
+      service_charge_centavos: fee,
     });
     let lineNo = 0;
-    const line = (productId, name, qty, unitCentavos, lineCentavos) => rows.sale_items.push({
+    const line = (productId, name, qty, unitCentavos, lineCentavos, note) => rows.sale_items.push({
       id: uuid(), sale_id: saleId, line_no: ++lineNo, product_id: productId, product_name_snapshot: name,
       qty_milli: qty * 1000, sold_unit_id: unitId, sold_pack_factor_milli: 1000,
       unit_price_centavos: unitCentavos, price_level_applied: 'RETAIL', unit_cost_centavos: 0, discount_centavos: 0,
       tax_class_snapshot: 'VATABLE', tax_centavos: 0, line_total_centavos: lineCentavos,
       batch_id: null, returned_qty_milli: 0,
+      note: note ? String(note).replace(/\s+/g, ' ').trim().slice(0, 60) || null : null,
     });
     for (const l of itemLines) {
-      if (l.notes) summary.line_notes_dropped += 1;
-      line(l.menu_item_id, l.name_snapshot, l.quantity, cents(l.price_snapshot), cents(l.line_total));
+      if (l.notes) summary.line_notes += 1;
+      line(l.menu_item_id, l.name_snapshot, l.quantity, cents(l.price_snapshot), cents(l.line_total), l.notes);
     }
-    if (fee > 0) {
-      line(feeProduct, `Service charge (${Math.round(Number(o.service_fee_rate) * 1000) / 10}%)`, 1, fee, fee);
-      if (!voided) summary.service_charge_centavos += fee;
-    }
+    if (fee > 0 && !voided) summary.service_charge_centavos += fee;
     if (discount > 0) {
       const promo = promoOf.get(o.promo_code_id);
       rows.sale_discounts.push({

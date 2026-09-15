@@ -45,6 +45,7 @@ const settingsService = require('./settingsService');
 const sequenceService = require('./sequenceService');
 const inventoryService = require('./inventoryService');
 const batchRepository = require('../repositories/batchRepository');
+const inventoryRepository = require('../repositories/inventoryRepository');
 const creditService = require('./creditService');
 const shiftService = require('./shiftService');
 const drawerService = require('./drawerService');
@@ -625,6 +626,9 @@ function post(input, actor) {
     });
 
     const posted = [];
+    // INV-114: a line made to order took nothing off a shelf, so nothing goes back on one.
+    // Asked of the sale's own movements, as a void asks, not of the product today.
+    const moved = new Set(inventoryRepository.movementsForReference('sale', sale.id).map((m) => m.product_id));
 
     for (const line of resolved) {
       // ── INV-201 — a batch-tracked line goes back to the batch it came from ──
@@ -646,7 +650,8 @@ function post(input, actor) {
       // Posted for both dispositions. A write-off that posted only the DAMAGE out
       // would show stock leaving a shelf it never returned to, and the ledger would
       // have no row saying the customer brought anything back at all.
-      const back = batchDraw.length > 0
+      const stocked = moved.has(line.product_id);
+      const back = !stocked ? null : batchDraw.length > 0
         ? batchDraw.map((draw) => inventoryService.post({
           productId: line.product_id,
           type: 'CUSTOMER_RETURN',
@@ -677,7 +682,7 @@ function post(input, actor) {
       // why: what actually happened is that goods came back and were condemned, and
       // both halves of that are things somebody will later need to count.
       let writeOff = null;
-      if (line.disposition === 'WRITE_OFF') {
+      if (stocked && line.disposition === 'WRITE_OFF') {
         const condemn = (qtyMilli, batchId = null) => inventoryService.post({
           productId: line.product_id,
           type: 'DAMAGE',
@@ -715,8 +720,8 @@ function post(input, actor) {
         restock_approved_by: line.overrides_default && authorisation.approver
           ? authorisation.approver.id
           : (line.overrides_default ? actor.id : null),
-        return_movement_id: back.movement.id,
-        write_off_movement_id: writeOff ? writeOff.movement.id : null,
+        return_movement_id: back && back.movement ? back.movement.id : null,
+        write_off_movement_id: writeOff && writeOff.movement ? writeOff.movement.id : null,
       });
 
       // ── POS-301's running total on the sale ──
@@ -733,10 +738,11 @@ function post(input, actor) {
         default_disposition: line.default_disposition,
         restocked_against_default: line.overrides_default,
         line_total_centavos: line.line_total_centavos,
-        return_movement_id: back.movement.id,
-        write_off_movement_id: writeOff ? writeOff.movement.id : null,
-        // POS-303's net effect, said out loud: a restock adds, a write-off nets zero.
-        net_stock_milli: line.disposition === 'RESTOCK' ? line.qty_milli : 0,
+        return_movement_id: back && back.movement ? back.movement.id : null,
+        write_off_movement_id: writeOff && writeOff.movement ? writeOff.movement.id : null,
+        // POS-303's net effect, said out loud: a restock adds, a write-off nets zero, and a
+        // line made to order moves nothing either way (INV-114).
+        net_stock_milli: stocked && line.disposition === 'RESTOCK' ? line.qty_milli : 0,
       });
     }
 

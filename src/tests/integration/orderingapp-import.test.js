@@ -88,7 +88,7 @@ const SOURCE = {
 
 test.before(() => {
   temp.openMigrated('orderingapp-import');
-  temp.seedStore({ storeName: 'Kape sa Kanto', taxMode: 'NONE', withOwner: false, industry: 'AGRIVET' });
+  temp.seedStore({ storeName: 'Kape sa Kanto', taxMode: 'NONE', withOwner: false, industry: 'CAFE' });
   temp.seedUser({ username: 'owner', role: 'OWNER', password: PASSWORD });
   owner = authService.verifyToken(authService.login({ username: 'owner', password: PASSWORD }).token);
   backups = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-oa-backups-'));
@@ -106,8 +106,8 @@ test('TASK-064: an OrderingApp store imports whole, and the daily report says wh
   assert.equal(summary.completed_centavos, 23000 + 8345 + 20400);
   assert.equal(summary.voided_centavos, 8900);
   assert.deepEqual(summary.skipped_orders, [{ order: 'KK-1004', reason: 'never paid' }]);
-  assert.equal(summary.line_notes_dropped, 1);
-  assert.equal(summary.table_labels_dropped, 1);
+  assert.equal(summary.line_notes, 1, 'kept, since TASK-066');
+  assert.equal(summary.table_labels, 1);
   assert.equal(summary.shifts, 2, 'Jo on the 1st, and the former staff member on the 2nd');
 
   const checked = importService.validate(archive);
@@ -116,7 +116,7 @@ test('TASK-064: an OrderingApp store imports whole, and the daily report says wh
 
   const done = importService.run(archive, { reason: 'TASK-064 test' }, owner);
   assert.equal(done.entities.sales.inserted, 4);
-  assert.equal(done.entities.products.inserted, 4, 'three menu items and the service charge');
+  assert.equal(done.entities.products.inserted, 3, 'the three menu items, made to order');
   assert.equal(done.entities.users.inserted, 3);
 
   const daily = reportService.daily({ from: '2026-08-01', to: '2026-08-02' }, owner);
@@ -130,8 +130,14 @@ test('TASK-064: an OrderingApp store imports whole, and the daily report says wh
   const withFee = saleRepository.findByNo('KK-1002');
   assert.equal(withFee.total_centavos, 8345);
   assert.equal(withFee.txn_discount_centavos, 1000);
-  const lines = dataRepository.rowsOf('sale_items').filter((l) => l.sale_id === withFee.id).sort((a, b) => a.line_no - b.line_no);
-  assert.deepEqual(lines.map((l) => [l.product_name_snapshot, l.line_total_centavos]), [['Iced Latte', 8900], ['Service charge (5%)', 445]]);
+  // TASK-066: the fee is the sale's service charge, and the table, how it was served and
+  // the note are the sale's own.
+  assert.deepEqual([withFee.service_charge_bp, withFee.service_charge_centavos], [500, 445]);
+  assert.deepEqual([withFee.order_type, withFee.table_label], ['DINE_IN', 'T2']);
+  const lines = dataRepository.rowsOf('sale_items').filter((l) => l.sale_id === withFee.id);
+  assert.deepEqual(lines.map((l) => [l.product_name_snapshot, l.line_total_centavos, l.note]), [['Iced Latte', 8900, 'less ice']]);
+  assert.equal(daily.totals.service_charge_centavos, 445);
+  assert.equal(daily.reconciliation.reconciles, true, daily.reconciliation.statement);
   const discount = dataRepository.rowsOf('sale_discounts').find((d) => d.sale_id === withFee.id);
   assert.match(discount.reason, /OPENING/);
 
@@ -148,9 +154,11 @@ test('TASK-064: an OrderingApp store imports whole, and the daily report says wh
   assert.equal(users.find((u) => u.full_name === 'Jo').username, 'jo-staff', 'a username is three characters at least');
   assert.equal(users.find((u) => u.full_name === 'Jo').password_hash, 'IMPORTED-NO-PASSWORD');
   assert.equal(dataRepository.rowsOf('products').find((p) => p.sku === 'OLD-BREW').is_active, 0);
+  assert.ok(dataRepository.rowsOf('products').every((p) => p.is_stocked === 0), 'made to order (INV-114)');
+  assert.equal(saleRepository.findByNo('KK-1005').order_type, 'TAKE_OUT');
 });
 
-test('TASK-064: the base must be a newly set-up store', () => {
+test('TASK-064: the base must be a newly set-up café', () => {
   // The store above now has products and sales.
   assert.throws(() => convert({ base: exportService.build().archive, source: SOURCE }), /newly set-up store/);
   assert.ok(zip.unzipMany(exportService.build().archive).length > 1);

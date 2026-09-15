@@ -19,6 +19,8 @@ import { KEYMAP, HELP_ORDER, actionFor, isMapped } from '../shell/keymap.js';
 
 // TASK-056: the actions with no button of their own, in the order a sale uses them.
 const TOUCH_ACTIONS = Object.freeze(['F3', 'F4', 'F5', 'F8', 'Delete', 'F6', 'F7']);
+// TASK-066: the same keys, in a café's words (POS-109).
+const CAFE_LABELS = Object.freeze({ F6: 'Send', F7: 'Orders', F12: 'Send & new' });
 
 export function createPos({ root, session, onPay }) {
   const cart = createCart();
@@ -58,8 +60,10 @@ export function createPos({ root, session, onPay }) {
       return;
     }
 
-    cart.lines.forEach((line) => {
-      const pricedLine = priced?.lines?.find((l) => l.product_id === line.productId);
+    cart.lines.forEach((line, index) => {
+      // By position, not by product: since POS-111 two lines may be the same product with
+      // different notes, and the price-check answers line for line in the order sent.
+      const pricedLine = priced?.lines?.[index]?.product_id === line.productId ? priced.lines[index] : null;
       const selected = line.key === selectedKey;
 
       linesHost.append(h('div', {
@@ -70,6 +74,8 @@ export function createPos({ root, session, onPay }) {
         onclick: () => { selectedKey = line.key; renderLines(); },
       }, [
         h('div', { class: 'cart-line-name', text: line.name }),
+        // POS-111: what the kitchen is told about this line.
+        line.note ? h('div', { class: 'cart-line-note', text: line.note }) : null,
         h('div', { class: 'cart-line-detail' }, [
           // POS-102: both the entered pack and the base unit; the ledger stores base.
           h('span', {
@@ -196,6 +202,8 @@ export function createPos({ root, session, onPay }) {
 
   function stockAfter(line) {
     const product = catalogue.get(line.productId);
+    // INV-114: made to order has no shelf to count down.
+    if (line.isStocked === false || (product && product.is_stocked === false)) return null;
     if (!product || product.on_hand_milli === undefined || product.on_hand_milli === null) return null;
 
     // In base units: what comes off the shelf is kilos, whatever the line was keyed in.
@@ -204,6 +212,54 @@ export function createPos({ root, session, onPay }) {
       .filter((l) => l.productId === line.productId)
       .reduce((sum, l) => sum + cart.baseMilliOf(l), 0);
     return product.on_hand_milli - takenBefore;
+  }
+
+  // ── TASK-066: a café's counter ─────────────────────────────────────────────
+
+  /** POS-109: whether this store takes orders before they are paid. The server's answer. */
+  const ordersOn = () => Boolean(policy?.orders?.enabled);
+  let openOrders = [];           // GET /open-orders, for the count on the Orders button
+
+  const tableInput = h('input', {
+    type: 'text', class: 'order-table', placeholder: 'Table or name', autocomplete: 'off',
+    'aria-label': 'Table or name', maxlength: '30',
+    oninput: (event) => { cart.tableLabel = event.target.value; saveSoon(); renderOrderState(); },
+  });
+  const orderStateHost = h('div', { class: 'order-state-host' });
+
+  /**
+   * The order this cart is: how it is served, where, and — for an order already sent —
+   * whether the kitchen has everything on the screen.
+   */
+  function orderBlock() {
+    const open = cart.openOrder;
+    if (document.activeElement !== tableInput) tableInput.value = cart.tableLabel;
+    renderOrderState();
+    return h('div', { class: 'rail-block rail-order' }, [
+      h('h2', { text: open ? `Order ${open.order_no}` : 'New order' }),
+      h('div', { class: 'order-types', role: 'group', 'aria-label': 'How it is served' },
+        policy.orders.order_types.map((type) => h('button', {
+          type: 'button',
+          class: `order-type${cart.orderType === type.code ? ' is-on' : ''}`,
+          'aria-pressed': String(cart.orderType === type.code),
+          text: type.label,
+          onclick: async () => { cart.orderType = type.code; await reprice(); },
+        }))),
+      tableInput,
+      orderStateHost,
+    ]);
+  }
+
+  function renderOrderState() {
+    const open = cart.openOrder;
+    if (!open) { clear(orderStateHost); return; }
+    const changed = cart.changedSinceLoaded();
+    clear(orderStateHost).append(
+      h('p', { class: `order-state${changed ? ' is-changed' : ''}`, text: changed ? 'Changes not sent to the kitchen yet.' : 'The kitchen has this order.' }),
+      changed
+        ? h('button', { class: 'rail-action', text: 'Discard changes', onclick: () => discardChanges() })
+        : h('button', { class: 'rail-action', text: 'Put the order back', onclick: () => leaveOrder() }),
+    );
   }
 
   function renderRail() {
@@ -215,6 +271,7 @@ export function createPos({ root, session, onPay }) {
     // the Pay button, on the one screen this product is for. The payment screen already
     // filters for the same reason; this call site did not.
     clear(railHost).append(...[
+      ordersOn() ? orderBlock() : null,
       h('div', { class: 'rail-block rail-customer-block' }, [
         h('h2', { text: 'Customer' }),
         h('p', { class: 'rail-customer', text: customer ? customer.name : 'Walk-in' }),
@@ -245,6 +302,10 @@ export function createPos({ root, session, onPay }) {
           ? h('p', { class: 'rail-statutory', text: `${priced.statutory.id_type_label} · ${priced.statutory.name} · ${priced.statutory.id_no}` })
           : null,
         priced?.tax_summary ? row('VAT', money(priced.tax_amount_centavos)) : null,
+        // POS-112: on a dine-in bill, after every discount — its own row, and the rate on it.
+        priced?.service_charge_centavos > 0
+          ? row(`Service charge ${percent(priced.service_charge_bp)}`, money(priced.service_charge_centavos), 'service-charge')
+          : null,
         h('hr'),
         row('TOTAL', priced ? money(priced.total_centavos) : money(0), 'total'),
       ]),
@@ -254,7 +315,21 @@ export function createPos({ root, session, onPay }) {
           disabled: cart.isEmpty || !priced || priced.requires_authorisation,
           onclick: () => pay(),
         }),
-        h('button', { class: 'rail-action', icon: 'circle-pause', text: 'Park & new  F12', onclick: () => park({ andNew: true }) }),
+        ordersOn()
+          ? h('button', {
+            class: 'rail-action send-order', icon: 'send',
+            text: cart.openOrder ? 'Send changes  F6' : 'Send to kitchen  F6',
+            disabled: cart.isEmpty || (Boolean(cart.openOrder) && !cart.changedSinceLoaded()),
+            onclick: () => sendOrder(),
+          })
+          : h('button', { class: 'rail-action', icon: 'circle-pause', text: 'Park & new  F12', onclick: () => park({ andNew: true }) }),
+        ordersOn()
+          ? h('button', {
+            class: 'rail-action open-orders', icon: 'clipboard-list',
+            text: `Orders${openOrders.length ? ` (${openOrders.length})` : ''}  F7`,
+            onclick: () => showOrders(),
+          })
+          : null,
       ]),
       // PR-105 and PR-203 surfaced where they happen (§6), not at Complete.
       priced?.requires_authorisation ? authorisations() : null,
@@ -411,9 +486,9 @@ export function createPos({ root, session, onPay }) {
     return cart.lines.find((line) => line.key === selectedKey) ?? cart.lines.at(-1) ?? null;
   }
 
-  function prompt({ title, label, value = '', onSubmit }) {
+  function prompt({ title, label, value = '', onSubmit, inputmode = 'decimal', maxlength = null }) {
     modalOpen = true;
-    const input = h('input', { type: 'text', value, autocomplete: 'off', inputmode: 'decimal' });
+    const input = h('input', { type: 'text', value, autocomplete: 'off', inputmode, maxlength });
     const close = () => { modalOpen = false; clear(panelHost); search.focus(); };
 
     clear(panelHost).append(h('form', {
@@ -648,9 +723,27 @@ export function createPos({ root, session, onPay }) {
       await reprice();
     },
 
-    park: () => park({ andNew: false }),
-    parkAndNew: () => park({ andNew: true }),
-    retrieve: () => retrieve(),
+    // TASK-066: in a café the park keys send the order to the kitchen, and retrieve lists
+    // the open orders — the same place on the keyboard for the same idea: set it down.
+    park: () => (ordersOn() ? sendOrder() : park({ andNew: false })),
+    parkAndNew: () => (ordersOn() ? sendOrder() : park({ andNew: true })),
+    retrieve: () => (ordersOn() ? showOrders() : retrieve()),
+    note: () => {
+      const line = selected();
+      if (!line) return;
+      prompt({
+        title: `Note — ${line.name}`,
+        label: 'For the kitchen',
+        value: line.note || '',
+        inputmode: 'text',
+        maxlength: String(policy?.orders?.note_max || 60),
+        onSubmit: async (text) => {
+          const moved = cart.setNote(line.key, text);
+          selectedKey = moved ? moved.key : null;
+          await reprice();
+        },
+      });
+    },
     pay: () => pay(),
     exactCash: () => pay({ exactCash: true }),
     cancelField: () => { results.hidden = true; attachBar.hidden = true; if (modalOpen) { modalOpen = false; clear(panelHost); } search.focus(); },
@@ -704,6 +797,149 @@ export function createPos({ root, session, onPay }) {
     } catch (err) {
       ui.toast(err.message, { kind: 'error' });
     }
+  }
+
+  // ── POS-109 — the orders ──────────────────────────────────────────────────
+
+  async function refreshOrders() {
+    if (!ordersOn()) return;
+    try {
+      ({ orders: openOrders } = await api.get('/open-orders'));
+    } catch { openOrders = []; }
+    renderRail();
+  }
+
+  /** What the printer said about a kitchen ticket, where it is worth saying. */
+  function ticketNote(printed) {
+    if (!printed || printed.delivered || printed.pending || printed.transport === 'BROWSER') return;
+    if (printed.transport === 'NONE') return;
+    ui.toast(`The kitchen ticket did not print (${printed.error}). Tell the kitchen, or print it again from Orders.`, { kind: 'error' });
+  }
+
+  /**
+   * F6 in a café: this order to the kitchen — all of it the first time, what changed
+   * after that — and the counter cleared for the next table.
+   */
+  async function sendOrder() {
+    if (cart.isEmpty) return ui.toast('There is nothing to send.', { kind: 'error' });
+    if (!cart.orderType) return ui.toast('Choose dine-in, take-out or delivery first.', { kind: 'error' });
+    try {
+      const body = cart.toRequest();
+      const result = cart.openOrder
+        ? await api.put(`/open-orders/${cart.openOrder.id}`, body)
+        : await api.post('/open-orders', body);
+      await api.del('/carts/active').catch(() => {});
+      const where = result.order.table_label ? ` — ${result.order.table_label}` : '';
+      cart.clear();
+      priced = null;
+      render();
+      ui.toast(result.changes > 0
+        ? `Order ${result.order.order_no}${where} sent to the kitchen.`
+        : `Order ${result.order.order_no}${where}: nothing new for the kitchen.`, { kind: 'success' });
+      ticketNote(result.printed);
+      await refreshOrders();
+    } catch (err) {
+      ui.toast(err.message, { kind: 'error' });
+    }
+    return undefined;
+  }
+
+  /** Products the order names, fetched into the catalogue the cart reads names from. */
+  async function fetchProducts(lines) {
+    for (const line of lines || []) {
+      if (catalogue.has(line.productId)) continue;
+      try {
+        const { product } = await api.get(`/products/${line.productId}`);
+        catalogue.set(product.id, await withStock(product));
+      } catch { /* left unavailable and flagged by the cart model */ }
+    }
+  }
+
+  async function loadOrder(order) {
+    await fetchProducts(order.lines);
+    cart.loadOrder(order, catalogue);
+    selectedKey = null;
+    await reprice();
+  }
+
+  async function discardChanges() {
+    if (!cart.openOrder) return;
+    try {
+      const { order } = await api.get(`/open-orders/${cart.openOrder.id}`);
+      await loadOrder(order);
+    } catch (err) {
+      ui.toast(err.message, { kind: 'error' });
+    }
+  }
+
+  /** The order stays open for later; the counter is cleared for the next one. */
+  async function leaveOrder() {
+    await api.del('/carts/active').catch(() => {});
+    cart.clear();
+    priced = null;
+    render();
+  }
+
+  /** F7 in a café: every open order, oldest first, to take up, reprint or call off. */
+  async function showOrders() {
+    await refreshOrders();
+    modalOpen = true;
+    const close = () => { modalOpen = false; clear(panelHost); search.focus(); };
+    const age = (at) => {
+      const minutes = Math.max(0, Math.round((Date.now() - Date.parse(at)) / 60000));
+      return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+    };
+
+    const busy = !cart.isEmpty && cart.changedSinceLoaded();
+    clear(panelHost).append(h('div', { class: 'pos-prompt open-orders-panel' }, [
+      h('h2', { text: 'Open orders' }),
+      openOrders.length === 0 ? h('p', { class: 'muted', text: 'No orders are open. Send one to the kitchen with F6.' }) : null,
+      busy ? h('p', { class: 'muted', text: 'Send or pay the order on the counter before you take up another.' }) : null,
+      ...openOrders.map((order) => h('div', { class: `open-order${cart.openOrder?.id === order.id ? ' is-current' : ''}` }, [
+        h('button', {
+          class: 'open-order-load',
+          disabled: busy,
+          onclick: async () => { close(); await loadOrder(order); },
+        }, [
+          h('strong', { text: `Order ${order.order_no}` }),
+          h('span', { text: [order.order_type_label, order.table_label].filter(Boolean).join(' · ') }),
+          h('span', { class: 'muted', text: `${order.line_count} line${order.line_count === 1 ? '' : 's'} · ${age(order.opened_at)}` }),
+          h('span', { class: 'money', text: order.total_centavos === null ? '—' : money(order.total_centavos) }),
+        ]),
+        h('button', {
+          class: 'rail-action', icon: 'printer', text: 'Ticket',
+          disabled: policy?.orders?.kitchen_printer === 'NONE',
+          onclick: async () => {
+            try { const result = await api.post(`/open-orders/${order.id}/ticket`, {}); ticketNote(result.printed); ui.toast(`Order ${order.order_no}'s ticket printed again.`); } catch (err) { ui.toast(err.message, { kind: 'error' }); }
+          },
+        }),
+        h('button', {
+          class: 'rail-action', icon: 'x', text: 'Cancel…',
+          onclick: () => cancelOrder(order),
+        }),
+      ])),
+      h('div', { class: 'prompt-actions' }, [h('button', { text: 'Close', onclick: close })]),
+    ]));
+  }
+
+  /** Called off before it is paid: a reason, and the kitchen told to stop (POS-109). */
+  function cancelOrder(order) {
+    prompt({
+      title: `Cancel order ${order.order_no}${order.table_label ? ` — ${order.table_label}` : ''}`,
+      label: 'Why? (the kitchen is told to stop)',
+      inputmode: 'text',
+      onSubmit: async (reason) => {
+        try {
+          const result = await api.post(`/open-orders/${order.id}/cancel`, { reason });
+          if (cart.openOrder?.id === order.id) { cart.clear(); priced = null; render(); }
+          ui.toast(`Order ${order.order_no} cancelled.`);
+          ticketNote(result.printed);
+          await refreshOrders();
+        } catch (err) {
+          ui.toast(err.message, { kind: 'error' });
+        }
+      },
+    });
   }
 
   async function chooseCustomer() {
@@ -777,14 +1013,17 @@ export function createPos({ root, session, onPay }) {
 
   async function restore(saved) {
     if (!saved) return;
-    for (const line of saved.lines || []) {
-      if (catalogue.has(line.productId)) continue;
-      try {
-        const { product } = await api.get(`/products/${line.productId}`);
-        catalogue.set(product.id, await withStock(product));
-      } catch { /* left unavailable and flagged by the cart model */ }
-    }
+    await fetchProducts(saved.lines);
     cart.restore(saved, catalogue);
+    // TASK-066: a draft that was an open order is that order again, so the counter can
+    // still say what the kitchen has not been sent. An order paid or cancelled since
+    // leaves the lines as a new order.
+    if (saved.open_order_id && ordersOn()) {
+      try {
+        const { order } = await api.get(`/open-orders/${saved.open_order_id}`);
+        if (order.status === 'OPEN') cart.attachOrder(order);
+      } catch { /* gone: the lines stay, as a new order */ }
+    }
     await reprice();
   }
 
@@ -825,17 +1064,26 @@ export function createPos({ root, session, onPay }) {
   function helpBar() {
     const empty = cart.isEmpty;
     const needsCart = new Set(['F3', 'F4', 'F5', 'F8', 'Delete', 'F6']);
+    // TASK-066: a café's words for the same keys — F6 sends the order, F7 lists them.
+    const labelOf = (key) => (ordersOn() && CAFE_LABELS[key]) || KEYMAP[key].label;
     const buttons = TOUCH_ACTIONS.filter((key) => key !== 'F8' || policy?.statutory?.enabled)
       .map((key) => h('button', {
         type: 'button', class: 'pos-action', 'aria-keyshortcuts': key,
         disabled: needsCart.has(key) && empty,
         onclick: () => { const run = actions[KEYMAP[key].action]; if (run) run(); },
       }, [
-        h('span', { text: KEYMAP[key].label }),
+        h('span', { text: labelOf(key) }),
         h('kbd', { class: 'key-hint', text: key === 'Delete' ? 'Del' : key }),
       ]));
+    // POS-111: a note for the kitchen, where there is a kitchen. A button only — every
+    // function key is spoken for, and F11 is the screen's own.
+    if (ordersOn()) {
+      buttons.splice(buttons.length - 2, 0, h('button', {
+        type: 'button', class: 'pos-action', disabled: empty, onclick: () => actions.note(),
+      }, [h('span', { text: 'Note' })]));
+    }
     const hints = HELP_ORDER.filter((key) => !TOUCH_ACTIONS.includes(key))
-      .map((key) => h('span', { class: 'help-key' }, [h('kbd', { text: key }), h('span', { text: KEYMAP[key].label })]));
+      .map((key) => h('span', { class: 'help-key' }, [h('kbd', { text: key }), h('span', { text: labelOf(key) })]));
     return h('div', { class: 'pos-help' }, [
       h('div', { class: 'pos-actions', role: 'toolbar', 'aria-label': 'Counter actions' }, buttons),
       h('div', { class: 'pos-hints key-hint' }, hints),
@@ -868,8 +1116,11 @@ export function createPos({ root, session, onPay }) {
     try {
       policy = await api.get('/sales/pricing-policy');
     } catch { /* the sale re-checks every one of them regardless */ }
+    // TASK-066: a café's counter starts on the first way it serves — dine-in.
+    if (ordersOn() && !cart.orderType) cart.orderType = policy.orders.order_types[0].code;
 
     render();
+    refreshOrders();
 
     // POS-105: come back to the cart that was open.
     try {

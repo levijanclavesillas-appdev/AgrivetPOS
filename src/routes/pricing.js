@@ -13,10 +13,12 @@ const express = require('express');
 const pricingService = require('../services/pricingService');
 const saleService = require('../services/saleService');
 const discountRuleService = require('../services/discountRuleService');
+const printService = require('../services/printService');
 const taxService = require('../services/taxService');
 const storeProfileService = require('../services/storeProfileService');
 const customerService = require('../services/customerService');
 const settingsService = require('../services/settingsService');
+const openOrderService = require('../services/openOrderService');
 const errors = require('../services/errors');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
@@ -63,6 +65,10 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
       // refusal — the store does not grant it, no line is eligible, the ID is
       // incomplete — before the customer is at the payment screen.
       statutory: body.statutory || null,
+      // POS-112: the dine-in service charge, previewed as it will be charged.
+      serviceChargeBp: openOrderService.serviceChargeBpFor(
+        openOrderService.orderTypeOf(body.orderType, { required: false })
+      ),
     });
 
     res.json(result);
@@ -108,6 +114,17 @@ router.get('/sales/pricing-policy', atTheCounter, (req, res, next) => {
         note: 'The 20% is computed before any voluntary discount and the two never add '
           + 'together: the customer receives the larger (TAX-005). In VAT mode the line '
           + 'is exempt and the 20% is taken on the VAT-exclusive amount.',
+      },
+      // TASK-066: a café's counter — whether orders are taken before payment, how they
+      // may be served, the dine-in service charge and whether a kitchen ticket prints.
+      orders: {
+        rule_id: 'POS-109',
+        enabled: openOrderService.enabled(),
+        order_types: openOrderService.ORDER_TYPES.map((code) => ({ code, label: printService.ORDER_TYPE_LABELS[code] })),
+        service_charge_bp: settingsService.get('service_charge_bp'),
+        kitchen_printer: settingsService.get('kitchen_printer'),
+        table_max: openOrderService.TABLE_MAX,
+        note_max: require('../services/cartService').NOTE_MAX,
       },
     });
   } catch (err) {

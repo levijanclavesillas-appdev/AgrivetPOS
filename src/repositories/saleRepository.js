@@ -33,14 +33,15 @@ const SALE_COLUMNS = `
   subtotal_centavos, line_discount_centavos, txn_discount_centavos,
   statutory_discount_centavos, vatable_centavos, vat_exempt_centavos,
   zero_rated_centavos, vat_centavos, total_centavos, change_centavos,
-  approved_by, voided_at, voided_by, void_reason, occurred_at, created_by
+  approved_by, voided_at, voided_by, void_reason, occurred_at, created_by,
+  order_type, table_label, service_charge_bp, service_charge_centavos
 `;
 
 const ITEM_COLUMNS = `
   id, sale_id, line_no, product_id, product_name_snapshot, qty_milli, sold_unit_id,
   sold_pack_factor_milli, unit_price_centavos, price_level_applied, unit_cost_centavos,
   discount_centavos, tax_class_snapshot, tax_centavos, line_total_centavos,
-  batch_id, returned_qty_milli
+  batch_id, returned_qty_milli, note
 `;
 
 const TENDER_COLUMNS = 'id, sale_id, method, amount_centavos, reference_no, status, created_at';

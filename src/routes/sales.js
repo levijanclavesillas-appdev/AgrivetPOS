@@ -24,6 +24,7 @@
 
 const express = require('express');
 const saleService = require('../services/saleService');
+const openOrderService = require('../services/openOrderService');
 const printService = require('../services/printService');
 const voidService = require('../services/voidService');
 const sequenceService = require('../services/sequenceService');
@@ -58,13 +59,23 @@ router.post('/sales', atTheCounter, async (req, res, next) => {
       // whether the store grants the discount at all, and which lines it reaches, are
       // decisions the pricing engine makes and this route holds no copy of.
       statutory: body.statutory || null,
+      // TASK-066: a café's order — how it is served, the table, the open order it pays for.
+      orderType: body.orderType || null,
+      tableLabel: body.tableLabel ?? null,
+      openOrderId: body.openOrderId || null,
     }, req.session);
 
     // FR_3.7 / INT-1: the receipt prints now, after the sale has committed — until
     // TASK-054 nothing called this, and the first paper a store ever saw of a sale was a
     // reprint stamped REPRINT. It cannot fail the sale: the money is banked, and a
     // printer fault is an answer on the receipt screen, not an error.
-    res.status(201).json({ ...result, printed: await firstPrint(result.sale.id) });
+    res.status(201).json({
+      ...result,
+      printed: await firstPrint(result.sale.id),
+      // POS-110: and the kitchen hears what it has not yet — the whole order for a sale
+      // rung up without one, what was added at the counter for one that was.
+      kitchen: { printed: await kitchenPrint(result.sale.id, req.session) },
+    });
   } catch (err) {
     next(err);
   }
@@ -81,6 +92,16 @@ async function firstPrint(saleId) {
   // A LAN printer answers within its own four-second timeout; waiting for it keeps the
   // screen truthful, and costs the cashier time only when the printer is not there.
   return printService.outcome(record);
+}
+
+/** POS-110 after the sale: null where the kitchen has nothing new to hear. */
+async function kitchenPrint(saleId, actor) {
+  try {
+    const record = openOrderService.ticketForSale(saleId, actor);
+    return record ? await printService.outcome(record) : null;
+  } catch (err) {
+    return { delivered: false, transport: null, error: err.message };
+  }
 }
 
 /**

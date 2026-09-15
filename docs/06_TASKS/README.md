@@ -383,9 +383,9 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-061](TASK-061-short-deliveries.md) | A delivery can leave out a product that did not come; an order the rest of will not come is closed short | Built, `b1e9ce0` | The store's next short delivery |
 | [TASK-062](TASK-062-web-version.md) | The web version: one container per store, hosted mode, browser printing, backup downloads | Built, `cb43666`; live at `pos.chachisoftware.store/s/demo/` since TASK-065 | The first store's owner agreeing it needs the internet |
 | [TASK-063](TASK-063-web-and-devices.md) | One store on the web and its devices, synced; devices sell offline | Built, `311357c` | A store using the web and a phone together |
-| [TASK-064](TASK-064-restaurant-pos-review.md) | Review back-end.store (restaurant POS): integration and data migration. It migrates (proved on a copy, `tools/orderingapp/to-archive.js`); imports over 1 MB fixed | Reviewed, *this commit* | — |
+| [TASK-064](TASK-064-restaurant-pos-review.md) | Review back-end.store (restaurant POS): integration and data migration. It migrates (proved on a copy, `tools/orderingapp/to-archive.js`); imports over 1 MB fixed | Reviewed, `1f680ba` | — |
 | [TASK-065](TASK-065-stores-on-one-address.md) | Web stores at `pos.chachisoftware.store/s/<store>/`; the owner's "Your stores" by Google; no DNS per store | Built, `01f4899`; `demo` live | — |
-| [TASK-066](TASK-066-cafe-restaurant.md) | Café / Restaurant at setup: made-to-order items, open orders, kitchen ticket, line notes, service charge; then NAM-NAM moves off back-end.store | Queued | The store owner, 2026-09-16 |
+| [TASK-066](TASK-066-cafe-restaurant.md) | Café / Restaurant at setup: made-to-order items, open orders, kitchen ticket, line notes, service charge; then NAM-NAM moves off back-end.store | Built, *this commit*; NAM-NAM's move waits on the owner | NAM-NAM's first day on Chachi POS |
 
 **`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
 100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription

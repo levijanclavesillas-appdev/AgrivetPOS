@@ -27,6 +27,7 @@ const cartRepository = require('../repositories/cartRepository');
 const customerRepository = require('../repositories/customerRepository');
 
 const MAX_LINES = 200;
+const NOTE_MAX = 60;
 
 const textOrNull = (value) => {
   const trimmed = typeof value === 'string' ? value.trim().slice(0, 60) : '';
@@ -61,8 +62,30 @@ function normaliseLines(lines) {
       qtyMilli: qty,
       packUnitId: line.packUnitId || null,
       discountCentavos: Number.isInteger(line.discountCentavos) ? line.discountCentavos : 0,
+      // POS-111 (TASK-066): what the kitchen is told about this line — "less ice".
+      note: noteOf(line.note),
     };
   });
+}
+
+/** POS-111: a line's note, trimmed to what a kitchen ticket can carry, or null. */
+function noteOf(value) {
+  const trimmed = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, NOTE_MAX) : '';
+  return trimmed || null;
+}
+
+/**
+ * TASK-066: the order a café cart is for — how it is served, the table, and the open order
+ * it was loaded from. Kept with the draft so a restart brings the counter back to the
+ * same table, and never trusted for anything but that: the sale reads the order again.
+ */
+function orderOf(input = {}) {
+  const orderType = typeof input.orderType === 'string' ? input.orderType.toUpperCase() : null;
+  return {
+    orderType: ['DINE_IN', 'TAKE_OUT', 'DELIVERY'].includes(orderType) ? orderType : null,
+    tableLabel: textOrNull(input.tableLabel),
+    openOrderId: typeof input.openOrderId === 'string' && input.openOrderId ? input.openOrderId : null,
+  };
 }
 
 // ── The active cart (POS-105) ───────────────────────────────────────────────
@@ -74,7 +97,7 @@ function normaliseLines(lines) {
  * power cut equivalent: neither loses anything the cashier had keyed. It replaces
  * rather than appends — the cart is one row, not a log of edits.
  */
-function save({ lines = [], customerId = null, transactionDiscountCentavos = 0 }, actor) {
+function save({ lines = [], customerId = null, transactionDiscountCentavos = 0, ...order }, actor) {
   const shift = shiftService.requireOpenShift(actor, { action: 'build a cart' });
   const normalised = normaliseLines(lines);
   const at = clock.nowUtc();
@@ -88,6 +111,7 @@ function save({ lines = [], customerId = null, transactionDiscountCentavos = 0 }
     const payload = JSON.stringify({
       lines: normalised,
       transactionDiscountCentavos: Number.isInteger(transactionDiscountCentavos) ? transactionDiscountCentavos : 0,
+      ...orderOf(order),
     });
 
     // An empty cart is not saved — it is cleared. A row saying "this cashier has a
@@ -282,6 +306,10 @@ function present(row) {
     customer: customer ? { id: customer.id, name: customer.name, price_level: customer.price_level } : null,
     lines: payload.lines,
     transaction_discount_centavos: payload.transactionDiscountCentavos || 0,
+    // TASK-066: the café's order this cart is, where it is one.
+    order_type: payload.orderType || null,
+    table_label: payload.tableLabel || null,
+    open_order_id: payload.openOrderId || null,
     priced,
     unpriceable: priced === null,
     parked_at: row.parked_at,
@@ -291,6 +319,6 @@ function present(row) {
 }
 
 module.exports = {
-  MAX_LINES, normaliseLines,
+  MAX_LINES, NOTE_MAX, normaliseLines, noteOf, orderOf,
   save, active, clear, complete, park, parked, resume, expireForShift, present,
 };

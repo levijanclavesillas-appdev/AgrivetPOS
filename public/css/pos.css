@@ -620,3 +620,52 @@
 .rail-sync { font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
 .rail-sync.is-offline { color: var(--md-warning, #b45309); }
 .device-list td small { display: block; }
+
+/* ── TASK-066: a café's counter ─────────────────────────────────────────── */
+
+/* POS-111: the note sits under the line it is about, in the words the kitchen will read. */
+.cart-line-note {
+  margin: 2px 0; color: var(--md-primary); font-size: var(--type-body-sm-size); font-style: italic;
+}
+
+/* POS-109: how the order is served — a segmented choice — and the table or name. */
+.order-types { display: flex; gap: 0; margin-bottom: var(--space-2); }
+.order-type {
+  flex: 1; min-height: var(--touch); padding: 0 var(--space-2);
+  border-radius: 0; font-size: var(--type-label-lg-size);
+}
+.order-type:first-child { border-radius: var(--shape-full) 0 0 var(--shape-full); }
+.order-type:last-child { border-radius: 0 var(--shape-full) var(--shape-full) 0; }
+.order-type + .order-type { margin-left: -1px; }
+.order-type.is-on {
+  background: var(--md-secondary-container); color: var(--md-on-secondary-container);
+  border-color: var(--md-outline); font-weight: 600;
+}
+.order-table { width: 100%; min-height: var(--touch); }
+.order-state { margin: var(--space-2) 0 0; font-size: var(--type-body-sm-size); color: var(--md-on-surface-muted); }
+.order-state.is-changed { color: var(--md-warning); font-weight: 600; }
+.rail-row.service-charge { color: var(--md-on-surface-variant); }
+
+/* The open orders: oldest first, each one a row to take up, reprint or call off. */
+.open-orders-panel .open-order {
+  display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-2); align-items: center;
+  border-bottom: 1px solid var(--md-outline-variant); padding: var(--space-1) 0;
+}
+.open-orders-panel .open-order.is-current { background: var(--md-primary-container); }
+.open-order-load {
+  display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto;
+  column-gap: var(--space-3); align-items: baseline; text-align: left;
+  min-height: var(--touch); background: none; border: 0; border-radius: var(--shape-sm);
+  font: inherit; cursor: pointer; padding: var(--space-2);
+}
+.open-order-load .money { grid-row: 1 / span 2; grid-column: 3; align-self: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.open-order-load .muted { grid-column: 2; font-size: var(--type-body-sm-size); }
+.open-orders-panel .rail-action { width: auto; margin-top: 0; }
+
+@media (max-width: 899px) {
+  .pos-rail .rail-order { order: 1; }
+  .open-orders-panel .open-order { grid-template-columns: 1fr; }
+}
+.payment-order, .receipt-order {
+  margin: 0 0 var(--space-2); font-size: var(--type-title-md-size); font-weight: 600; color: var(--md-primary);
+}

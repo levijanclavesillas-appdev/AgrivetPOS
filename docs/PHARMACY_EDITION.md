@@ -165,26 +165,29 @@ migrated from the old names.
 The setup wizard's first step asks **what kind of store this is**. The choice is
 `store_profile.industry` (`904_store_industry.sql`), **fixed once made** (owner's decision: a store
 set up as the wrong kind is set up again), and shown at sign-in as *Chachi POS **(Pharmacy)***.
-Motorcycle shops and wholesale & retail are listed as coming soon and cannot be chosen yet.
+A café or restaurant joined them in `TASK-066` (§13). Motorcycle shops and wholesale & retail are
+listed as coming soon and cannot be chosen yet.
 
 **What an industry decides is small, on purpose.** Every feature is in every store — generic
 names, batches and expiry, recall, pictures, packs, credit, the subscription, the Android app. An
 industry decides only the defaults a store would otherwise change on day one, and the words it
 sees. All of it is in `src/config/industries.js`:
 
-| | Pharmacy | Agrivet |
-| :--- | :--- | :--- |
-| Senior citizen / PWD discount (`statutory_discount_enabled`, P-1) | On | Off — a question for the accountant |
-| Return reasons (`POS-302`) | …"Seal broken or packaging tampered", "Adverse reaction reported"… | …"Animal refused the feed"… |
-| Return write-off categories (`POS-304`) | Medicines, OTC Medicines, Vitamins, Supplements, Vaccines, Biologics | Veterinary, Veterinary Medicines, Medicines, Vaccines, Biologics |
-| A new product in the editor (P-2) | Batch-tracked and senior/PWD-eligible, ticked | Both unticked |
-| Customers from the opening credit balances | `REGULAR` | `FARM` |
-| The opening spreadsheet's examples and Read me | Paracetamol, boxes of 100 tablets | Hog feed, sacks of 50 kg |
-| Sign-in, sidebar mark | *Chachi POS (Pharmacy)*, pill | *Chachi POS (Agrivet)*, sprout |
+| | Pharmacy | Agrivet | Café / Restaurant |
+| :--- | :--- | :--- | :--- |
+| Senior citizen / PWD discount (`statutory_discount_enabled`, P-1) | On | Off — a question for the accountant | On — restaurant meals are named in RA 9994 |
+| Orders before payment and kitchen tickets (`POS-109`, `POS-110`) | Off | Off | On, tickets on the receipt printer |
+| Return reasons (`POS-302`) | …"Seal broken or packaging tampered", "Adverse reaction reported"… | …"Animal refused the feed"… | …"Wrong order served", "Food spoiled or undercooked"… |
+| Return write-off categories (`POS-304`) | Medicines, OTC Medicines, Vitamins, Supplements, Vaccines, Biologics | Veterinary, Veterinary Medicines, Medicines, Vaccines, Biologics | Food, Meals, Pastries, Desserts |
+| A new product in the editor (P-2) | Batch-tracked and senior/PWD-eligible, ticked | Both unticked | Made to order and senior/PWD-eligible, ticked |
+| Customers from the opening credit balances | `REGULAR` | `FARM` | `REGULAR` |
+| The opening spreadsheet's examples and Read me | Paracetamol, boxes of 100 tablets | Hog feed, sacks of 50 kg | Bibimbap by the serving, water by the case |
+| Sign-in, sidebar mark | *Chachi POS (Pharmacy)*, pill | *Chachi POS (Agrivet)*, sprout | *Chachi POS (Café / Restaurant)*, coffee cup |
 
 The settings are **seeded** from the industry at setup and are ordinary settings afterwards: the
 owner can change any of them. Adding an industry is a block in `industries.js` with
-`available: true`; the column's CHECK already names the two on the roadmap.
+`available: true`; the column's CHECK already names the two on the roadmap (a café was not on it,
+so `908_cafe.sql` rebuilt the table to admit it).
 
 ## 10. The barcode on a box (`TASK-055`)
 
@@ -254,3 +257,28 @@ connect the same way as the first.
 devices must connect again. A web copy's backup restored on a PC makes that PC standalone (the
 store moving off the web).
 
+## 13. A café or restaurant (`TASK-066`)
+
+The owner (2026-09-16): a café or restaurant is a kind of store at setup, beside a pharmacy and an
+agrivet. Its first is NAM-NAM, the café on back-end.store (`TASK-064`). A café takes the order at
+the table, the kitchen makes it, and the customer pays when they leave.
+
+| Rule | Statement |
+| :--- | :--- |
+| `INV-114` | A product may be **made to order**: it keeps no stock. Selling it needs none on hand and moves none, and so does its void or return. Nothing can receive, count, adjust or order it from a supplier, it is never low on stock, and it cannot be batch-tracked or given a minimum. A product with stock on hand cannot become made to order until that stock is sold or written off. A café's new products start made to order |
+| `POS-109` | Where the store takes orders before they are paid (`open_orders_enabled`, on for a café), an order is taken with how it is served (dine-in, take-out or delivery) and a table or a name, and gets the day's next number on that counter. It can be changed until it is paid. Paying for it is an ordinary sale (`POS-108`'s number, prices resolved then) that records the order's number, table and type. An order called off before it is paid needs a reason and is audited. Open orders belong to the counter, are never synced (`SYNC-001`), and outlive the shift: a shift closes with them open, and the close says which. A café's sale rung up without an order gets a number too |
+| `POS-110` | Sending an order prints a kitchen ticket: the number, table, type, and each item with its quantity and note, and no prices. After the first, a ticket carries only what changed — `+` more, `−` no longer wanted. Paying prints whatever was added at the counter and never sent; cancelling prints a ticket telling the kitchen to stop; an order's ticket can be printed again, marked REPRINT. The kitchen printer (`kitchen_printer`) is the receipt printer, a network printer of its own, or none, and is set per device |
+| `POS-111` | A sale line may carry a note to the kitchen, up to 60 characters. It is on the ticket, the receipt and the sale line. A line with a note is its own line |
+| `POS-112` | A dine-in bill carries the service charge the owner sets (`service_charge_bp`, 0 by default), on what the lines come to after every discount. It is a figure of its own on the sale, not a product: its own line on the receipt, VATable in VAT mode, and a term of its own in the daily report (gross − discounts + service charge − returns = net). A return does not refund it |
+
+**What was built.** `908_cafe.sql` admits `CAFE`, adds `products.is_stocked`, the order's type,
+table and service charge on `sales`, `sale_items.note`, and `open_orders`. The counter in a café
+has an order block (Dine-in / Take-out / Delivery and the table), **Send to kitchen** (`F6`) and
+**Orders** (`F7`) where a shop has Park and Retrieve, a **Note** action, and the service charge in
+the totals. The shift close lists the orders still open. The product editor has **Made to order**.
+The opening spreadsheet takes a `made_to_order` column. Kitchen tickets pass `TAX-006` like every
+document: a note that happens to read like a forbidden phrase ("or no sugar") is printed with the
+phrase broken (`documentService.neutralise`), never refused.
+
+**Not built, and Chachi Dine's ground if a café asks:** modifiers with prices of their own, split
+bills by item, a floor plan, a kitchen display, and ingredient recipes.

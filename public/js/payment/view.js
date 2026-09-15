@@ -143,7 +143,13 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
     const blocked = tenders.blockedReason();
 
     clear(summaryHost).append(...[
+      // TASK-066: which order is being paid for, where a café's counter knows.
+      orderLine() ? h('p', { class: 'payment-order', text: orderLine() }) : null,
       line('Amount due', money(priced.total_centavos), 'due'),
+      // POS-112: already in the amount due, and said, because the customer asks.
+      priced.service_charge_centavos > 0
+        ? line(`incl. service charge ${priced.service_charge_bp / 100}%`, money(priced.service_charge_centavos), 'service-charge')
+        : null,
       // TAX-004, restated where the money changes hands: the cashier confirms the name
       // on the ID out loud, and the figure is separate from every other discount
       // because it is a different claim.
@@ -163,6 +169,13 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
     completeButton.disabled = Boolean(blocked);
     blockedNote.textContent = blocked || '';
     blockedNote.hidden = !blocked;
+  }
+
+  /** "Order 12 · Dine-in · Table 4", or nothing for a shop's sale. */
+  function orderLine() {
+    const served = { DINE_IN: 'Dine-in', TAKE_OUT: 'Take-out', DELIVERY: 'Delivery' }[cart.orderType];
+    return [cart.openOrder ? `Order ${cart.openOrder.order_no}` : null, served || null, cart.tableLabel || null]
+      .filter(Boolean).join(' · ');
   }
 
   const line = (label, value, cls = '') => h('div', { class: `summary-line ${cls}` }, [

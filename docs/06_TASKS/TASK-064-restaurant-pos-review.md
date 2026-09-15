@@ -138,7 +138,7 @@ throwaway containers and stores are deleted.
 | Item | Why, and what happens to it |
 | :--- | :--- |
 | Passwords | Credentials never travel (`SEC-1`), so each user sets a new password |
-| Line notes (38), table labels (4), dine-in/take-out | Chachi POS has nowhere to keep them until TASK-066 adds the columns; then the tool carries them |
+| ~~Line notes (38), table labels (4), dine-in/take-out~~ | Carried since TASK-066, which added the columns: the note on the sale line, the table and type on the sale, the fee as its service charge |
 | Order status history | Chachi POS has no kitchen status: an order is completed when paid |
 | Print queue (1,864 jobs) | Never printed, and it is not history |
 | Promo code definitions (4) | There are no promo codes in Chachi POS |

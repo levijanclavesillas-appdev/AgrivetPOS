@@ -56,6 +56,9 @@ const TYPES = Object.freeze({
 
 const TYPE_NAMES = Object.freeze(Object.keys(TYPES));
 
+/** The documents a made-to-order product's lines appear on, and move nothing (INV-114). */
+const SALE_DOCUMENTS = Object.freeze(['sale', 'sale_void', 'sale_return']);
+
 function assertType(type) {
   if (!Object.prototype.hasOwnProperty.call(TYPES, type)) {
     throw new RangeError(`unknown movement type: ${type} (INV-103)`);
@@ -100,6 +103,24 @@ function post({
   }
 
   const qty = normaliseQuantity(type, qtyMilli);
+
+  // INV-114 (TASK-066), here for the reason INV-201 is: here is the only way stock moves.
+  // A made-to-order product keeps none. Its sale, and the void or return of that sale,
+  // move nothing and say so; anything else — a delivery, a count, an adjustment — is
+  // somebody treating it as stock, and is refused.
+  if (product.is_stocked === 0) {
+    if (SALE_DOCUMENTS.includes(referenceType)) {
+      return {
+        movement: null, notStocked: true, balanceMilli: 0,
+        averageChanged: false, avgCostCentavos: product.avg_cost_centavos,
+      };
+    }
+    throw errors.conflict(
+      `${product.name} is made to order and keeps no stock, so there is nothing to record as `
+      + `"${describe(type).toLowerCase()}". To keep stock of it, untick "Made to order" on the product first.`,
+      { ruleId: 'INV-114' }
+    );
+  }
 
   // INV-201, enforced here because here is the only way stock moves.
   //
@@ -504,7 +525,10 @@ function onHand(productId) {
     base_unit_code: product.base_unit_code,
     min_stock_milli: product.min_stock_milli,
     // INV-109 at read time, for one product.
-    is_low_stock: Boolean(product.is_active) && product.min_stock_milli > 0 && qty <= product.min_stock_milli,
+    is_low_stock: Boolean(product.is_active) && product.is_stocked !== 0
+      && product.min_stock_milli > 0 && qty <= product.min_stock_milli,
+    // INV-114: the counter shows no "stock after" for what is made to order.
+    is_stocked: product.is_stocked !== 0,
     has_moved: Boolean(row),
     updated_at: row ? row.updated_at : null,
   };

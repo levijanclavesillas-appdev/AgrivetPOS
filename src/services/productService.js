@@ -179,9 +179,11 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
     // UOM-003: the base unit is immutable once anything has moved. Surfaced so the
     // editor can lock the field and say why, rather than discovering it at save.
     base_unit_locked: Boolean(row.has_moved),
-    is_low_stock: Boolean(row.is_active) && row.min_stock_milli > 0
+    // INV-114: a made-to-order product keeps no stock, so it is never low on it.
+    is_low_stock: Boolean(row.is_active) && row.is_stocked !== 0 && row.min_stock_milli > 0
       && (row.qty_on_hand_milli ?? 0) <= row.min_stock_milli,
     is_batch_tracked: Boolean(row.is_batch_tracked),
+    is_stocked: row.is_stocked !== 0,
     is_active: Boolean(row.is_active),
     // TASK-052: the picture's version, or null. The renderer fetches
     // /products/:id/image?v=<version>, so a replaced picture is a new address.
@@ -366,6 +368,9 @@ function createWithin(input, actor, session = actor) {
 
   const barcodes = (input.barcodes || []).map(validateBarcode);
   const packs = (input.packs || []).map((pack) => normalisePack(pack, baseUnit));
+  // INV-114: stocked unless said otherwise, as every product before TASK-066 was.
+  const stocked = input.isStocked !== false;
+  if (!stocked) assertMayBeMadeToOrder({ isBatchTracked: Boolean(input.isBatchTracked), minStockMilli: minStock });
 
   const row = productRepository.insert({
     id: ids.uuidv7(),
@@ -382,6 +387,7 @@ function createWithin(input, actor, session = actor) {
     avg_cost_as_of: avgCost > 0 ? at : null,
     min_stock_milli: minStock,
     is_batch_tracked: input.isBatchTracked ? 1 : 0,
+    is_stocked: stocked ? 1 : 0,
     is_active: 1,
     created_at: at,
     created_by: actor.id || null,
@@ -465,6 +471,28 @@ function update(id, changes, actor, session = actor) {
     move('base_unit_id', unit.id);
   }
   if (changes.isActive !== undefined) move('is_active', changes.isActive ? 1 : 0);
+  if (changes.isStocked !== undefined) {
+    const stocked = changes.isStocked ? 1 : 0;
+    if (stocked === 0 && current.is_stocked !== 0) {
+      assertMayBeMadeToOrder({
+        isBatchTracked: Boolean(fields.is_batch_tracked ?? current.is_batch_tracked),
+        minStockMilli: fields.min_stock_milli ?? 0,
+        onHandMilli: current.qty_on_hand_milli ?? 0,
+        unitCode: current.base_unit_code,
+      });
+      // Nothing to reorder, so no threshold to be under.
+      move('min_stock_milli', 0);
+    }
+    move('is_stocked', stocked);
+  }
+  // Whichever field moved, a product that ends up made to order ends up without batches or
+  // a minimum (INV-114).
+  if ((fields.is_stocked ?? current.is_stocked) === 0) {
+    assertMayBeMadeToOrder({
+      isBatchTracked: Boolean(fields.is_batch_tracked ?? current.is_batch_tracked),
+      minStockMilli: fields.min_stock_milli ?? current.min_stock_milli,
+    });
+  }
 
   if (Object.keys(fields).length === 0) return detail(current, session, { at });
 
@@ -505,6 +533,36 @@ function assertBaseUnitChangeable(productId) {
     + 'product with the right unit and move the stock across with an adjustment.',
     { ruleId: 'UOM-003' }
   );
+}
+
+/**
+ * INV-114 — what a made-to-order product cannot also be.
+ *
+ * It keeps no stock, so it has no batches to track and no minimum to fall under. And a
+ * product with stock on the shelf cannot become one: those units would stop being
+ * counted, valued or sold against, and would simply vanish from the books. They are sold,
+ * or written off, first.
+ */
+function assertMayBeMadeToOrder({ isBatchTracked, minStockMilli = 0, onHandMilli = 0, unitCode = '' }) {
+  if (isBatchTracked) {
+    throw errors.badRequest(
+      'A product made to order keeps no stock, so it has no batches to track. Untick one or the other.',
+      { ruleId: 'INV-114' }
+    );
+  }
+  if (onHandMilli !== 0) {
+    throw errors.conflict(
+      `This product has ${quantity.format(onHandMilli, unitCode)} on hand. Sell it or write it off `
+      + 'before making it to order, or those units would drop out of the stock the store counts.',
+      { ruleId: 'INV-114' }
+    );
+  }
+  if (minStockMilli > 0) {
+    throw errors.badRequest(
+      'A product made to order keeps no stock, so it has no minimum stock. Leave it at zero.',
+      { ruleId: 'INV-114' }
+    );
+  }
 }
 
 /**

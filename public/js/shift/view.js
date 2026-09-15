@@ -265,6 +265,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
         h('h1', { text: 'Close the shift' }),
       ]),
       notMine(),
+      openOrders(),
       h('p', { class: 'muted', text: 'Count each one and type what you actually have. '
         + 'Nothing is filled in for you — a figure the system typed is not a count.' }),
 
@@ -361,6 +362,22 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
       cell.textContent = variance === null ? '—' : money(variance);
       cell.className = `money variance ${variance === null ? '' : (variance < 0 ? 'down' : (variance > 0 ? 'up' : 'zero'))}`;
     });
+  }
+
+  /**
+   * POS-109 (TASK-066): orders still being eaten. They are not in this drawer — nobody has
+   * paid for them — and they stay open for whoever is on the counter next, so closing is
+   * not refused; the closer is told which they are leaving.
+   */
+  function openOrders() {
+    const open = state.open_orders;
+    if (!open || open.count === 0) return null;
+    const which = open.orders.map((o) => `Order ${o.order_no}${o.table_label ? ` (${o.table_label})` : ''}`).join(', ');
+    return h('div', { class: 'alert alert-info', role: 'status' }, [
+      h('span', { class: 'alert-message', text: `${open.count} order${open.count === 1 ? ' is' : 's are'} still open — ${which}. `
+        + 'Nobody has paid for them, so they are not in this count. They stay open for whoever is on the counter next.' }),
+      h('span', { class: 'alert-rule', text: 'POS-109' }),
+    ]);
   }
 
   /**

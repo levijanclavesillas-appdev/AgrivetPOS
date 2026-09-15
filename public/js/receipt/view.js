@@ -285,6 +285,13 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
     if (host) clear(host).append(actionsBlock());
   }
 
+  /** "Order 12 · Dine-in · Table 4", from what the server said about the sale. */
+  function orderLine(view) {
+    const served = { DINE_IN: 'Dine-in', TAKE_OUT: 'Take-out', DELIVERY: 'Delivery' }[view.order_type];
+    return [view.order_no ? `Order ${view.order_no}` : null, served || null, view.table_label || null]
+      .filter(Boolean).join(' · ');
+  }
+
   function mount() {
     clear(root).append(h('div', { class: 'receipt' }, [
       // Only where there is somewhere to go back to. Reached from a completed sale this
@@ -292,6 +299,8 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
       // return to a cart that has already been paid for.
       onBack ? h('button', { class: 'report-back', icon: 'arrow-left', text: 'Receipts', onclick: () => onBack() }) : null,
       h('h1', { text: sale.sale.sale_no }),
+      // TASK-066: a café's order — the number the counter called, how it was served, where.
+      orderLine(sale.sale) ? h('p', { class: 'receipt-order', text: orderLine(sale.sale) }) : null,
       h('div', { class: 'receipt-figures' }, [
         h('div', { class: 'summary-line total' }, [
           h('span', { text: 'Total' }), h('span', { class: 'money', text: money(sale.sale.total_centavos) }),
@@ -310,6 +319,11 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
     // is a toast, the status line and a queued original, never an unwound sale.
     if (printState && !printState.delivered && printState.transport !== 'NONE') {
       ui.toast(`The receipt did not print (${printState.error}). Press Print it when the printer is ready.`, { kind: 'error' });
+    }
+    // POS-110: and the kitchen's ticket, which is the one the food depends on.
+    const kitchen = sale.kitchen && sale.kitchen.printed;
+    if (kitchen && !kitchen.delivered && !kitchen.pending && !['NONE', 'BROWSER'].includes(kitchen.transport)) {
+      ui.toast(`The kitchen ticket did not print (${kitchen.error}). Tell the kitchen what to make.`, { kind: 'error' });
     }
 
     load();

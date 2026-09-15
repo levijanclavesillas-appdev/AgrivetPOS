@@ -96,6 +96,14 @@ function resolveLines(input) {
         { ruleId: 'VR-206' }
       );
     }
+    if (product.is_stocked === 0) {
+      // INV-114: nothing would arrive on a shelf. What the kitchen buys to make it — the
+      // rice, the beans — is ordered as products of its own.
+      throw errors.conflict(
+        `${product.name} is made to order and keeps no stock, so it is not bought in. Order what it is made from.`,
+        { ruleId: 'INV-114' }
+      );
+    }
     if (seen.has(product.id)) {
       // Two lines for the same product make "how much of this is outstanding"
       // ambiguous on receipt, and the buyer meant one line with a bigger number.

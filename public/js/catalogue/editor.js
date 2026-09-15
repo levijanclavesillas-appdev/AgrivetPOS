@@ -32,7 +32,7 @@ const PRICE_LEVELS = ['RETAIL', 'WHOLESALE', 'DEALER'];
 // server put in the payload, not by a role check here. TX-412 omits cost entirely for
 // anyone who may not see it, so the editor cannot render it by mistake — and there is no
 // role variable in scope for a future change to start branching on.
-export function createProductEditor({ root, productId, onClose, productDefaults = null }) {
+export function createProductEditor({ root, productId, onClose, productDefaults = null, industry = null }) {
   let product = null;
   let reference = { categories: [], brands: [], units: [] };
   let tab = 'Identity';
@@ -83,6 +83,8 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
     tax_class: 'VATABLE', min_stock_milli: 0, is_active: true,
     is_batch_tracked: productDefaults ? Boolean(productDefaults.isBatchTracked) : true,
     statutory_discount_eligible: productDefaults ? Boolean(productDefaults.statutoryDiscountEligible) : true,
+    // INV-114 (TASK-066): a café's menu item starts made to order; a shop's product, stocked.
+    is_stocked: productDefaults ? productDefaults.isStocked !== false : true,
     qty_on_hand_milli: 0, has_moved: false, base_unit_locked: false,
     barcodes: [], packs: [], prices: { RETAIL: null, WHOLESALE: null, DEALER: null },
   });
@@ -128,7 +130,8 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
     const name = field('Name', h('input', { type: 'text', value: product.name, required: true }));
     const genericName = field('Generic name', h('input', {
       type: 'text', value: product.generic_name || '', maxlength: 120,
-      placeholder: 'Paracetamol — leave blank if it has none',
+      // A café has no generic names; the field stays, as every feature does (TASK-053).
+      placeholder: industry === 'CAFE' ? 'Leave blank — it is for medicines' : 'Paracetamol — leave blank if it has none',
     }));
     const category = referenceSelect('categories', 'Category', product.category.id, true);
     const brand = referenceSelect('brands', 'Brand', product.brand ? product.brand.id : null, false);
@@ -138,6 +141,12 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
         value: c, text: c.replace(/_/g, ' ').toLowerCase(), selected: c === product.tax_class,
       }))));
     const batchTracked = batchTrackedField();
+    const madeToOrder = checkField(
+      product.is_stocked === false,
+      'Made to order — no stock is kept',
+      'For what the kitchen makes when it is ordered. It sells with nothing on hand, and is never '
+        + 'received, counted or low on stock (INV-114). Untick for what you buy and sell as it is.'
+    );
     const statutory = checkField(
       product.statutory_discount_eligible,
       'The senior citizen / PWD discount applies to this product',
@@ -172,6 +181,11 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
         // Sent only while it can still change; once locked the server would refuse a
         // different answer, and resending the same one is noise in the audit trail.
         if (batchTracked.input) changes.isBatchTracked = batchTracked.input.checked;
+        changes.isStocked = !madeToOrder.input.checked;
+        if (madeToOrder.input.checked && batchTracked.input && batchTracked.input.checked) {
+          ui.toast('A product made to order has no batches. Untick one or the other (INV-114).', { kind: 'error' });
+          return;
+        }
         if (retail) {
           const pesos = Number.parseFloat(retail.input.value);
           if (!Number.isFinite(pesos) || pesos < 0) {
@@ -185,7 +199,7 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
     }, [
       pictureField(),
       sku.el, name.el, genericName.el, category.el, brand.el, unit.el, taxClass.el,
-      batchTracked.el, statutory.el,
+      madeToOrder.el, batchTracked.el, statutory.el,
       retail ? retail.el : null,
       h('div', { class: 'editor-actions' }, [
         h('button', { type: 'submit', class: 'primary', text: isNew ? 'Create product' : 'Save' }),
@@ -699,6 +713,15 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
   // ── Stock (INV-101, INV-109, UOM-005) ─────────────────────────────────────
 
   function stockTab() {
+    // INV-114: nothing on a shelf, so nothing to show or set here.
+    if (product.is_stocked === false) {
+      return h('div', {}, [
+        h('p', { class: 'muted', text: 'This product is made to order, so no stock is kept: it sells with '
+          + 'nothing on hand, and is never received, counted or low on stock. To keep stock of it, untick '
+          + '"Made to order" on the Identity tab.' }),
+        h('p', { class: 'refusal-rule', text: 'INV-114' }),
+      ]);
+    }
     const minimum = h('input', {
       type: 'text', inputmode: 'decimal',
       value: quantity(product.min_stock_milli),

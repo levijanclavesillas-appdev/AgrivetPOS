@@ -10,6 +10,7 @@ import * as ui from './ui.js';
 import { h, clear } from './ui.js';
 import { openAccount, renderRecover } from './account.js';
 import { manila } from './format.js';
+import { setEmptyIcon } from './pictures.js';
 import { createPos } from '../pos/view.js';
 import { createPayment } from '../payment/view.js';
 import { createReceipt } from '../receipt/view.js';
@@ -414,6 +415,7 @@ export function createApp({ root }) {
       productId,
       // TASK-053 / P-2: the ticks a new product starts with are the store's industry's.
       productDefaults: installation.industry?.product_defaults || null,
+      industry: installation.industry?.code || null,
       // A newly created product reopens in the editor rather than dropping back to the
       // list: its packs, prices and barcodes are the next four things anybody does.
       onClose: (createdId) => (createdId ? showProductEditor(createdId) : showProducts()),
@@ -858,10 +860,10 @@ export function createApp({ root }) {
 
   function renderRail(activeId) {
     clear(railHost).append(
-      // The store's kind, as its mark (TASK-053). @icons pill sprout
+      // The store's kind, as its mark (TASK-053, TASK-066). @icons pill sprout coffee
       h('div', {
         class: 'rail-brand',
-        icon: installation.industry?.code === 'AGRIVET' ? 'sprout' : 'pill',
+        icon: { AGRIVET: 'sprout', CAFE: 'coffee' }[installation.industry?.code] || 'pill',
         text: PRODUCT_NAME,
         title: installation.industry ? installation.industry.display_name : PRODUCT_NAME,
       }),
@@ -958,6 +960,8 @@ export function createApp({ root }) {
         app_version: health?.app_version || null,
         industry: status?.industry || null,
       };
+      // TASK-066: a product with no picture shows the store's mark. @icons pill coffee
+      setEmptyIcon(installation.industry?.code === 'CAFE' ? 'coffee' : 'pill');
       signIn();
     },
     get session() { return session; },

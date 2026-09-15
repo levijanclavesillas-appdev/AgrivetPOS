@@ -31,6 +31,9 @@ const settingsService = require('./settingsService');
 const discountRuleService = require('./discountRuleService');
 const productRepository = require('../repositories/productRepository');
 
+/** POS-112: a service charge is part of the price of the service, so VAT is on it. */
+const SERVICE_CHARGE_TAX_CLASS = 'VATABLE';
+
 const PRICE_LEVELS = Object.freeze(['RETAIL', 'WHOLESALE', 'DEALER']);
 
 /**
@@ -571,7 +574,7 @@ function assertWithinLine(discountCentavos, baseCentavos, productName) {
  */
 function priceCart({
   lines, customer = null, taxMode, actorRole = null, approverRole = null,
-  transactionDiscountCentavos = 0, statutory = null, at = null,
+  transactionDiscountCentavos = 0, statutory = null, at = null, serviceChargeBp = 0,
 }) {
   taxService.assertMode(taxMode);
   if (!Array.isArray(lines) || lines.length === 0) {
@@ -729,6 +732,8 @@ function priceCart({
       category_id: product.category_id,
       category_name: product.category_name,
       category_max_discount_bp: categoryMaxDiscountBp,
+      // INV-114: whether selling it takes anything off a shelf.
+      is_stocked: product.is_stocked !== 0,
       qty_milli: line.qtyMilli,
       unit_price_centavos: price.price_centavos,
       price_level: price.resolved_level,
@@ -870,11 +875,26 @@ function priceCart({
     amount_centavos: line.net_centavos - shares[i],
   }));
 
-  // 5. Tax treatment, per line (TAX-002, TAX-003).
+  // 4b. POS-112 (TASK-066): the service charge, on what the lines came to after every
+  // discount — a charge for serving the meal the customer is actually paying for. It is a
+  // figure of its own, not a line: it is not a product, nothing is discounted off it, and
+  // a return does not refund it. The caller decides whether one applies (dine-in only).
+  const linesTotal = withShares.reduce((sum, l) => sum + l.amount_centavos, 0);
+  const chargeBp = Number.isInteger(serviceChargeBp) && serviceChargeBp > 0 ? serviceChargeBp : 0;
+  const serviceCharge = chargeBp === 0 ? 0 : money.toSafeNumber(
+    money.divRoundHalfUp(BigInt(linesTotal) * BigInt(chargeBp), 10000n), 'service charge'
+  );
+
+  // 5. Tax treatment, per line (TAX-002, TAX-003) — and the service charge beside them,
+  // VATable in VAT mode: it is part of what the store is paid for its service.
   const tax = taxService.computeTax({
     taxMode,
-    lines: withShares.map((l) => ({ taxClass: l.tax_class, amountCentavos: l.amount_centavos })),
+    lines: [
+      ...withShares.map((l) => ({ taxClass: l.tax_class, amountCentavos: l.amount_centavos })),
+      ...(serviceCharge > 0 ? [{ taxClass: SERVICE_CHARGE_TAX_CLASS, amountCentavos: serviceCharge }] : []),
+    ],
   });
+  const serviceChargeTax = serviceCharge > 0 ? tax.lines[withShares.length] : null;
 
   const priced = withShares.map((line, i) => ({
     ...line,
@@ -940,7 +960,12 @@ function priceCart({
     transaction_discount_source: txnChoice.source,
     transaction_discount_choice: txnChoice,
     transaction_discount_decision: txnDecision,
-    total_centavos: priced.reduce((sum, l) => sum + l.amount_centavos, 0),
+    // POS-112: what the bill came to before it, the rate, and the charge.
+    lines_total_centavos: linesTotal,
+    service_charge_bp: chargeBp,
+    service_charge_centavos: serviceCharge,
+    service_charge_vat_centavos: serviceChargeTax ? serviceChargeTax.vat_centavos : 0,
+    total_centavos: linesTotal + serviceCharge,
     tax_amount_centavos: tax.total_vat_centavos,
     tax_summary: tax.summary,
     // What the POS screen needs to decide between completing, prompting for an

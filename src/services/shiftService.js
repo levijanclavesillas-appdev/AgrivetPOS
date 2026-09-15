@@ -525,6 +525,8 @@ function close({
     backup,
     summary,
     printed,
+    // POS-109 (TASK-066): the orders still being eaten, left open for the next shift.
+    open_orders: require('./openOrderService').carriedOver(),
     // OPS-007's list, recomputed after the close so it carries the backup that just
     // ran (or did not). One service produces it, so SCR-503 and SCR-601 cannot
     // disagree about whether the store is backed up (TASK-017 requirement 11).

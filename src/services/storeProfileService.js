@@ -83,12 +83,15 @@ function industry() {
   return row ? row.industry : null;
 }
 
+/** "Pharmacy, Agrivet or Café / Restaurant" — a list the way it is said. */
+const spoken = (words) => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} or ${words.at(-1)}`);
+
 /** TASK-053: only an industry that is offered may be chosen. */
 function assertIndustry(code) {
   const known = industries.get(code);
   if (!known || !known.available) {
     throw errors.badRequest(
-      `Choose what kind of store this is: ${industries.AVAILABLE.map((c) => industries.get(c).label).join(' or ')}.`,
+      `Choose what kind of store this is: ${spoken(industries.AVAILABLE.map((c) => industries.get(c).label))}.`,
       { ruleId: 'VR-501' }
     );
   }

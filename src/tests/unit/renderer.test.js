@@ -241,7 +241,11 @@ test('the cart request is the shape POST /sales takes', async () => {
     customerId: 'c1',
     transactionDiscountCentavos: 250,
     statutory: null,
-    lines: [{ productId: 'p1', qtyMilli: 1255, packUnitId: null, discountCentavos: 500 }],
+    lines: [{ productId: 'p1', qtyMilli: 1255, packUnitId: null, discountCentavos: 500, note: null }],
+    // TASK-066: a shop's cart names no order.
+    orderType: null,
+    tableLabel: null,
+    openOrderId: null,
   });
 
   // TAX-004's claim travels in the same request — and out of the cart the moment it is
@@ -250,6 +254,58 @@ test('the cart request is the shape POST /sales takes', async () => {
   assert.deepEqual(cart.toRequest().statutory, { idType: 'SENIOR_CITIZEN', idNo: '12-3456789', name: 'Lolo Ambrosio Cruz' });
   cart.clear();
   assert.equal(cart.toRequest().statutory, null);
+});
+
+test('TASK-066: a note makes a line its own, and a café cart carries its order', async () => {
+  const { createCart } = await load('js/pos/cart.js');
+  const cart = createCart();
+  const latte = { id: 'l1', sku: 'LATTE', name: 'Iced Latte', base_unit: { code: 'SRV', allows_fraction: false }, is_stocked: false };
+  cart.add({ product: latte, qtyMilli: 2000 });
+
+  // POS-111: one of the two with less ice is a line of its own; a second scan adds to
+  // the plain one; the same note again joins the line that has it.
+  const plain = cart.lines[0];
+  cart.setQuantity(plain.key, 1000);
+  cart.add({ product: latte, qtyMilli: 1000 });
+  cart.setNote(cart.lines[0].key, '  less   ice ');
+  cart.add({ product: latte, qtyMilli: 1000 });
+  assert.deepEqual(cart.lines.map((l) => [l.note, l.qtyMilli, l.isStocked]), [['less ice', 2000, false], [null, 1000, false]]);
+  cart.setNote(cart.lines[1].key, 'less ice');
+  assert.deepEqual(cart.lines.map((l) => [l.note, l.qtyMilli]), [['less ice', 3000]]);
+
+  // POS-109: the order travels with the request, and an order taken up remembers what the
+  // kitchen has, so the counter can say what is not sent yet.
+  cart.orderType = 'DINE_IN';
+  cart.tableLabel = 'Table 4';
+  assert.deepEqual([cart.toRequest().orderType, cart.toRequest().tableLabel, cart.toRequest().openOrderId], ['DINE_IN', 'Table 4', null]);
+  cart.loadOrder({
+    id: 'o1', order_no: 7, order_type: 'TAKE_OUT', table_label: 'Ana', customer: null, transaction_discount_centavos: 0,
+    lines: [{ productId: 'l1', qtyMilli: 1000, packUnitId: null, discountCentavos: 0, note: 'no sugar' }],
+  }, new Map([['l1', latte]]));
+  assert.equal(cart.toRequest().openOrderId, 'o1');
+  assert.deepEqual([cart.orderType, cart.tableLabel], ['TAKE_OUT', 'Ana']);
+  assert.equal(cart.changedSinceLoaded(), false);
+  cart.add({ product: latte, qtyMilli: 1000 });
+  assert.equal(cart.changedSinceLoaded(), true, 'another latte is not sent yet');
+  cart.markSent({ id: 'o1', order_no: 7 });
+  assert.equal(cart.changedSinceLoaded(), false);
+  cart.clear();
+  assert.deepEqual([cart.toRequest().openOrderId, cart.tableLabel, cart.orderType], [null, '', 'TAKE_OUT'],
+    'the next table is served the way the last one was');
+});
+
+test('TASK-066: a café\'s counter sends orders, lists them, and shows the service charge', () => {
+  const source = codeOf('js/pos/view.js');
+  assert.match(source, /api\.post\('\/open-orders', body\)/);
+  assert.match(source, /api\.put\(`\/open-orders\/\$\{cart\.openOrder\.id\}`, body\)/);
+  assert.match(source, /\/open-orders\/\$\{order\.id\}\/cancel/);
+  assert.match(source, /Send to kitchen  F6/);
+  assert.match(source, /Service charge \$\{percent\(priced\.service_charge_bp\)\}/);
+  // By position: two lines of one product with different notes are two lines.
+  assert.match(source, /priced\?\.lines\?\.\[index\]/);
+  // The browser prints the kitchen's ticket with the receipt.
+  assert.match(codeOf('js/shell/print.js'), /payload\.kitchen && payload\.kitchen\.printed/);
+  assert.match(codeOf('js/catalogue/editor.js'), /Made to order — no stock is kept/);
 });
 
 test('the cart computes no total — every figure comes from the server', async () => {

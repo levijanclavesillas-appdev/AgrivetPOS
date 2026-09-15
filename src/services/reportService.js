@@ -205,7 +205,10 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
   // half subtracts what was refunded.
   const returned = returnRepository.returnTotals({ from: scope.fromAt, to: scope.toAt, shiftId: shift });
   const returns = returned.returns_centavos;
-  const reconciledNet = totals.gross_centavos - discounts - returns;
+  // POS-112: a dine-in bill's service charge is added after every discount, and is in
+  // what was paid but in no line — so the identity carries it as a term of its own.
+  const serviceCharge = totals.service_charge_centavos;
+  const reconciledNet = totals.gross_centavos - discounts + serviceCharge - returns;
   // Net of returns on both sides, or the two halves would be reconciling different
   // days: `net_centavos` is what the sales were, and a returned sack is no longer one.
   const netAfterReturns = totals.net_centavos - returns;
@@ -223,6 +226,7 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
       statutory_discount_centavos: totals.statutory_discount_centavos,
       voluntary_discount_centavos: voluntaryDiscounts,
       discount_centavos: discounts,
+      service_charge_centavos: serviceCharge,
       returns_centavos: returns,
       return_count: returned.return_count,
       // Both figures, because the pair is the check. `net_centavos` is the day net of
@@ -258,6 +262,9 @@ function daily({ from, to = null, shiftId = null, lineLimit = 500 } = {}, actor 
         + (totals.statutory_discount_centavos > 0
           ? ` − ${money.toDisplay(totals.statutory_discount_centavos)} statutory`
           : '')
+        // Named only where there is one, like the statutory term: a shop reads the
+        // sentence it always read.
+        + (serviceCharge > 0 ? ` + ${money.toDisplay(serviceCharge)} service charge` : '')
         + ` − ${money.toDisplay(returns)} returns`
         + ` = ${money.toDisplay(reconciledNet)} net`,
       gross_less_discounts_centavos: reconciledNet,
@@ -1048,6 +1055,8 @@ function exportCsv(report, params, actor) {
       // TAX-004: its own row. An accountant reading this file is reading it to find
       // exactly this figure, and it is not derivable from a merged total.
       ['Statutory discounts', built.totals.statutory_discount_centavos],
+      // POS-112: added to the bill, not taken off it.
+      ['Service charge', built.totals.service_charge_centavos],
       ['Returns', built.totals.returns_centavos],
       ['  refunded off a balance', built.totals.refund_credit_centavos],
       ['  refunded in cash', built.totals.refund_cash_centavos],

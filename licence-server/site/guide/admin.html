@@ -12,6 +12,7 @@
   <li><a href="#tax-mode">Change the tax mode</a></li>
   <li><a href="#receipt-printer">Set up the receipt printer and print a test page</a></li>
   <li><a href="#cash-drawer">Connect the cash drawer</a></li>
+  <li><a href="#cafe-settings">A café's kitchen printer, service charge and orders</a></li>
   <li><a href="#discount-limits">Set discount limits and cash rounding</a></li>
   <li><a href="#senior-citizen-pwd">Senior citizen and PWD discount</a></li>
   <li><a href="#other-settings">All the other settings</a></li>
@@ -152,6 +153,17 @@
     <li>Test with a real ₱1 cash sale, then void it (see <a href="/guide/corrections">Returns, voids and reprints</a>).</li>
   </ol>
   <p>If the drawer does not open, the sale is still saved. Open it with its key and check the cable at the printer.</p>
+</section>
+
+<section id="cafe-settings">
+  <h2>A café's kitchen printer, service charge and orders</h2>
+  <p class="who"><strong>Who:</strong> Owner. The kitchen printer can also be set by a Manager.</p>
+  <p>A store set up as <strong>Café / Restaurant</strong> starts taking orders before they are paid, with kitchen tickets printing on the receipt printer and no service charge. Each can be changed in <strong>Admin → Settings</strong>.</p>
+  <ul>
+    <li><strong>Take orders before they are paid, with a table or a name, and send them to the kitchen</strong> (in <em>Sales and the till</em>): on for a café. Off, the counter works like a shop's, with Park and Retrieve.</li>
+    <li><strong>Kitchen tickets print on</strong> (in <em>Sales and the till</em>): <strong>RECEIPT</strong> uses the receipt printer, including the web version's print dialog, where the ticket prints on its own page after the receipt. <strong>LAN</strong> is a network printer in the kitchen: type its address in <strong>Kitchen printer address on the network</strong>. <strong>NONE</strong> prints no tickets. Like the receipt printer, this is set on each device.</li>
+    <li><strong>Service charge on a dine-in bill, in basis points; 0 is none</strong> (in <em>Discounts and rounding</em>): 1000 is 10%. It is added to dine-in bills only, after every discount, and prints on the receipt as its own line. It appears on the daily report as <em>+ service charge</em>. A return does not refund it: if a table's whole bill was wrong, void the sale during the shift instead.</li>
+  </ul>
 </section>
 
 <section id="discount-limits">

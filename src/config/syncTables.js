@@ -12,6 +12,7 @@ const LOCAL_TABLES = Object.freeze([
   'licence_state',       // each installation links its own subscription seat (TASK-048)
   'backups',             // each installation backs up its own disk (OPS-001)
   'carts',               // the cart on this counter (POS-105)
+  'open_orders',         // the orders taken at this counter and not yet paid (POS-109)
   'system_events',       // this machine's clock and launch checks (OPS-009)
   'alert_dismissals',    // what was dismissed on this screen
   'sync_identity', 'sync_state', 'sync_changes', 'sync_devices',
@@ -37,6 +38,7 @@ const HUB_DERIVED_COLUMNS = Object.freeze({
 const LOCAL_SETTINGS = Object.freeze([
   'backup_folder', 'backup_hour', 'backup_period_hours', 'backup_retention_count',
   'printer_transport', 'printer_device', 'printer_host', 'printer_port', 'receipt_width_columns',
+  'kitchen_printer', 'kitchen_printer_host', 'kitchen_printer_port',
 ]);
 
 module.exports = { LOCAL_TABLES, HUB_DERIVED_TABLES, HUB_DERIVED_COLUMNS, LOCAL_SETTINGS };

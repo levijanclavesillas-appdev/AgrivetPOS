@@ -150,12 +150,15 @@ const KINDS = Object.freeze({
     // `generic_name` and `senior_pwd` (pharmacy edition): the two things a drugstore
     // catalogue carries that an agrivet's did not. `senior_pwd` is the product's
     // TAX-004 eligibility, read the way `batch_tracked` is — yes or blank.
-    optional: ['generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd'],
+    //
+    // `made_to_order` (TASK-066): a café's meals and coffee keep no stock (INV-114), read
+    // the same way — yes or blank.
+    optional: ['generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd', 'made_to_order'],
     example: [
-      ['sku', 'name', 'category', 'base_unit', 'retail_price', 'generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd'],
-      ['PARA-500', 'Paracetamol 500mg tablet', 'Medicines', 'TAB', '4.50', 'Paracetamol', 'Sample Pharma', '', '', 'VATABLE', '200', '4800012345678', 'yes', 'yes'],
-      ['ASC-500', 'Ascorbic Acid 500mg capsule', 'Vitamins', 'CAP', '6.00', 'Ascorbic acid', '', '', '', 'VATABLE', '100', '', 'yes', 'yes'],
-      ['COTTON-50', 'Cotton balls 50s', 'Personal Care', 'PC', '35.00', '', '', '', '', 'VATABLE', '10', '', '', ''],
+      ['sku', 'name', 'category', 'base_unit', 'retail_price', 'generic_name', 'brand', 'wholesale_price', 'dealer_price', 'tax_class', 'min_stock', 'barcode', 'batch_tracked', 'senior_pwd', 'made_to_order'],
+      ['PARA-500', 'Paracetamol 500mg tablet', 'Medicines', 'TAB', '4.50', 'Paracetamol', 'Sample Pharma', '', '', 'VATABLE', '200', '4800012345678', 'yes', 'yes', ''],
+      ['ASC-500', 'Ascorbic Acid 500mg capsule', 'Vitamins', 'CAP', '6.00', 'Ascorbic acid', '', '', '', 'VATABLE', '100', '', 'yes', 'yes', ''],
+      ['COTTON-50', 'Cotton balls 50s', 'Personal Care', 'PC', '35.00', '', '', '', '', 'VATABLE', '10', '', '', '', ''],
     ],
   },
   // UOM-002 for a whole catalogue: "1 BOX = 100 TAB", one row each. A drugstore sells
@@ -627,6 +630,15 @@ function checkProducts(source, problems, warnings, declared = NOTHING_DECLARED) 
     // must not silently grant a statutory discount the product does not carry.
     const seniorPwd = /^(y|yes|true|1)$/i.test(text(values.senior_pwd, { max: 8 }));
     if (seniorPwd) extra.statutoryDiscountEligible = true;
+    // INV-114, by the same reading: a typo leaves the product stocked, which the counter
+    // then refuses to sell without stock rather than silently selling what is not there.
+    const madeToOrder = /^(y|yes|true|1)$/i.test(text(values.made_to_order, { max: 8 }));
+    if (madeToOrder && batchTracked) {
+      reject(`${sku}: made_to_order and batch_tracked cannot both be yes — a product made when `
+        + 'it is ordered has no batches (INV-114).', 'INV-114');
+      continue;
+    }
+    if (madeToOrder) extra.isStocked = false;
     const genericName = text(values.generic_name, { max: 120 });
     if (genericName) extra.genericName = genericName;
 

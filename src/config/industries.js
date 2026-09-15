@@ -146,6 +146,73 @@ const INDUSTRIES = Object.freeze({
       balances: { customer: 'Santos Farm', balance: '12500.00', code: 'SF', contact_no: '09171234567', credit_limit: '50000.00', terms_days: '30', note: 'From the blue notebook' },
     }),
   }),
+  // TASK-066: the store owner, 2026-09-16 — "another type on set up as cafe/restaurant
+  // beside agrivet, pharmacy". The first is a café that takes an order at the table,
+  // sends it to the kitchen and is paid when the customer leaves.
+  CAFE: Object.freeze({
+    code: 'CAFE',
+    label: 'Café / Restaurant',
+    blurb: 'Cafés, restaurants, eateries and food stalls',
+    icon: 'coffee',
+    available: true,
+    settings: Object.freeze({
+      // TAX-004: RA 9994 and RA 10754 name restaurant meals for the beneficiary's own
+      // use, so a café grants the 20% from the day it opens, as a drugstore does.
+      statutory_discount_enabled: true,
+      // POS-109 and POS-110: orders are taken before they are paid, and the kitchen is
+      // told on the receipt printer until the owner gives it a printer of its own.
+      open_orders_enabled: true,
+      kitchen_printer: 'RECEIPT',
+      return_reasons: Object.freeze([
+        'Wrong order served',
+        'Not as ordered',
+        'Food spoiled or undercooked',
+        'Foreign object found',
+        'Served twice',
+        'Customer changed their mind',
+      ]),
+      // POS-304: food that has left the kitchen is never put back on a shelf. A made-to-
+      // order product moves no stock either way (INV-114); this covers a bottled drink or
+      // a packed pastry filed under these.
+      return_write_off_categories: Object.freeze([
+        'Food',
+        'Meals',
+        'Pastries',
+        'Desserts',
+      ]),
+    }),
+    // INV-114: a menu item is cooked or poured when it is ordered, so a new product starts
+    // made to order; a bottled drink is the one the owner unticks.
+    productDefaults: Object.freeze({ isBatchTracked: false, statutoryDiscountEligible: true, isStocked: false }),
+    // A café's account customers are regulars — an office that orders lunch on a tab.
+    customerType: 'REGULAR',
+    readme: Object.freeze({
+      categories: 'Rice Bowls, Coffee, Pastries',
+      units: 'SRV (serving), CUP, PC, BOT',
+      fractions: 'only for units that can be sold in part, like kilograms. Servings and cups cannot.',
+      generic: 'generic_name: leave blank. It is for medicines.',
+      batch: ['batch_tracked: leave blank. It is for goods sold by expiry date, like medicines.'],
+      senior: ['senior_pwd: write yes for food and drinks the senior citizen / PWD 20% discount covers —',
+        'meals for the buyer’s own use. Leave blank for the rest.'],
+      madeToOrder: ['made_to_order: write yes for what the kitchen makes when it is ordered — meals, coffee.',
+        'The system keeps no stock of it. Leave blank for what you buy and sell as it is, like bottled drinks.'],
+      pack: 'One row per pack: WATER-500, CASE, 24 means one case holds 24 bottles. The product is still',
+    }),
+    examples: Object.freeze({
+      categories: { name: 'Rice Bowls' },
+      units: { code: 'SRV', name: 'Serving' },
+      brands: { name: 'House' },
+      suppliers: { name: 'Mindanao Food Supply', code: 'MFS', contact_person: 'Carla Diaz', contact_no: '09171234567', terms_days: '15', address: 'Koronadal City' },
+      products: {
+        sku: 'BIBIMBAP', name: 'Bibimbap', category: 'Rice Bowls', base_unit: 'SRV', retail_price: '115.00',
+        generic_name: '', brand: '', wholesale_price: '', dealer_price: '', tax_class: 'VATABLE', min_stock: '',
+        barcode: '', batch_tracked: '', senior_pwd: 'yes', made_to_order: 'yes',
+      },
+      packs: { sku: 'WATER-500', unit: 'CASE', contains: '24', barcode: '4800098765432' },
+      stock: { sku: 'WATER-500', quantity: '48', unit_cost: '12.00', note: 'Counted 1 Sep', batch_no: '', expiry_date: '', supplier: '' },
+      balances: { customer: 'Koronadal Credit Office', balance: '3500.00', code: 'KCO', contact_no: '09171234567', credit_limit: '10000.00', terms_days: '15', note: 'From the blue notebook' },
+    }),
+  }),
   MOTORCYCLE: Object.freeze({
     code: 'MOTORCYCLE', label: 'Motorcycle shop', blurb: 'Parts, accessories and service shops',
     icon: 'motorbike', available: false,

@@ -179,6 +179,7 @@ function lowStock({ limit = 200, offset = 0 } = {}) {
       LEFT JOIN brands b ON b.id = p.brand_id
       LEFT JOIN inventory i ON i.product_id = p.id
      WHERE p.is_active = 1
+       AND p.is_stocked = 1          -- INV-114: made to order is never low on stock
        AND p.min_stock_milli > 0
        AND COALESCE(i.qty_on_hand_milli, 0) <= p.min_stock_milli
      ORDER BY (COALESCE(i.qty_on_hand_milli, 0) - p.min_stock_milli), p.name COLLATE NOCASE
@@ -191,7 +192,7 @@ function countLowStock() {
     SELECT COUNT(*) AS n
       FROM products p
       LEFT JOIN inventory i ON i.product_id = p.id
-     WHERE p.is_active = 1 AND p.min_stock_milli > 0
+     WHERE p.is_active = 1 AND p.is_stocked = 1 AND p.min_stock_milli > 0
        AND COALESCE(i.qty_on_hand_milli, 0) <= p.min_stock_milli
   `).get().n;
 }

@@ -18,6 +18,14 @@ export function createCart() {
   // to keep (RA 10173's minimisation), and a resumed cart asks for the ID again, which
   // is a second look at the card rather than a copy of it.
   let statutory = null;
+  // TASK-066: a café's order — how it is served, the table or name, and the open order
+  // this cart was loaded from (with what it held when loaded, to know what changed).
+  let orderType = null;
+  let tableLabel = '';
+  let openOrder = null;          // { id, order_no, lines (as loaded) }
+
+  /** A line's identity: product, unit, and — since a note makes a line its own — its note. */
+  const keyOf = (productId, packUnitId, note) => `${productId}:${packUnitId || 'base'}${note ? `:${note}` : ''}`;
 
   /**
    * Add a product, or increase the line already holding it.
@@ -27,9 +35,11 @@ export function createCart() {
    * one-unit lines is not that. Lines differing by pack are kept apart, because a sack
    * and a loose kilo are different things to pick.
    */
-  function add({ product, qtyMilli = 1000, packUnitId = null }) {
+  function add({ product, qtyMilli = 1000, packUnitId = null, note = null }) {
+    // A second scan adds to the line without a note: "one more" is one more of the plain
+    // one, and the latte with less ice stays the latte with less ice (POS-111).
     const existing = lines.find(
-      (line) => line.productId === product.id && line.packUnitId === packUnitId
+      (line) => line.productId === product.id && line.packUnitId === packUnitId && (line.note || null) === (note || null)
     );
 
     if (existing) {
@@ -38,7 +48,7 @@ export function createCart() {
     }
 
     const line = {
-      key: `${product.id}:${packUnitId || 'base'}`,
+      key: keyOf(product.id, packUnitId, note),
       productId: product.id,
       sku: product.sku,
       name: product.name,
@@ -53,8 +63,31 @@ export function createCart() {
         : null,
       qtyMilli,
       discountCentavos: 0,
+      note: note || null,
+      // INV-114: made to order — no "stock after" under it.
+      isStocked: product.is_stocked !== false,
     };
     lines.push(line);
+    return line;
+  }
+
+  /**
+   * POS-111: a note for the kitchen. The line becomes its own — where another line of the
+   * same product already carries this note, the two become one.
+   */
+  function setNote(key, note) {
+    const line = lines.find((l) => l.key === key);
+    if (!line) return null;
+    const text = String(note || '').replace(/\s+/g, ' ').trim() || null;
+    const merged = lines.find((l) => l.key !== key && l.productId === line.productId
+      && l.packUnitId === line.packUnitId && (l.note || null) === text);
+    if (merged) {
+      merged.qtyMilli += line.qtyMilli;
+      remove(key);
+      return merged;
+    }
+    line.note = text;
+    line.key = keyOf(line.productId, line.packUnitId, text);
     return line;
   }
 
@@ -98,6 +131,7 @@ export function createCart() {
 
     const merged = lines.find(
       (l) => l.key !== key && l.productId === line.productId && l.packUnitId === (packUnitId || null)
+        && (l.note || null) === (line.note || null)
     );
     if (merged) {
       merged.qtyMilli += line.qtyMilli;
@@ -108,7 +142,7 @@ export function createCart() {
     line.packUnitId = packUnitId || null;
     line.packUnitCode = pack ? pack.unit.code : null;
     line.packFactorMilli = pack ? pack.factor_milli : null;
-    line.key = `${line.productId}:${packUnitId || 'base'}`;
+    line.key = keyOf(line.productId, packUnitId, line.note);
     return line;
   }
 
@@ -137,6 +171,26 @@ export function createCart() {
     customer = null;
     transactionDiscountCentavos = 0;
     statutory = null;
+    tableLabel = '';
+    openOrder = null;
+    // The order type is kept: a café serving dine-in serves the next table dine-in too.
+  }
+
+  /** The lines as the server holds an order's, to tell whether this cart has changed. */
+  const wireLines = () => lines.map((line) => ({
+    productId: line.productId,
+    qtyMilli: line.qtyMilli,
+    packUnitId: line.packUnitId || null,
+    discountCentavos: line.discountCentavos || 0,
+    note: line.note || null,
+  }));
+
+  /** True when the cart holds more or less than the order it was loaded from. */
+  function changedSinceLoaded() {
+    if (!openOrder) return lines.length > 0;
+    const norm = (list) => JSON.stringify(list.map((l) => [l.productId, l.packUnitId || null, l.qtyMilli, l.discountCentavos || 0, l.note || null])
+      .sort((a, b) => (a.join('|') < b.join('|') ? -1 : 1)));
+    return norm(wireLines()) !== norm(openOrder.lines);
   }
 
   /** The request body for price-check and for the sale — one shape, two callers. */
@@ -147,12 +201,11 @@ export function createCart() {
       // TAX-004: sent to price-check and to the sale, which are the two callers that
       // may act on it. `PUT /carts/active` reads neither it nor anything like it.
       statutory,
-      lines: lines.map((line) => ({
-        productId: line.productId,
-        qtyMilli: line.qtyMilli,
-        packUnitId: line.packUnitId,
-        discountCentavos: line.discountCentavos,
-      })),
+      lines: wireLines(),
+      // TASK-066: the café's order. Null for a shop's sale, which sends none of them.
+      orderType,
+      tableLabel: tableLabel || null,
+      openOrderId: openOrder ? openOrder.id : null,
     };
   }
 
@@ -161,11 +214,13 @@ export function createCart() {
     clear();
     customer = saved.customer ?? null;
     transactionDiscountCentavos = saved.transaction_discount_centavos || 0;
+    if (saved.order_type) orderType = saved.order_type;
+    tableLabel = saved.table_label || '';
 
     for (const line of saved.lines || []) {
       const product = catalogue.get(line.productId);
       if (product) {
-        const added = add({ product, qtyMilli: line.qtyMilli, packUnitId: line.packUnitId });
+        const added = add({ product, qtyMilli: line.qtyMilli, packUnitId: line.packUnitId, note: line.note || null });
         added.discountCentavos = line.discountCentavos || 0;
       } else {
         // The product could not be re-read — withdrawn, or the catalogue was not
@@ -183,16 +238,44 @@ export function createCart() {
           packFactorMilli: null,
           qtyMilli: line.qtyMilli,
           discountCentavos: line.discountCentavos || 0,
+          note: line.note || null,
           unavailable: true,
         });
       }
     }
   }
 
+  /**
+   * An open order into the counter (POS-109): its lines, table and type, remembered as
+   * loaded so the screen can say whether anything is waiting to go to the kitchen.
+   */
+  function loadOrder(order, catalogue = new Map()) {
+    restore({
+      customer: order.customer, transaction_discount_centavos: order.transaction_discount_centavos,
+      order_type: order.order_type, table_label: order.table_label, lines: order.lines,
+    }, catalogue);
+    openOrder = { id: order.id, order_no: order.order_no, lines: order.lines.map((l) => ({ ...l, packUnitId: l.packUnitId || null, note: l.note || null })) };
+  }
+
+  /** A restored draft that was an open order: the order, as the kitchen has it (POS-105). */
+  function attachOrder(order) {
+    openOrder = { id: order.id, order_no: order.order_no, lines: order.lines.map((l) => ({ ...l, packUnitId: l.packUnitId || null, note: l.note || null })) };
+  }
+
+  /** After a send, what the kitchen has is what the cart holds. */
+  function markSent(order) {
+    openOrder = { id: order.id, order_no: order.order_no, lines: wireLines() };
+  }
+
   return {
     add,
     baseMilliOf,
     setUnit,
+    setNote,
+    loadOrder,
+    attachOrder,
+    markSent,
+    changedSinceLoaded,
     setQuantity,
     setLineDiscount,
     remove,
@@ -208,5 +291,10 @@ export function createCart() {
     set transactionDiscountCentavos(value) { transactionDiscountCentavos = Math.max(0, value || 0); },
     get statutory() { return statutory; },
     set statutory(value) { statutory = value || null; },
+    get orderType() { return orderType; },
+    set orderType(value) { orderType = value || null; },
+    get tableLabel() { return tableLabel; },
+    set tableLabel(value) { tableLabel = String(value || ''); },
+    get openOrder() { return openOrder; },
   };
 }

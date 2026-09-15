@@ -89,6 +89,20 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 24, group: 'SALES', ruleId: 'POS-508', ownerOnly: false,
     what: 'Hours a shift may stay open before it raises an alert', min: 1, max: 168,
   },
+  // POS-109 (TASK-066): orders taken before they are paid — the table eats, then pays. On
+  // for a café from the day it opens (config/industries.js), off for a shop, where a sale
+  // is paid at the counter it is rung up at and a parked cart covers the rest.
+  open_orders_enabled: {
+    type: 'BOOL', value: false, group: 'SALES', ruleId: 'POS-109', ownerOnly: true,
+    what: 'Take orders before they are paid, with a table or a name, and send them to the kitchen',
+  },
+  // POS-112: on the dine-in bill only, after every discount. Basis points like every other
+  // rate here: 10% is 1000. Zero is off, and is the default everywhere — a service
+  // charge is the owner's decision, and one a customer must be told about.
+  service_charge_bp: {
+    type: 'INT', value: 0, group: 'PRICING', ruleId: 'POS-112', ownerOnly: true,
+    what: 'Service charge on a dine-in bill, in basis points; 0 is none', min: 0, max: 2000,
+  },
 
   // ── Reports and alerts (RPT-*, OPS-007) ───────────────────────────────────
   // Both of these were constants in reportService and alertService until TC-UT-06
@@ -302,6 +316,22 @@ const REGISTRY = Object.freeze({
   printer_port: {
     type: 'INT', value: 9100, group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
     what: 'LAN printer port; 9100 is the ESC/POS raw port', min: 1, max: 65535,
+  },
+  // POS-110 (TASK-066): where the kitchen's ticket prints. RECEIPT is the receipt printer,
+  // whatever it is — BROWSER included, so the web version's print dialog carries both.
+  // LAN is a printer of the kitchen's own on the network. A café starts on RECEIPT.
+  kitchen_printer: {
+    type: 'STRING', value: 'NONE', group: 'SALES', ruleId: 'POS-110', ownerOnly: false,
+    what: 'Kitchen tickets print on: NONE, RECEIPT (the receipt printer), or LAN (a printer of their own)',
+    oneOf: ['NONE', 'RECEIPT', 'LAN'],
+  },
+  kitchen_printer_host: {
+    type: 'STRING', value: '', group: 'SALES', ruleId: 'POS-110', ownerOnly: false,
+    what: 'Kitchen printer address on the network',
+  },
+  kitchen_printer_port: {
+    type: 'INT', value: 9100, group: 'SALES', ruleId: 'POS-110', ownerOnly: false,
+    what: 'Kitchen printer port; 9100 is the ESC/POS raw port', min: 1, max: 65535,
   },
 
   // ── Backup (OPS-*) ────────────────────────────────────────────────────────

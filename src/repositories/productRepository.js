@@ -8,7 +8,7 @@ const db = require('../config/database');
 const COLUMNS = `
   p.id, p.sku, p.name, p.generic_name, p.category_id, p.brand_id, p.base_unit_id, p.description,
   p.tax_class, p.statutory_discount_eligible, p.avg_cost_centavos, p.avg_cost_as_of,
-  p.min_stock_milli, p.is_batch_tracked, p.is_active,
+  p.min_stock_milli, p.is_batch_tracked, p.is_stocked, p.is_active,
   p.created_at, p.created_by, p.updated_at, p.updated_by
 `;
 
@@ -134,7 +134,7 @@ function insert(row) {
 const UPDATABLE = [
   'sku', 'name', 'generic_name', 'category_id', 'brand_id', 'base_unit_id', 'description', 'tax_class',
   'statutory_discount_eligible', 'avg_cost_centavos', 'avg_cost_as_of', 'min_stock_milli',
-  'is_batch_tracked', 'is_active', 'updated_at', 'updated_by',
+  'is_batch_tracked', 'is_stocked', 'is_active', 'updated_at', 'updated_by',
 ];
 
 function updateFields(id, fields) {

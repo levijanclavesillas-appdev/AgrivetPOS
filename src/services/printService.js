@@ -95,6 +95,8 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
     ...header(profile, 'TRANSACTION RECORD', columns),
     escpos.centre(sale.sale_no, columns),
     escpos.centre(clock.toManila(sale.occurred_at), columns),
+    // POS-109: how it was served, and where — the number the counter called, the table.
+    ...(sale.order_type ? [escpos.centre(escpos.truncate(orderLine(sale), columns), columns)] : []),
     escpos.divider(columns),
   ];
 
@@ -120,6 +122,8 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
       unitPrice: money.toDisplay(item.unit_price_centavos, { symbol: false }),
       lineTotal: money.toDisplay(gross(item), { symbol: false }),
     }, columns));
+    // POS-111: the note the kitchen was given, under what it was about.
+    if (item.note) lines.push(...indented(documentService.neutralise(item.note), 2, columns));
     if (item.vat_exemption_centavos > 0) lines.push(off('  Less VAT', item.vat_exemption_centavos));
     if (item.statutory_discount_centavos > 0) lines.push(off(`  ${statutoryLabel(sale)} disc`, item.statutory_discount_centavos));
     if (item.line_discount_centavos > 0) lines.push(off('  Discount', item.line_discount_centavos));
@@ -134,6 +138,14 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
   if (sum('statutory_discount_centavos') > 0) lines.push(off(`${statutoryLabel(sale)} disc`, sum('statutory_discount_centavos')));
   if (sum('line_discount_centavos') > 0) lines.push(off('Line discounts', sum('line_discount_centavos')));
   if (sale.txn_discount_centavos > 0) lines.push(off('Discount', sale.txn_discount_centavos));
+  // POS-112: added after every deduction, on what they left — so the arithmetic still
+  // closes: Subtotal − deductions + service charge = TOTAL.
+  if (sale.service_charge_centavos > 0) {
+    lines.push(escpos.leftRight(
+      `Service charge ${formatBp(sale.service_charge_bp)}`,
+      money.toDisplay(sale.service_charge_centavos, { symbol: false }), columns
+    ));
+  }
 
   lines.push(escpos.leftRight('TOTAL', money.toDisplay(sale.total_centavos, { symbol: false }), columns));
   lines.push('');
@@ -397,6 +409,77 @@ function renderReturnAcknowledgement({
   };
 }
 
+// ── POS-110 — the kitchen ticket (TASK-066) ─────────────────────────────────
+
+/** POS-109's words for how an order is served. The one place they are written. */
+const ORDER_TYPE_LABELS = Object.freeze({ DINE_IN: 'Dine-in', TAKE_OUT: 'Take-out', DELIVERY: 'Delivery' });
+
+/** "Order 12 · Dine-in · Table 4": the order number where the counter gave one. */
+function orderLine(order) {
+  return [
+    order.order_no ? `Order ${order.order_no}` : null,
+    ORDER_TYPE_LABELS[order.order_type] || null,
+    order.table_label ? documentService.neutralise(order.table_label) : null,
+  ].filter(Boolean).join(' · ');
+}
+
+/** Text wrapped under the line it belongs to, indented (escpos.wrap trims leading space). */
+const indented = (text, by, columns) => escpos.wrap(text, columns - by).map((line) => `${' '.repeat(by)}${line}`);
+
+/** 10% for 1000 basis points, 2.5% for 250. */
+const formatBp = (bp) => (bp % 100 === 0 ? `${bp / 100}%` : `${(bp / 100).toFixed(2).replace(/0$/, '')}%`);
+
+/**
+ * What the cook reads.
+ *
+ * Large, and nothing on it that is not for the kitchen: the number, the table, what to
+ * make and how. No prices — a cook does not need them, and a ticket that looks like a
+ * bill is one somebody hands a customer. `changes` are the lines since the last ticket:
+ * the first ticket for an order is the whole order; after that, `+` is more to make and
+ * `−` is something the customer no longer wants.
+ */
+function renderKitchenTicket({
+  order, lines: entries, kind = 'NEW', sentBy = null, at, columns = width(), reprint = false,
+}) {
+  escpos.assertWidth(columns);
+  const title = {
+    NEW: 'KITCHEN',
+    CHANGES: 'KITCHEN - CHANGES',
+    CANCELLED: 'KITCHEN - ORDER CANCELLED',
+  }[kind] || 'KITCHEN';
+
+  const out = [
+    escpos.centre(title, columns),
+    escpos.centre(order.order_no ? `ORDER ${order.order_no}` : 'ORDER', columns),
+    escpos.centre(escpos.truncate(orderLine({ ...order, order_no: null }), columns), columns),
+    escpos.centre(clock.toManila(at), columns),
+    escpos.divider(columns),
+  ];
+
+  for (const entry of entries) {
+    const sign = kind === 'NEW' ? '' : (entry.deltaMilli > 0 ? '+ ' : '- ');
+    const qty = Math.abs(entry.deltaMilli);
+    const amount = qty % 1000 === 0 && !entry.packCode
+      ? `${qty / 1000} x`
+      : `${(qty / 1000).toString()} ${entry.packCode || entry.unitCode || ''}`.trim();
+    out.push(...escpos.wrap(`${sign}${amount} ${documentService.neutralise(entry.name)}`, columns));
+    if (entry.note) out.push(...indented(documentService.neutralise(entry.note), 4, columns));
+  }
+  if (entries.length === 0) out.push(escpos.centre('(nothing)', columns));
+
+  out.push(escpos.divider(columns));
+  if (sentBy) out.push(escpos.truncate(`Sent by ${documentService.neutralise(sentBy)}`, columns));
+  out.push(...footer(columns, { reprint }));
+
+  return {
+    kind: 'KITCHEN_TICKET',
+    document_no: order.order_no ? `ORDER ${order.order_no}` : null,
+    reprint,
+    columns,
+    text: out.join('\n'),
+  };
+}
+
 function renderClosingSummary({
   profile, shift, expected, lines: methodLines, variance, beyondTolerance, tolerance,
   reason, closedBy, at, columns = width(), reprint = false,
@@ -531,6 +614,20 @@ function send(bytes) {
 }
 
 /**
+ * POS-110: the kitchen's ticket, to the kitchen's printer. RECEIPT shares the receipt
+ * printer, whatever it is; LAN is a printer of the kitchen's own; NONE prints nothing and
+ * says so, like a store with no receipt printer.
+ */
+function sendKitchen(bytes) {
+  const where = settingsService.get('kitchen_printer');
+  if (where === 'RECEIPT') return send(bytes);
+  if (where === 'NONE') return { delivered: false, transport: 'NONE', error: 'No kitchen printer is set.' };
+  const host = settingsService.get('kitchen_printer_host');
+  if (!host) return { delivered: false, transport: 'LAN', error: 'No kitchen printer address is set.' };
+  return sendOverTcp(bytes, host, settingsService.get('kitchen_printer_port'));
+}
+
+/**
  * Written as a synchronous-looking call that returns immediately with a promise
  * attached, because every caller is on a committed transaction and none of them may
  * wait: NFR_1.1 gives a sale two seconds, and a printer that has been unplugged takes
@@ -570,7 +667,8 @@ function sendOverTcp(bytes, host, port, { timeoutMs = 4000 } = {}) {
  */
 function install() {
   documentService.setDriver((record) => {
-    const outcome = send(escpos.encode(record.text));
+    const bytes = escpos.encode(record.text);
+    const outcome = record.kind === 'KITCHEN_TICKET' ? sendKitchen(bytes) : send(bytes);
     record.transport = outcome.transport;
     // TASK-062: handed to the browser, which prints it. Not a failure, and not queued:
     // whether the paper came out is the person at the print dialog's to see.
@@ -664,6 +762,6 @@ function clearQueue() {
 module.exports = {
   width, header, footer,
   renderSaleReceipt, renderAcknowledgement, renderReturnAcknowledgement, renderClosingSummary,
-  renderStatement,
-  send, sendOverTcp, plainReason, outcome, install, uninstall, enqueue, takeQueued, queued, clearQueue,
+  renderStatement, renderKitchenTicket, orderLine, ORDER_TYPE_LABELS,
+  send, sendKitchen, sendOverTcp, plainReason, outcome, install, uninstall, enqueue, takeQueued, queued, clearQueue,
 };

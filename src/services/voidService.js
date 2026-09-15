@@ -45,6 +45,7 @@ const creditService = require('./creditService');
 const drawerService = require('./drawerService');
 const saleRepository = require('../repositories/saleRepository');
 const batchRepository = require('../repositories/batchRepository');
+const inventoryRepository = require('../repositories/inventoryRepository');
 const returnRepository = require('../repositories/returnRepository');
 const creditRepository = require('../repositories/creditRepository');
 const shiftRepository = require('../repositories/shiftRepository');
@@ -267,7 +268,12 @@ function post({ saleId, reason, approver = null }, actor) {
     // declared type for it and its sign is fixed at +, so a reversal cannot itself be
     // mis-signed into a second sale.
     const reversed = [];
+    // INV-114: a line made to order took nothing off a shelf, so there is nothing to put
+    // back. Asked of the sale's own movements rather than of the product today, which may
+    // have been ticked or unticked since.
+    const moved = new Set(inventoryRepository.movementsForReference('sale', sale.id).map((m) => m.product_id));
     for (const item of items) {
+      if (!moved.has(item.product_id)) continue;
       // INV-201: a batch-tracked line goes back to the batches it took, in the
       // quantities it took from each. `sale_item_batches` recorded them at the sale, so
       // the reversal reads that back rather than allocating afresh — a void says the
@@ -295,6 +301,7 @@ function post({ saleId, reason, approver = null }, actor) {
           referenceNo: sale.sale_no,
           occurredAt: at,
         });
+        if (!movement.movement) continue;   // made to order since, and at nothing on hand
         reversed.push({
           product: item.product_name_snapshot,
           qty_milli: draw.qtyMilli,

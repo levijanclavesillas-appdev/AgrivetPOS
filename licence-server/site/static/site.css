@@ -24,6 +24,7 @@
   /* One accent per kind of store. Agrivet's is the app icon's green. */
   --pharmacy: #0d9488; --pharmacy-soft: #ccfbf1;
   --agrivet: #1f5e40;  --agrivet-soft: #dcfce7;
+  --cafe: #92400e;     --cafe-soft: #fef3c7;
   --moto: #c2410c;     --moto-soft: #ffedd5;
   --retail: #4f46e5;   --retail-soft: #e0e7ff;
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, .06);
@@ -141,7 +142,8 @@ p { margin: 0 0 1rem; }
 .section-head .kicker + h2 { margin-top: 0; }
 
 /* Stores */
-.stores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem; }
+/* Three to a row: the three kinds of store available now, then the two coming. */
+.stores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
 @media (max-width: 1080px) { .stores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .stores { grid-template-columns: 1fr; } }
 .store { --accent: var(--blue); --soft: var(--blue-soft); position: relative; display: flex; flex-direction: column; background: var(--surface);
@@ -149,6 +151,7 @@ p { margin: 0 0 1rem; }
 .store::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--accent); }
 .store.pharmacy { --accent: var(--pharmacy); --soft: var(--pharmacy-soft); }
 .store.agrivet { --accent: var(--agrivet); --soft: var(--agrivet-soft); }
+.store.cafe { --accent: var(--cafe); --soft: var(--cafe-soft); }
 .store.moto { --accent: var(--moto); --soft: var(--moto-soft); }
 .store.retail { --accent: var(--retail); --soft: var(--retail-soft); }
 .store .badge { position: absolute; top: 1.3rem; right: 1.2rem; }
@@ -340,11 +343,12 @@ ol.steps > li::before { content: counter(step); position: absolute; left: 0; top
 .guide-shot.phone img { border-radius: 22px; }
 .guide-shot.phone figcaption { color: #cbd5e1; border: 0; padding: .7rem .6rem .4rem; }
 
-.guide-body .tip, .guide-body .warn, .guide-body .agrivet, .guide-body .android {
+.guide-body .tip, .guide-body .warn, .guide-body .agrivet, .guide-body .cafe, .guide-body .android {
   border-left: 4px solid; border-radius: 0 12px 12px 0; padding: .8rem 1rem; margin: 1rem 0; font-size: .98rem; }
 .guide-body .tip { border-color: var(--blue); background: var(--blue-soft); }
 .guide-body .warn { border-color: #d97706; background: #fffbeb; }
 .guide-body .agrivet { border-color: var(--agrivet); background: #f0fdf4; }
+.guide-body .cafe { border-color: var(--cafe); background: #fffbeb; }
 .guide-body .android { border-color: var(--pharmacy); background: #f0fdfa; }
 .guide-body .table-wrap { overflow-x: auto; margin: 1rem 0 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .guide-body table { width: 100%; border-collapse: collapse; font-size: .95rem; }

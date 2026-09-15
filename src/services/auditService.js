@@ -79,6 +79,10 @@ const ACTIONS = Object.freeze({
   SALE_VOIDED: { what: 'Sale voided', rule: 'AUD-601' },
   SALE_RETURNED: { what: 'Return processed', rule: 'AUD-601' },
   RECEIPT_REPRINTED: { what: 'Receipt reprinted', rule: 'AUD-601' },
+  // TASK-066: an order the kitchen may already have cooked, called off before it was
+  // paid. No money moved, so it is not a sale void — but it is food made and not sold,
+  // and who called it off and why is the question an owner asks at the end of the day.
+  OPEN_ORDER_VOIDED: { what: 'Order cancelled before payment', rule: 'POS-109' },
 
   // ── AUD-601: credit ───────────────────────────────────────────────────────
   CREDIT_LIMIT_CHANGED: { what: 'Credit limit changed', rule: 'AUD-601' },

@@ -23,8 +23,12 @@ router.get('/carts/active', atTheCounter, (req, res, next) => {
 
 router.put('/carts/active', atTheCounter, (req, res, next) => {
   try {
-    const { lines = [], customerId = null, transactionDiscountCentavos = 0 } = req.body || {};
-    res.json(cartService.save({ lines, customerId, transactionDiscountCentavos }, req.session));
+    const {
+      lines = [], customerId = null, transactionDiscountCentavos = 0, orderType = null, tableLabel = null, openOrderId = null,
+    } = req.body || {};
+    res.json(cartService.save({
+      lines, customerId, transactionDiscountCentavos, orderType, tableLabel, openOrderId,
+    }, req.session));
   } catch (err) {
     next(err);
   }

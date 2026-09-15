@@ -59,6 +59,8 @@ function dailyTotals({ fromAt, toAt, shiftId = null }) {
       COALESCE(SUM(s.line_discount_centavos), 0)                    AS line_discount_centavos,
       COALESCE(SUM(s.txn_discount_centavos), 0)                     AS txn_discount_centavos,
       COALESCE(SUM(s.statutory_discount_centavos), 0)               AS statutory_discount_centavos,
+      -- POS-112 (TASK-066): not a product and not in the subtotal, so its own figure.
+      COALESCE(SUM(s.service_charge_centavos), 0)                   AS service_charge_centavos,
       COALESCE(SUM(s.total_centavos), 0)                            AS net_centavos,
       COALESCE(SUM(s.vat_centavos), 0)                              AS vat_centavos,
       COALESCE(SUM(s.change_centavos), 0)                           AS change_centavos

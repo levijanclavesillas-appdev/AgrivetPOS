@@ -1226,7 +1226,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` `PUT` | `/products/:id/quantity-breaks` | `TX-422` / `TX-411` | `PR-104`. The `PUT` takes a **whole set** for one price level — a band added on its own is a set nobody validated. An empty list removes them |
 | `GET` `PUT` | `/customers/:id/prices` | `TX-413` / `TX-411` | `PR-103`. Behind `TX-411`, not `TX-413`: a negotiated price is a selling price that happens to be attached to a customer, and `TX-413` reaches a cashier |
 | `GET` | `/sales/pricing-policy` | `TX-401` | The acting user's ceiling, who may approve above it, and — since `TASK-023` — the configured tiers and capped categories, so no screen holds a copy (`OPS-005`). Since `TASK-027` it also reports whether the store grants the statutory discount, at what rate and on which ID types (`TAX-004`) |
-| `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5`. Takes the same optional `statutory` block as the price check; the discount itself is never sent, only the claim (`TAX-004`). Since `TASK-028` a tender may be `STORE_CREDIT`, spending the balance the store holds for that customer (`CR-108`) |
+| `POST` | `/sales` | `TX-401` | **the transaction** — `FR_3.5`. Takes the same optional `statutory` block as the price check; the discount itself is never sent, only the claim (`TAX-004`). Since `TASK-028` a tender may be `STORE_CREDIT`, spending the balance the store holds for that customer (`CR-108`). Since `TASK-066`: `orderType`, `tableLabel`, `openOrderId` and a line's `note`; a dine-in sale carries the service charge (`POS-112`), and the answer's `kitchen.printed` is the kitchen's ticket (`POS-110`) |
 | `POST` | `/sales/:id/reprint` | `TX-430` | `POS-208` |
 | `GET` | `/reports/dashboard?date=` | `TX-421` | `FR_6.1` — every tile from the query behind it |
 | `GET` | `/reports/alerts` | `TX-421` | `OPS-007` |
@@ -1287,6 +1287,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/sync/push` · `GET /sync/pull?since=` | device | TASK-063 — a device's changes up, everybody's since a version down (`SYNC-002`) |
 | `GET` | `/sync/status` · `POST /sync/now` | signed in | TASK-063 — where this installation is; sync a device now |
 | `POST` | `/sync/go-online` | `TX-427` | TASK-063 — a standalone store uploads itself to its waiting web copy and becomes its device A |
+| `GET` | `/open-orders` · `/open-orders/:id` | `TX-401` | `POS-109` (TASK-066) — the orders open on this counter, priced now |
+| `POST` | `/open-orders` · `PUT /open-orders/:id` | `TX-401` | `POS-109`/`POS-110` — take an order or send its changes: `{ lines, orderType, tableLabel, customerId }`. Answers `{ order, changes, printed }`; the kitchen gets only what changed |
+| `POST` | `/open-orders/:id/cancel` · `/open-orders/:id/ticket` | `TX-401` | `POS-109` — called off with `{ reason }`, audited `OPEN_ORDER_VOIDED`; the whole ticket again, marked REPRINT (`POS-110`) |
 | `GET` | `/alerts` | signed in | `OPS-007` |
 | `POST` | `/alerts/dismiss` | signed in | `OPS-007` — never the undismissible three |
 | `POST` | `/health/integrity-check` | `TX-428` | `OPS-006` |

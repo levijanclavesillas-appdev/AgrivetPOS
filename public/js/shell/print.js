@@ -12,7 +12,7 @@
 // on either.
 
 export function printText(text) {
-  if (typeof document === 'undefined' || !text) return;
+  if (typeof document === 'undefined' || !text || (Array.isArray(text) && text.length === 0)) return;
   let sheet = document.querySelector('#print-sheet');
   if (!sheet) {
     sheet = document.createElement('pre');
@@ -20,7 +20,14 @@ export function printText(text) {
     sheet.setAttribute('aria-hidden', 'true');
     document.body.append(sheet);
   }
-  sheet.textContent = text;
+  // TASK-066: a café's sale prints two documents — the receipt and the kitchen's ticket —
+  // and one print dialog carries both, each on its own page.
+  sheet.replaceChildren(...[].concat(text).map((one) => {
+    const page = document.createElement('div');
+    page.className = 'print-page';
+    page.textContent = one;
+    return page;
+  }));
   document.body.classList.add('printing-document');
   const done = () => {
     document.body.classList.remove('printing-document');
@@ -33,6 +40,8 @@ export function printText(text) {
 
 /** A response with a document for this browser to print, printed. */
 export function printIfBrowser(payload) {
-  const printed = payload && payload.printed;
-  if (printed && printed.transport === 'BROWSER' && printed.text) printText(printed.text);
+  const forBrowser = (printed) => (printed && printed.transport === 'BROWSER' && printed.text ? [printed.text] : []);
+  // POS-110: a sale's kitchen ticket rides beside its receipt.
+  const texts = [...forBrowser(payload && payload.printed), ...forBrowser(payload && payload.kitchen && payload.kitchen.printed)];
+  if (texts.length) printText(texts);
 }

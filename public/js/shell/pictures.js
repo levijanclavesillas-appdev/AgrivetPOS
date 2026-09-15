@@ -56,8 +56,12 @@ export function pictureUrl(productId, version, size = 'thumb') {
  * where there is none. The frame is the size either way, so a list does not jump as
  * its pictures load.
  */
+/** TASK-066: the mark of a product with no picture is the store's — a cup in a café. */
+let emptyIcon = 'pill';
+export function setEmptyIcon(name) { emptyIcon = name || 'pill'; }
+
 export function productPicture(product, { size = 'thumb', className = 'product-picture' } = {}) {
-  const frame = h('span', { class: `${className} is-empty`, 'aria-hidden': 'true' }, [icon('pill')]);
+  const frame = h('span', { class: `${className} is-empty`, 'aria-hidden': 'true' }, [icon(emptyIcon)]);
   const version = product && product.image_version;
   if (!version) return frame;
   pictureUrl(product.id, version, size).then((url) => {

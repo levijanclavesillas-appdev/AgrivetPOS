@@ -13,3 +13,8 @@
   }
   @page { margin: 3mm; }
 }
+
+/* TASK-066: a sale's receipt and its kitchen ticket in one dialog, a page each. */
+@media print {
+  body.printing-document #print-sheet .print-page + .print-page { break-before: page; }
+}

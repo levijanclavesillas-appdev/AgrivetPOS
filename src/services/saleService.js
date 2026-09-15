@@ -97,6 +97,8 @@ function complete(input, actor) {
     lines = [], customerId = null, tenders = [], transactionDiscountCentavos = 0,
     clientTotalCentavos = null, approver = null, acceptDuplicateReference = false,
     reason = null, statutory = null,
+    // TASK-066: how a café's order is served, where, and the open order it pays for.
+    orderType = null, tableLabel = null, openOrderId = null,
   } = input || {};
 
   if (!actor || !actor.id) throw new TypeError('a sale needs an acting user (POS-501)');
@@ -120,6 +122,15 @@ function complete(input, actor) {
       throw errors.conflict(`${customer.name} is not an active customer.`, { ruleId: 'VR-304' });
     }
     const taxMode = storeProfileService.taxMode();
+
+    // ── POS-109: the order this pays for, and how it was served ─────────────
+    //
+    // An open order's type and table are the order's, unless the counter changed them
+    // while paying. A sale with neither is a shop's sale, as every sale before TASK-066.
+    const openOrders = require('./openOrderService');
+    const order = openOrderId ? openOrders.forPayment(openOrderId) : null;
+    const served = openOrders.orderTypeOf(orderType || (order && order.order_type), { required: false });
+    const table = openOrders.tableOf(tableLabel ?? (order ? order.table_label : null));
 
     // ── 2 and 4. Re-resolve prices and recompute every total (PR-101, MON-003,
     //             MON-006, TAX-002) ────────────────────────────────────────────
@@ -146,6 +157,8 @@ function complete(input, actor) {
       // figure it did not compute itself.
       statutory,
       at,
+      // POS-112: the dine-in bill's service charge, at the rate in force now.
+      serviceChargeBp: openOrders.serviceChargeBpFor(served),
     });
 
     // PR-105 and PR-203: anything still needing authorisation stops the sale here,
@@ -188,7 +201,13 @@ function complete(input, actor) {
     const saleId = ids.uuidv7();
     const written = writeSale({
       saleId, saleNo, shift, customer, priced, resolvedLines, settled, taxMode, actor, approver, at, reason,
-      batchPlan,
+      batchPlan, orderType: served, tableLabel: table,
+    });
+
+    // POS-109: the order is paid — or a café's sale without one gets its own number.
+    openOrders.recordPayment({
+      order, saleId, orderType: served, tableLabel: table, customerId: customer ? customer.id : null,
+      actor, shiftId: shift.id, at,
     });
 
     // ── 10. One inventory movement per line, and the on-hand update ─────────
@@ -339,9 +358,11 @@ function assertStock(priced) {
   const settingsService = require('./settingsService');
   const allowNegative = settingsService.get('allow_negative_stock');
 
-  // Several lines may name the same product; the check is on the total taken.
+  // Several lines may name the same product; the check is on the total taken. A product
+  // made to order is cooked when it is ordered, and has no shelf to run out on (INV-114).
   const wanted = new Map();
   for (const line of priced.lines) {
+    if (line.is_stocked === false) continue;
     wanted.set(line.product_id, (wanted.get(line.product_id) || 0) + line.qty_milli);
   }
 
@@ -639,7 +660,7 @@ function planBatches(priced, at) {
 
 function writeSale({
   saleId, saleNo, shift, customer, priced, resolvedLines, settled, taxMode, actor, approver, at, reason,
-  batchPlan = [],
+  batchPlan = [], orderType = null, tableLabel = null,
 }) {
   const summary = priced.tax_summary || {
     vatable_sales_centavos: 0, vat_exempt_sales_centavos: 0, zero_rated_sales_centavos: 0,
@@ -673,6 +694,11 @@ function writeSale({
     void_reason: null,
     occurred_at: at,
     created_by: actor.id,
+    // TASK-066: how it was served, where, and the dine-in service charge (POS-109, POS-112).
+    order_type: orderType,
+    table_label: tableLabel,
+    service_charge_bp: priced.service_charge_bp || 0,
+    service_charge_centavos: priced.service_charge_centavos || 0,
   });
 
   const items = priced.lines.map((line, index) => {
@@ -712,6 +738,8 @@ function writeSale({
       line_total_centavos: line.amount_centavos,
       batch_id: null,
       returned_qty_milli: 0,
+      // POS-111: what the kitchen was asked for, kept with what was sold.
+      note: require('./cartService').noteOf(resolvedLines[index].line.note),
     };
     saleRepository.insertItem(item);
     return item;
@@ -1033,6 +1061,13 @@ function present(sale) {
       vat_centavos: sale.vat_centavos,
       total_centavos: sale.total_centavos,
       change_centavos: sale.change_centavos,
+      // TASK-066: a café's order — how it was served, where, its number on this counter,
+      // and the dine-in service charge.
+      order_type: sale.order_type || null,
+      table_label: sale.table_label || null,
+      order_no: require('./openOrderService').numberForSale(sale.id),
+      service_charge_bp: sale.service_charge_bp || 0,
+      service_charge_centavos: sale.service_charge_centavos || 0,
       approved_by: sale.approved_by,
       occurred_at: sale.occurred_at,
       occurred_at_manila: clock.toManila(sale.occurred_at),
@@ -1081,6 +1116,7 @@ function present(sale) {
       tax_class: item.tax_class_snapshot,
       tax_centavos: item.tax_centavos,
       line_total_centavos: item.line_total_centavos,
+      note: item.note || null,
     })),
     tenders: tenders.map((tender) => ({
       method: tender.method,
