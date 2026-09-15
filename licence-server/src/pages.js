@@ -12,7 +12,7 @@ const CSS = `
 *{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:42rem;margin:0 auto;padding:2rem 1rem}main.wide{max-width:72rem}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:1rem;padding:1.5rem;margin:0 0 1rem;box-shadow:0 1px 3px rgba(15,23,42,.06)}
-.brand{display:flex;align-items:center;gap:.5rem;font-weight:700;margin:0 0 1.5rem}.brand span{display:inline-grid;place-items:center;width:2rem;height:2rem;border-radius:.6rem;background:var(--primary);color:#fff}
+.brand{margin:0 0 1.5rem}.brand a{display:inline-flex;align-items:center;gap:.5rem;font-weight:700;color:inherit;text-decoration:none}.brand span{display:inline-grid;place-items:center;width:2rem;height:2rem;border-radius:.6rem;background:var(--primary);color:#fff}
 h1{font-size:1.4rem;margin:0 0 .5rem}h2{font-size:1.1rem;margin:1.5rem 0 .5rem}p{margin:0 0 1rem}.muted{color:var(--muted)}
 label{display:block;font-weight:600;margin:0 0 .25rem}input,select{width:100%;min-height:44px;padding:.5rem .75rem;border:1px solid #cbd5e1;border-radius:.5rem;font:inherit;margin:0 0 1rem;background:#fff}
 button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 1.25rem;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:var(--primary);font:inherit;font-weight:600;text-decoration:none;cursor:pointer}
@@ -23,6 +23,7 @@ button,.button{display:inline-flex;align-items:center;justify-content:center;min
 table{width:100%;border-collapse:collapse;font-size:.95rem}th,td{text-align:left;padding:.5rem;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
 .scroll{overflow-x:auto}.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.row form{margin:0}
 .tag{display:inline-block;padding:0 .5rem;border-radius:999px;font-size:.8rem;font-weight:600}.tag.ok{background:var(--ok);color:var(--ok-ink)}.tag.warn{background:var(--warn);color:var(--warn-ink)}.tag.err{background:var(--err);color:var(--err-ink)}
+.foot{margin:1.5rem 0 0;text-align:center;font-size:.9rem;color:var(--muted)}.foot a{color:inherit}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:0 1rem}
 `;
 
@@ -30,7 +31,8 @@ function layout(title, body, { wide = false } = {}) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · Chachi POS</title>
 <link rel="stylesheet" href="/assets/site.css"></head>
-<body><main${wide ? ' class="wide"' : ''}><p class="brand"><span>C</span> Chachi POS</p>${body}</main></body></html>`;
+<body><main${wide ? ' class="wide"' : ''}><p class="brand"><a href="/"><span>C</span> Chachi POS</a></p>${body}
+<p class="foot"><a href="/">Home</a> · <a href="/privacy">Privacy</a></p></main></body></html>`;
 }
 
 const hidden = (name, value) => `<input type="hidden" name="${esc(name)}" value="${esc(value)}">`;

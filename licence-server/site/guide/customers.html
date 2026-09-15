@@ -1,0 +1,210 @@
+<h1>Customers and utang</h1>
+<p class="intro">Keep a list of the customers who buy on credit, set how much credit each one gets and when they must pay, collect their payments, and print a statement they can check line by line. This chapter also covers store credit and writing off a debt that will never be paid.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#add-a-customer">Add a customer</a></li>
+  <li><a href="#customer-types">Customer types and price levels</a></li>
+  <li><a href="#credit-limit-and-terms">Change a credit limit or terms</a></li>
+  <li><a href="#change-customer-details">Change or deactivate a customer</a></li>
+  <li><a href="#sell-on-credit">Sell on credit</a></li>
+  <li><a href="#over-the-limit">When a customer is over their limit</a></li>
+  <li><a href="#take-a-payment">Take a payment on account</a></li>
+  <li><a href="#print-a-statement">Print a statement</a></li>
+  <li><a href="#ageing">See who owes what, and for how long</a></li>
+  <li><a href="#store-credit">Store credit</a></li>
+  <li><a href="#write-off">Write off a bad debt</a></li>
+  <li><a href="#agreed-prices">Agreed prices</a></li>
+  <li><a href="#disputed-balance">When a customer disputes their balance</a></li>
+</ol></nav>
+
+<section id="add-a-customer">
+  <h2>Add a customer</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
+  <p>A walk-in sale needs no customer. Add the people who buy on credit, and anyone who should get a different price list.</p>
+  <ol class="steps">
+    <li>Click <strong>Customers</strong> in the menu.</li>
+    <li>Click <strong>New customer</strong>. A form opens above the list.</li>
+    <li>Type the <strong>Name</strong> (2 to 120 characters).</li>
+    <li>If you like, type a short <strong>Code</strong> — what the store calls them in the notebook, for example RDC-01. Each code can be used once.</li>
+    <li>Type the <strong>Contact number</strong>: a mobile such as 0917 123 4567, or a landline with its area code.</li>
+    <li>Choose the <strong>Type</strong> and the <strong>Price level</strong> (see <a href="#customer-types">the next section</a>).</li>
+    <li>If they will buy on credit, tick <strong>Buys on credit</strong>, then type the <strong>Credit limit (₱)</strong> — the most they may owe at one time — and the <strong>Terms (days)</strong> they have to pay. 0 means cash on delivery.</li>
+    <li>Click <strong>Add customer</strong>. You see "(name) added." and their profile opens.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/customers-new.webp" alt="The Customers screen with the new customer form open: Name Carmen Aquino, a code, a mobile number, Type REGULAR, Price level RETAIL, Buys on credit ticked, Credit limit 2,000.00 and Terms 15." width="1280" height="800" loading="lazy"><figcaption>Tick Buys on credit to open the limit and terms fields.</figcaption></figure>
+  <p class="warn"><strong>Important:</strong> Decide about credit when you add the customer. In this version the profile has no switch to turn credit on later for a customer added as cash-only.</p>
+  <p>If a number is refused, Chachi POS says it does not look like a Philippine mobile or landline. Spaces and dashes are fine. To bring in the balances from your old notebook when you start, use the setup spreadsheet — see <a href="/guide/getting-started">Getting started</a>. Those balances appear on the statement as "Opening balance".</p>
+</section>
+
+<section id="customer-types">
+  <h2>Customer types and price levels</h2>
+  <p class="who"><strong>Who:</strong> Anyone adding a customer</p>
+  <p>The <strong>Type</strong> is a label for your own sorting. It does not change prices. The <strong>Price level</strong> does: it decides which of each product's prices the customer pays (RETAIL, WHOLESALE or DEALER). The prices themselves are set on each product — see <a href="/guide/products">Products and prices</a>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th><th>Use it for</th></tr></thead>
+    <tbody>
+      <tr><td>WALK IN</td><td>An unnamed counter customer. A walk-in can never buy on credit.</td></tr>
+      <tr><td>RETAIL</td><td>An ordinary shopper.</td></tr>
+      <tr><td>REGULAR</td><td>A known customer who comes back — the usual choice, and the one the form starts with.</td></tr>
+      <tr><td>WHOLESALE</td><td>A buyer in quantity, such as a clinic or a barangay health station.</td></tr>
+      <tr><td>DEALER</td><td>A reseller.</td></tr>
+      <tr><td>FARM</td><td>Carried over from the Agrivet edition. A drugstore can ignore it.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="agrivet"><strong>Agrivet edition:</strong> customers created from the opening-balance spreadsheet are given the type FARM. In the Pharmacy edition they are REGULAR.</p>
+</section>
+
+<section id="credit-limit-and-terms">
+  <h2>Change a credit limit or terms</h2>
+  <p class="who"><strong>Who:</strong> Manager or Owner</p>
+  <ol class="steps">
+    <li>Click <strong>Customers</strong> and click the customer's row to open their profile.</li>
+    <li>Click <strong>Change credit limit</strong>.</li>
+    <li>Type the new <strong>Limit (₱)</strong> and, if needed, the new <strong>Terms (days)</strong>.</li>
+    <li>Type why it is changing in the box beside the button.</li>
+    <li>Click <strong>Save limit</strong>. You see "Credit limit changed."</li>
+  </ol>
+  <p>A cashier who tries this is refused. Every change is kept in the audit trail with the old and new figures and who made it. New terms apply to new sales only: what the customer already owes keeps the due date it was given on the day of the sale.</p>
+</section>
+
+<section id="change-customer-details">
+  <h2>Change or deactivate a customer</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner (limit and terms: Manager or Owner)</p>
+  <p>On the profile you can change the credit limit and terms (above) and deactivate the customer. In this version the name, code, contact number, type and price level cannot be changed on screen after the customer is added, so check them before you click <strong>Add customer</strong>.</p>
+  <h3>Deactivate a customer</h3>
+  <ol class="steps">
+    <li>Open the customer's profile.</li>
+    <li>Click <strong>Deactivate</strong> and confirm.</li>
+  </ol>
+  <p>A deactivated customer stays on every past sale and payment, but can no longer be chosen at the counter. Tick <strong>Show inactive</strong> on the list to see them. A customer who owes money, or who has store credit, cannot be deactivated: "This customer still owes ₱… Collect or write off the balance before you deactivate them." A customer is never deleted.</p>
+</section>
+
+<section id="sell-on-credit">
+  <h2>Sell on credit</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner, on their own open shift</p>
+  <ol class="steps">
+    <li>On the POS, press <kbd>F2</kbd> (Customer) and search by name, code or number. Click the customer.</li>
+    <li>Ring up the items and press <kbd>F9</kbd> to pay.</li>
+    <li>The payment screen shows the customer's <strong>Limit</strong>, <strong>Balance</strong> and <strong>Available</strong> credit. Click <strong>CREDIT</strong> for the amount going on their account.</li>
+    <li>Complete the sale as usual.</li>
+  </ol>
+  <p>The sale is due on the date their terms give (for example 15 days after the sale); with terms of 0 it is due the same day. Only a registered, active customer who buys on credit can use <strong>CREDIT</strong>. The full steps are in <a href="/guide/selling">Selling at the counter</a>.</p>
+</section>
+
+<section id="over-the-limit">
+  <h2>When a customer is over their limit</h2>
+  <p class="who"><strong>Who:</strong> Cashier; a Manager or Owner decides</p>
+  <p>When you choose a customer who has no credit left, the POS says "(name) is at their credit limit." On the payment screen, a sale bigger than their available credit shows "This sale is over their available credit. A manager or owner must authorise it." If you complete it anyway, the sale is refused: "(name) has ₱… of credit available and this sale needs ₱…".</p>
+  <p>In this version the payment screen has no button to call a manager for this. Do one of these:</p>
+  <ul>
+    <li><strong>Split the payment:</strong> put only the available amount on <strong>CREDIT</strong> and take the rest in cash, GCash or QR Ph.</li>
+    <li><strong>Raise the limit:</strong> a manager or owner changes the limit on the customer's profile (<a href="#credit-limit-and-terms">Change a credit limit</a>), with a reason. Then complete the sale.</li>
+  </ul>
+  <p>The dashboard lists how many accounts have reached their limit.</p>
+</section>
+
+<section id="take-a-payment">
+  <h2>Take a payment on account</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner, on their own open shift</p>
+  <p>Use this when a customer pays some or all of what they owe. A payment is always applied to their <strong>oldest unpaid invoice first</strong>, then the next oldest.</p>
+  <ol class="steps">
+    <li>Click <strong>Customers</strong>, then <strong>Take payment</strong> on the customer's row (or open their profile and click <strong>Take payment</strong>).</li>
+    <li>The screen shows what they <strong>Owe now</strong>. Type what they are paying in <strong>Amount (₱)</strong>, or click <strong>Pay in full</strong>.</li>
+    <li>Choose the <strong>Method</strong>: CASH, GCASH or QRPH.</li>
+    <li>For GCash or QR Ph, type the <strong>Reference number</strong> from the customer's phone. It is required. Chachi POS records it; it does not check that the money arrived, so check your wallet.</li>
+    <li>Add <strong>Notes</strong> if useful.</li>
+    <li>Check the line under the form, for example "₱1,500.00 owing − ₱500.00 paid = ₱1,000.00 owing".</li>
+    <li>Click <strong>Record payment</strong>. For cash, the drawer opens.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/customers-take-payment.webp" alt="The Payment from Baby Reyes screen: Owes now, Terms 15 days and an overdue note at the top; Amount 500.00 typed, a Pay in full button, Method CASH with a note that the drawer opens, and a line showing the amount still owing after this payment; a Record payment button." width="1280" height="800" loading="lazy"><figcaption>A part payment: the line shows what will still be owed.</figcaption></figure>
+  <p>You then see <strong>Payment recorded</strong>, with "They still owe ₱…" or "They owe nothing now.", and <strong>What it settled</strong> — which invoices the money went to. A <strong>COLLECTION ACKNOWLEDGEMENT</strong> prints with its own number (COLL-…), the amount, method, reference, the invoices it paid, the balance now and your name. Hand it to the customer. It is not an official receipt. Click <strong>Done</strong> to return to the profile.</p>
+  <ul>
+    <li><strong>Part payments</strong> are normal. Each payment is recorded separately, even two on the same day.</li>
+    <li><strong>No open shift:</strong> you are told to open your shift first — see <a href="/guide/closing#open-a-shift">Open your shift</a>. A cash payment goes into your drawer and is counted at your close as "Collections in cash".</li>
+    <li><strong>Paying more than they owe:</strong> the screen says "That is ₱… more than they owe." <strong>Record payment</strong> stays greyed until you tick <strong>Yes — keep the extra ₱… as store credit against their next purchase.</strong> Or lower the amount and give change.</li>
+  </ul>
+</section>
+
+<section id="print-a-statement">
+  <h2>Print a statement</h2>
+  <p class="who"><strong>Who:</strong> Manager or Owner</p>
+  <p>A statement is what you hand a customer who asks "how much do I owe?". It starts from the balance brought forward, lists every sale, payment, return and write-off in the period with a running balance, and ends with the balance on the last day.</p>
+  <ol class="steps">
+    <li>Open the customer's profile and click <strong>Statement</strong>.</li>
+    <li>The period starts on the first of this month. To change it, pick the two dates and click <strong>Show</strong>.</li>
+    <li>Check the lines. Under each payment you see which invoices it settled.</li>
+    <li>Click <strong>Print</strong>. You see "Statement printed." (or "Statement queued for the printer." if the printer did not answer).</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/customers-statement.webp" alt="The Statement of account screen for Barangay Health Station – Poblacion: date range, Brought forward, a table of credit sales and a collection with the invoice it settled, a running balance column, and the closing amount owed to the store in large type. Print and Export CSV buttons at the top." width="1280" height="800" loading="lazy"><figcaption>The balance at the bottom is the account's own figure, so it always matches the profile.</figcaption></figure>
+  <p>The bottom line says "₱… owed to the store", or "₱… in credit — the store owes this to (name)". <strong>Export CSV</strong> saves the same figures as a spreadsheet file. A cashier who clicks <strong>Statement</strong> is told to ask the owner or a manager.</p>
+</section>
+
+<section id="ageing">
+  <h2>See who owes what, and for how long</h2>
+  <p class="who"><strong>Who:</strong> Manager or Owner</p>
+  <ol class="steps">
+    <li>Click <strong>Reports</strong>. Click the <strong>Credit outstanding</strong> or <strong>Overdue accounts</strong> tile, or <strong>Ageing</strong> in the list of reports.</li>
+    <li>Read the totals at the top: <strong>Owed to the store</strong> and <strong>Accounts with debt</strong>, then the five columns: <strong>Not yet due</strong>, <strong>1–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>Over 90 days</strong> past due.</li>
+    <li>Work down the table. The customer with the oldest debt is at the top, with their phone number.</li>
+    <li>Click a row to open that customer's profile, where you can take a payment or print their statement.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/customers-ageing.webp" alt="The Ageing report: totals at the top, five boxes for not yet due through over 90 days, and a table of customers with contact numbers, amounts in each age column, credit held and total owing. Baby Reyes is at the top with an invoice more than 20 days past due." width="1280" height="800" loading="lazy"><figcaption>Oldest debt first — the order in which to make your calls.</figcaption></figure>
+  <p>Each invoice is aged from its own due date, so one customer can have amounts in several columns. <strong>Credit held</strong> is store credit the customer has with you; it is shown on its own and never makes a debt look younger. The line at the bottom checks the arithmetic: aged debt, less credit held, equals what the accounts say is owed. <strong>Export CSV</strong> saves the report.</p>
+  <p>On the customer list, <strong>overdue … days</strong> means an invoice is past its due date and <strong>due soon</strong> means one falls due within 3 days (the owner can change this in <strong>Admin</strong> → <strong>Settings</strong>, under <strong>Credit</strong>). The dashboard also warns how many accounts are overdue.</p>
+</section>
+
+<section id="store-credit">
+  <h2>Store credit</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
+  <p>Store credit is money the store owes a customer. A customer gets it in two ways:</p>
+  <ul>
+    <li><strong>An overpayment</strong> on account that you chose to keep as store credit (see <a href="#take-a-payment">Take a payment</a>).</li>
+    <li><strong>A return</strong> of goods they bought on credit: the value goes back to their account, and anything beyond what they still owe becomes store credit. See <a href="/guide/corrections">Returns, voids and reprints</a>.</li>
+  </ul>
+  <p>The customer list shows <strong>in credit</strong>, and the profile says "The store owes them ₱… — from an overpayment or a return."</p>
+  <h3>Spend it</h3>
+  <ol class="steps">
+    <li>Choose the customer with <kbd>F2</kbd> before paying.</li>
+    <li>On the payment screen, click <strong>STORE CREDIT</strong> (it shows how much they hold). It covers as much of the bill as their credit allows.</li>
+    <li>Take any rest in cash, GCash or QR Ph, and complete the sale.</li>
+  </ol>
+  <p>You cannot spend more than they hold. Store credit can be used even when a customer is at their credit limit. It is spent on purchases; Chachi POS has no step for paying it back in cash.</p>
+</section>
+
+<section id="write-off">
+  <h2>Write off a bad debt</h2>
+  <p class="who"><strong>Who:</strong> Owner only</p>
+  <p>When the store accepts that a debt will never be paid — the customer moved away, or the business closed — the owner writes it off. Only the owner sees the button.</p>
+  <ol class="steps">
+    <li>Open the customer's profile and click <strong>Write off</strong>.</li>
+    <li>Check <strong>Amount to write off (₱)</strong>. It starts at the full balance; you can write off less.</li>
+    <li>In <strong>Why</strong>, say what actually happened. Your accountant will read it.</li>
+    <li>Click <strong>Write it off</strong>. You see "₱… written off. Balance now ₱…".</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> A write-off cannot be undone. You cannot write off more than the customer owes.</p>
+  <p>Afterwards the balance falls and the oldest invoices are marked settled, so they leave the ageing report and the overdue warnings. The statement shows a "Write-off" line with your reason. A write-off is never counted as a payment received, and the audit trail records it as "Debt written off".</p>
+</section>
+
+<section id="agreed-prices">
+  <h2>Agreed prices</h2>
+  <p class="who"><strong>Who:</strong> Anyone who can open a customer</p>
+  <p>The profile has an <strong>Agreed prices</strong> block. An agreed price overrides every other price for that product, whatever quantity the customer buys. Most customers have none: "None — this customer pays the retail price." This version has no screen for entering agreed prices; to give a customer a different price list, set their <strong>Price level</strong> when you add them.</p>
+</section>
+
+<section id="disputed-balance">
+  <h2>When a customer disputes their balance</h2>
+  <p class="who"><strong>Who:</strong> Manager or Owner</p>
+  <p>Nothing on an account can be edited or deleted: every sale, payment, return and write-off stays on the record with the date and the person who recorded it. That is what lets you settle a disagreement.</p>
+  <ol class="steps">
+    <li>Open the customer's profile. <strong>Unpaid invoices</strong> shows what is still open, and <strong>Payments received</strong> shows each payment and the invoices it settled.</li>
+    <li>Print a statement for a period that starts before the item in dispute. Go down it line by line with the customer until you find where you disagree.</li>
+    <li>Ask for their acknowledgement slips (COLL-…) and receipts, and match the numbers against the <strong>Document</strong> column.</li>
+    <li>For a GCash or QR Ph payment, check the reference number on the statement against your wallet's history.</li>
+    <li>The owner can look in <strong>Admin</strong> → <strong>Audit</strong>: filter <strong>What</strong> for "Collection recorded", "Credit limit changed" or "Debt written off" to see who did it, when and why.</li>
+  </ol>
+  <ul>
+    <li><strong>The customer paid and it was not recorded:</strong> take the payment now, with a note saying when it was really paid.</li>
+    <li><strong>They were charged for goods they did not take:</strong> make a return on that sale, and the amount goes back to their account. See <a href="/guide/corrections">Returns, voids and reprints</a>.</li>
+  </ul>
+  <p>If Chachi POS ever says a statement "does not agree with the account", do not hand it over — contact us at the address below.</p>
+</section>

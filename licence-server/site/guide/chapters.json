@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "getting-started",
+    "title": "Getting started",
+    "summary": "Install Chachi POS, run the setup wizard, link your subscription and sign in."
+  },
+  {
+    "slug": "products",
+    "title": "Products and prices",
+    "summary": "Load your products, add new ones, set units, packs, prices, barcodes and pictures."
+  },
+  {
+    "slug": "units",
+    "title": "Units and packs",
+    "summary": "How Chachi POS counts stock in one base unit, and how boxes, strips, sacks and kilos are bought, priced and sold."
+  },
+  {
+    "slug": "selling",
+    "title": "Selling at the counter",
+    "summary": "Open a shift, ring up a sale, give discounts, take any payment and print the receipt."
+  },
+  {
+    "slug": "corrections",
+    "title": "Returns, voids and reprints",
+    "summary": "Take back an item, cancel a sale the right way, and print a receipt again."
+  },
+  {
+    "slug": "closing",
+    "title": "Cash and closing the shift",
+    "summary": "Cash in and out of the drawer, count the drawer, explain a difference and close the day."
+  },
+  {
+    "slug": "stock",
+    "title": "Stock, expiry and counts",
+    "summary": "Adjust stock, count the shelves, track batches and expiry, and recall a batch."
+  },
+  {
+    "slug": "buying",
+    "title": "Suppliers and deliveries",
+    "summary": "Keep suppliers, order stock, receive a delivery and record a purchase."
+  },
+  {
+    "slug": "customers",
+    "title": "Customers and utang",
+    "summary": "Add customers, sell on credit, collect payments, print statements and manage store credit."
+  },
+  {
+    "slug": "reports",
+    "title": "Reports",
+    "summary": "Read the dashboard and the sales, stock, credit and payment reports, and export them."
+  },
+  {
+    "slug": "admin",
+    "title": "Users, settings and backups",
+    "summary": "Add users and roles, set up the store, tax, receipt and printer, and keep your data safe."
+  },
+  {
+    "slug": "help",
+    "title": "Troubleshooting",
+    "summary": "Forgotten passwords, lock-outs, printers, subscription warnings and moving to a new computer."
+  }
+]

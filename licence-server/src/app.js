@@ -9,15 +9,20 @@
 //   GET  /api/v1/public-key        the key the POS verifies licences with
 //   GET  /link, /auth/google…      the owner links a device, signed in with Google
 //   GET  /admin…                   Chachi's page: stores, devices, manual payments
+//   GET  /, /privacy, /static/…     the public site that introduces Chachi POS (site/)
+//   GET  /guide, /guide/:chapter    the user guide (site/guide/, wrapped by guide.js)
 
 const crypto = require('crypto');
+const path = require('path');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { pages } = require('./pages');
+const guide = require('./guide');
 const { pkce } = require('./google');
 const { ServiceError } = require('./service');
 
 const OWNER_COOKIE = 'cps_owner';
+const SITE = path.join(__dirname, '..', 'site');
 const ADMIN_COOKIE = 'cps_admin';
 
 function cookies(req) {
@@ -64,6 +69,25 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
 
   app.get('/assets/site.css', (req, res) => res.type('text/css').set('Cache-Control', 'public, max-age=3600').send(pages.css));
 
+  // ── The public site ───────────────────────────────────────────────────────
+  //
+  // Static files, and no script: the same CSP as every other page here. The pages are
+  // revalidated on each visit so a change shows at once; what they link to is under
+  // /static and cached for a day.
+
+  const sitePage = (file) => (req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(SITE, file));
+  app.get('/', sitePage('index.html'));
+  app.get('/privacy', sitePage('privacy.html'));
+  app.get('/robots.txt', sitePage('robots.txt'));
+  app.get('/sitemap.xml', (req, res) => res.type('application/xml').set('Cache-Control', 'no-cache').send(guide.sitemap()));
+  app.get(['/guide', '/guide/:slug'], (req, res, next) => {
+    const html = guide.render(req.params.slug || '');
+    if (!html) return next();
+    return res.type('html').set('Cache-Control', 'no-cache').send(html);
+  });
+  app.get('/favicon.ico', (req, res) => res.redirect(301, '/static/img/favicon-32.png'));
+  app.use('/static', express.static(path.join(SITE, 'static'), { index: false, maxAge: '1d' }));
+
   // ── The API the POS calls ─────────────────────────────────────────────────
 
   const api = express.Router();
@@ -104,8 +128,6 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
 
   const owner = (req) => service.getSession(cookies(req)[OWNER_COOKIE], 'owner');
   const page = (res, html, status = 200) => res.status(status).type('html').set('Cache-Control', 'no-store').send(html);
-
-  app.get('/', (req, res) => res.redirect('/link'));
 
   app.get('/link', (req, res) => {
     const code = String(req.query.code || '');

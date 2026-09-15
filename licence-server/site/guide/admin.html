@@ -1,0 +1,351 @@
+<h1>Users, settings and backups</h1>
+<p class="intro">Give each person their own login and role, set up the store, tax, receipt, printer and limits, and keep the store's data safe with backups. This chapter also covers the audit trail, the health panel and the subscription screen.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#open-admin">Open the Admin screens</a></li>
+  <li><a href="#add-a-user">Add a user</a></li>
+  <li><a href="#edit-a-user">Change a user's name or role</a></li>
+  <li><a href="#reset-a-password-or-pin">Reset a password or PIN</a></li>
+  <li><a href="#deactivate-a-user">Deactivate or reactivate a user</a></li>
+  <li><a href="#change-a-setting">Change a setting</a></li>
+  <li><a href="#store-details">Change the store's details and the receipt heading</a></li>
+  <li><a href="#tax-mode">Change the tax mode</a></li>
+  <li><a href="#receipt-printer">Set up the receipt printer and print a test page</a></li>
+  <li><a href="#cash-drawer">Connect the cash drawer</a></li>
+  <li><a href="#discount-limits">Set discount limits and cash rounding</a></li>
+  <li><a href="#senior-citizen-pwd">Senior citizen and PWD discount</a></li>
+  <li><a href="#other-settings">All the other settings</a></li>
+  <li><a href="#automatic-backups">How automatic backups work</a></li>
+  <li><a href="#back-up-now">Make a backup now</a></li>
+  <li><a href="#copy-backups-off">Copy backups off the computer</a></li>
+  <li><a href="#restore-a-backup">Restore a backup</a></li>
+  <li><a href="#export-data">Export all the store's data</a></li>
+  <li><a href="#import-data">Import an exported archive</a></li>
+  <li><a href="#audit-trail">Read the audit trail</a></li>
+  <li><a href="#health-panel">Check the health panel</a></li>
+  <li><a href="#subscription">The subscription screen and its warnings</a></li>
+</ol></nav>
+
+<section id="open-admin">
+  <h2>Open the Admin screens</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>Choose <strong>Admin</strong> in the menu. Only the owner sees it. It has seven tabs: <strong>Users</strong>, <strong>Settings</strong>, <strong>Audit</strong>, <strong>Backups</strong>, <strong>Export / import</strong>, <strong>Health</strong> and <strong>Subscription</strong>. On a phone the tabs scroll sideways.</p>
+  <p class="tip"><strong>Tip:</strong> when the app refuses something, the message often ends with a code in brackets, such as (VR-503). Read it out when you call Chachi's. It names the exact rule.</p>
+</section>
+
+<section id="add-a-user">
+  <h2>Add a user</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>Give every person who works in the store their own login. If people share one, every price change, discount and drawer count is recorded against the wrong name.</p>
+  <ol class="steps">
+    <li>Open <strong>Admin → Users</strong> and press <strong>New user</strong>.</li>
+    <li>Type the <strong>Username</strong> they will sign in with: lower case, no spaces, 3 to 32 characters, and different from everyone else's.</li>
+    <li>Type the <strong>Full name</strong>. This is the name shown on the audit trail.</li>
+    <li>Choose the <strong>Role</strong>. A note under it says what the role does (see <a href="/guide/getting-started#roles">Roles: who can do what</a>).</li>
+    <li>Type a <strong>Password</strong> of at least 10 characters, and tell the person what it is.</li>
+    <li>Type a 6-digit <strong>PIN</strong>. It is optional, but without one a cashier must type their full password whenever the screen locks. A PIN cannot be all one digit (111111) or a run such as 123456.</li>
+    <li>Press <strong>Create user</strong>. They appear in the list, and the <strong>PIN</strong> column shows "set" if they have one.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/admin-users-new.webp" alt="The Users tab under Admin. The New user form is open with Username, Full name, Role set to CASHIER with its note, Password and PIN (optional) fields, and Create user and Cancel buttons. Below it, the list of users with columns Username, Name, Role, PIN, Status." width="1280" height="800" loading="lazy"><figcaption>A new cashier. The PIN column in the list shows who can unlock with a PIN.</figcaption></figure>
+</section>
+
+<section id="edit-a-user">
+  <h2>Change a user's name or role</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <ol class="steps">
+    <li>In <strong>Admin → Users</strong>, press <strong>Edit</strong> on the person's row.</li>
+    <li>Change the <strong>Username</strong>, <strong>Full name</strong> or <strong>Role</strong>. Leave <strong>New password</strong> and <strong>PIN</strong> blank to keep them.</li>
+    <li>Press <strong>Save</strong>.</li>
+  </ol>
+  <p>The store must always keep one active owner. Changing the last owner to another role is refused with <strong>This is the last active owner. Create another owner before demoting this one.</strong></p>
+</section>
+
+<section id="reset-a-password-or-pin">
+  <h2>Reset a password or PIN</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>Staff cannot change their own password or PIN. When someone forgets theirs, or is locked out after too many wrong tries, the owner sets a new one.</p>
+  <ol class="steps">
+    <li>In <strong>Admin → Users</strong>, press <strong>Edit</strong> on the person's row. A locked account shows <strong>locked … min</strong> under <strong>Status</strong>.</li>
+    <li>Type a <strong>New password</strong> (at least 10 characters), a new 6-digit <strong>PIN</strong>, or both.</li>
+    <li>Press <strong>Save</strong>. A new password also unlocks the account at once.</li>
+  </ol>
+  <p>Nobody can read a password or PIN back. The audit trail records that it was reset, never what it is. If the owner's own password is lost, see <a href="/guide/help">Troubleshooting</a>.</p>
+</section>
+
+<section id="deactivate-a-user">
+  <h2>Deactivate or reactivate a user</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>Users are never deleted. When someone leaves, deactivate them: they can no longer sign in, and everything they did still shows their name.</p>
+  <ol class="steps">
+    <li>In <strong>Admin → Users</strong>, press <strong>Edit</strong> on their row, then <strong>Deactivate</strong>, and confirm. They disappear from the list.</li>
+    <li>To bring someone back, tick <strong>Show deactivated</strong>, press <strong>Edit</strong> on their row, then <strong>Reactivate</strong>.</li>
+  </ol>
+  <p>The last active owner cannot be deactivated. Create another owner first.</p>
+</section>
+
+<section id="change-a-setting">
+  <h2>Change a setting</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p><strong>Admin → Settings</strong> holds every figure the store runs on, in sections: <strong>The store</strong> (with <strong>Tax mode</strong>), <strong>Security and sessions</strong>, <strong>Sales and the till</strong>, <strong>Reports and alerts</strong>, <strong>Discounts and rounding</strong>, <strong>Inventory</strong>, <strong>Credit</strong>, <strong>Purchasing</strong> and <strong>Backup</strong>.</p>
+  <ol class="steps">
+    <li>Find the setting. A small grey line under it gives its internal name, the values allowed, the default, and when it was last changed.</li>
+    <li>Change the value. For a list, such as reasons, type one item per line.</li>
+    <li>Press <strong>Save this section</strong> at the bottom of <strong>that</strong> section. Each section saves on its own.</li>
+    <li>The message says how many settings were saved. If a value is not allowed, the message says why, and nothing in that section is saved.</li>
+  </ol>
+  <p>Every change goes on the audit trail with the old and the new value.</p>
+  <p class="tip"><strong>Tip:</strong> money amounts are in <strong>centavos</strong> (the internal name ends in "_centavos"): type 10000 for ₱100.00. Percentages are in <strong>basis points</strong> (the name ends in "_bp"): 100 is 1%, so 2% is 200.</p>
+</section>
+
+<section id="store-details">
+  <h2>Change the store's details and the receipt heading</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>The top of every receipt prints the store name, address, contact number and TIN (when set). The bottom always says <strong>This is not an official receipt</strong>. That line is required for these receipts and cannot be changed. Chachi POS does not print BIR official receipts, and there is no other custom header or footer.</p>
+  <ol class="steps">
+    <li>In <strong>Admin → Settings</strong>, go to <strong>The store</strong>.</li>
+    <li>Change the <strong>Store name</strong>, <strong>Address</strong>, <strong>Contact number</strong> or <strong>TIN</strong>.</li>
+    <li>Press <strong>Save the store</strong>. The next receipt prints the new details.</li>
+  </ol>
+</section>
+
+<section id="tax-mode">
+  <h2>Change the tax mode</h2>
+  <p class="who"><strong>Who:</strong> Owner only</p>
+  <p>The tax mode decides what the receipt prints and what every report header states. Change it only when the store's registration really changes, and ask your accountant first.</p>
+  <ol class="steps">
+    <li>In <strong>Admin → Settings</strong>, under <strong>The store</strong>, find <strong>Tax mode</strong>. It says the current mode.</li>
+    <li>Choose <strong>NONE — Not registered</strong>, <strong>NON_VAT — Non-VAT (percentage tax)</strong> or <strong>VAT — VAT-registered</strong>. A sentence under it explains the choice.</li>
+    <li>Optionally type why it is changing in the box next to it. It is kept on the audit trail.</li>
+    <li>Press <strong>Change mode</strong> and confirm.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> past sales keep the mode they were made under, and any report covering the day of the change shows both modes. This cannot be undone.</p>
+</section>
+
+<section id="receipt-printer">
+  <h2>Set up the receipt printer and print a test page</h2>
+  <p class="who"><strong>Who:</strong> Owner, usually with Chachi's on installation day</p>
+  <p>The printer settings are in the <strong>Sales and the till</strong> section of <strong>Admin → Settings</strong>. Until a printer is set up, nothing prints, but every sale still saves normally.</p>
+  <ol class="steps">
+    <li>Set <strong>Receipt width: 32 columns for 58 mm paper, 48 for 80 mm</strong> to match your paper roll.</li>
+    <li>Set <strong>How the receipt printer is connected: NONE, USB or LAN</strong>.</li>
+    <li>For a <strong>USB</strong> printer on Windows, type the printer's shared name on this PC in <strong>USB printer device or share the bridge writes to</strong>, in the form \\COMPUTER-NAME\PRINTER-NAME, for example \\SHOPPC\POS-58. The printer must be shared in Windows. Chachi's sets this up when installing.</li>
+    <li>For a <strong>LAN</strong> (network) printer, type its address, such as 192.168.1.50, in <strong>LAN printer address</strong>. Leave <strong>LAN printer port</strong> at 9100 unless the printer's manual says otherwise.</li>
+    <li>Press <strong>Save this section</strong>. The test uses the saved settings, so save first.</li>
+    <li>Press <strong>Print a test page</strong>. A slip headed <strong>PRINTER TEST</strong> should come out.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/admin-settings-printer.webp" alt="The Sales and the till section of Settings. The receipt width set to 32, the printer connection set to LAN, the LAN printer address 192.168.1.50 and port 9100, with a Print a test page button and a Save this section button." width="1280" height="800" loading="lazy"><figcaption>The printer settings and the test page button, in the Sales and the till section.</figcaption></figure>
+  <p><strong>Check the paper, not the screen.</strong> A wrong width gives no error; it wraps peso amounts onto two lines. On a network printer, the success message can appear before the printer has answered.</p>
+  <p>If the message says <strong>It did not print (…). It is queued.</strong>, the words in brackets say why. For example, "No receipt printer is configured." means the connection is still NONE. A receipt that failed to print can be reprinted later; the sale itself is never lost.</p>
+  <p class="android"><strong>On Android:</strong> set the connection to <strong>LAN</strong> and use a network (Wi-Fi or LAN) ESC/POS printer. USB and Bluetooth printers are not supported.</p>
+</section>
+
+<section id="cash-drawer">
+  <h2>Connect the cash drawer</h2>
+  <p class="who"><strong>Who:</strong> Owner, usually with Chachi's</p>
+  <p>There is no drawer setting. The drawer's cable plugs into the drawer port on the receipt printer, not into the computer, and the printer opens it. It opens for a cash sale, a cash payment on a customer's account, a cash refund, cash handed back on a void, and cash in or out of the till.</p>
+  <ol class="steps">
+    <li>Plug the drawer cable into the printer's drawer port.</li>
+    <li>Set up the printer (<a href="#receipt-printer">above</a>).</li>
+    <li>Test with a real ₱1 cash sale, then void it (see <a href="/guide/corrections">Returns, voids and reprints</a>).</li>
+  </ol>
+  <p>If the drawer does not open, the sale is still saved. Open it with its key and check the cable at the printer.</p>
+</section>
+
+<section id="discount-limits">
+  <h2>Set discount limits and cash rounding</h2>
+  <p class="who"><strong>Who:</strong> Owner only</p>
+  <p>These are in <strong>Discounts and rounding</strong> in <strong>Admin → Settings</strong>. Each role can give a discount up to its own limit. Above that, a manager or owner whose limit covers it approves at the counter (see <a href="/guide/selling">Selling at the counter</a>).</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Setting</th><th>Default</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Highest discount a cashier may apply, in basis points</td><td>200</td><td>2%</td></tr>
+      <tr><td>Highest discount a manager may apply, in basis points</td><td>500</td><td>5%</td></tr>
+      <tr><td>Highest discount an owner may apply, in basis points</td><td>10000</td><td>100%</td></tr>
+      <tr><td>Cash payable rounding step in centavos; 1 is off</td><td>1</td><td>No rounding. Type 25, for example, to round the cash due to 25 centavos.</td></tr>
+      <tr><td>Basket-size discount bands, on the subtotal before any discount</td><td>One band at 0%</td><td>No basket discount.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Basket-size bands are typed as a list. Each band has the subtotal it starts at in centavos, the discount in basis points, and a label. For 2% off baskets of ₱1,000 or more:</p>
+  <p>[{"min_subtotal_centavos": 0, "discount_bp": 0, "label": "No basket discount"}, {"min_subtotal_centavos": 100000, "discount_bp": 200, "label": "2% over ₱1,000"}]</p>
+  <p>Two bands cannot start at the same amount. If the list is not typed correctly, it is refused and nothing is saved.</p>
+</section>
+
+<section id="senior-citizen-pwd">
+  <h2>Senior citizen and PWD discount</h2>
+  <p class="who"><strong>Who:</strong> Owner only</p>
+  <p>The statutory 20% senior citizen and PWD discount (and, for a VAT-registered store, the VAT exemption) is built in and is <strong>on</strong> from the start. The 20% rate is set by law and cannot be changed.</p>
+  <ol class="steps">
+    <li>The switch is <strong>Grant the senior citizen and PWD statutory discount on eligible products</strong>, in <strong>Discounts and rounding</strong>. Leave it ticked.</li>
+    <li>Which products qualify is set on each product, with the senior citizen / PWD tick in the product editor (see <a href="/guide/products">Products and prices</a>).</li>
+    <li>The cashier gives it at the counter with <kbd>F8</kbd> <strong>SC/PWD</strong> (see <a href="/guide/selling">Selling at the counter</a>).</li>
+  </ol>
+  <p class="agrivet"><strong>Agrivet edition:</strong> this switch starts <strong>off</strong>. Turn it on only if you sell eligible goods for the customer's own use.</p>
+</section>
+
+<section id="other-settings">
+  <h2>All the other settings</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>Labels as they appear on the screen. Leave a setting at its default unless you have a reason to change it.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Section</th><th>Setting</th><th>Default</th></tr></thead>
+    <tbody>
+      <tr><td>Security and sessions</td><td>Minutes of inactivity before the screen locks</td><td>15</td></tr>
+      <tr><td>Security and sessions</td><td>Failed sign-in attempts before an account locks</td><td>5</td></tr>
+      <tr><td>Security and sessions</td><td>Minutes an account stays locked</td><td>15</td></tr>
+      <tr><td>Sales and the till</td><td>Cash variance at shift close that requires a reason</td><td>10000 (₱100)</td></tr>
+      <tr><td>Sales and the till</td><td>Settlement variance that requires a reason</td><td>10000 (₱100)</td></tr>
+      <tr><td>Sales and the till</td><td>Reasons till cash may be moved in or out</td><td>Owner withdrawal, Petty cash, and others</td></tr>
+      <tr><td>Sales and the till</td><td>Hours a shift may stay open before it raises an alert</td><td>24</td></tr>
+      <tr><td>Sales and the till</td><td>Days a return is accepted without manager authorisation</td><td>7</td></tr>
+      <tr><td>Sales and the till</td><td>Reasons a customer may return goods</td><td>Wrong item sold, Expired stock, and others</td></tr>
+      <tr><td>Sales and the till</td><td>Categories whose returns default to write-off rather than restock</td><td>Medicines, OTC Medicines, Vitamins, and others</td></tr>
+      <tr><td>Reports and alerts</td><td>Days a cash-variance alert keeps showing on the dashboard</td><td>7</td></tr>
+      <tr><td>Reports and alerts</td><td>Days a dismissed alert stays hidden before it is raised again</td><td>1</td></tr>
+      <tr><td>Reports and alerts</td><td>Longest range a single report may cover</td><td>366 days</td></tr>
+      <tr><td>Inventory</td><td>Allow a sale to take stock below zero, flagged and warned</td><td>Off</td></tr>
+      <tr><td>Inventory</td><td>Adjustment value above which owner authorisation is required</td><td>500000 (₱5,000)</td></tr>
+      <tr><td>Inventory</td><td>Reasons an inventory adjustment may be filed under</td><td>Damaged in storage, Spoilage, and others</td></tr>
+      <tr><td>Inventory</td><td>Days before an unposted stock count is flagged stale</td><td>7</td></tr>
+      <tr><td>Inventory</td><td>Days before expiry at which a batch reads NEAR_EXPIRY</td><td>90</td></tr>
+      <tr><td>Credit</td><td>Days before a due date at which a balance reads DUE_SOON</td><td>3</td></tr>
+      <tr><td>Purchasing</td><td>Receipt cost variance needing authorisation, in basis points</td><td>1000 (10%)</td></tr>
+      <tr><td>Backup</td><td>Folder automatic backups are written to</td><td>The folder chosen in setup</td></tr>
+      <tr><td>Backup</td><td>Hour of the day (Manila, 0–23) the daily backup runs</td><td>21 (9:00 pm)</td></tr>
+      <tr><td>Backup</td><td>Hours without a verified backup before the launch warning appears</td><td>36</td></tr>
+      <tr><td>Backup</td><td>Number of backups kept before the oldest is pruned</td><td>30</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>A sale may be voided only within its own open shift</strong> is shown for information and cannot be changed.</p>
+</section>
+
+<section id="automatic-backups">
+  <h2>How automatic backups work</h2>
+  <p class="who"><strong>Who:</strong> automatic; the owner checks them</p>
+  <p>Chachi POS backs itself up every time a shift is closed, and once a day after the configured hour (9:00 pm unless changed) while the app is running. It also takes a backup just before a restore, an import, an opening-data load or an update.</p>
+  <p>Each backup is a .zip file named <strong>pharmacy_backup_</strong> plus the date, time and cause, in the folder shown on <strong>Admin → Backups</strong>. The app opens and checks each one straight away. Only one that passes shows <strong>Verified</strong>, and only verified backups count. The newest 30 are kept.</p>
+  <p>If no backup has been verified for 36 hours, a red warning appears on the dashboard and the Backups tab. It cannot be dismissed. It usually means the backup folder's drive is unplugged or missing.</p>
+  <p class="tip"><strong>Tip:</strong> to move backups elsewhere, change <strong>Folder automatic backups are written to</strong> in Settings. It must be a full path outside the app's own data folder. Old backups stay in the old folder; copy them across if you want them listed.</p>
+</section>
+
+<section id="back-up-now">
+  <h2>Make a backup now</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <ol class="steps">
+    <li>Open <strong>Admin → Backups</strong>.</li>
+    <li>Press <strong>Back up now</strong>. The message says <strong>Backing up and verifying…</strong>, then the file name and <strong>verified</strong>.</li>
+    <li>The new backup is at the top of the list, with the trigger "manual".</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/admin-backups.webp" alt="The Backups tab. A Back up now button at the top right, the line Last verified backup with a date, the backup folder path, a box headed Two things worth knowing, and a table of backups with the columns Taken, Trigger, Verified, Size and File, and a Restore button on each verified row." width="1280" height="800" loading="lazy"><figcaption>The backup list. Only rows marked Verified can be restored.</figcaption></figure>
+  <p>If it fails, the message says why, for example that the folder cannot be written to. Check that the drive is plugged in, or choose another folder in Settings.</p>
+</section>
+
+<section id="copy-backups-off">
+  <h2>Copy backups off the computer</h2>
+  <p class="who"><strong>Who:</strong> Owner, once a week</p>
+  <p>Backups on the shop computer do not survive losing that computer to fire, theft, flood or a failed disk. The app cannot copy them elsewhere for you, and will not remind you.</p>
+  <ol class="steps">
+    <li>Plug in a USB stick.</li>
+    <li>Open the backup folder shown on <strong>Admin → Backups</strong> in File Explorer.</li>
+    <li>Copy the folder, or at least the newest files, to the stick, and keep the stick away from the shop computer.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> backups are not password-protected. Anyone with the file can read every price, customer and peso the store has taken. Keep the stick where you keep the cash box.</p>
+  <p class="android"><strong>On Android:</strong> connect the tablet to a computer with a USB cable and copy the <strong>Documents/ChachiPharmacyPOS Backups</strong> folder.</p>
+</section>
+
+<section id="restore-a-backup">
+  <h2>Restore a backup</h2>
+  <p class="who"><strong>Who:</strong> Owner only</p>
+  <p>Restoring <strong>replaces everything</strong> with the contents of a backup. Every sale, payment, stock movement and customer change made after it was taken is gone. Use it only when the data is damaged or something cannot be corrected any other way. Fix a wrong price by changing the price, and a wrong sale with a void or a return.</p>
+  <ol class="steps">
+    <li>Close every open shift, including other people's. A restore is refused while any shift is open.</li>
+    <li>Open <strong>Admin → Backups</strong> and find the backup. Read its date under <strong>Taken</strong>.</li>
+    <li>Press <strong>Restore…</strong> on that row. The box <strong>Restore this backup?</strong> says what will be lost.</li>
+    <li>Type the file name exactly as shown under the box. <strong>Restore</strong> only works when it matches.</li>
+    <li>Press <strong>Restore</strong>. The app first backs up the current data; if that fails, nothing is changed.</li>
+    <li>The message names that fresh backup. Anything you need from the period you undid is in it.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/admin-restore-dialog.webp" alt="The Restore this backup? box over the Backups tab. It says the database will be replaced by a named backup taken on a given date, that every sale, payment, stock movement and customer change since then will be gone, and that a backup of the current database is taken first. A box to type the filename, the filename under it, and Cancel and Restore buttons." width="1280" height="800" loading="lazy"><figcaption>Typing the file name makes you read the date before anything is replaced.</figcaption></figure>
+  <p>If your user did not exist yet in that backup, the app restarts and you sign in as a user that did.</p>
+  <p><strong>Restore…</strong> appears only on verified backups still in the backup folder. Rows marked <strong>pruned</strong> or <strong>not in folder</strong> cannot be restored. To move the store to a new computer, see <a href="/guide/help">Troubleshooting</a>.</p>
+</section>
+
+<section id="export-data">
+  <h2>Export all the store's data</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>An export is one .zip archive holding every record as readable files, for keeping a copy other programs can read or for moving the data into another Chachi POS. It is not a backup; to put the store back as it was, <a href="#restore-a-backup">restore a backup</a>.</p>
+  <ol class="steps">
+    <li>Open <strong>Admin → Export / import</strong>.</li>
+    <li>Press <strong>Export everything</strong> and save the file.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> passwords and PINs are never exported. After importing into a new installation, the owner must set a new password for each person before they can sign in.</p>
+  <p class="android"><strong>On Android:</strong> the export is saved to <strong>Downloads</strong>.</p>
+</section>
+
+<section id="import-data">
+  <h2>Import an exported archive</h2>
+  <p class="who"><strong>Who:</strong> Owner only</p>
+  <p>An import writes the data from an exported archive into this store. A full backup is taken first, and the import lands completely or not at all.</p>
+  <ol class="steps">
+    <li>In <strong>Admin → Export / import</strong>, under <strong>Import</strong>, choose <strong>If a row is already here</strong>: <strong>Keep what is here, skip the archive's</strong>, <strong>Replace it with the archive's</strong>, or <strong>Do not import at all</strong>. It applies to the whole import.</li>
+    <li>Under <strong>Archive</strong>, choose the .zip file. The app checks it and writes nothing.</li>
+    <li>Read the summary. <strong>Ready to import</strong> shows the source store, row counts and collisions. <strong>This archive cannot be imported</strong> lists the problems.</li>
+    <li>Press <strong>Import this archive</strong>. It only works when the check has passed.</li>
+    <li><strong>Imported</strong> shows the rows written, skipped and replaced, and the backup taken first. Press <strong>Done</strong>.</li>
+  </ol>
+  <p>If the import was a mistake, restore that backup from the Backups tab. The same tab also has <strong>Load opening data</strong>, for the Excel template (see <a href="/guide/products">Products and prices</a>).</p>
+</section>
+
+<section id="audit-trail">
+  <h2>Read the audit trail</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>The audit trail answers "who changed this, and what was it before?" It records price and cost changes, credit limits, stock adjustments, voids, returns, reprints, user and settings changes, exports and restores, shift opens and closes, cash in and out, and approvals. Nothing on it can be changed or removed.</p>
+  <ol class="steps">
+    <li>Open <strong>Admin → Audit</strong>. The newest rows are first, 50 to a page. Use <strong>Newer</strong> and <strong>Older</strong> to move between pages.</li>
+    <li>Each row shows <strong>When</strong>, <strong>Who</strong>, <strong>What</strong> happened, what it was <strong>On</strong>, and <strong>Why</strong>.</li>
+    <li>Click a row marked <strong>+</strong> to see <strong>Before</strong> and <strong>After</strong>: the old and new values side by side.</li>
+    <li>To narrow the list, use <strong>Who</strong>, <strong>What</strong>, <strong>From</strong> and <strong>To</strong>, which apply at once. For <strong>Entity</strong> (products, sales, users…), type it and press <strong>Filter</strong>. <strong>Clear</strong> shows everything again.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/admin-audit-detail.webp" alt="The Audit trail tab with filters for Who, What, Entity, From and To. The table shows rows with When, Who, What, On and Why. One row, Selling price changed, is open and shows Before and After boxes with the old and new price." width="1280" height="800" loading="lazy"><figcaption>An opened row shows the value before and after the change.</figcaption></figure>
+  <p>An <strong>approved by</strong> tag beside a name means someone else authorised the action, such as a manager approving a void. <strong>system</strong> means the app did it by itself, such as a scheduled backup. <strong>Permission refused</strong> rows show someone trying to reach something their role does not allow.</p>
+  <p><strong>Export CSV</strong> saves the rows matching your filters as a spreadsheet file. The export itself goes on the trail.</p>
+</section>
+
+<section id="health-panel">
+  <h2>Check the health panel</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p><strong>Admin → Health</strong> tells you whether this installation is safe to trade on. Open it first when something seems wrong.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Line</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td>Schema version</td><td>The database layout's version. If it adds "this build expects…", restart the app.</td></tr>
+      <tr><td>Database size</td><td>How big the store's data is.</td></tr>
+      <tr><td>Last verified backup</td><td>When the last good backup was taken, and its file. "Never" needs action today.</td></tr>
+      <tr><td>Backup folder</td><td>Where backups go. "Not set" means none are running.</td></tr>
+      <tr><td>Last export</td><td>When the data was last exported.</td></tr>
+      <tr><td>Last integrity check</td><td>When the database was last checked, and whether it was sound.</td></tr>
+      <tr><td>Application version</td><td>The version of Chachi POS on this device.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Press <strong>Check the database now</strong> to test the database. It says <strong>The database is sound.</strong> or lists the problems; if there are problems, call Chachi's before restoring anything. Red lines at the top warn about an old backup, a computer clock that is behind (fix the clock; selling still works), or a needed restart. The <strong>Rows</strong> and <strong>Storage settings</strong> lists are for Chachi's support.</p>
+  <p class="tip"><strong>Tip:</strong> when you call Chachi's, read out the <strong>Application version</strong> and <strong>Last verified backup</strong>.</p>
+</section>
+
+<section id="subscription">
+  <h2>The subscription screen and its warnings</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p><strong>Admin → Subscription</strong> shows whether this POS is covered. Linking it the first time is in <a href="/guide/getting-started#link-your-subscription">Link your subscription and start the free trial</a>. Once linked, it shows the store, <strong>Owner</strong> (the Google account), <strong>Paid until</strong>, <strong>Last checked</strong> and <strong>Check again by</strong>.</p>
+  <p>The POS checks by itself whenever it has the internet. Press <strong>Check now</strong> to check at once, for example after Chachi's has recorded your payment. <strong>Link again</strong> repeats the link with a new code; you rarely need it.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tag</th><th>What it means</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Active</strong></td><td>Subscribed until the date shown.</td><td>Nothing.</td></tr>
+      <tr><td><strong>Ending soon</strong></td><td>The last 7 days. The message says why: the paid period is ending, or this POS has not reached the internet since the date shown.</td><td>Pay through Chachi's, or connect to the internet and press <strong>Check now</strong>.</td></tr>
+      <tr><td><strong>Grace period</strong></td><td>The subscription has ended; everything still works for 7 more days.</td><td>Renew now. After the grace date, no new shift can be opened.</td></tr>
+      <tr><td><strong>Lapsed</strong></td><td>No new shift can be opened, so nothing new can be sold. Reports, export and backups still work.</td><td>Renew, then press <strong>Check now</strong>.</td></tr>
+      <tr><td><strong>Not linked</strong></td><td>Never linked, or the licence is not valid for this POS.</td><td>Press <strong>Link this POS</strong> and approve the code.</td></tr>
+      <tr><td><strong>Not set up</strong></td><td>This copy of the app cannot check licences.</td><td>Call Chachi's.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The subscription ends on the paid-until date, or 30 days after the last successful check, whichever is sooner. So a paid POS that stays offline for a month also warns you. The same message appears on the <strong>Reports</strong> dashboard.</p>
+  <p>A lapse never loses data and never stops a shift that is already open; that shift can finish and close normally. Setting the computer's clock back does not undo a lapse. If <strong>Check now</strong> says <strong>The licence server could not be reached</strong>, check the internet connection and try again.</p>
+</section>

@@ -1,0 +1,204 @@
+<h1>Products and prices</h1>
+<p class="intro">Bring your product list in from one Excel workbook, then find, add and change products one at a time: their prices, barcodes, pictures, categories and brands.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#load-opening-data">Load your products from the opening workbook</a></li>
+  <li><a href="#find-a-product">Find a product</a></li>
+  <li><a href="#add-a-product">Add a product</a></li>
+  <li><a href="#units-and-packs">Choose the unit and the packs</a></li>
+  <li><a href="#set-prices">Set prices and quantity breaks</a></li>
+  <li><a href="#barcodes">Add barcodes</a></li>
+  <li><a href="#product-pictures">Add a picture of the product</a></li>
+  <li><a href="#categories-and-brands">Categories and brands</a></li>
+  <li><a href="#deactivate-a-product">Stop selling a product</a></li>
+</ol></nav>
+
+<section id="load-opening-data">
+  <h2>Load your products from the opening workbook</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>When the store starts on Chachi POS, you can bring in everything at once: categories, units, brands, suppliers, products, packs, the stock on the shelf and what customers owe. You do it with one Excel workbook that you download from the app, fill in and send back. You can do it in step 6 of the setup wizard (<strong>6 · Your data</strong>) or later, from <strong>Admin → Export / import</strong>, under <strong>Load opening data</strong>.</p>
+  <ol class="steps">
+    <li>Open <strong>Admin</strong>, then <strong>Export / import</strong>, and go down to <strong>Load opening data</strong>.</li>
+    <li>Click <strong>Download the Excel template</strong>. The file pharmacy_opening_template.xlsx is saved on the computer.</li>
+    <li>Open it in Excel and read the <strong>Read me</strong> tab first. On every other tab, row 1 is the column name and row 2 says whether the column is required, with an example. Type your own data from row 3 down.</li>
+    <li>Fill in the tabs you need, in this order: Categories, Units, Brands, Suppliers, Products, Packs, Opening stock, Credit balances. Leave a tab empty if you have nothing for it.</li>
+    <li>Save the file as it is, as an Excel Workbook (.xlsx). Do not rename the tabs or the columns.</li>
+    <li>Back in the app, under <strong>Choose the filled-in workbook</strong>, choose the file.</li>
+    <li>In <strong>Cutover date</strong>, choose the day you stopped using the notebook. Opening stock and balances are dated on that day. Leave it blank for today.</li>
+    <li>Click <strong>Check</strong>. Checking writes nothing, so you can do it as many times as you need.</li>
+    <li>Read the report. It says <strong>Ready to load</strong>, or how many rows to fix, and names the tab and the row of each problem, for example “Products, row 7: …”. Fix those rows in Excel, save, choose the file again and click <strong>Check</strong> again.</li>
+    <li>When the report says <strong>Ready to load</strong>, read the notes under it, then click <strong>Load this data</strong>.</li>
+  </ol>
+  <p>The app takes a full backup first, then loads the whole workbook in one step: either all of it goes in or none of it does. The result says what was loaded and names the backup file. If the load was a mistake, restore that backup from <strong>Admin → Backups</strong> (see <a href="/guide/admin#restore-a-backup">Restore a backup</a>).</p>
+  <figure class="guide-shot"><img src="/static/guide/products-opening-check.webp" alt="The Load opening data panel after Check. A heading says 3 rows to fix before this can load, followed by a list of problems, each starting with the tab and row, and a table of tabs with rows, will load and rejected counts. The Load this data button is greyed out." width="1280" height="800" loading="lazy"><figcaption>Each problem starts with the tab and the row to fix. <strong>Load this data</strong> stays greyed out until nothing is left to fix.</figcaption></figure>
+  <h3>What goes on the Products and Opening stock tabs</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tab</th><th>Required columns</th><th>Optional columns</th></tr></thead>
+    <tbody>
+      <tr><td>Products</td><td>sku, name, category, base_unit, retail_price</td><td>generic_name, brand, wholesale_price, dealer_price, tax_class, min_stock, barcode, batch_tracked, senior_pwd</td></tr>
+      <tr><td>Packs</td><td>sku, unit, contains</td><td>default_sell</td></tr>
+      <tr><td>Opening stock</td><td>sku, quantity, unit_cost</td><td>note, batch_no, expiry_date, supplier (all three required for a batch-tracked product)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Write “yes” under “batch_tracked” for goods sold by expiry date (medicines, vitamins) and under “senior_pwd” for goods the senior citizen / PWD discount covers. A blank cell means no. Write dates year first, like “2027-03-31”. Quantities are in the product's base unit: 1,000 tablets, not 10 boxes.</p>
+  <h3>Common problems in the check report</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>The report says</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>this store has no unit “TABS”</td><td>Add the unit to the Units tab, or fix the spelling so it matches.</td></tr>
+      <tr><td>this store has no category “…”</td><td>Add it to the Categories tab. A product row never creates a category by itself.</td></tr>
+      <tr><td>no retail price</td><td>Every product needs a retail price, or it could not be sold.</td></tr>
+      <tr><td>PAR-500 is already in the catalogue</td><td>That product was loaded before. Delete its row from the Products tab.</td></tr>
+      <tr><td>… is batch-tracked, so its opening stock needs a batch number, an expiry date, a supplier</td><td>Fill in batch_no, expiry_date and supplier on the Opening stock row.</td></tr>
+      <tr><td>… is not an expiry date. Write it as YYYY-MM-DD</td><td>Retype the date year first, for example 2027-03-31.</td></tr>
+      <tr><td>… no unit cost</td><td>Find what the stock cost you and type it in.</td></tr>
+      <tr><td>… is also on line 12</td><td>The Opening stock tab takes one row per product. Put the whole quantity on one row.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="warn"><strong>Important:</strong> get “unit_cost” right. Every sale keeps the cost that applied when it was made, so a wrong opening cost makes every profit figure wrong and cannot be fixed afterwards. A cost of zero loads, with a note, because free samples happen.</p>
+  <p class="tip"><strong>Tip:</strong> an expiry date that has already passed still loads, with a note. That stock cannot be sold. Write it off afterwards (see <a href="/guide/stock#write-off">Write off expired or damaged stock</a>).</p>
+  <p>Because the Opening stock tab takes one row per product, it loads one batch of each product. Pictures are not in the workbook; add them product by product (see <a href="#product-pictures">Add a picture of the product</a>).</p>
+  <p>If you already keep your lists as CSV files, open <strong>Send CSV files instead</strong>. Each tab has its own file and its own <strong>Template</strong> button. Choosing a CSV file sets the workbook aside, and choosing a workbook sets the CSV files aside.</p>
+  <p class="agrivet"><strong>Agrivet edition:</strong> the opening load takes three CSV files: products, opening stock and opening credit balances. You download a template for each, and the button is <strong>Check the files</strong>. Categories and units must be added by hand before the check will pass.</p>
+</section>
+
+<section id="find-a-product">
+  <h2>Find a product</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager, Inventory or Cashier (a cashier can look but not change anything)</p>
+  <ol class="steps">
+    <li>Click <strong>Products</strong> in the menu on the left.</li>
+    <li>Type in the search box. It finds a product by name, generic name, SKU, barcode or brand, so “parac” finds every brand of paracetamol.</li>
+    <li>To see one shelf only, choose it in <strong>All categories</strong>.</li>
+    <li>To see only what needs reordering, click <strong>Low stock</strong>. Click <strong>All products</strong> to go back.</li>
+    <li>To include products you stopped selling, tick <strong>Show inactive</strong>.</li>
+    <li>Click a row, or press <kbd>Enter</kbd> on it, to open the product.</li>
+  </ol>
+  <p>Each row shows the SKU, the picture and name with the generic name under it, the brand, the category, the base unit, the stock on hand and the retail price. A row marked <strong>low</strong> is at or below its minimum stock. A product marked <strong>no price</strong> has no retail price and cannot be sold. The list shows 50 products a page; use <strong>Previous</strong> and <strong>Next</strong> for more.</p>
+  <figure class="guide-shot"><img src="/static/guide/products-list.webp" alt="The Products screen. Along the top are the Valuation, Stock count, Low stock and New product buttons, a search box and a category filter. Below is a list of drugstore products, each with a small picture, the generic name under the product name, brand, category, base unit, stock on hand and retail price, and Adjust and Batches buttons at the end of each row." width="1280" height="800" loading="lazy"><figcaption>The generic name sits under the product name. Rows at or below their minimum carry the <strong>low</strong> tag.</figcaption></figure>
+</section>
+
+<section id="add-a-product">
+  <h2>Add a product</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <ol class="steps">
+    <li>On <strong>Products</strong>, click <strong>New product</strong>. Only the <strong>Identity</strong> tab is shown until the product is saved.</li>
+    <li>Fill in the fields (see the table below).</li>
+    <li>Click <strong>Create product</strong>, or press <kbd>Ctrl</kbd>+<kbd>S</kbd>. The product opens again with all five tabs: <strong>Identity</strong>, <strong>Units</strong>, <strong>Pricing</strong>, <strong>Stock</strong> and <strong>Barcodes</strong>.</li>
+    <li>On <strong>Stock</strong>, type the <strong>Minimum stock</strong> and click <strong>Save</strong>. At or below this figure the product shows in Low stock. Zero turns the warning off.</li>
+    <li>Add packs, other prices and barcodes on the other tabs (see below).</li>
+  </ol>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to put</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Picture</strong></td><td>Optional. See <a href="#product-pictures">Add a picture of the product</a>.</td></tr>
+      <tr><td><strong>SKU</strong></td><td>Your own short code, like PAR-500. Letters, digits, dot, dash or underscore. Saved in capitals, and no two products can share one.</td></tr>
+      <tr><td><strong>Name</strong></td><td>The name customers know, 2 to 120 characters: “Paracetamol 500 mg tablet”.</td></tr>
+      <tr><td><strong>Generic name</strong></td><td>The generic on the box, like Paracetamol. Leave it blank if there is none. The counter searches it.</td></tr>
+      <tr><td><strong>Category</strong></td><td>Required. Click <strong>New category</strong> if yours is not in the list.</td></tr>
+      <tr><td><strong>Brand</strong></td><td>Optional. Click <strong>New brand</strong> to add one.</td></tr>
+      <tr><td><strong>Base unit</strong></td><td>Required. The smallest thing you sell it in: tablet, capsule, bottle. See <a href="/guide/units">Units and packs</a>.</td></tr>
+      <tr><td><strong>Tax class</strong></td><td><strong>vatable</strong>, <strong>vat exempt</strong> or <strong>zero rated</strong>. Ask your accountant which medicines are VAT-exempt.</td></tr>
+      <tr><td><strong>Track this product by batch and expiry date</strong></td><td>Ticked for a new product. Keep it ticked for anything with an expiry date. Untick it for goods without one, such as cotton balls or a thermometer.</td></tr>
+      <tr><td><strong>The senior citizen / PWD discount applies to this product</strong></td><td>Ticked for a new product. Untick it for goods the discount does not cover.</td></tr>
+      <tr><td><strong>Retail price (₱)</strong></td><td>Required, per base unit: the price of one tablet, not one box. You can change it later.</td></tr>
+    </tbody>
+  </table></div>
+  <figure class="guide-shot"><img src="/static/guide/products-new-product.webp" alt="The New product screen on the Identity tab, scrolled down past the picture box, SKU, Name and Generic name: the Category, Brand, Base unit and Tax class fields, two ticked boxes for batch and expiry tracking and for the senior citizen and PWD discount, a Retail price field and a Create product button." width="1280" height="800" loading="lazy"><figcaption>Both boxes start ticked. Untick them only for goods with no expiry date or no senior / PWD discount.</figcaption></figure>
+  <p class="warn"><strong>Important:</strong> the base unit and the batch-tracking box are locked as soon as any stock moves for the product. After that they cannot be changed, so check both before the first stock arrives.</p>
+  <p>If saving is refused, the message names the problem: “The SKU "PAR-500" is already used by another product”, or “A product name is 2 to 120 characters”.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Task</th><th>Owner</th><th>Manager</th><th>Inventory</th><th>Cashier</th></tr></thead>
+    <tbody>
+      <tr><td>Add or change a product, its packs, barcodes and picture</td><td>Yes</td><td>Yes</td><td>Yes</td><td>No</td></tr>
+      <tr><td>Change a selling price or quantity breaks</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr>
+      <tr><td>See the average cost</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+    </tbody>
+  </table></div>
+  <p class="agrivet"><strong>Agrivet edition:</strong> the product screen has no generic name, no picture and no batch or senior / PWD boxes.</p>
+</section>
+
+<section id="units-and-packs">
+  <h2>Choose the unit and the packs</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Every product keeps its stock in one <strong>base unit</strong>, the smallest thing you sell: a tablet, a capsule, a bottle. Choose it in <strong>Base unit</strong> on the Identity tab. If you also sell the product by the blister or by the box, add those as packs on the <strong>Units</strong> tab: pick the unit, type how many base units it holds (100 for a box of 100 tablets) and click <strong>Add pack</strong>.</p>
+  <p>How units and packs work at the counter, on deliveries and in stock counts, with a worked example, is in <a href="/guide/units">Units and packs</a>.</p>
+</section>
+
+<section id="set-prices">
+  <h2>Set prices and quantity breaks</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>A product has up to three prices, all per base unit: <strong>Retail</strong>, <strong>Wholesale</strong> and <strong>Dealer</strong>. Each customer is set to one of these price levels (see <a href="/guide/customers#add-a-customer">Add a customer</a>). A walk-in pays retail. If a customer's level has no price for a product, the counter charges retail.</p>
+  <ol class="steps">
+    <li>Open the product and click <strong>Pricing</strong>.</li>
+    <li>Type the prices in <strong>Retail price (₱)</strong>, <strong>Wholesale price (₱)</strong> and <strong>Dealer price (₱)</strong>. A box you leave empty is left as it was.</li>
+    <li>Click <strong>Save prices</strong>. Under each price you see since when it has applied.</li>
+  </ol>
+  <p>A new price applies to sales from now on. Sales already made keep the price they were sold at. The owner also sees <strong>Average cost</strong> at the top of the tab. It comes from deliveries and the opening stock and is not typed here.</p>
+  <h3>Quantity breaks</h3>
+  <p>A quantity break is a lower price per unit when a customer buys more. For example, Paracetamol at ₱3.50 a tablet, and ₱3.00 a tablet from 100 tablets.</p>
+  <ol class="steps">
+    <li>On the <strong>Pricing</strong> tab, under <strong>Quantity breaks</strong>, choose the <strong>Price level</strong>.</li>
+    <li>In the first row type where the band starts in <strong>From</strong> (in the base unit, for example 100) and its <strong>Price (₱)</strong>.</li>
+    <li>Click <strong>Add a band</strong> for another row.</li>
+    <li>Click <strong>Save retail bands</strong> (the button names the level you chose).</li>
+  </ol>
+  <p>The band that fits the line's quantity sets the price of the whole line: 100 tablets are all ₱3.00, 99 tablets are all ₱3.50. Each band must be cheaper than the one before it and cheaper than the level price, and no two bands can start at the same quantity. Saving replaces every band at that level; save an empty table to remove them.</p>
+  <figure class="guide-shot"><img src="/static/guide/products-pricing.webp" alt="The Pricing tab of Paracetamol 500 mg tablet, scrolled down past the average cost the owner sees at the top: the Retail, Wholesale and Dealer price fields with a Save prices button, then a Quantity breaks table with a band from 100 TAB at 3.00 pesos, and the Add a band and Save retail bands buttons." width="1280" height="800" loading="lazy"><figcaption>Prices are per tablet. The quantity break from 100 TAB means a box of 100 is sold at ₱3.00 a tablet.</figcaption></figure>
+  <p class="tip"><strong>Tip:</strong> the Pricing tab lets you set a price below the average cost. At the counter, a line that sells below average cost after its discount needs a Manager or Owner to approve it (see <a href="/guide/selling#give-a-discount">Give a discount</a>).</p>
+  <p>Prices agreed with one customer are not set on the product, and this version has no screen for entering them (see <a href="/guide/customers#agreed-prices">Agreed prices</a>).</p>
+</section>
+
+<section id="barcodes">
+  <h2>Add barcodes</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <ol class="steps">
+    <li>Open the product and click <strong>Barcodes</strong>.</li>
+    <li>Click in the box that says “Scan it, or type it” and scan the barcode, or type it and click <strong>Add</strong>.</li>
+    <li>The code appears in the list and the box is ready for the next one. A product can have several codes, for example one on the box and one on the blister.</li>
+    <li>To take a code off, click <strong>Remove</strong> beside it.</li>
+  </ol>
+  <p>A barcode is at least 4 characters. One barcode belongs to one product only; if it is already used you see “That barcode is already attached to another product.” The in-store labels printed by a weighing scale (13 digits starting with 02 or 20 to 29) are refused, because part of the number is a weight.</p>
+  <p class="tip"><strong>Tip:</strong> every barcode belongs to the product, not to a pack. Scanning the barcode printed on a box adds one tablet to the sale. Change the line to a box with <kbd>F3</kbd> (see <a href="/guide/units#sell-by-the-pack">Sell by the pack or loose</a>).</p>
+  <h3>If the counter scans a barcode that is not in the system</h3>
+  <p>The counter shows “[the code] is not in the catalogue.” with <strong>Attach [the code] to a product</strong> and <strong>Dismiss</strong>. The attach button clears the search box so you can find the product by name and sell it; it does not save the code. Afterwards, someone who can edit products opens the product and adds the code on its <strong>Barcodes</strong> tab. A cashier should write the code down and give it to the manager.</p>
+</section>
+
+<section id="product-pictures">
+  <h2>Add a picture of the product</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>A picture of the box helps the cashier pick the right product when a customer points at it. It shows beside the name in the product list, in the counter's search results and on the product screen.</p>
+  <ol class="steps">
+    <li>Open the product. The <strong>Picture</strong> is at the top of the Identity tab.</li>
+    <li>Click <strong>Add a picture</strong>.</li>
+    <li>On a computer, choose a photo file (JPEG, PNG or WebP). On Android, take a photo or choose one from the gallery.</li>
+    <li>The picture is shrunk and saved straight away; you see “Picture saved”. There is no need to click Save.</li>
+    <li>To change it, click <strong>Replace picture</strong>. To take it off, click <strong>Remove</strong> and confirm.</li>
+  </ol>
+  <p>On a new product, the picture you choose is saved when you click <strong>Create product</strong>. If the file is not a picture you see “That file is not a picture. Choose a photo, a JPEG or a PNG.” If a photo is too busy to shrink, you see “That picture is too detailed to save small enough. Try a closer, plainer photo.” Pictures are kept in the store's data, so backups carry them.</p>
+  <p class="android"><strong>On Android:</strong> <strong>Add a picture</strong> offers the camera as well as the gallery, so you can photograph the box at the shelf.</p>
+</section>
+
+<section id="categories-and-brands">
+  <h2>Categories and brands</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Every product has a category, such as Pain &amp; Fever or Vitamins. Categories group the product list, and you can count stock one category at a time. A brand is optional; a product without one shows a dash in the list.</p>
+  <ol class="steps">
+    <li>On the product's Identity tab, click <strong>New category</strong> (or <strong>New brand</strong>) beside the list.</li>
+    <li>Type the <strong>Name</strong> and click <strong>Save</strong>.</li>
+    <li>The new category is added to the list and chosen for this product. The rest of what you typed is kept.</li>
+  </ol>
+  <p>Two categories, or two brands, cannot have the same name: you see “"Vitamins" already exists”. You can also list categories and brands on the Categories and Brands tabs of the opening workbook; there a category can also carry a discount ceiling (“max_discount_percent”). There is no screen to rename or remove a category or a brand, so check the spelling before you save.</p>
+</section>
+
+<section id="deactivate-a-product">
+  <h2>Stop selling a product</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>A product is never deleted, because past sales and stock records point to it. Instead you deactivate it.</p>
+  <ol class="steps">
+    <li>Open the product. On the Identity tab, click <strong>Deactivate</strong>.</li>
+    <li>Read the question “Withdraw [product name] from sale?” and click <strong>OK</strong>.</li>
+    <li>The product is marked <strong>inactive</strong>.</li>
+  </ol>
+  <p>An inactive product disappears from the product list and the counter's search. Tick <strong>Show inactive</strong> to see it. If it is still in a cart, the counter refuses it with “[product name] is withdrawn and cannot be sold.” It stays on every past sale and report, and a last delivery of it can still be received.</p>
+  <p class="warn"><strong>Important:</strong> the product screen has no button to make a product active again, so be sure before you deactivate.</p>
+</section>

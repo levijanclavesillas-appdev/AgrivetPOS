@@ -1,0 +1,191 @@
+<h1>Cash and closing the shift</h1>
+<p class="intro">Every peso that goes into or out of the drawer belongs to somebody's shift. This chapter shows how to open your shift with a counted float, record cash you add or take out during the day, count the drawer at the end, explain a difference, and what the owner checks afterwards.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#open-a-shift">Open your shift</a></li>
+  <li><a href="#shift-left-open">If a shift was left open</a></li>
+  <li><a href="#cash-in-and-out">Put cash in or take cash out</a></li>
+  <li><a href="#check-the-drawer">See what the drawer should hold</a></li>
+  <li><a href="#before-you-close">Before you close</a></li>
+  <li><a href="#close-the-shift">Count the drawer and close</a></li>
+  <li><a href="#explain-a-difference">When the drawer is short or over</a></li>
+  <li><a href="#after-the-close">The closing summary and the backup</a></li>
+  <li><a href="#hand-over">Hand over to the next cashier</a></li>
+  <li><a href="#manager-checks">What the owner or manager checks</a></li>
+  <li><a href="#subscription-lapsed">When the subscription has ended</a></li>
+</ol></nav>
+
+<section id="open-a-shift">
+  <h2>Open your shift</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
+  <p>You need your own open shift before you can sell, take a customer's payment, give a refund or move cash in or out of the drawer. The shift is yours alone: nobody else can sell on it, and at the end you count the drawer against it. Inventory users do not have shifts.</p>
+  <ol class="steps">
+    <li>Sign in with your username and password.</li>
+    <li>Click <strong>Shift</strong> in the menu on the left. On a phone, tap the menu button at the top first. (A cashier lands on the POS instead; it says "Open your shift before selling" — click <strong>Open shift</strong> there.)</li>
+    <li>Count the cash in the drawer — the change you start the day with.</li>
+    <li>Type the amount in <strong>Opening float (₱)</strong>. If the drawer is empty, type 0.</li>
+    <li>Tick <strong>I have counted this and it is correct</strong>.</li>
+    <li>Click <strong>Open shift</strong>. You see "Shift open." and the <strong>Shift</strong> screen with the drawer figures. You can now sell.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/closing-open-shift.webp" alt="The Open your shift screen: an Opening float field with 2,000.00 typed in, a ticked box saying I have counted this and it is correct, and an Open shift button." width="1280" height="800" loading="lazy"><figcaption>The float you type here is the starting point of the count at the end of the day.</figcaption></figure>
+  <p>If you do not tick the box, the shift does not open and Chachi POS asks you to count the float and confirm it. Each person can have only one shift open. If yours is already open, the <strong>Shift</strong> screen shows it instead of this form, and you carry on with it.</p>
+  <p class="tip"><strong>Tip:</strong> When the screen locks, your PIN unlocks it only while your shift is open. After you close your shift, sign in again with your password.</p>
+  <p>If a message about the subscription appears instead of "Shift open.", see <a href="#subscription-lapsed">When the subscription has ended</a>.</p>
+</section>
+
+<section id="shift-left-open">
+  <h2>If a shift was left open</h2>
+  <p class="who"><strong>Who:</strong> The person whose shift it is; the Owner if an approval is needed</p>
+  <p>A shift never closes by itself. If somebody forgets to close, the shift stays open, and the next day's sales go into the same shift. Chachi POS does not close it for you, because a close needs a real count of the drawer.</p>
+  <ul>
+    <li><strong>If it is your own shift:</strong> the <strong>Shift</strong> screen shows "Open since" with yesterday's date. Close it first with a real count (see <a href="#close-the-shift">Count the drawer and close</a>), then open a new shift with today's float. Otherwise two days are counted as one.</li>
+    <li><strong>After 24 hours</strong> the dashboard shows an alert: "(name) has had a shift open since …, longer than the 24-hour maximum. Close it with a count; it is not closed automatically." The owner can change the 24 hours in <strong>Admin</strong> → <strong>Settings</strong>, under <strong>Hours a shift may stay open before it raises an alert</strong>.</li>
+    <li><strong>A long shift that closes with a difference</strong> beyond the store's tolerance needs the owner's approval. See <a href="#explain-a-difference">When the drawer is short or over</a>.</li>
+    <li><strong>If it is another person's shift:</strong> that person must sign in and close it. In this version a manager or owner cannot open another person's shift from the menu to close it for them.</li>
+  </ul>
+</section>
+
+<section id="cash-in-and-out">
+  <h2>Put cash in or take cash out</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner, on their own open shift</p>
+  <p>Record every movement of cash that is not a sale, a refund or a customer's payment: the owner taking cash, paying a delivery from the drawer, petty cash, adding coins for change, or taking money to the bank. If you do not record it, the drawer will not balance at the end of the day.</p>
+  <ol class="steps">
+    <li>Click <strong>Shift</strong> in the menu.</li>
+    <li>Click <strong>Cash in / out</strong>. The screen shows how much the drawer should hold right now.</li>
+    <li>In <strong>Direction</strong>, choose <strong>Cash out — money leaving the drawer</strong> or <strong>Cash in — money added to the drawer</strong>.</li>
+    <li>Type the amount in <strong>Amount (₱)</strong>.</li>
+    <li>Choose a <strong>Reason</strong> from the list.</li>
+    <li>If it helps, type a note in <strong>Notes</strong> — for example the supplier's name and invoice number.</li>
+    <li>Click <strong>Record</strong>. You see "Recorded.", the cash drawer opens if one is connected, and you are back on the <strong>Shift</strong> screen with the new figure.</li>
+  </ol>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Reason</th><th>Use it when</th></tr></thead>
+    <tbody>
+      <tr><td>Owner withdrawal</td><td>The owner takes cash out of the drawer.</td></tr>
+      <tr><td>Petty cash</td><td>Small store expenses paid from the drawer, such as water or cleaning supplies.</td></tr>
+      <tr><td>Change fund top-up</td><td>You add coins or small bills for change (Cash in).</td></tr>
+      <tr><td>Bank deposit</td><td>Cash leaves the drawer to go to the bank.</td></tr>
+      <tr><td>Supplier paid in cash</td><td>You pay a delivery from the drawer.</td></tr>
+      <tr><td>Correction of a miscount</td><td>You find you made a counting mistake earlier in the shift.</td></tr>
+    </tbody>
+  </table></div>
+  <figure class="guide-shot"><img src="/static/guide/closing-cash-out.webp" alt="The Cash in and out screen: Direction set to Cash out, Amount 1,850.00, Reason Supplier paid in cash, Notes with a supplier invoice number, and a Record button." width="1280" height="800" loading="lazy"><figcaption>Paying a delivery from the drawer: Cash out, with the reason Supplier paid in cash.</figcaption></figure>
+  <p class="tip"><strong>Tip:</strong> A cash out for a delivery records only the money. To add the goods to your stock, record the delivery as well — see <a href="/guide/buying">Suppliers and deliveries</a>.</p>
+  <p>You cannot take out more than the drawer should hold. Chachi POS refuses and says "There is ₱… in the drawer and this would take out ₱…". The list of reasons is set by the owner in <strong>Admin</strong> → <strong>Settings</strong>, under <strong>Reasons till cash may be moved in or out</strong>.</p>
+  <p class="warn"><strong>Important:</strong> A cash in or cash out is never a sale. It does not change stock, sales figures or anyone's balance. Do not use <strong>Cash in</strong> for a sale you forgot to ring up — ring up the sale.</p>
+</section>
+
+<section id="check-the-drawer">
+  <h2>See what the drawer should hold</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
+  <p>Click <strong>Shift</strong> at any time during the day. The table shows how Chachi POS works out the cash that should be in the drawer, line by line, so you can check it yourself:</p>
+  <ul>
+    <li><strong>Opening float</strong>, plus <strong>Cash sales</strong> (the cash customers handed over), plus <strong>Collections in cash</strong> (customers paying what they owe), plus <strong>Cash in</strong>;</li>
+    <li>minus <strong>Cash out</strong>, <strong>Refunds</strong> and <strong>Change given</strong>;</li>
+    <li>equals <strong>Expected in the drawer</strong>.</li>
+  </ul>
+  <p>Under it, <strong>Taken today, by method</strong> shows sales and collections for CASH, GCASH, QRPH and CREDIT.</p>
+  <figure class="guide-shot"><img src="/static/guide/closing-drawer.webp" alt="The Shift screen for an open shift: Cash in / out and Close shift buttons, the line Open since this morning, a table from Opening float down to Expected in the drawer, and a second table of sales and collections by payment method." width="1280" height="800" loading="lazy"><figcaption>Each line of the expected figure is shown, so the arithmetic can be checked against the drawer.</figcaption></figure>
+</section>
+
+<section id="before-you-close">
+  <h2>Before you close</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
+  <ul>
+    <li><strong>Finish or clear every sale.</strong> When the shift closes, the cart on the POS screen and every parked cart are thrown away. Nothing in them was sold, so stock is not affected, but they cannot be brought back — ring them up again on the next shift.</li>
+    <li><strong>Correct mistakes now.</strong> A manager or owner can void a sale only while its shift is still open. After the close, the only way to take a sale back is a return. See <a href="/guide/corrections">Returns, voids and reprints</a>.</li>
+    <li><strong>Get your GCash and QR Ph totals.</strong> Open the store's GCash or QR Ph merchant history and add up what came in during your shift.</li>
+  </ul>
+</section>
+
+<section id="close-the-shift">
+  <h2>Count the drawer and close</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner, on their own shift</p>
+  <ol class="steps">
+    <li>Click <strong>Shift</strong>, then <strong>Close shift</strong>. The <strong>Close the shift</strong> screen shows one row per payment method, with what Chachi POS expects.</li>
+    <li>Count all the cash in the drawer, float included. Type it in the <strong>Counted</strong> box of the <strong>CASH</strong> row.</li>
+    <li>Type the GCash total you received during the shift in the <strong>GCASH</strong> row.</li>
+    <li>Type the QR Ph total in the <strong>QRPH</strong> row.</li>
+    <li>Read the <strong>Variance</strong> column. A minus amount means you are short; a plus amount means you are over.</li>
+    <li>If any row is out, type what happened in <strong>Reason for the variance</strong>.</li>
+    <li>Click <strong>Count and close</strong>.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/closing-count.webp" alt="The Close the shift screen: rows for CASH, GCASH and QRPH with expected amounts, counted amounts typed in and the variance for each; CASH shows 150.00 short in red; the CREDIT row says there is nothing to count; the reason field is filled in; a Count and close button at the bottom." width="1280" height="800" loading="lazy"><figcaption>Nothing is filled in for you. The variance appears as you type each count.</figcaption></figure>
+  <p>The <strong>CREDIT</strong> row has no box: "Nothing to count — a credit sale takes no money. It is collected later."</p>
+  <p class="warn"><strong>Important:</strong> A box you leave empty counts as zero. If you had GCash sales and leave <strong>GCASH</strong> empty, the whole GCash total shows as short. Never type the expected figure just to make it balance — count again instead.</p>
+</section>
+
+<section id="explain-a-difference">
+  <h2>When the drawer is short or over</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner; the Owner approves a long shift</p>
+  <p>Small differences happen. The store sets a <strong>tolerance</strong> — ₱100 unless the owner changed it in <strong>Admin</strong> → <strong>Settings</strong> (<strong>Cash variance at shift close that requires a reason</strong>). It applies to each method separately.</p>
+  <ul>
+    <li><strong>Within the tolerance:</strong> the shift closes. A reason is optional.</li>
+    <li><strong>Beyond the tolerance:</strong> the shift does not close until you give a reason. The message names the row, for example "CASH is ₱250.00 short, beyond the ₱100.00 tolerance. Closing needs a reason — the count is never silently forced to balance." Type the reason and click <strong>Count and close</strong> again.</li>
+  </ul>
+  <p>Write what really happened, in plain words: "Gave ₱200 change twice to one customer", "GCash ₱150 from 3:10 pm not in the wallet yet". The reason is printed on the closing summary, shown to the owner on the dashboard, and kept in the audit trail with your name.</p>
+  <h3>A shift open longer than the maximum</h3>
+  <p>If the shift has been open longer than the maximum (24 hours unless changed) and a row is beyond the tolerance, an owner must approve the close.</p>
+  <ol class="steps">
+    <li>After you click <strong>Count and close</strong>, an approval panel appears.</li>
+    <li>The owner types their username in <strong>Approver</strong> and their password in <strong>Password</strong>, then clicks <strong>Approve</strong>.</li>
+    <li>You see that the owner authorised this close. Click <strong>Count and close</strong> again.</li>
+  </ol>
+  <p>If the owner is closing their own shift, no approval is asked.</p>
+</section>
+
+<section id="after-the-close">
+  <h2>The closing summary and the backup</h2>
+  <p class="who"><strong>Who:</strong> Whoever closed the shift</p>
+  <p>After the close you see <strong>Shift closed</strong>. It tells you:</p>
+  <ul>
+    <li><strong>The backup.</strong> Closing makes a backup of the day and checks that the copy can be read back: "The day is backed up and the copy was opened and checked". If a red message says the day is not backed up, your shift is still closed and nothing is lost, but tell the owner before you go home. The owner fixes it under <strong>Admin</strong> → <strong>Backups</strong> — see <a href="/guide/admin">Users, settings and backups</a>.</li>
+    <li><strong>The result:</strong> "The drawer balanced exactly.", or how much it is short or over, and whether that is within the tolerance.</li>
+    <li><strong>The reason</strong> you gave, and the table of expected, counted and variance per method.</li>
+  </ul>
+  <figure class="guide-shot"><img src="/static/guide/closing-summary.webp" alt="The Shift closed screen: a message that the day is backed up, with the backup file name; a line saying the drawer is 150.00 short, beyond the 100.00 tolerance; the recorded reason; the table of expected, counted and variance per method; a line saying whether the summary printed (here, that no receipt printer is configured and it is queued); and a Done button." width="1280" height="800" loading="lazy"><figcaption>The summary screen says whether the backup worked and whether the summary printed.</figcaption></figure>
+  <p>The <strong>SHIFT CLOSING SUMMARY</strong> prints on the receipt printer by itself: opening float, cash sales, collections, cash in and out, change given, the expected and counted amount for each method, the cash variance and the reason. Keep it with the counted cash.</p>
+  <p class="warn"><strong>Important:</strong> There is no button to print the summary again, and this screen cannot be opened again after you click <strong>Done</strong>. If it says "The summary did not print", write down or photograph the figures first.</p>
+  <p>Click <strong>Done</strong>. A closed shift cannot be changed. Anything you forgot — a refund, a cash out — goes into the next shift.</p>
+  <p class="android"><strong>On Android:</strong> the backup goes to <strong>Documents/ChachiPharmacyPOS Backups</strong> if you allowed file access when the app was first opened; otherwise it stays in the app's own folder and is deleted if the app is uninstalled. Copy the backups off the tablet regularly.</p>
+</section>
+
+<section id="hand-over">
+  <h2>Hand over to the next cashier</h2>
+  <p class="who"><strong>Who:</strong> Cashiers, Managers, Owners</p>
+  <p>There is no hand-over button. Each person has their own shift and their own count, so a hand-over is one close and one open.</p>
+  <ol class="steps">
+    <li>The outgoing cashier finishes or clears the cart and all parked carts. Parked carts belong to their shift; the next cashier cannot retrieve them.</li>
+    <li>The outgoing cashier closes their shift, counting the drawer with the incoming cashier watching.</li>
+    <li>The day's takings are removed as the store decides, leaving the change for the next shift.</li>
+    <li>The incoming cashier signs in with their own username: click the outgoing cashier's name at the bottom of the menu, then <strong>Different user</strong> if the lock screen appears.</li>
+    <li>The incoming cashier counts what is left in the drawer and opens their own shift with that as the float.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> Chachi POS lets two people have shifts open at the same time, and each shift expects its own cash. If two cashiers share one drawer with two shifts open, neither count will be right. One drawer, one open shift.</p>
+</section>
+
+<section id="manager-checks">
+  <h2>What the owner or manager checks</h2>
+  <p class="who"><strong>Who:</strong> Manager or Owner</p>
+  <ul>
+    <li><strong>The dashboard alerts</strong> (<strong>Reports</strong> in the menu). A close beyond the tolerance shows as, for example: Joy Mendoza closed … short by ₱250.00 — "Gave change twice". It stays for 7 days. Also look for a shift open too long, and for any backup warning — those cannot be dismissed.</li>
+    <li><strong>The Payments report</strong>, to see what was taken per method, and <strong>Reconciliation</strong>, to compare GCash and QR Ph with the wallet's own statement. See <a href="/guide/reports">Reports</a>.</li>
+    <li><strong>The printed closing summary</strong>, against the cash that was handed in.</li>
+    <li><strong>The audit trail</strong> (Owner: <strong>Admin</strong> → <strong>Audit</strong>). Filter <strong>What</strong> for "Shift closed with a variance beyond tolerance" or "Till cash moved in or out" to see every close and every cash in or out, with who did it and why.</li>
+  </ul>
+</section>
+
+<section id="subscription-lapsed">
+  <h2>When the subscription has ended</h2>
+  <p class="who"><strong>Who:</strong> Everyone is affected; only the Owner can renew</p>
+  <p>Chachi POS checks the store's subscription online at least once every 30 days. The dashboard warns in the last 7 days before it ends. After the end there are 7 days of grace in which everything still works.</p>
+  <p>After the grace period, <strong>no new shift can be opened</strong>. Clicking <strong>Open shift</strong> shows "The subscription ended on … and its grace period on …. Reports, export and backups still work; no new shift can be opened until it is renewed."</p>
+  <ul>
+    <li>A shift that is already open keeps working until it is closed. A sale in progress is never cut off.</li>
+    <li>Once that shift is closed, nobody can open a new one — so nobody can sell, take payments or give refunds until the subscription is renewed.</li>
+    <li>Reports, exports and backups keep working throughout.</li>
+    <li>The same happens if the computer has not been online for 30 days: connect it to the internet and the owner clicks <strong>Check now</strong> under <strong>Admin</strong> → <strong>Subscription</strong>.</li>
+  </ul>
+  <p>If the POS was never linked to the store, the message is "This POS is not linked to a store yet. The owner links it under Admin → Subscription." See <a href="/guide/getting-started">Getting started</a> and <a href="/guide/help">Troubleshooting</a>.</p>
+  <p class="agrivet"><strong>Agrivet edition:</strong> the Agrivet edition has no subscription, so this section does not apply.</p>
+</section>

@@ -1,0 +1,234 @@
+<h1>Troubleshooting</h1>
+<p class="intro">What to do when something goes wrong: a forgotten password, a locked account, a printer or scanner that will not work, a subscription warning, a power cut, or a move to a new computer.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#forgot-owner-password">I forgot the owner password</a></li>
+  <li><a href="#user-forgot-password">A user forgot their password or PIN</a></li>
+  <li><a href="#account-locked">"This account is locked"</a></li>
+  <li><a href="#printer-does-not-print">The receipt printer does not print</a></li>
+  <li><a href="#drawer-does-not-open">The cash drawer does not open</a></li>
+  <li><a href="#scanner-problems">The scanner types nothing, or the wrong thing</a></li>
+  <li><a href="#barcode-not-found">"… is not in the catalogue" when you scan</a></li>
+  <li><a href="#subscription-warnings">Subscription warnings</a></li>
+  <li><a href="#app-will-not-start">Chachi POS will not start</a></li>
+  <li><a href="#power-cut">The power went off in the middle of a sale</a></li>
+  <li><a href="#new-computer">Moving to a new computer</a></li>
+  <li><a href="#wrong-date-time">The date or time on receipts is wrong</a></li>
+  <li><a href="#get-help">How to get help</a></li>
+</ol></nav>
+
+<section id="forgot-owner-password">
+  <h2>I forgot the owner password</h2>
+  <p>Chachi POS works offline, so there is no "forgot password" email.</p>
+  <h3>If the store has a second owner account</h3>
+  <ol class="steps">
+    <li>The other owner signs in and opens <strong>Admin</strong> → <strong>Users</strong>.</li>
+    <li>They click <strong>Edit</strong> on your account, type a <strong>New password</strong> (at least 10 characters) and click <strong>Save</strong>.</li>
+  </ol>
+  <h3>If you are the only owner</h3>
+  <p>The recovery code you wrote down during setup (four groups of letters and numbers, such as <kbd>K7QM-3XPD-9WTR-HN4B</kbd>) is the only way back into the owner account. In this version there is no screen for using it yourself: the sign-in screen has no "forgot password" button. Contact us at <strong>ChachiSoftware@gmail.com</strong> (see <a href="#get-help">How to get help</a>) and have the paper with the recovery code ready. Do not type the code into the email itself.</p>
+  <p>When the code has been used, it stops working and a new code is shown once. Write the new one down straight away.</p>
+  <p class="warn"><strong>Important:</strong> if the owner password and the recovery code are both lost, nobody can get into the owner account. Wrong recovery codes also count as failed sign-ins and lock the account (see below).</p>
+  <p class="tip"><strong>Tip:</strong> a second owner account for a trusted family member means one forgotten password never locks the store out. See <a href="/guide/admin#add-a-user">Add a user</a>.</p>
+</section>
+
+<section id="user-forgot-password">
+  <h2>A user forgot their password or PIN</h2>
+  <p class="who"><strong>Who fixes it:</strong> Owner. Managers cannot change other people's passwords.</p>
+  <h3>Forgotten password</h3>
+  <ol class="steps">
+    <li>Sign in as the owner and open <strong>Admin</strong> → <strong>Users</strong>.</li>
+    <li>Click <strong>Edit</strong> on the person's row.</li>
+    <li>Type a <strong>New password</strong> of at least 10 characters and click <strong>Save</strong>. You see <em>Saved.</em></li>
+    <li>Tell the person their new password in private.</li>
+  </ol>
+  <p>A new password also removes a lock on the account straight away. More in <a href="/guide/admin#reset-a-password-or-pin">Reset a password or PIN</a>.</p>
+  <h3>Forgotten PIN</h3>
+  <p>The PIN only unlocks the screen during an open shift, and signing in with the password always works instead. On the lock screen, press <strong>Different user</strong> and sign in with the username and password. Their cart is kept and comes back when the same person signs in on the same shift. See <a href="/guide/getting-started#when-the-screen-locks">When the screen locks</a>.</p>
+  <p>To set a new PIN, the owner opens <strong>Edit</strong> on the user, types six digits in <strong>PIN</strong> and clicks <strong>Save</strong>. A PIN cannot be all one digit (111111) or a run (123456).</p>
+  <h3>"Incorrect username or password"</h3>
+  <p>This same message appears for a wrong username, a wrong password, and an account that has been deactivated. Check the spelling of the username first. The owner can see deactivated users by ticking <strong>Show deactivated</strong> in <strong>Admin</strong> → <strong>Users</strong>.</p>
+</section>
+
+<section id="account-locked">
+  <h2>"This account is locked"</h2>
+  <p>After 5 wrong tries in a row (passwords, PINs, or the owner's recovery code, all counted together) the account is locked for 15 minutes. The sign-in screen says, for example, <em>This account is locked for 12 more minutes after too many failed attempts.</em> Closing and opening the app does not remove the lock.</p>
+  <ul>
+    <li><strong>Wait</strong> for the minutes shown, then sign in carefully.</li>
+    <li><strong>Or the owner unlocks it at once</strong> by giving the person a new password (<a href="#user-forgot-password">above</a>). In <strong>Admin</strong> → <strong>Users</strong> a locked account shows <strong>locked 12 min</strong>. Setting a new PIN alone does not unlock it.</li>
+    <li><strong>If the owner is locked out</strong>, wait, or have a second owner give you a new password.</li>
+  </ul>
+  <p class="warn"><strong>Important:</strong> the count of wrong tries only goes back to zero after a successful sign-in. When the lock ends, one more wrong try locks the account again for another 15 minutes.</p>
+  <p>The number of tries and the minutes are owner settings under <strong>Admin</strong> → <strong>Settings</strong> → <strong>Security and sessions</strong> (<a href="/guide/admin#change-a-setting">Change a setting</a>).</p>
+  <p>Not the same thing: after 15 minutes without use, the screen locks by itself (<em>Screen locked</em>). That is not a locked account. Sign in again with your password; see <a href="/guide/getting-started#when-the-screen-locks">When the screen locks</a>.</p>
+</section>
+
+<section id="printer-does-not-print">
+  <h2>The receipt printer does not print</h2>
+  <p><strong>The sale is saved even if the receipt does not print.</strong> The screen says <em>The receipt did not print (…). It is queued — press Reprint when the printer is ready.</em> The words in brackets tell you why. Do not ring the sale up again.</p>
+  <h3>Check the printer</h3>
+  <ol class="steps">
+    <li>Is it switched on, with the cover closed and no error light?</li>
+    <li>Is there paper, the right way round? Thermal paper prints on one side only.</li>
+    <li>Is the cable firmly in at both ends: USB to the computer, or the network cable to the router?</li>
+  </ol>
+  <h3>Check the printer settings</h3>
+  <p>Sign in as the owner and open <strong>Admin</strong> → <strong>Settings</strong>. The printer is in the <strong>Sales and the till</strong> group (more in <a href="/guide/admin#receipt-printer">Receipt printer</a>).</p>
+  <ul>
+    <li><strong>How the receipt printer is connected: NONE, USB or LAN.</strong> NONE means no printer is set up; every receipt then says <em>No receipt printer is configured.</em></li>
+    <li><strong>USB</strong> (Windows): the Windows printer must be shared, and <strong>USB printer device or share the bridge writes to</strong> holds its share path, written <kbd>\\COMPUTER-NAME\SHARE-NAME</kbd>. If it is empty you see <em>No USB printer device is set.</em></li>
+    <li><strong>LAN</strong> (network printer): <strong>LAN printer address</strong> is the printer's IP address, for example <kbd>192.168.1.50</kbd>, and the port is <kbd>9100</kbd>. Most receipt printers print their IP address on a self-test page (see the printer's manual). The computer and the printer must be on the same network. With a network printer the POS often cannot tell that nothing printed, so there may be no error message at all: check the paper. If your router gives the printer a new address after a restart, set the new address here, or give the printer a fixed address.</li>
+    <li><strong>Receipt width: 32 columns for 58 mm paper, 48 for 80 mm.</strong> If peso amounts break onto two lines, the width is wrong.</li>
+  </ul>
+  <h3>Print a test page</h3>
+  <ol class="steps">
+    <li>After changing a setting, click <strong>Save this section</strong>.</li>
+    <li>Click <strong>Print a test page</strong>.</li>
+    <li>Look at the paper, not only the screen. <em>A test page went to the printer. Check the paper.</em> means it was sent. For a network printer that is off, the screen can still say this, so the paper is the real test.</li>
+  </ol>
+  <h3>When it works again</h3>
+  <p>Open <strong>Receipts</strong>, open the sale, and click <strong>Reprint</strong>. The copy is marked REPRINT. See <a href="/guide/corrections">Returns, voids and reprints</a>.</p>
+  <p class="android"><strong>On Android:</strong> use a network (LAN or Wi-Fi) receipt printer and set the connection to LAN. USB and Bluetooth printers do not work from the tablet.</p>
+</section>
+
+<section id="drawer-does-not-open">
+  <h2>The cash drawer does not open</h2>
+  <p>The drawer is plugged into the <strong>receipt printer</strong> (a small phone-type cable), not into the computer. The printer tells it to open.</p>
+  <ul>
+    <li>It opens only when cash moves: a sale paid fully or partly in cash, a cash payment on a customer's account, a cash refund, a voided cash sale, or a cash in or cash out. A GCash, QR Ph or credit sale does not open it.</li>
+    <li>If the printer is not printing, the drawer will not open either. Fix the printer first (<a href="#printer-does-not-print">above</a>).</li>
+    <li>Check the drawer cable is pushed into the drawer port on the printer, and that the drawer is not locked with its key.</li>
+  </ul>
+  <p>There is no button in the app to open the drawer on its own. Use the drawer's key if you must open it. The sale is saved whether or not the drawer opens.</p>
+</section>
+
+<section id="scanner-problems">
+  <h2>The scanner types nothing, or the wrong thing</h2>
+  <p>A barcode scanner works like a keyboard: it types the numbers and presses Enter. Any USB scanner works, and on Android a USB or Bluetooth scanner in keyboard mode.</p>
+  <ol class="steps">
+    <li>Open Notepad (or any place you can type) and scan a product.</li>
+    <li><strong>Nothing appears:</strong> check the cable, or pair the Bluetooth scanner again. The scanner should beep. Check it is set to keyboard (HID) mode in its manual.</li>
+    <li><strong>The number appears but the cursor does not move to a new line:</strong> the scanner is not sending Enter. Scan the "add Enter/CR suffix" setup barcode in its manual. Without Enter, the POS treats the scan as typing.</li>
+    <li><strong>Wrong letters or symbols appear:</strong> set the scanner's keyboard language to US using its manual, and make sure Caps Lock is off.</li>
+  </ol>
+  <p>Scans add items only on the <strong>POS</strong> screen. There a scan always goes into <strong>Scan or search</strong>, even if you clicked somewhere else, except when a box is open (for example quantity or discount). Then the code goes into that box. Close the box first.</p>
+  <p>If the code appears in the search box with a list of matches instead of adding the item, the scanner is sending the digits slowly. Pick the product from the list, and set the scanner to its fastest speed if it has one.</p>
+</section>
+
+<section id="barcode-not-found">
+  <h2>"… is not in the catalogue" when you scan</h2>
+  <p>The POS shows <em>4800123456789 is not in the catalogue.</em> with <strong>Attach 4800123456789 to a product</strong> and <strong>Dismiss</strong>. The product may be in the catalogue without this barcode, or not in the catalogue at all.</p>
+  <ol class="steps">
+    <li>Click <strong>Dismiss</strong>, type the product's name in <strong>Scan or search</strong> and add it to the sale as usual.</li>
+    <li>After the customer has gone, an Owner, Manager or Inventory user opens the product in <strong>Products</strong> and adds the barcode, so the next scan works. See <a href="/guide/products">Products and prices</a>.</li>
+  </ol>
+  <p>Other messages you may see:</p>
+  <ul>
+    <li><em>This is a weight-embedded barcode — the kind a scale prints…</em> These labels cannot be read. Search for the product by name.</li>
+    <li><em>A barcode is at least 4 characters.</em> or <em>A barcode is letters, digits, dot, dash or underscore.</em> The scan was misread. Scan again, or check the scanner's settings (<a href="#scanner-problems">above</a>).</li>
+  </ul>
+</section>
+
+<section id="subscription-warnings">
+  <h2>Subscription warnings</h2>
+  <p>The subscription is checked online. The POS does this by itself once a day whenever the internet is on, and it must reach the licence server <strong>at least once every 30 days</strong>. Selling does not need the internet otherwise. The state shows on the dashboard and under <strong>Admin</strong> → <strong>Subscription</strong>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Shown as</th><th>What it means</th><th>What still works</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Active</strong></td><td><em>Subscribed until …</em></td><td>Everything</td></tr>
+      <tr><td><strong>Ending soon</strong></td><td>The last 7 days before the end date.</td><td>Everything</td></tr>
+      <tr><td><strong>Grace period</strong></td><td>Up to 7 days after the end date.</td><td>Everything</td></tr>
+      <tr><td><strong>Lapsed</strong></td><td>The grace period is over.</td><td>The shift already open, until it is closed; reports, export and backups. <strong>No new shift can be opened</strong>, so no new sales.</td></tr>
+      <tr><td><strong>Not linked</strong></td><td>This POS has never been linked to your store.</td><td>No shift can be opened.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The message says which of two reasons applies:</p>
+  <ul>
+    <li><em>…the subscription is paid until then</em> or <em>(not paid)</em>: pay your subscription (by GCash or bank transfer) and tell Chachi's at <strong>ChachiSoftware@gmail.com</strong>. When the payment has been recorded, press <strong>Check now</strong>.</li>
+    <li><em>…this POS has not reached the licence server since …; connect it to the internet to renew</em> or <em>(not renewed online)</em>: connect the computer or tablet to the internet, then the owner opens <strong>Admin</strong> → <strong>Subscription</strong> and presses <strong>Check now</strong>. It should say <em>Checked with the licence server.</em></li>
+  </ul>
+  <p>If you see <em>The licence server could not be reached. Check the internet connection and try again.</em>, open any website to check the internet, then try again.</p>
+  <h3>Not linked</h3>
+  <p>The owner presses <strong>Link this POS</strong> under <strong>Admin</strong> → <strong>Subscription</strong> and approves the code at <strong>pos.chachisoftware.store/link</strong>, signed in with the Google account that owns the store. Step by step: <a href="/guide/getting-started#link-your-subscription">Link your subscription</a>. If the code runs out first (<em>The code expired before it was approved. Start again.</em>), press <strong>Link this POS</strong> again. <em>The licence on this POS is not valid for it. Link it to the store again.</em> is fixed the same way, with <strong>Link again</strong>.</p>
+  <p>Only the owner can link or check the subscription.</p>
+</section>
+
+<section id="app-will-not-start">
+  <h2>Chachi POS will not start</h2>
+  <p>On Windows, if Chachi POS cannot start it may close without showing a message. Try these in order:</p>
+  <ol class="steps">
+    <li>Wait a minute after double-clicking <strong>Chachi Pharmacy POS</strong>. The first start after an update takes longer.</li>
+    <li>Restart the computer and try again.</li>
+    <li><strong>Plug in the backup drive.</strong> Before an update changes your data, it first makes a backup in your backup folder. If that folder is on a USB drive or another drive that is not connected, or the disk is full, the update stops and the app does not open. Your data is not touched. Connect the drive or free some disk space, then start again.</li>
+    <li>If you installed an older version over a newer one, install the newer version again. The older one refuses to open data written by a newer one, to protect it.</li>
+    <li>Reinstalling Chachi POS keeps your data. It is not deleted when you uninstall.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> never delete the <strong>ChachiPharmacyPOS</strong> folder inside the computer's AppData\Local folder. It holds the store's database.</p>
+  <p class="android"><strong>On Android:</strong> the app shows <em>The store could not start</em> with the reason. Close the app and open it again. If it happens again, email support with the reason shown.</p>
+  <p>If none of this helps, email support with the version number and what happened (<a href="#get-help">How to get help</a>).</p>
+</section>
+
+<section id="power-cut">
+  <h2>The power went off in the middle of a sale</h2>
+  <ul>
+    <li><strong>Completed sales are kept.</strong> A sale is saved whole or not at all, never half.</li>
+    <li><strong>The cart you were ringing up is kept.</strong> It is saved as you add items.</li>
+    <li><strong>Your shift is still open</strong>, with its cash figures.</li>
+  </ul>
+  <ol class="steps">
+    <li>When the power is back, open Chachi POS and sign in with your <strong>password</strong> (the same user as before).</li>
+    <li>Open <strong>Receipts</strong> and look for the last sale.</li>
+    <li><strong>If it is there</strong>, it was completed. Click <strong>Reprint</strong> if the customer needs the receipt.</li>
+    <li><strong>If it is not there</strong>, it was not completed. Click <strong>POS</strong>: the cart comes back. Take payment and finish the sale. If the customer had already paid by GCash or QR Ph, do not charge them again; record the payment with the reference from their phone.</li>
+  </ol>
+  <p class="tip"><strong>Tip:</strong> a small UPS (battery backup) for the computer and printer gives you time to finish the sale and shut down properly.</p>
+</section>
+
+<section id="new-computer">
+  <h2>Moving to a new computer</h2>
+  <p class="who"><strong>Who:</strong> Owner</p>
+  <p>The <strong>Backups</strong> tab can only restore backups that the same computer made, so it is for going back in time on one computer (<a href="/guide/admin#restore-a-backup">Restore a backup</a>). To move the store to another computer, use <strong>Export / import</strong> (<a href="/guide/admin#export-data">Export</a> and <a href="/guide/admin#import-data">Import</a>). If you are unsure about any step, contact us at <strong>ChachiSoftware@gmail.com</strong> before you move.</p>
+  <h3>On the old computer</h3>
+  <ol class="steps">
+    <li>Close every open shift.</li>
+    <li>Open <strong>Admin</strong> → <strong>Export / import</strong> and click <strong>Export everything</strong>. You see <em>Exported as … Keep it somewhere other than this machine.</em></li>
+    <li>Copy that .zip file to a USB stick. Copy the backup folder too, as a spare.</li>
+  </ol>
+  <h3>On the new computer</h3>
+  <ol class="steps">
+    <li>Install Chachi POS and run the setup wizard (<a href="/guide/getting-started">Getting started</a>). <strong>Give the owner a different username from the one on the old computer</strong>, for example add a 2. Two users cannot share a username, and the import stops if they do.</li>
+    <li>Sign in as the new owner and open <strong>Admin</strong> → <strong>Export / import</strong>.</li>
+    <li>Under <strong>Import</strong>, choose the .zip file in <strong>Archive</strong>. Leave <strong>If a row is already here</strong> on <strong>Keep what is here, skip the archive's</strong>.</li>
+    <li>Read the summary. When it says <strong>Ready to import</strong>, click <strong>Import this archive</strong>. A backup is taken first, and the import either completes fully or changes nothing.</li>
+    <li>Imported users arrive <strong>without passwords</strong>. In <strong>Admin</strong> → <strong>Users</strong>, set a new password (and PIN) for each person, including your old owner account if you want to keep using it.</li>
+    <li>Check <strong>Admin</strong> → <strong>Settings</strong>: the new computer keeps its own settings, so set the printer, receipt width and your other figures as they were.</li>
+    <li>Link the new computer: <strong>Admin</strong> → <strong>Subscription</strong> → <strong>Link this POS</strong>. If the old computer will not be used again, tell Chachi's so its link can be removed.</li>
+    <li>Make a test sale and print a receipt before you open for the day.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> if the old computer is broken and you have no export, keep your latest backup files (named <kbd>pharmacy_backup_…zip</kbd>) safe and email support. Backups copied from another computer show as <strong>Unrecognised files</strong> on the Backups tab and cannot be restored from there.</p>
+</section>
+
+<section id="wrong-date-time">
+  <h2>The date or time on receipts is wrong</h2>
+  <p>Chachi POS takes the date and time from the computer's (or tablet's) clock and always shows Philippine time.</p>
+  <ol class="steps">
+    <li>On Windows, open <strong>Settings</strong> → <strong>Time &amp; language</strong> → <strong>Date &amp; time</strong>. Turn on <strong>Set time automatically</strong> and choose a <strong>(UTC+08:00)</strong> time zone.</li>
+    <li>On Android, open <strong>Settings</strong> → <strong>Date &amp; time</strong> and turn on the automatic date and time.</li>
+    <li>Close Chachi POS and open it again.</li>
+  </ol>
+  <p>If the clock is behind the last sale, the dashboard shows an alert that begins <em>This machine's clock reads …</em>. Selling continues, but new sales and other records get the wrong date until the clock is fixed. Records already saved keep the date they were saved with.</p>
+  <p class="warn"><strong>Important:</strong> if the clock was ever set to a future date, even for a moment, the subscription may show as ended, and correcting the clock does not change that. Email support.</p>
+</section>
+
+<section id="get-help">
+  <h2>How to get help</h2>
+  <p>Email <strong>ChachiSoftware@gmail.com</strong>. To get an answer quickly, include:</p>
+  <ul>
+    <li>Your store name, your name and a phone number.</li>
+    <li>Windows computer or Android tablet, and the <strong>version number</strong>. It is at the bottom of the sign-in screen (<em>Version …</em>) and under <strong>Admin</strong> → <strong>Health</strong> → <strong>Application version</strong>.</li>
+    <li>What you were doing, step by step, and when it happened.</li>
+    <li>The exact message, word for word, including the code in brackets such as (SEC-3) or (PO-205). A photo of the screen is best.</li>
+    <li>The receipt, order or delivery number if it is about one.</li>
+  </ul>
+  <p class="warn"><strong>Important:</strong> never send a password, a PIN or the recovery code. Do not send a backup or export file unless you are asked to: it holds every price, customer and peso of your store.</p>
+</section>

@@ -1,0 +1,130 @@
+<h1>Stock, expiry and counts</h1>
+<p class="intro">See what is on the shelf and what needs reordering, correct the stock figure, count the shelves, keep track of batches and expiry dates, and find who bought a recalled batch.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#see-stock">See stock on hand and low stock</a></li>
+  <li><a href="#adjust-stock">Adjust stock</a></li>
+  <li><a href="#count-stock">Count the stock</a></li>
+  <li><a href="#batches-and-expiry">Batches and expiry</a></li>
+  <li><a href="#write-off">Write off expired or damaged stock</a></li>
+  <li><a href="#recall-a-batch">Recall a batch</a></li>
+  <li><a href="#how-stock-is-kept">How the stock figure is kept</a></li>
+</ol></nav>
+
+<section id="see-stock">
+  <h2>See stock on hand and low stock</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager, Inventory or Cashier</p>
+  <p>Stock is always shown in the product's base unit, such as tablets (see <a href="/guide/units">Units and packs</a>).</p>
+  <ol class="steps">
+    <li>Click <strong>Products</strong>. The <strong>On hand</strong> column shows each product's stock. A product at or below its minimum carries a <strong>low</strong> tag.</li>
+    <li>Click <strong>Low stock</strong> to list only those products, with their <strong>Minimum</strong> beside the stock on hand. If nothing needs reordering you see “Nothing is at or below its reorder point.”</li>
+    <li>Click <strong>All products</strong> to go back to the full list.</li>
+  </ol>
+  <p>A product shows as low stock when its stock on hand is at or below the <strong>Minimum stock</strong> on its <strong>Stock</strong> tab. Set it there and click <strong>Save</strong>; zero turns the warning off. The dashboard also lists low stock and expiry warnings (see <a href="/guide/reports#the-dashboard">The dashboard</a>). The <strong>Valuation</strong> button on Products opens the stock valuation report.</p>
+  <figure class="guide-shot"><img src="/static/guide/stock-low-stock.webp" alt="The Low stock screen: a list of drugstore products such as Cetirizine 10 mg tablet, Oral rehydration salts sachet and Multivitamins syrup, each with its stock on hand and its minimum, and an All products button at the top." width="1280" height="800" loading="lazy"><figcaption>Low stock lists each product's stock beside the minimum you set for it: your reorder list.</figcaption></figure>
+  <p>To reorder, raise a purchase order under <strong>Buying</strong> (see <a href="/guide/buying#create-a-purchase-order">Create a purchase order</a>).</p>
+</section>
+
+<section id="adjust-stock">
+  <h2>Adjust stock</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Use an adjustment when the stock figure for one product is wrong: a thermometer was dropped, a box was used in the store, or a delivery was never recorded. You type what is really on the shelf, and the app records the difference with a reason. This works for products that are not tracked by batch; for batch-tracked products see the note below.</p>
+  <ol class="steps">
+    <li>On <strong>Products</strong>, click <strong>Adjust</strong> on the product's row. The <strong>Adjust stock</strong> screen shows the product, <strong>On hand now</strong> and the base unit.</li>
+    <li>Count the product on the shelf and type the total in <strong>Counted quantity</strong>. Type what is there, not the difference.</li>
+    <li>Read the line under it, for example “−1 PC — there is less on the shelf than the system thinks.” If it says “The count matches. Nothing to post.”, there is nothing to do.</li>
+    <li>Choose a <strong>Reason</strong>. You can only pick from the list.</li>
+    <li>Add <strong>Notes</strong> if the reason does not say enough.</li>
+    <li>Click <strong>Post adjustment</strong>. You see “Adjustment posted” and return to Products.</li>
+  </ol>
+  <p>The reasons that come with the app are: Damaged in storage, Spoilage, Physical count correction, Received but not recorded, Internal use, Supplier shortage on delivery, and Data entry correction. The owner can change the list in <strong>Admin → Settings</strong>, under <strong>Reasons an inventory adjustment may be filed under</strong> (see <a href="/guide/admin#other-settings">All the other settings</a>).</p>
+  <figure class="guide-shot"><img src="/static/guide/stock-adjust.webp" alt="The Adjust stock screen for Digital thermometer. It shows 9 PC on hand now. The Counted quantity box holds 8, a line below says minus 1 PC, there is less on the shelf than the system thinks, and the Reason list shows Damaged in storage. At the bottom are the Post adjustment and Cancel buttons." width="1280" height="800" loading="lazy"><figcaption>You type what you counted; the app works out the difference and shows it before you post.</figcaption></figure>
+  <h3>If an owner has to approve</h3>
+  <p>An adjustment worth more than ₱5,000 at average cost needs the owner (the owner can change this limit in <strong>Admin → Settings</strong>, under <strong>Adjustment value above which owner authorisation is required</strong>). When you click <strong>Post adjustment</strong>, a panel opens instead. The owner types their username in <strong>Approver</strong> and their <strong>Password</strong>, and clicks <strong>Approve</strong>. Then click <strong>Post adjustment</strong> again. Both names are recorded. An owner who posts the adjustment themselves does not need a second person.</p>
+  <p class="warn"><strong>Important:</strong> the Adjust screen does not work for a product tracked by batch. It refuses with a message ending “is batch-tracked, so a adjustment movement must name its batch.” For those products, correct the stock with a <a href="#count-stock">stock count</a>, counting only that product's batches, or write off an expired batch from its <a href="#write-off">Batches</a> screen.</p>
+</section>
+
+<section id="count-stock">
+  <h2>Count the stock</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory counts and posts. A Manager or Owner who did not open the count approves it.</p>
+  <p>A stock count checks a whole category, or the whole store, against the shelves. When you open it, the app freezes what it expects on every shelf. The store can keep selling while you count: the difference is measured against the frozen figure, so sales made during the count stay sold.</p>
+  <h3>Start the count</h3>
+  <ol class="steps">
+    <li>On <strong>Products</strong>, click <strong>Stock count</strong>. The <strong>Stock counts</strong> screen lists earlier counts.</li>
+    <li>In <strong>What to count</strong>, choose <strong>Every product</strong> or one category. One category at a time is the usual count.</li>
+    <li>Add a <strong>Note</strong> if you like, and click <strong>Open a count</strong>. You see how many products were frozen, and the count sheet opens.</li>
+  </ol>
+  <h3>Count</h3>
+  <ol class="steps">
+    <li>Find a product with <strong>Find a product</strong>, or walk the sheet from the top.</li>
+    <li>Type what you count in the <strong>Counted</strong> box, in the base unit. It is saved when you leave the box, so you can stop and come back later.</li>
+    <li>A product tracked by batch has one line per batch, labelled “Batch MD24-0815 · expires …”, under a heading that shows the product's total. Count each batch's boxes separately.</li>
+    <li>Type <strong>0</strong> for a shelf that is empty. Leave the box blank for a shelf you did not reach.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> a blank is not a zero. A blank line writes nothing. A 0 writes off everything the system expected on that line.</p>
+  <figure class="guide-shot"><img src="/static/guide/stock-count-sheet.webp" alt="A stock count sheet for the Pain and Fever category. Columns are Product, Expected at freeze, Counted, Variance and Value. Paracetamol 500 mg tablet has a heading row with its total and two batch lines below it, one counted and one still showing not counted. At the bottom a line says how many are counted and how many are not." width="1280" height="800" loading="lazy"><figcaption>Each batch has its own line. Lines nobody has counted show “not counted” and write nothing.</figcaption></figure>
+  <h3>Review the differences</h3>
+  <p>At the bottom the sheet shows how many lines are counted, how many are not (“those write nothing”) and how many differ from the frozen figure. In <strong>Show</strong>, choose <strong>Not counted yet</strong> to find the lines you missed, or <strong>Different from expected</strong> to recheck the differences. The <strong>Variance</strong> column shows each difference.</p>
+  <h3>Approve and post</h3>
+  <ol class="steps">
+    <li>A Manager or Owner who did not open the count signs in, opens it from the <strong>Stock counts</strong> list and clicks <strong>Approve this count</strong>.</li>
+    <li>Click <strong>Post the count</strong>. The app writes one movement for each line that differs, and nothing for lines that matched or were not counted.</li>
+    <li>The result says how many products were adjusted and what the difference was worth. Click <strong>Back to counts</strong>.</li>
+  </ol>
+  <p>If the store has only one active user, that person's count is approved without a second person, and the record says so. A count opened more than 7 days ago needs the owner to approve posting it, in a panel that opens when you click <strong>Post the count</strong>.</p>
+  <p class="tip"><strong>Tip:</strong> plan who counts and who approves. The person who opened the count cannot approve it while another user is active. If the owner opens the count and the only other accounts are cashiers, nobody can approve it, so have a manager or inventory clerk open it instead.</p>
+  <p>To stop a count without posting it, click <strong>Abandon</strong>, say why, and click <strong>Abandon count</strong>. A posted count cannot be changed; correct it with an adjustment, or with another count for a batch-tracked product.</p>
+</section>
+
+<section id="batches-and-expiry">
+  <h2>Batches and expiry</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager, Inventory or Cashier</p>
+  <p>A product tracked by batch keeps its stock as batches: each with the supplier's batch number, the supplier and the expiry date printed on the box. Batches are created when that stock arrives, with its batch number, expiry date and supplier: from the opening workbook, or on a delivery (see <a href="/guide/buying#batch-tracked-products">Batch-tracked products on a delivery</a>). You cannot type a batch in on the Batches screen or on a count sheet.</p>
+  <ol class="steps">
+    <li>On <strong>Products</strong>, click <strong>Batches</strong> on the product's row. The button is only on products tracked by batch.</li>
+    <li>The screen shows <strong>On hand</strong> and <strong>In batches</strong> (always the same total), then one row per batch: <strong>Batch</strong>, <strong>Supplier</strong>, <strong>Expires</strong> (with “in 12 days” or “5 days ago”), <strong>Status</strong> and <strong>Held</strong>.</li>
+    <li>To see batches that are sold out, tick <strong>Include batches that are used up — a recall still names them</strong>.</li>
+  </ol>
+  <p>The status is <strong>Good</strong>, <strong>Near expiry</strong> or <strong>Expired</strong>. A batch is near expiry within 90 days of its date; the owner can change the number of days in <strong>Admin → Settings</strong>, under <strong>Days before expiry at which a batch reads NEAR_EXPIRY</strong>. A batch can still be sold on the date printed on it and is expired the day after. The status changes by itself at midnight. The dashboard's expiry warnings have a <strong>See the batches</strong> or <strong>Write it off</strong> button that opens this screen.</p>
+  <figure class="guide-shot"><img src="/static/guide/stock-batches.webp" alt="The Batches screen for Hydrogen peroxide 3% 120 mL. It shows On hand and In batches with the same total. Two batch rows: LP-4871, expired 5 days ago, status Expired, holding 3 BTL, with Recall and Write off buttons; and LP-5460, good, holding 15 BTL, with a Recall button." width="1280" height="800" loading="lazy"><figcaption>An expired batch is highlighted and is the only kind with a <strong>Write off</strong> button.</figcaption></figure>
+  <h3>First to expire is sold first</h3>
+  <p>The cashier never picks a batch. Each sale takes stock from the batch that expires first, and moves on to the next batch if one is not enough. Expired batches are never sold, and there is no way to override that.</p>
+  <p>If the only stock left is expired, the sale is refused when it is completed, with a message such as “Hydrogen peroxide 3% 120 mL: 1 BTL short. 3 BTL is on the shelf but expired (LP-4871 on …) and may not be sold.” Take the expired boxes off the shelf and write them off.</p>
+</section>
+
+<section id="write-off">
+  <h2>Write off expired or damaged stock</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <h3>Expired stock</h3>
+  <ol class="steps">
+    <li>Open the product's <strong>Batches</strong> screen (from Products, or from the dashboard's <strong>Write it off</strong> button).</li>
+    <li>On the expired batch, click <strong>Write off</strong>.</li>
+    <li>The box “Write off batch LP-4871” says how much will go. Add a <strong>Note (optional)</strong> if you like.</li>
+    <li>Click <strong>Write it off</strong>. You see, for example, “LP-4871 written off — 3 BTL gone from stock”.</li>
+  </ol>
+  <p>The stock is recorded as expired, not deleted, so the Movement analysis report shows what left the shelf through expiry (see <a href="/guide/reports#stock-value-and-movements">Stock value and movements</a>). The <strong>Write off</strong> button appears only on expired batches that still hold stock. A cashier sees the batches but not the button.</p>
+  <h3>Damaged stock</h3>
+  <p>For a product not tracked by batch, post an <a href="#adjust-stock">adjustment</a> with the reason <strong>Damaged in storage</strong>. For a batch-tracked product, count the damaged batch at what is left in a <a href="#count-stock">stock count</a>. Damaged goods a customer brings back are handled as a return (see <a href="/guide/corrections#return-goods">Return goods</a>).</p>
+</section>
+
+<section id="recall-a-batch">
+  <h2>Recall a batch</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager, Inventory or Cashier. Saving the list as a file: Owner or Manager.</p>
+  <p>When a manufacturer or the FDA recalls a batch, the recall screen lists every sale that took stock from it, with the customer's name and phone number.</p>
+  <ol class="steps">
+    <li>On <strong>Products</strong>, click <strong>Batches</strong> on the product. If the batch is sold out, tick <strong>Include batches that are used up — a recall still names them</strong>.</li>
+    <li>Click <strong>Recall</strong> on the batch named in the notice.</li>
+    <li>The screen <strong>Recall — batch …</strong> shows the product, supplier, expiry, and how much is <strong>Still in the shop</strong>.</li>
+    <li>Read the three figures: <strong>Still out there</strong> (the quantity with customers), <strong>People to ring</strong> (customers with a name) and <strong>Cannot be reached</strong> (walk-in sales).</li>
+    <li>Work down the list: <strong>Customer</strong>, <strong>Contact</strong>, <strong>Receipt</strong>, <strong>When</strong>, <strong>Took</strong> and <strong>Still out</strong>. Walk-in sales say “no way to reach them”. Voided sales and part-returned lines stay on the list, marked, because the goods may still be with the customer.</li>
+    <li>Click <strong>Export CSV</strong> to save the list as a file you can print or work through by phone.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/stock-recall.webp" alt="The Recall screen for batch MD24-0815 of Paracetamol 500 mg tablet. At the top are the product, supplier, expiry and the quantity still in the shop, then three large figures: still out there, people to ring and cannot be reached. Below is a list of sales with customer, contact number, receipt number, date and time, quantity taken and quantity still out, with walk-in rows saying no way to reach them." width="1280" height="800" loading="lazy"><figcaption>The walk-in count tells you how many buyers you cannot phone.</figcaption></figure>
+  <p class="warn"><strong>Important:</strong> the recall screen does not stop the counter selling the batch. Pull the boxes off the shelf, then take them out of stock by counting that batch as 0 in a <a href="#count-stock">stock count</a>.</p>
+</section>
+
+<section id="how-stock-is-kept">
+  <h2>How the stock figure is kept</h2>
+  <p>Nobody types the stock figure. Every change is recorded as a movement with its type and reason: opening stock, goods received, sold, sale voided, customer return, adjustment, expired, stock count difference. Stock on hand is the total of those movements, and a batch's quantity is the same total for that batch. A movement is never edited or deleted; a mistake is corrected by a new movement beside it, so the record shows what really happened, mistakes included. You can read them in the Movement analysis report (see <a href="/guide/reports#stock-value-and-movements">Stock value and movements</a>).</p>
+  <p class="agrivet"><strong>Agrivet edition:</strong> the product screen does not offer batch tracking, so products are normally not tracked by batch. The Adjust screen then works for every product, and the Batches button does not appear.</p>
+</section>

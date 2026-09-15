@@ -1,0 +1,224 @@
+<h1>Getting started</h1>
+<p class="intro">Install Chachi POS on a Windows PC or an Android tablet, set up your store with the setup wizard, link your subscription and sign in. At the end you will find a map of the menu and what each role can do.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#what-you-need">What you need</a></li>
+  <li><a href="#install-on-windows">Install on a Windows PC</a></li>
+  <li><a href="#install-on-android">Install on an Android tablet or phone</a></li>
+  <li><a href="#run-the-setup-wizard">Run the setup wizard</a></li>
+  <li><a href="#keep-the-recovery-code-safe">Keep the recovery code safe</a></li>
+  <li><a href="#link-your-subscription">Link your subscription and start the free trial</a></li>
+  <li><a href="#sign-in">Sign in</a></li>
+  <li><a href="#when-the-screen-locks">When the screen locks, and your PIN</a></li>
+  <li><a href="#lock-or-change-user">Lock the screen, sign out or change user</a></li>
+  <li><a href="#find-your-way-around">Find your way around</a></li>
+  <li><a href="#roles">Roles: who can do what</a></li>
+</ol></nav>
+
+<section id="what-you-need">
+  <h2>What you need</h2>
+  <p>Chachi POS runs on one computer or tablet in the store, and keeps everything on it. You do not need the internet to sell, print or back up.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Item</th><th>What works</th></tr></thead>
+    <tbody>
+      <tr><td>Computer</td><td>A Windows 10 or 11 PC (64-bit). An ordinary 4 GB computer with a 1366 × 768 screen is enough.</td></tr>
+      <tr><td>Or a tablet or phone</td><td>Android 8 or newer (Pharmacy edition).</td></tr>
+      <tr><td>Receipt printer</td><td>An ESC/POS thermal printer, 58 mm or 80 mm paper, by USB or network. On Android, a network (Wi-Fi or LAN) printer only.</td></tr>
+      <tr><td>Cash drawer</td><td>One that plugs into the receipt printer. It opens on cash sales.</td></tr>
+      <tr><td>Barcode scanner</td><td>A USB scanner (on Android, USB or Bluetooth) that types like a keyboard and sends <kbd>Enter</kbd> after each scan.</td></tr>
+      <tr><td>USB stick</td><td>For copying backups off the computer once a week.</td></tr>
+      <tr><td>Google account</td><td>For the owner only, to link the subscription.</td></tr>
+      <tr><td>Internet</td><td>To link the subscription, then at least once every 30 days so it can be checked.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="agrivet"><strong>Agrivet edition:</strong> Windows PC only. There is no Android app for it.</p>
+</section>
+
+<section id="install-on-windows">
+  <h2>Install on a Windows PC</h2>
+  <p class="who"><strong>Who:</strong> usually Chachi's, on installation day</p>
+  <p>Chachi POS comes as one installer file, <strong>ChachiPharmacyPOS-Setup-</strong> plus the version number. It needs no internet and no administrator password.</p>
+  <ol class="steps">
+    <li>Copy the installer from the USB stick to the PC and double-click it.</li>
+    <li>Keep the suggested install folder, or choose another, and let it install.</li>
+    <li>When it finishes, Chachi POS starts and opens the setup wizard (<a href="#run-the-setup-wizard">below</a>).</li>
+  </ol>
+  <p>A <strong>Chachi Pharmacy POS</strong> shortcut is added to the desktop and the Start menu. The store's data is kept in <strong>%LOCALAPPDATA%\ChachiPharmacyPOS</strong>.</p>
+  <p class="warn"><strong>Important:</strong> if Windows asks for an administrator password while installing, stop and call Chachi's. If Windows warns that the file is unrecognised, continue only if it came to you directly from Chachi's.</p>
+  <p><strong>Updates</strong> never install themselves. A new version comes as a new installer: close every shift, quit the app, and run it over the old one in the same folder. It backs up your data before changing anything. <strong>Uninstalling</strong> removes the program only; the database and backup folder stay, and reinstalling finds them.</p>
+</section>
+
+<section id="install-on-android">
+  <h2>Install on an Android tablet or phone</h2>
+  <p class="who"><strong>Who:</strong> Chachi's installs the app for you</p>
+  <p>The Android app is <strong>not on Google Play</strong>; Chachi's installs it. It is the same program as on Windows, with the same screens and rules.</p>
+  <ol class="steps">
+    <li>Open <strong>Chachi Pharmacy POS</strong>. The first time, it asks <strong>Where should backups go?</strong></li>
+    <li>Tap <strong>Allow</strong>. On the next screen turn on <strong>Allow access to manage all files</strong>, then come back.</li>
+    <li>The setup wizard opens. It is the same as on Windows (<a href="#run-the-setup-wizard">below</a>).</li>
+  </ol>
+  <p>Backups then go to <strong>Documents/ChachiPharmacyPOS Backups</strong>, which stays if the app is removed and can be copied to a computer by USB cable.</p>
+  <p class="warn"><strong>Important:</strong> if you tap <strong>Not now</strong>, backups stay inside the app and are <strong>deleted if it is uninstalled</strong>. The whole store lives on the tablet, so losing it without a backup copied off loses the store.</p>
+  <p class="android"><strong>On Android:</strong> finish the setup wizard on the day the app is installed, before installing other apps. Use a network receipt printer. Downloaded files, such as the Excel template or an export, go to <strong>Downloads</strong>.</p>
+</section>
+
+<section id="run-the-setup-wizard">
+  <h2>Run the setup wizard</h2>
+  <p class="who"><strong>Who:</strong> the store owner, usually with Chachi's</p>
+  <p>The wizard runs once, the first time Chachi POS starts. Nothing is saved until you press <strong>Finish setup</strong>; if the app is closed halfway, it starts again at step 1. Use <strong>Next</strong> and <strong>Back</strong> to move between steps.</p>
+  <ol class="steps">
+    <li><strong>1 · Your store.</strong> Type the <strong>Store name</strong>, <strong>Address</strong>, <strong>Contact number</strong> and, if you have one, the <strong>TIN</strong>. They print at the top of every receipt.</li>
+    <li><strong>2 · Tax.</strong> Choose <strong>Not registered</strong> (prices are final), <strong>Non-VAT (percentage tax)</strong> (prices are final, no tax shown on the receipt) or <strong>VAT-registered</strong> (prices include 12% VAT, and receipts show a VAT summary). Ask your accountant if unsure. Only the owner can change it later.</li>
+    <li><strong>3 · Owner account.</strong> Type the owner's <strong>Full name</strong> and a <strong>Username</strong> (3 to 32 characters). Choose a <strong>Password</strong> of at least 10 characters and repeat it in <strong>Confirm password</strong>. The <strong>Counter PIN</strong> (6 digits) is optional.</li>
+    <li><strong>4 · Recovery code.</strong> Read the note and tick <strong>I understand the code is shown once and I am ready to write it down.</strong> Have paper and a pen ready.</li>
+    <li><strong>5 · Backup folder.</strong> Keep the suggested folder (on Windows, <strong>Documents\ChachiPharmacyPOS Backups</strong>) or type the full path of another, ideally on a second drive. Press <strong>Finish setup</strong>.</li>
+    <li><strong>Setup complete</strong> shows your <strong>recovery code</strong>, such as NQ85-YP3L-U8H2-CFU6. Write it down now; it is never shown again.</li>
+    <li>Press <strong>I have written it down — next</strong> to load your products now, or <strong>Skip — go to the application</strong>.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/getting-started-wizard-owner.webp" alt="The setup wizard on step 3, Owner account. On the left, the list of steps with Store and Tax ticked. On the right, fields for Full name, Username, Counter PIN, Password and Confirm password, with Back and Next buttons." width="1280" height="800" loading="lazy"><figcaption>Step 3. The PIN is optional; the password needs at least 10 characters.</figcaption></figure>
+  <h3>Step 6 · Your data (optional)</h3>
+  <p>Step 6 loads the products, opening stock and customer balances you already have from one Excel workbook: <strong>Download the Excel template</strong>, fill it in, choose it, press <strong>Check</strong>, then <strong>Load this data</strong>, and finally <strong>Go to the application</strong>. You can also do it later in <strong>Admin → Export / import</strong>. Details are in <a href="/guide/products">Products and prices</a>.</p>
+  <h3>If a step is refused</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Message</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>The two passwords do not match.</td><td>Type the same password in both boxes.</td></tr>
+      <tr><td>The PIN is exactly 6 digits, or leave it empty.</td><td>Use exactly 6 digits, not all the same (111111) and not a run (123456, 654321).</td></tr>
+      <tr><td>The backup folder must be outside the application data folder…</td><td>Choose a folder in Documents or on another drive.</td></tr>
+      <tr><td>The backup folder must be a full path.</td><td>Type the whole path, such as D:\Store Backups.</td></tr>
+      <tr><td>That folder is not writable…</td><td>The app could not save a test file there. Choose another folder.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="keep-the-recovery-code-safe">
+  <h2>Keep the recovery code safe</h2>
+  <p class="who"><strong>Who:</strong> the store owner</p>
+  <p>Chachi POS works offline, so there is no "forgot password" email. The recovery code is the only way back into the owner account if the owner password is lost. The app keeps only a scrambled copy that cannot be read back, so neither the app nor Chachi's can show it to you again.</p>
+  <ol class="steps">
+    <li>Write the code on paper exactly as shown, with the dashes.</li>
+    <li>Keep it with the business permits or the cash box, not in the drawer beside the computer.</li>
+    <li>Do not photograph it onto a phone that other people use.</li>
+  </ol>
+  <p class="warn"><strong>Important:</strong> if the owner password is forgotten and the code is lost too, nobody can get into the owner account. If you have lost the code, tell Chachi's now, while you can still sign in. See also <a href="/guide/help">Troubleshooting</a>.</p>
+</section>
+
+<section id="link-your-subscription">
+  <h2>Link your subscription and start the free trial</h2>
+  <p class="who"><strong>Who:</strong> Owner, with the Google account that owns the store</p>
+  <p>Until the POS is linked, <strong>no shift can be opened</strong>, so nothing can be sold. Linking needs the internet once. You sign in with Google on a web page, not in the POS, and the POS never sees your Google password. Everyone else keeps signing in with their own POS username.</p>
+  <ol class="steps">
+    <li>Sign in as the owner and open <strong>Admin</strong>, then the <strong>Subscription</strong> tab. It says <strong>Not linked</strong>.</li>
+    <li>Press <strong>Link this POS</strong>. A code such as K7QM-3XPD appears under <strong>Approve it from any browser</strong>. It works for 15 minutes.</li>
+    <li>Press <strong>Open the link page</strong>. Or, on your phone, go to <strong>pos.chachisoftware.store/link</strong>, type the code and press <strong>Continue</strong>.</li>
+    <li>Press <strong>Continue with Google</strong> and sign in with the store owner's Google account.</li>
+    <li>On <strong>Approve this device?</strong>, check the code matches. For your first device, check the <strong>Store name</strong>. For another device of the same store, choose your store. Press <strong>Approve</strong>.</li>
+    <li>The page says <strong>Linked</strong>. Within a few seconds the POS shows <strong>Active</strong> and "Subscribed until" a date.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/getting-started-subscription-code.webp" alt="The Admin screen with the Subscription tab open. A red Not linked tag, and a box titled Approve it from any browser with three short steps, a large code in the form XXXX-XXXX, and an Open the link page button." width="1280" height="800" loading="lazy"><figcaption>The code to approve. The screen updates by itself after you press Approve.</figcaption></figure>
+  <p>A new store starts on a <strong>14-day free trial</strong>, shown as <strong>Paid until</strong>. To continue after it, contact Chachi's to pay by GCash or bank transfer; the POS picks up the new date at its next check. It checks by itself whenever it has the internet, and must get online <strong>at least once every 30 days</strong>. The warnings are explained in <a href="/guide/admin#subscription">The subscription screen and its warnings</a>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>If you see</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>The licence server could not be reached…</td><td>Connect to the internet and press <strong>Link this POS</strong> again.</td></tr>
+      <tr><td>The code expired before it was approved. Start again.</td><td>Get a new code and approve it within 15 minutes.</td></tr>
+      <tr><td>The owner denied the link.</td><td><strong>Deny</strong> was pressed. Start again and press <strong>Approve</strong>.</td></tr>
+      <tr><td>Only the owner manages the subscription.</td><td>Sign in with the owner account.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="tip"><strong>Tip:</strong> a new or replacement device joins the same subscription. Link it the same way and choose your existing store.</p>
+</section>
+
+<section id="sign-in">
+  <h2>Sign in</h2>
+  <p class="who"><strong>Who:</strong> everyone</p>
+  <ol class="steps">
+    <li>Type your <strong>Username</strong> and <strong>Password</strong>.</li>
+    <li>Press <strong>Sign in</strong> or <kbd>Enter</kbd>.</li>
+  </ol>
+  <p>A <strong>Cashier</strong> lands on <strong>POS</strong>, an <strong>Inventory</strong> clerk on <strong>Products</strong>, and a <strong>Manager</strong> or <strong>Owner</strong> on the <strong>Reports</strong> dashboard. To sell, open your shift first (<a href="/guide/selling">Selling at the counter</a>).</p>
+  <figure class="guide-shot"><img src="/static/guide/getting-started-sign-in.webp" alt="The sign-in screen. At the top, the store name Botika ni Chachi (Demo) and under it Chachi Pharmacy POS. Username and Password fields and a Sign in button. The version number at the bottom." width="1280" height="800" loading="lazy"><figcaption>The sign-in screen shows your store's name and, at the bottom, the version.</figcaption></figure>
+  <p><strong>Incorrect username or password</strong> is shown for either mistake. Check Caps Lock and try again. After 5 wrong tries in a row the account is locked for 15 minutes (<strong>This account is locked for … more minutes…</strong>). Wait, or ask the owner to set a new password in <strong>Admin → Users</strong>, which unlocks it at once (<a href="/guide/admin#reset-a-password-or-pin">Reset a password or PIN</a>). Staff cannot change their own password.</p>
+</section>
+
+<section id="when-the-screen-locks">
+  <h2>When the screen locks, and your PIN</h2>
+  <p class="who"><strong>Who:</strong> everyone</p>
+  <p>After 15 minutes without use (the owner can change this in <strong>Admin → Settings</strong>), your session ends. The screen locks the next time someone clicks or scans. The cart is <strong>not lost</strong>.</p>
+  <ol class="steps">
+    <li>If your shift is open, you see <strong>Screen locked</strong> and <strong>Your cart is kept.</strong></li>
+    <li>Type your 6-digit <strong>PIN</strong> and press <strong>Unlock</strong>. You are back where you were.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/getting-started-lock-screen.webp" alt="The Screen locked box over the POS screen: the cashier's username, enter your PIN to continue, Your cart is kept. A PIN field, an Unlock button and a Different user button." width="1280" height="800" loading="lazy"><figcaption>The lock screen. The cart behind it is kept.</figcaption></figure>
+  <p>A PIN only unlocks your own open shift; it is not a way to sign in. If your shift is closed, the sign-in screen appears with your username filled in and <strong>A PIN unlocks an open shift. Sign in with your password to open one.</strong> If you have no PIN, press <strong>Different user</strong> and sign in with your password.</p>
+  <p>A PIN unlock is for carrying on with the sale in front of you. It never opens Settings, Users, product editing or reports. If you see <strong>A PIN session cannot … Sign in with your password.</strong>, click your username at the bottom of the menu, press <strong>Different user</strong>, and sign in with your password. Your cart is kept.</p>
+  <p class="warn"><strong>Important:</strong> wrong PINs count toward the same 5-try lock as wrong passwords. Do not guess.</p>
+</section>
+
+<section id="lock-or-change-user">
+  <h2>Lock the screen, sign out or change user</h2>
+  <p class="who"><strong>Who:</strong> everyone</p>
+  <p>There is no separate sign-out button. Use your username at the bottom of the menu whenever you leave the counter or hand over.</p>
+  <ol class="steps">
+    <li>Click your username at the bottom of the menu. If you have a PIN, the screen locks and you can come back with it.</li>
+    <li>To hand over, press <strong>Different user</strong>. The next person signs in. <strong>The previous cashier's cart is kept on their shift.</strong> means nothing was thrown away.</li>
+  </ol>
+  <p>Without a PIN, clicking your username goes straight to the sign-in screen. Closing the app also signs you out.</p>
+  <p class="tip"><strong>Tip:</strong> never let someone sell under your name. Every sale, discount and drawer count is recorded against whoever is signed in.</p>
+</section>
+
+<section id="find-your-way-around">
+  <h2>Find your way around</h2>
+  <p class="who"><strong>Who:</strong> everyone</p>
+  <p>The menu runs down the left side. You only see the items your role can use.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Menu item</th><th>What it is for</th><th>Who sees it</th></tr></thead>
+    <tbody>
+      <tr><td><strong>POS</strong></td><td>Sales and payment (<a href="/guide/selling">Selling at the counter</a>)</td><td>Owner, Manager, Cashier</td></tr>
+      <tr><td><strong>Returns</strong></td><td>Taking items back (<a href="/guide/corrections">Returns, voids and reprints</a>)</td><td>Owner, Manager, Cashier</td></tr>
+      <tr><td><strong>Receipts</strong></td><td>This shift's receipts, to reprint or void</td><td>Owner, Manager, Cashier</td></tr>
+      <tr><td><strong>Customers</strong></td><td>Customers, utang and collections (<a href="/guide/customers">Customers and utang</a>)</td><td>Everyone; Inventory can only look</td></tr>
+      <tr><td><strong>Products</strong></td><td>Catalogue, stock, batches, counts (<a href="/guide/products">Products</a>, <a href="/guide/stock">Stock</a>)</td><td>Everyone; Cashier can only look</td></tr>
+      <tr><td><strong>Shift</strong></td><td>Open and close your shift, cash in and out (<a href="/guide/closing">Cash and closing</a>)</td><td>Owner, Manager, Cashier</td></tr>
+      <tr><td><strong>Buying</strong></td><td>Suppliers, orders and deliveries (<a href="/guide/buying">Suppliers and deliveries</a>)</td><td>Owner, Manager, Inventory</td></tr>
+      <tr><td><strong>Reports</strong></td><td>Dashboard, alerts and reports (<a href="/guide/reports">Reports</a>)</td><td>Owner, Manager, Cashier (own shift)</td></tr>
+      <tr><td><strong>Admin</strong></td><td>Users, settings, audit, backups, export and import, health, subscription (<a href="/guide/admin">Users, settings and backups</a>)</td><td>Owner only</td></tr>
+    </tbody>
+  </table></div>
+  <p>On a smaller screen the menu shows icons only; hold the mouse over one to see its name.</p>
+  <figure class="guide-shot phone"><img src="/static/guide/getting-started-menu-phone.webp" alt="Chachi POS on a phone with the menu slid open over the screen, listing POS, Returns, Receipts, Customers, Products, Shift, Buying, Reports and Admin, with the username at the bottom." width="390" height="844" loading="lazy"><figcaption>On a phone, the menu is behind the ☰ button at the top left.</figcaption></figure>
+  <p class="android"><strong>On Android:</strong> on a phone, tap ☰ at the top left to open the menu, and tap outside it to close it. On a tablet the menu is the icon strip down the side. Both work in portrait and landscape.</p>
+</section>
+
+<section id="roles">
+  <h2>Roles: who can do what</h2>
+  <p class="who"><strong>Who:</strong> the owner sets each person's role in <strong>Admin → Users</strong></p>
+  <p>Every person has one of four roles, checked on every action. When a cashier needs something beyond their role, such as a void, a manager or owner approves it on the spot.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>What</th><th>Owner</th><th>Manager</th><th>Cashier</th><th>Inventory</th></tr></thead>
+    <tbody>
+      <tr><td>Sell at the counter, reprint a receipt</td><td>Yes</td><td>Yes</td><td>Yes</td><td>—</td></tr>
+      <tr><td>Discount up to own limit (default 2% cashier, 5% manager, 100% owner)</td><td>Yes</td><td>Yes</td><td>Yes</td><td>—</td></tr>
+      <tr><td>Approve a bigger discount, a sale below cost, or an over-limit credit sale</td><td>Yes</td><td>Yes</td><td>—</td><td>—</td></tr>
+      <tr><td>Void a sale</td><td>Yes</td><td>Yes</td><td>With approval</td><td>—</td></tr>
+      <tr><td>Take back a return</td><td>Yes</td><td>Yes</td><td>Yes</td><td>—</td></tr>
+      <tr><td>Open and close own shift, cash in and out</td><td>Yes</td><td>Yes</td><td>Yes</td><td>—</td></tr>
+      <tr><td>Close another person's shift</td><td>Yes</td><td>Yes</td><td>—</td><td>—</td></tr>
+      <tr><td>Add or edit customers</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Look only</td></tr>
+      <tr><td>Record a customer's payment (collection)</td><td>Yes</td><td>Yes</td><td>Yes</td><td>—</td></tr>
+      <tr><td>Set a credit limit</td><td>Yes</td><td>Yes</td><td>—</td><td>—</td></tr>
+      <tr><td>Write off a customer's balance</td><td>Yes</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>Add or edit products</td><td>Yes</td><td>Yes</td><td>—</td><td>Yes</td></tr>
+      <tr><td>Change a selling price</td><td>Yes</td><td>Yes</td><td>—</td><td>—</td></tr>
+      <tr><td>See and change product cost</td><td>Yes</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>Adjust stock</td><td>Yes</td><td>Yes</td><td>—</td><td>Yes</td></tr>
+      <tr><td>Approve a stock count</td><td>Yes</td><td>Yes</td><td>—</td><td>—</td></tr>
+      <tr><td>Buying: orders, suppliers, deliveries</td><td>Yes</td><td>Yes</td><td>—</td><td>Yes</td></tr>
+      <tr><td>Sales and profit reports</td><td>Yes</td><td>Yes</td><td>Own shift</td><td>—</td></tr>
+      <tr><td>Stock reports</td><td>Yes</td><td>Yes</td><td>Look only</td><td>Yes</td></tr>
+      <tr><td>Admin: users, settings, tax mode, backups and restore, export and import, audit trail, health, subscription</td><td>Yes</td><td>—</td><td>—</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <p class="tip"><strong>Tip:</strong> the note on the Users screen says a Manager can do "everything except users and settings". In this version the whole <strong>Admin</strong> section, including backups and the audit trail, is shown to the Owner only.</p>
+  <p class="warn"><strong>Important:</strong> do not let the store trade on the owner's login. Give each person their own account, so cost prices stay hidden and every record names the right person.</p>
+</section>

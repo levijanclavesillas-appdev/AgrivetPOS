@@ -12,6 +12,7 @@ const licence = require('../src/licence');
 const { createService, normaliseCode, addMonths } = require('../src/service');
 const { createGoogle } = require('../src/google');
 const { createApp } = require('../src/app');
+const guide = require('../src/guide');
 
 const PASSWORD = 'correct-horse-battery-staple';
 
@@ -220,6 +221,54 @@ test('pages carry a strict policy and no script', async () => {
     assert.match(r.headers.get('content-security-policy'), /default-src 'self'.*frame-ancestors 'none'/);
     assert.equal(r.headers.get('x-frame-options'), 'DENY');
     assert.equal(/<script/i.test(await r.text()), false);
+  } finally { await s.close(); }
+});
+
+test('the public site: its pages, every file they name, and the same policy with no script', async () => {
+  const s = await boot();
+  try {
+    const guidePages = ['/guide', ...guide.chapters().map((c) => `/guide/${c.slug}`)];
+    for (const page of ['/', '/privacy', ...guidePages]) {
+      const r = await fetch(`${s.base}${page}`);
+      assert.equal(r.status, 200, page);
+      assert.match(r.headers.get('content-type'), /text\/html/);
+      assert.match(r.headers.get('content-security-policy'), /default-src 'self'/);
+      const html = await r.text();
+      assert.match(html, /Chachi POS/);
+      // The one <script> allowed is the search engines' data block, which a browser never runs.
+      for (const tag of html.match(/<script[^>]*>/gi) || []) assert.match(tag, /type="application\/ld\+json"/, `${page}: ${tag}`);
+      const files = new Set([...html.matchAll(/(?:src|href)="(\/static\/[^"#]+)/g)].map((m) => m[1]));
+      for (const file of files) {
+        const asset = await fetch(`${s.base}${file}`);
+        assert.equal(asset.status, 200, `${page} names ${file}`);
+        assert.match(asset.headers.get('cache-control'), /max-age=86400/);
+      }
+    }
+    assert.equal((await fetch(`${s.base}/static/nothing-here.png`)).status, 404);
+    assert.match(await (await fetch(`${s.base}/robots.txt`)).text(), /Disallow: \/admin/);
+    const sitemap = await (await fetch(`${s.base}/sitemap.xml`)).text();
+    for (const page of guidePages) assert.ok(sitemap.includes(`store${page}<`), `sitemap lists ${page}`);
+    assert.equal((await fetch(`${s.base}/guide/no-such-chapter`)).status, 404);
+    assert.equal((await fetch(`${s.base}/guide/..%2Fsrc%2Fapp`)).status, 404);
+    assert.equal((await fetch(`${s.base}/link`)).status, 200);
+  } finally { await s.close(); }
+});
+
+test('the guide: every link between chapters, and within one, reaches a section that exists', async () => {
+  const s = await boot();
+  try {
+    const html = {};
+    for (const page of ['/guide', ...guide.chapters().map((c) => `/guide/${c.slug}`)]) {
+      html[page] = await (await fetch(`${s.base}${page}`)).text();
+    }
+    const ids = (text) => new Set([...text.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+    for (const [page, text] of Object.entries(html)) {
+      for (const [, target, hash] of text.matchAll(/href="(\/guide(?:\/[a-z-]+)?)?(?:#([^"]+))?"/g)) {
+        const where = target || page;
+        assert.ok(html[where], `${page} links to ${where}, which is not a guide page`);
+        if (hash) assert.ok(ids(html[where]).has(hash), `${page} links to ${where}#${hash}, which has no such section`);
+      }
+    }
   } finally { await s.close(); }
 });
 

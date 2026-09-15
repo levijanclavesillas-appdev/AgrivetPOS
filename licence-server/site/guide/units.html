@@ -1,0 +1,152 @@
+<h1>Units and packs</h1>
+<p class="intro">Chachi POS keeps every product's stock in one base unit, such as the tablet. Boxes, blisters and sacks are packs: fixed bundles of that unit. This chapter explains how that works when you buy, price, sell and count.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#how-it-works">How units and packs work</a></li>
+  <li><a href="#base-unit">Choose the base unit</a></li>
+  <li><a href="#add-a-pack">Add a pack</a></li>
+  <li><a href="#pack-prices">Prices for packs</a></li>
+  <li><a href="#sell-by-the-pack">Sell by the pack or loose</a></li>
+  <li><a href="#buy-by-the-pack">Receive a delivery of packs</a></li>
+  <li><a href="#open-a-box">Open a box to sell loose</a></li>
+  <li><a href="#count-in-base-units">Counts, adjustments and stock on hand</a></li>
+  <li><a href="#fix-unit-mistakes">Fix a unit or pack mistake</a></li>
+</ol></nav>
+
+<section id="how-it-works">
+  <h2>How units and packs work</h2>
+  <p>Every product has exactly one <strong>base unit</strong>: the smallest thing you sell it in, such as a tablet (TAB), a capsule (CAP), a bottle (BTL) or a kilo (KG). Everything about the product is kept in that unit: the stock on hand, every stock movement, the price, the cost, the minimum stock and the stock count. There is no second stock figure in boxes.</p>
+  <p>A <strong>pack</strong> is a name for a fixed number of base units: 1 BLISTER = 10 TAB, 1 BOX = 100 TAB. You use a pack when you sell. The moment a pack is sold, the app turns it into base units, and that is what leaves the stock.</p>
+  <h3>A worked example: Paracetamol 500 mg</h3>
+  <p>The product's base unit is TAB. It has two packs, BLISTER = 10 TAB and BOX = 100 TAB. The retail price is ₱3.50 per tablet. It starts with no stock.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>What happens</th><th>What you enter</th><th>Stock moves</th><th>Stock on hand</th></tr></thead>
+    <tbody>
+      <tr><td>A delivery of 5 boxes arrives, at ₱190 a box</td><td>Arrived 500 (TAB), unit cost ₱1.90</td><td>+500 TAB</td><td>500 TAB</td></tr>
+      <tr><td>A customer buys 1 box</td><td>1, unit BOX</td><td>−100 TAB</td><td>400 TAB</td></tr>
+      <tr><td>You open a box and sell 15 loose tablets</td><td>15, unit TAB</td><td>−15 TAB</td><td>385 TAB</td></tr>
+    </tbody>
+  </table></div>
+  <p>Both sales were charged per tablet: the box is 100 × ₱3.50 = ₱350.00 and the loose tablets are 15 × ₱3.50 = ₱52.50. Opening the box needed no step in the app. At the end the product list shows <strong>385 TAB</strong>: that is 3 sealed boxes and 85 loose tablets on the shelf. The app always shows the figure in tablets and does not split it into boxes for you.</p>
+  <p class="agrivet"><strong>Agrivet edition:</strong> the same rules apply. A feed sold by the kilo has base unit KG, which can be sold in fractions, and a pack SACK = 50 KG. Twenty sacks received are 1,000 KG, a sack sold takes 50 KG, and 2.5 KG sold loose takes 2.5 KG.</p>
+</section>
+
+<section id="base-unit">
+  <h2>Choose the base unit</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Choose the smallest amount you will ever sell. If you sell paracetamol by the tablet, the base unit is TAB, even though it arrives in boxes. If you only ever sell a syrup as a whole bottle, the base unit is BTL. If the base unit were BOX, you could never sell a single tablet.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Product</th><th>Base unit</th><th>Packs</th></tr></thead>
+    <tbody>
+      <tr><td>Paracetamol 500 mg tablet</td><td>TAB</td><td>BLISTER = 10 TAB, BOX = 100 TAB</td></tr>
+      <tr><td>Paracetamol syrup 60 mL</td><td>BTL</td><td>none</td></tr>
+      <tr><td>Face masks, sold by the box only</td><td>BOX</td><td>none</td></tr>
+      <tr><td>Hog feed (Agrivet)</td><td>KG</td><td>SACK = 50 KG</td></tr>
+    </tbody>
+  </table></div>
+  <ol class="steps">
+    <li>On the product's <strong>Identity</strong> tab, choose the <strong>Base unit</strong>.</li>
+    <li>If the unit is not in the list, click <strong>New unit</strong>. Type the <strong>Name</strong> (Tablet), the <strong>Short code</strong> as it should appear on the receipt (TAB), and tick <strong>This can be sold in fractions — 1.5 of them</strong> only for a unit that can be split, such as millilitres or kilos. Click <strong>Save</strong>.</li>
+    <li>Click <strong>Save</strong> (or <strong>Create product</strong> for a new product).</li>
+  </ol>
+  <p>A unit that cannot be sold in fractions takes whole numbers only: the counter refuses 2.5 tablets. A unit that can be split takes up to three decimals, such as 1.255 KG. A unit code is letters and digits only. There is no screen to change a unit once it is made, so decide on fractions when you create it.</p>
+  <h3>Why the base unit locks</h3>
+  <p>As soon as any stock moves for the product (opening stock, a delivery, a sale), the base unit is locked. The Identity tab shows it as text with the reason: “This cannot be changed: stock has moved for this product, and every one of those movements is recorded in this unit.” If you could change TAB to BOX, the 500 already recorded would suddenly mean 500 boxes.</p>
+  <figure class="guide-shot"><img src="/static/guide/units-base-unit-locked.webp" alt="The Identity tab of a product that has sold stock. In place of the Base unit list is the text Tablet (TAB), followed by a grey explanation that it cannot be changed because stock has moved, and the rule code UOM-003." width="1280" height="800" loading="lazy"><figcaption>Once stock has moved, the base unit is shown as text with the reason and the way to correct it.</figcaption></figure>
+</section>
+
+<section id="add-a-pack">
+  <h2>Add a pack</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <ol class="steps">
+    <li>Open the product and click <strong>Units</strong>. The tab says which unit everything is stored in.</li>
+    <li>In <strong>Choose a unit…</strong>, pick the pack unit, for example BOX. If it is not there, click <strong>New unit</strong> and make it.</li>
+    <li>In the box that says “How many base units”, type how many base units one pack holds: 100.</li>
+    <li>Click <strong>Add pack</strong>. The table shows the pack as a sentence: <strong>1 BOX = 100 TAB</strong>. Read it to check the size.</li>
+  </ol>
+  <p>Add each pack against the base unit directly. A box of 10 blisters of 10 tablets is BOX = 100 TAB, not BOX = 10 BLISTER. There is no pack inside a pack. A product can have as many packs as you like, but only one of each unit, and a pack cannot be in the base unit itself.</p>
+  <figure class="guide-shot"><img src="/static/guide/units-packs-tab.webp" alt="The Units tab of Paracetamol 500 mg tablet. A line says everything is stored in Tablet (TAB). A table lists two packs, BLISTER and BOX, with the sentences 1 BLISTER = 10 TAB and 1 BOX = 100 TAB and a Remove button on each. Below are a unit list, a How many base units box, and the Add pack and New unit buttons." width="1280" height="800" loading="lazy"><figcaption>Each pack is shown as a sentence, so a size typed wrong (1,000 instead of 100) is easy to spot.</figcaption></figure>
+  <p>To remove a pack, click <strong>Remove</strong> beside it. To change a pack's size, remove it and add it again with the right number. Sales already made keep the size they were sold at.</p>
+  <p>In the opening workbook, packs go on the Packs tab, one row each: sku PAR-500, unit BOX, contains 100 (see <a href="/guide/products#load-opening-data">Load your products from the opening workbook</a>).</p>
+</section>
+
+<section id="pack-prices">
+  <h2>Prices for packs</h2>
+  <p>A pack has no price of its own. Every price is per base unit, and a pack costs its size times that price: a box of 100 tablets at ₱3.50 is ₱350.00. If you change the tablet price, the box price changes with it.</p>
+  <p>To sell a box cheaper than 100 loose tablets, add a <strong>quantity break</strong> on the Pricing tab that starts at 100 TAB (see <a href="/guide/products#set-prices">Set prices and quantity breaks</a>). The break is based on the number of tablets on the line, so a box of 100 and 100 loose tablets get the same price.</p>
+  <p class="warn"><strong>Important:</strong> type the price of one base unit, never the price of the box. A retail price of ₱350 on a tablet product makes each tablet ₱350 and a box ₱35,000.</p>
+</section>
+
+<section id="sell-by-the-pack">
+  <h2>Sell by the pack or loose</h2>
+  <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
+  <p>Every product goes into the sale as 1 base unit, whether you scan it or pick it from the search. This is true even when you scan the barcode printed on a box, because a barcode belongs to the product, not to a pack.</p>
+  <ol class="steps">
+    <li>Scan the product, or search for it and pick it. The line shows <strong>1 TAB</strong>.</li>
+    <li>With that line selected, press <kbd>F3</kbd> (see <a href="/guide/selling#change-quantity">Change the quantity</a>). The quantity box opens with the product's name.</li>
+    <li>Type the number in <strong>Quantity</strong>, for example 1.</li>
+    <li>Choose the pack in <strong>Unit</strong>, for example BOX. Under the box you see what it comes to: “1 BOX = 100 TAB”.</li>
+    <li>Click <strong>Apply</strong>. The line now reads <strong>1 BOX (100 TAB)</strong>, with the price per tablet and the line total.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/units-quantity-prompt.webp" alt="The counter screen with the quantity box open for Paracetamol 500 mg tablet. The Quantity field shows 1 and the Unit list shows BOX. Under them a line reads 1 BOX = 100 TAB and a note says BOX cannot be sold in parts." width="1280" height="800" loading="lazy"><figcaption>The line under the fields shows how many tablets the pack takes, before you apply it.</figcaption></figure>
+  <p>To sell a box and some loose tablets together, add the product a second time (scan or search again). It comes in as a new line in TAB, next to the box line. Press <kbd>F3</kbd> on it and type 15. Scanning the same product again adds to the loose line; it does not change the box line.</p>
+  <p>Under each line the counter shows <strong>stock after</strong> in base units, for example “stock after: 385 TAB”. When the sale is paid, the stock falls by the base units: 100 TAB for the box and 15 TAB for the loose tablets. For a product tracked by batch, the tablets come from the batch that expires first (see <a href="/guide/stock#batches-and-expiry">Batches and expiry</a>). The receipt prints each line's price per base unit and the line total.</p>
+  <h3>Fractions</h3>
+  <p>If the unit you choose cannot be split, a note under the field says so, for example “BOX cannot be sold in parts — a whole number of them.”, and a fraction is refused. A unit that can be split, such as KG or ML, takes decimals: 2.5 KG of feed loose is fine, but half a SACK is not.</p>
+</section>
+
+<section id="buy-by-the-pack">
+  <h2>Receive a delivery of packs</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Purchase orders and deliveries are entered in the base unit. The quantity columns show the unit code beside each box, and <strong>Unit cost</strong> is the cost of one base unit. The full steps are in <a href="/guide/buying#receive-a-delivery">Receive a delivery</a>, and how the average cost moves is in <a href="/guide/buying#costs-and-average-cost">Costs and the average cost</a>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>The supplier's invoice says</th><th>You enter</th></tr></thead>
+    <tbody>
+      <tr><td>5 boxes of 100 tablets at ₱190 a box</td><td>Arrived 500, unit cost 1.90 (₱190 ÷ 100)</td></tr>
+      <tr><td>24 bottles at ₱43 each (base unit BTL)</td><td>Arrived 24, unit cost 43.00</td></tr>
+      <tr><td>20 sacks of 50 kg at ₱1,500 a sack (Agrivet, base unit KG)</td><td>Arrived 1000, unit cost 30.00</td></tr>
+    </tbody>
+  </table></div>
+  <p>The average cost the owner sees on the Pricing tab is also per base unit. If a box price does not divide evenly (₱100 for 30 tablets is ₱3.333…), type the cost rounded to the centavo; the delivery's value may then differ from the invoice by a few centavos.</p>
+  <p>A delivery that includes a product tracked by batch also needs its batch number and expiry date; read <a href="/guide/buying#batch-tracked-products">Batch-tracked products on a delivery</a> before you receive one.</p>
+</section>
+
+<section id="open-a-box">
+  <h2>Open a box to sell loose</h2>
+  <p>You do not need to do anything in the app. The stock is already counted in tablets, so a sealed box and an opened box are the same 100 TAB to the system. Open the box on the shelf and sell the tablets loose; each sale takes only the tablets sold.</p>
+  <p>What the app cannot tell you is how many boxes are still sealed. If you need that, count them on the shelf.</p>
+</section>
+
+<section id="count-in-base-units">
+  <h2>Counts, adjustments and stock on hand</h2>
+  <p>Everything that shows or changes a stock figure uses the base unit:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Where</th><th>What you see or type</th></tr></thead>
+    <tbody>
+      <tr><td>Product list, <strong>On hand</strong></td><td>385 TAB</td></tr>
+      <tr><td>Product's <strong>Stock</strong> tab</td><td><strong>On hand</strong> 385 TAB, and <strong>Minimum stock (TAB)</strong></td></tr>
+      <tr><td>Stock count sheet, <strong>Counted</strong></td><td>Type 385 for 3 sealed boxes and 85 loose tablets</td></tr>
+      <tr><td><strong>Adjust stock</strong>, <strong>Counted quantity (TAB)</strong></td><td>Type the total tablets on the shelf</td></tr>
+      <tr><td>Batches screen, <strong>Held</strong></td><td>Tablets in each batch</td></tr>
+    </tbody>
+  </table></div>
+  <p class="tip"><strong>Tip:</strong> when you count a shelf, multiply first: 3 sealed boxes × 100 = 300, plus 85 loose = 385. The count sheet has no box column. See <a href="/guide/stock#count-stock">Count the stock</a>.</p>
+</section>
+
+<section id="fix-unit-mistakes">
+  <h2>Fix a unit or pack mistake</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory (prices: Owner or Manager)</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Mistake</th><th>How to fix it</th></tr></thead>
+    <tbody>
+      <tr><td>Wrong base unit, and no stock has moved yet</td><td>Choose the right unit on the Identity tab and click <strong>Save</strong>.</td></tr>
+      <tr><td>Wrong base unit, and stock has moved</td><td>The unit is locked. Create a new product with the right unit, move the stock across with an adjustment on each product (see below), then deactivate the old product.</td></tr>
+      <tr><td>Wrong pack size</td><td>On the Units tab, <strong>Remove</strong> the pack and add it again with the right size. Sales already made took the old size; if that made the stock wrong, correct it with a count.</td></tr>
+      <tr><td>Price typed for the box instead of the tablet</td><td>On the Pricing tab, type the price of one base unit and click <strong>Save prices</strong>. Sales already made keep their price.</td></tr>
+      <tr><td>A unit made without fractions that needs them</td><td>A unit cannot be edited. Make a new unit with another code and use it for new products or packs.</td></tr>
+      <tr><td>Sold 1 TAB when the customer took a box</td><td>Before payment, press <kbd>F3</kbd> and change the unit. After payment, see <a href="/guide/corrections#void-or-return">Returns, voids and reprints</a>.</td></tr>
+    </tbody>
+  </table></div>
+  <p>To move stock to a new product: on the old product, adjust the counted quantity to 0 with the reason <strong>Data entry correction</strong>; on the new product, adjust it up to the real quantity with the same reason (see <a href="/guide/stock#adjust-stock">Adjust stock</a>).</p>
+  <p class="warn"><strong>Important:</strong> the Adjust screen refuses products tracked by batch, so this way of moving stock does not work for them. For a batch-tracked product, check the base unit and the pack sizes before its first stock arrives.</p>
+</section>

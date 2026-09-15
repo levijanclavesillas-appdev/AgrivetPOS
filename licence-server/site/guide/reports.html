@@ -1,0 +1,205 @@
+<h1>Reports</h1>
+<p class="intro">Read the dashboard every morning, check the day's sales and payments, compare GCash and QR Ph with the wallet's statement, see what sells and what does not, and save any report as a spreadsheet file.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#who-can-see-reports">Who can see which report</a></li>
+  <li><a href="#the-dashboard">Read the dashboard</a></li>
+  <li><a href="#dates-and-export">Choose the dates and export to CSV</a></li>
+  <li><a href="#daily-sales">Daily sales and gross profit</a></li>
+  <li><a href="#payments">Payments by method</a></li>
+  <li><a href="#gcash-reconciliation">Check GCash and QR Ph against the wallet</a></li>
+  <li><a href="#sales-analysis">Sales by category, cashier and product</a></li>
+  <li><a href="#top-and-slow-sellers">Top and slow sellers</a></li>
+  <li><a href="#stock-value-and-movements">Stock value and stock movements</a></li>
+  <li><a href="#ageing">Who owes the store (ageing)</a></li>
+  <li><a href="#voids-and-write-offs">Find voided sales and write-offs</a></li>
+  <li><a href="#does-not-reconcile">If a report says it does not reconcile</a></li>
+</ol></nav>
+
+<section id="who-can-see-reports">
+  <h2>Who can see which report</h2>
+  <p>Owners and managers land on the dashboard when they sign in. Everyone else opens it with <strong>Reports</strong> in the menu, if their role has it.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Report</th><th>Owner</th><th>Manager</th><th>Cashier</th><th>Inventory</th></tr></thead>
+    <tbody>
+      <tr><td>Dashboard</td><td>Yes</td><td>Yes</td><td>Own shift only</td><td>No</td></tr>
+      <tr><td>Daily sales, Payments, Sales analysis</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr>
+      <tr><td>Reconciliation, Ageing</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr>
+      <tr><td>Inventory valuation, Movement analysis</td><td>Yes</td><td>Yes</td><td>Yes (view)</td><td>Yes, from <strong>Products</strong> → <strong>Valuation</strong></td></tr>
+      <tr><td>Export CSV</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr>
+    </tbody>
+  </table></div>
+  <p>A cashier's dashboard shows the words <strong>Your shift only</strong>, and its sales figures are for their own shift today. If they have no shift today, it says <em>You have no shift on this day, so there are no figures to show you.</em> Opening a store-wide report as a cashier is refused with <em>You can only see the sales report for your own shift. Ask the owner or a manager for the store's figures.</em></p>
+  <p>A screen unlocked with a PIN cannot open reports. Sign in with your password instead.</p>
+</section>
+
+<section id="the-dashboard">
+  <h2>Read the dashboard</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager (Cashier: own shift)</p>
+  <p>Click <strong>Reports</strong>. The dashboard is headed <strong>Today</strong>, with the date and the time the figures were taken. Click <strong>Refresh</strong> to update them. It has four parts, from top to bottom.</p>
+  <h3>1. The subscription line</h3>
+  <p>Shown only when the subscription is ending soon, in its grace period, lapsed or not linked. See <a href="/guide/help#subscription-warnings">Subscription warnings</a>.</p>
+  <h3>2. Alerts</h3>
+  <p>Things that need someone to act, the most serious first: expired or nearly expired batches, low stock, overdue accounts, customers at their credit limit, a shift left open too long, a cash drawer that closed short or over, a backup that is overdue or failed, and a computer clock that is wrong.</p>
+  <ul>
+    <li>An expiry alert has a button (<strong>See the batches</strong> or <strong>Write it off</strong>) that opens that product's batches.</li>
+    <li>Click the <strong>×</strong> to hide an alert until you leave the dashboard. Backup and clock alerts cannot be hidden.</li>
+  </ul>
+  <h3>3. The seven tiles</h3>
+  <p>Click a tile to open the report behind it.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tile</th><th>What it means</th><th>Opens</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Today's gross sales</strong></td><td>Everything rung up today before discounts and returns. Voided sales are left out.</td><td>Daily sales</td></tr>
+      <tr><td><strong>Transactions</strong></td><td>How many sales were completed today.</td><td>Daily sales</td></tr>
+      <tr><td><strong>Payment mix</strong></td><td>Today's takings per payment method, after change, for example <em>CASH ₱8,420.00 · GCASH ₱2,150.00</em>.</td><td>Payments</td></tr>
+      <tr><td><strong>Credit outstanding</strong></td><td>What customers owe the store in total (utang). Store credit you hold for customers is not subtracted.</td><td>Ageing</td></tr>
+      <tr><td><strong>Overdue accounts</strong></td><td>How many customers have a balance past its due date.</td><td>Ageing</td></tr>
+      <tr><td><strong>Low stock</strong></td><td>How many products are at or below their reorder point.</td><td>The low-stock list of products</td></tr>
+      <tr><td><strong>Gross profit</strong></td><td>Today's sales (without VAT) less what the goods cost, with the margin as a percentage.</td><td>Daily sales</td></tr>
+    </tbody>
+  </table></div>
+  <p>The small code on each tile (such as RPT-101) names the rule behind the figure. Quote it if you ask for help.</p>
+  <figure class="guide-shot"><img src="/static/guide/reports-dashboard.webp" alt="The dashboard headed Today: a near-expiry alert and a low-stock alert at the top, then seven tiles for gross sales, transactions, payment mix, credit outstanding, overdue accounts, low stock and gross profit with its margin, and the All reports list below." width="1280" height="800" loading="lazy"><figcaption>Alerts first, then the seven tiles, then the list of all reports.</figcaption></figure>
+  <h3>4. All reports</h3>
+  <p>Below the tiles, <strong>All reports</strong> lists every report: <strong>Daily sales</strong>, <strong>Payments</strong>, <strong>Reconciliation</strong>, <strong>Sales analysis</strong>, <strong>Inventory valuation</strong>, <strong>Movement analysis</strong> and <strong>Ageing</strong>. Click one to open it. Each report has a <strong>Dashboard</strong> button at the top left to come back.</p>
+</section>
+
+<section id="dates-and-export">
+  <h2>Choose the dates and export to CSV</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Reports open on today. To see another day or a longer period:</p>
+  <ol class="steps">
+    <li>Pick the first day in <strong>From</strong> and the last day in <strong>To</strong>. For one day, pick the same date in both.</li>
+    <li>Click <strong>Show</strong>.</li>
+  </ol>
+  <p>Days run from midnight to midnight, Philippine time. One report can cover up to 366 days; a longer range is refused with <em>A report covers at most 366 days at a time.</em> <strong>Inventory valuation</strong> and <strong>Ageing</strong> have no dates: they show the position right now.</p>
+  <p>The sales reports start with a header block: the <strong>Range</strong>, the <strong>Scope</strong> (the whole store), the <strong>Tax mode</strong>, how many <strong>Voided sales</strong> were left out and their value, and who <strong>Generated</strong> it and when.</p>
+  <h3>Save a report as a CSV file</h3>
+  <ol class="steps">
+    <li>Open the report and set the dates.</li>
+    <li>Click <strong>Export CSV</strong>. A message such as <em>daily-2026-09-15.csv saved</em> appears. On Windows the file goes where your computer saves downloads (it may ask you where); on Android it goes to the tablet's <strong>Downloads</strong> folder.</li>
+    <li>Open the file with Excel, Google Sheets or LibreOffice.</li>
+  </ol>
+  <p><strong>Export CSV</strong> is on Daily sales, Payments, Inventory valuation, each tab of Sales analysis, Movement analysis and Ageing. The file has the same figures as the screen, amounts in pesos with two decimals, and the header block at the top. The daily sales file also shows senior citizen and PWD discounts on their own line. Every export is recorded in the audit trail.</p>
+</section>
+
+<section id="daily-sales">
+  <h2>Daily sales and gross profit</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Open it from the <strong>Today's gross sales</strong> tile or <strong>All reports</strong> → <strong>Daily sales</strong>.</p>
+  <ul>
+    <li><strong>The totals:</strong> Gross, less Line discounts, Transaction discounts and Returns, gives <strong>Net</strong>. Then VAT, Tendered, Change given and the number of Transactions.</li>
+    <li><strong>Reconciliation:</strong> the same sum written out in words, ending <em>This report reconciles.</em> The payments taken, less change, must equal net sales.</li>
+    <li><strong>Gross profit:</strong> sales without VAT, less the cost of the goods sold, and the margin. The cost is the product's average cost at the moment each item was sold, so a later delivery at a new price does not change past profit.</li>
+    <li><strong>Per product:</strong> quantity, revenue, cost and gross profit for each product sold.</li>
+    <li><strong>Voided — excluded from every figure above:</strong> each voided sale, with its receipt number, time, amount and cashier.</li>
+  </ul>
+  <figure class="guide-shot"><img src="/static/guide/reports-daily-sales.webp" alt="The Daily sales report for today, scrolled down to the totals: a totals table down to Net and Change given; a reconciliation box saying This report reconciles; gross profit with its margin; and the start of the table of products sold." width="1280" height="800" loading="lazy"><figcaption>The totals, the reconciliation written out, and the gross profit for the day.</figcaption></figure>
+  <p>Click <strong>Break it down</strong> to open Sales analysis for the same dates.</p>
+</section>
+
+<section id="payments">
+  <h2>Payments by method</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Open it from the <strong>Payment mix</strong> tile or <strong>All reports</strong> → <strong>Payments</strong>. One row for each method used in the period (CASH, GCASH, QRPH, CREDIT, STORE_CREDIT) shows the number of <strong>Sales</strong> and <strong>Tenders</strong>, the amount <strong>Tendered</strong>, the <strong>Change</strong> given, the <strong>Net</strong> and its <strong>Share</strong> of the total.</p>
+  <p><strong>Net</strong> is what was tendered less change, and its total equals net sales on the daily report. GCash and QR Ph rows say <strong>RECORDED</strong>: the cashier saw the payment on the customer's phone, but Chachi POS cannot confirm the money arrived. That is what the reconciliation below is for.</p>
+  <p>Click <strong>Reconcile</strong> to open the reconciliation for the same dates.</p>
+</section>
+
+<section id="gcash-reconciliation">
+  <h2>Check GCash and QR Ph against the wallet</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Do this daily or weekly, with your GCash app (or the bank or wallet that receives your QR Ph payments) open beside you. Cash is not checked here; it is counted at the shift close.</p>
+  <ol class="steps">
+    <li>Open <strong>All reports</strong> → <strong>Reconciliation</strong> (or <strong>Payments</strong> → <strong>Reconcile</strong>).</li>
+    <li>Set the two dates to the period you are checking and click <strong>Show</strong>.</li>
+    <li>Read the <strong>GCASH</strong> row: <strong>Recorded</strong> is what the cashiers recorded, with the number of tenders.</li>
+    <li>In the GCash app, add up the payments you received for the same dates (or read the total from your statement).</li>
+    <li>Type that total in the amount box on the GCASH row. Type the statement's reference in <strong>Statement reference</strong> if you have one.</li>
+    <li>If the two figures differ, say why in <strong>Why, if it differs</strong>: a fee, a transfer that arrived the next day, or a sale nobody paid for.</li>
+    <li>Click <strong>Record</strong>. The row now shows <em>Exactly as recorded</em>, or the difference as <em>₱50.00 short</em> or <em>₱50.00 over</em>, and who recorded it.</li>
+    <li>Do the same on the <strong>QRPH</strong> row. A row for <strong>OTHER</strong> is also shown; if it says ₱0.00, leave it.</li>
+  </ol>
+  <h3>Find the difference</h3>
+  <p>Click <strong>Show tenders</strong> on the row. Every payment behind the figure is listed with its <strong>Receipt</strong> number, time, <strong>Cashier</strong>, <strong>Reference</strong> and <strong>Amount</strong>. Match each reference number with the transactions in the GCash app. Payments marked <strong>no reference</strong> are the first to check.</p>
+  <figure class="guide-shot"><img src="/static/guide/reports-reconciliation.webp" alt="The Reconciliation screen: GCASH, QRPH and OTHER rows with recorded amounts; the GCASH row already recorded as 50 pesos short with a reason; below it the list of GCash tenders with receipt numbers, times, cashiers, reference numbers and amounts." width="1280" height="800" loading="lazy"><figcaption>Record what the wallet says, then use Show tenders to match each reference number.</figcaption></figure>
+  <h3>Rules to know</h3>
+  <ul>
+    <li>A difference of more than ₱100.00 needs a reason, or it is refused with a message that starts <em>GCASH settled … recorded — a difference of …</em>. The ₱100.00 is the setting <strong>Settlement variance that requires a reason</strong> (<a href="/guide/admin#change-a-setting">Change a setting</a>).</li>
+    <li>Recording never changes any sale or payment. The difference is kept as a record; nothing is "corrected".</li>
+    <li>Each method can be reconciled only once for any day. If you try an overlapping period, it is refused and tells you the period already done. Start your next check the day after the last one.</li>
+  </ul>
+</section>
+
+<section id="sales-analysis">
+  <h2>Sales by category, cashier and product</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Open <strong>All reports</strong> → <strong>Sales analysis</strong>, or <strong>Break it down</strong> on Daily sales. Set the dates and choose a tab.</p>
+  <ul>
+    <li><strong>By category:</strong> each category's products, lines, revenue, cost, gross profit, margin and share of revenue.</li>
+    <li><strong>By cashier:</strong> each cashier's shifts, transactions, net sales, average sale, discounts given, gross profit, margin and share. Useful for checking discounts and for scheduling staff.</li>
+    <li><strong>By product:</strong> every product sold with quantity, transactions, revenue, gross profit, margin and stock on hand. Use <strong>Sort by</strong> to order by Revenue, Quantity, Gross profit, Transactions or Name. Up to 200 rows are shown, and a line tells you how much of the total they cover.</li>
+  </ul>
+  <p>The category and cashier tabs check themselves: they should say <em>This breakdown adds up to the report it came from.</em> The two tabs can differ slightly from each other, because a discount on the whole sale belongs to the cashier's sale but not to any one category.</p>
+</section>
+
+<section id="top-and-slow-sellers">
+  <h2>Top and slow sellers</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>In <strong>Sales analysis</strong>, open the <strong>Movers</strong> tab and set the dates (a month or a quarter works best).</p>
+  <ul>
+    <li><strong>Fast — top 10 by revenue:</strong> the products that brought in the most money.</li>
+    <li><strong>Fast — top 10 by units:</strong> the products that sold the most pieces, ranked separately for each unit (for example <strong>In TAB</strong>, <strong>In BTL</strong>), because 40 tablets and 40 bottles are not the same thing.</li>
+    <li><strong>Slow:</strong> active products that sold nothing in the period, with the stock on hand, the money <strong>Tied up</strong> in it at average cost, and <strong>Last sold</strong>: <em>Never sold</em>, a date, or <em>Added during this range — too new to judge</em>.</li>
+  </ul>
+  <figure class="guide-shot"><img src="/static/guide/reports-movers.webp" alt="The Sales analysis screen on the Movers tab, scrolled to the end: the last of the top-by-units tables, grouped by unit (packs and sachets), then the Slow table listing a product with its stock on hand, the money tied up and Never sold." width="1280" height="800" loading="lazy"><figcaption>Reorder from the fast lists; the Slow list shows money sitting on the shelf.</figcaption></figure>
+  <p class="tip"><strong>Tip:</strong> Check the Slow list against expiry dates. A slow medicine with a near expiry is the one to move to the front of the shelf.</p>
+</section>
+
+<section id="stock-value-and-movements">
+  <h2>Stock value and stock movements</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager, Inventory, or Cashier (view only)</p>
+  <h3>Inventory valuation</h3>
+  <p>Open <strong>All reports</strong> → <strong>Inventory valuation</strong>, or <strong>Products</strong> → <strong>Valuation</strong>. It shows what your stock is worth right now: the total, then each product's <strong>SKU</strong>, <strong>On hand</strong>, <strong>Average cost</strong> and <strong>Value</strong> (on hand × average cost).</p>
+  <h3>Movement analysis</h3>
+  <p>Open <strong>All reports</strong> → <strong>Movement analysis</strong>, or <strong>Movement analysis</strong> on the valuation screen. Set the dates and click <strong>Show</strong>.</p>
+  <ul>
+    <li><strong>Reconciliation:</strong> the stock at the start of the period plus everything that moved equals the stock at the end. It should say <em>This ledger reconciles.</em></li>
+    <li><strong>By type:</strong> one row for each kind of movement: Goods received, Sold, Sale voided, Customer return, Adjustment, Damaged, Expired, Internal use, Stock count variance and others, with the number of movements, products and value. Click <strong>Only this</strong> to list the products behind one type; <strong>Show all</strong> goes back.</li>
+    <li><strong>Costed and Estimated:</strong> goods received carry the cost actually paid. Stock that went out (sold, damaged, expired) is valued at today's average cost, so that figure is an estimate. The column <strong>Where the value comes from</strong> says which.</li>
+  </ul>
+</section>
+
+<section id="ageing">
+  <h2>Who owes the store (ageing)</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Open it from the <strong>Credit outstanding</strong> or <strong>Overdue accounts</strong> tile, or <strong>All reports</strong> → <strong>Ageing</strong>. It shows what customers owe as of now:</p>
+  <ul>
+    <li>At the top: <strong>Owed to the store</strong>, <strong>Accounts with debt</strong>, and five totals: <strong>Not yet due</strong>, <strong>1–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>Over 90 days</strong> past the due date.</li>
+    <li>One row per customer, oldest debt first, with their contact number, the amount in each age column, any <strong>Credit held</strong> and the total <strong>Owing</strong>. One customer can have amounts in several columns, because each unpaid sale ages on its own.</li>
+    <li>Click a customer to open their profile, where you can record a payment or print a statement (<a href="/guide/customers">Customers and utang</a>).</li>
+  </ul>
+  <p class="tip"><strong>Tip:</strong> Use this list each morning as your list of people to call or visit, starting from the top.</p>
+</section>
+
+<section id="voids-and-write-offs">
+  <h2>Find voided sales and write-offs</h2>
+  <p class="who"><strong>Who:</strong> Owner or Manager; the audit trail is Owner only</p>
+  <p>There is no separate void report or write-off report screen in this version. Find them here instead:</p>
+  <ul>
+    <li><strong>Voided sales:</strong> open <strong>Daily sales</strong> for the dates you want. The header says how many were left out and their value, and the list at the bottom names each one with its cashier.</li>
+    <li><strong>Stock written off</strong> (damaged, expired, internal use, adjustments): open <strong>Movement analysis</strong> and click <strong>Only this</strong> on the <strong>Damaged</strong>, <strong>Expired</strong> or <strong>Adjustment</strong> row.</li>
+    <li><strong>Customer debts written off</strong>, and who approved each void: sign in as the owner, open <strong>Admin</strong> → <strong>Audit</strong> (<a href="/guide/admin#audit-trail">Audit trail</a>), choose <strong>Debt written off</strong> or <strong>Sale voided</strong> in <strong>What</strong>, set the dates and click <strong>Filter</strong>. Each row shows who, when and why.</li>
+  </ul>
+</section>
+
+<section id="does-not-reconcile">
+  <h2>If a report says it does not reconcile</h2>
+  <p>Daily sales, the Sales analysis tabs and Movement analysis each check their own arithmetic. If one says <em>This report does not reconcile — out by ₱…</em> (or <em>This breakdown does not add up</em>, or <em>The ledger does not reconcile</em>), it is a fault in the program, not rounding.</p>
+  <ol class="steps">
+    <li>Do not act on those figures yet.</li>
+    <li>Click <strong>Export CSV</strong> to keep a copy of the report as it is.</li>
+    <li>Email <strong>ChachiSoftware@gmail.com</strong> with the report name, the dates and the file (see <a href="/guide/help#get-help">How to get help</a>).</li>
+  </ol>
+</section>

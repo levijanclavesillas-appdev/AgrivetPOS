@@ -1,0 +1,201 @@
+<h1>Suppliers and deliveries</h1>
+<p class="intro">Keep a list of your suppliers, send them purchase orders, and record each delivery so the stock and the cost of every product are right.</p>
+
+<nav class="on-page" aria-label="On this page"><ol>
+  <li><a href="#how-buying-works">How buying works</a></li>
+  <li><a href="#add-a-supplier">Add or edit a supplier</a></li>
+  <li><a href="#create-a-purchase-order">Create a purchase order</a></li>
+  <li><a href="#send-the-order">Send the order to the supplier</a></li>
+  <li><a href="#change-or-cancel-an-order">Change or cancel an order</a></li>
+  <li><a href="#order-statuses">What the order statuses mean</a></li>
+  <li><a href="#receive-a-delivery">Receive a delivery against an order</a></li>
+  <li><a href="#receive-without-an-order">Receive a delivery without an order</a></li>
+  <li><a href="#costs-and-average-cost">Costs and the average cost</a></li>
+  <li><a href="#batch-tracked-products">Batch-tracked products on a delivery</a></li>
+  <li><a href="#delivery-does-not-match">When the delivery does not match the order</a></li>
+</ol></nav>
+
+<section id="how-buying-works">
+  <h2>How buying works</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory. Cashiers do not see <strong>Buying</strong>.</p>
+  <p>Everything in this chapter starts from <strong>Buying</strong> in the menu on the left. It opens the <strong>Purchase orders</strong> list. From there you reach <strong>Suppliers</strong>, <strong>New order</strong> and <strong>Receive without an order</strong>.</p>
+  <p>Two things to remember:</p>
+  <ul>
+    <li><strong>An order moves no stock.</strong> Raising or sending a purchase order does not change what is on the shelf. Only a delivery that you post adds stock.</li>
+    <li><strong>A posted delivery cannot be changed.</strong> Check the quantities and costs before you press <strong>Post delivery</strong>.</li>
+  </ul>
+  <p>Quantities on orders and deliveries are in the product's <strong>base unit</strong>, the smallest unit you count it in (for example tablets, capsules or bottles). The unit is shown beside the quantity box. The unit cost is the cost of <strong>one</strong> base unit.</p>
+  <p class="tip"><strong>Tip:</strong> If the supplier's invoice says ₱150.00 for a box of 100 tablets and you bought 5 boxes, enter <kbd>500</kbd> as the quantity and <kbd>1.50</kbd> as the unit cost.</p>
+</section>
+
+<section id="add-a-supplier">
+  <h2>Add or edit a supplier</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Every order and every delivery belongs to a supplier, so add your suppliers first.</p>
+  <ol class="steps">
+    <li>Click <strong>Buying</strong>, then <strong>Suppliers</strong>.</li>
+    <li>Click <strong>New supplier</strong>.</li>
+    <li>Type the <strong>Name</strong> as it appears on their invoice. It is required and two suppliers cannot have the same name.</li>
+    <li>Optionally type a short <strong>Code</strong> (it must be unique too).</li>
+    <li>In <strong>Terms (days)</strong>, type how many days they give you to pay. <kbd>0</kbd> means cash on delivery. The most is 365.</li>
+    <li>Fill in <strong>Contact person</strong>, <strong>Contact number</strong>, <strong>Address</strong> and <strong>Notes</strong> if you want.</li>
+    <li>Click <strong>Save</strong>. You see <em>Supplier saved</em>.</li>
+  </ol>
+  <p>To change a supplier, find it in the list (the search box finds a name, code or contact), click <strong>Edit</strong>, change the details and click <strong>Save</strong>.</p>
+  <h3>Stop using a supplier</h3>
+  <p>Suppliers are never deleted. Click <strong>Deactivate</strong> on the row. A deactivated supplier no longer appears when you choose a supplier for an order or a delivery. To see it again, tick <strong>Include deactivated</strong> and click <strong>Reactivate</strong>.</p>
+  <p>If the supplier still has orders you are waiting for, deactivating is refused with a message such as <em>… has 2 orders still outstanding. Receive or cancel them before deactivating the supplier.</em></p>
+</section>
+
+<section id="create-a-purchase-order">
+  <h2>Create a purchase order</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <ol class="steps">
+    <li>Click <strong>Buying</strong>, then <strong>New order</strong>.</li>
+    <li>In <strong>Supplier</strong>, choose the supplier. You cannot change the supplier after the order is saved.</li>
+    <li>Optionally set the <strong>Expected</strong> delivery date and type the <strong>Supplier's reference</strong> (their own order number).</li>
+    <li>On the first line, start typing the product name, generic name, SKU or barcode in the <strong>Product</strong> box, then choose the product from the list. The chosen product's name appears in small text under the box. If it does not, the line is not linked to a product yet.</li>
+    <li>Type the <strong>Quantity</strong> (in the unit shown beside it) and the <strong>Unit cost</strong> you expect to pay. The <strong>Line total</strong> and the order <strong>Total</strong> update as you type.</li>
+    <li>Click <strong>Add a line</strong> for each further product. Click <strong>Remove</strong> to take a line off.</li>
+    <li>Optionally type <strong>Notes</strong>. They are for the store only.</li>
+    <li>Click <strong>Save</strong>. You see a message like <em>PO-20260915-000003 saved</em>. The order is now a <strong>Draft</strong>.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/buying-new-order.webp" alt="The New purchase order screen: a supplier chosen, an expected date, three product lines each with a quantity in boxes or packs, a unit cost and a line total, and the order total below the lines." width="1280" height="800" loading="lazy"><figcaption>A new order with three lines. The unit beside each quantity shows what the quantity is counted in.</figcaption></figure>
+  <p>If you see <em>Line 2 needs a product, a quantity and a unit cost.</em>, that line has no product chosen from the list, or its quantity is zero or empty. Choose the product again from the list.</p>
+  <p class="tip"><strong>Tip:</strong> You can order a product that is no longer sold (inactive), for example to receive the last delivery of it.</p>
+</section>
+
+<section id="send-the-order">
+  <h2>Send the order to the supplier</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Chachi POS does not email or print purchase orders. You tell the supplier yourself (by text message, phone call or their order form) and then mark the order as sent.</p>
+  <ol class="steps">
+    <li>Open the order from the <strong>Purchase orders</strong> list (drafts are hidden until you untick <strong>Only what is still awaited</strong>).</li>
+    <li>Give the supplier the order: the order number, each product and quantity.</li>
+    <li>Click <strong>Send to supplier</strong>. You see <em>Sent to the supplier</em> and the status becomes <strong>Sent to supplier</strong>.</li>
+  </ol>
+  <p>An order with no lines cannot be sent.</p>
+</section>
+
+<section id="change-or-cancel-an-order">
+  <h2>Change or cancel an order</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <h3>Change a draft</h3>
+  <p>Open the draft, change the lines or dates, and click <strong>Save</strong>. Nobody outside the store has seen it, so it is simply changed.</p>
+  <h3>Change an order already sent</h3>
+  <p>Open the order. The screen warns that it has already been sent. Change what you need and click <strong>Save as revision 2</strong> (or the next number). The order keeps its number and gets a new revision, shown as <strong>rev 2</strong> in the list. Tell the supplier which revision is the current one. Changing only the <strong>Notes</strong> does not make a new revision.</p>
+  <p>Once any delivery has been received against an order, the order cannot be changed any more. Raise a new order for anything further.</p>
+  <h3>Cancel an order</h3>
+  <ol class="steps">
+    <li>Open the order and click <strong>Cancel order</strong>.</li>
+    <li>Type why it is being cancelled. A reason is required and goes on the audit trail.</li>
+    <li>Click <strong>Cancel order</strong> in the box. You see <em>Order cancelled</em>.</li>
+  </ol>
+  <p>An order that has had any delivery against it cannot be cancelled. The message says <em>… has already had goods delivered against it and cannot be cancelled.</em></p>
+</section>
+
+<section id="order-statuses">
+  <h2>What the order statuses mean</h2>
+  <p>The <strong>Purchase orders</strong> list shows only orders you are still waiting for, unless you untick <strong>Only what is still awaited</strong> or choose a status.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Meaning</th><th>What you can do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Draft</strong></td><td>Saved, not yet sent.</td><td>Edit, send, cancel</td></tr>
+      <tr><td><strong>Sent to supplier</strong></td><td>The supplier has it; nothing has arrived yet.</td><td>Change as a new revision, receive, cancel</td></tr>
+      <tr><td><strong>Partly received</strong></td><td>Some of it has arrived.</td><td>Receive the rest</td></tr>
+      <tr><td><strong>Received</strong></td><td>Everything ordered has arrived.</td><td>Nothing; it is finished</td></tr>
+      <tr><td><strong>Cancelled</strong></td><td>Stopped, with the reason shown.</td><td>Nothing</td></tr>
+    </tbody>
+  </table></div>
+  <p>The status changes by itself when you post a delivery. You never set <strong>Partly received</strong> or <strong>Received</strong> by hand.</p>
+</section>
+
+<section id="receive-a-delivery">
+  <h2>Receive a delivery against an order</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Do this while you count the goods, with the supplier's delivery receipt (DR) in your hand.</p>
+  <ol class="steps">
+    <li>Click <strong>Buying</strong>. Find the order and click <strong>Receive</strong> on its row (or open the order and click <strong>Receive delivery</strong>).</li>
+    <li>The screen <strong>Receive against PO-…</strong> lists every product still outstanding. <strong>Arrived</strong> is filled in with the outstanding quantity and <strong>Unit cost</strong> with the ordered cost.</li>
+    <li>Type the <strong>Delivery receipt no.</strong> and the <strong>Invoice no.</strong> from the supplier's papers.</li>
+    <li>For each line, correct <strong>Arrived</strong> to what you actually counted.</li>
+    <li>If some arrived broken, leaking or unusable, type how many in <strong>Damaged</strong> and say what was wrong in the box at the end of the line. <strong>Into stock</strong> shows what will be added: arrived minus damaged.</li>
+    <li>Change <strong>Unit cost</strong> to what the supplier <strong>actually charged</strong> on the invoice. The ordered cost is shown under the box so you can compare.</li>
+    <li>Check the total <strong>Into stock: ₱…</strong> against the invoice.</li>
+    <li>Click <strong>Post delivery</strong>. You see a message like <em>GR-20260915-000001 posted — ₱4,250.00 into stock</em>, and the order opens with its new status.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/buying-receive.webp" alt="The Receive against PO screen: delivery receipt and invoice numbers filled in; each line shows Outstanding, Arrived, Damaged, Into stock, Unit cost with the ordered cost under it, and Value. One line has 2 damaged with a note." width="1280" height="800" loading="lazy"><figcaption>Into stock is arrived minus damaged. The ordered cost under each unit cost helps you spot a price change.</figcaption></figure>
+  <p>The order screen then shows <strong>Received</strong> and <strong>Outstanding</strong> for each line and, under <strong>Deliveries against this order</strong>, each delivery with its number, date and value.</p>
+  <h3>Part deliveries</h3>
+  <p>If only part of the order came, type what arrived. The order becomes <strong>Partly received</strong> and stays in the list. When the rest comes, click <strong>Receive</strong> again; only the products still outstanding are listed.</p>
+  <p class="warn"><strong>Important:</strong> in this version every product listed on the delivery screen needs an arrived quantity above zero, and there is no button to take a line off. If one product on the order did not come at all, the screen will not post. See <a href="#delivery-does-not-match">When the delivery does not match the order</a>.</p>
+  <p>Damaged items count as delivered against the order. They reduce what is still outstanding, but they do not go into stock.</p>
+</section>
+
+<section id="receive-without-an-order">
+  <h2>Receive a delivery without an order</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
+  <p>Use this when goods arrive with no purchase order behind them: a sales agent's walk-in delivery, or stock you bought and paid for at another shop.</p>
+  <ol class="steps">
+    <li>Click <strong>Buying</strong>, then <strong>Receive without an order</strong>. The screen is called <strong>Receive a delivery</strong>.</li>
+    <li>Choose the <strong>Supplier</strong>. A delivery always needs one. If it is a new source, add it first under <strong>Suppliers</strong>.</li>
+    <li>Type the <strong>Delivery receipt no.</strong> and <strong>Invoice no.</strong> if there are any.</li>
+    <li>On the first line, type in the <strong>Product</strong> box and choose the product from the list.</li>
+    <li>Type <strong>Arrived</strong>, any <strong>Damaged</strong>, and the <strong>Unit cost</strong> you paid.</li>
+    <li>Click <strong>Add a line</strong> for each further product.</li>
+    <li>Click <strong>Post delivery</strong>.</li>
+  </ol>
+  <p>There is no button to remove a line here. If you added one line too many, click <strong>Cancel</strong> and start again. Each product can be on a delivery only once, so put the whole quantity on one line.</p>
+  <p class="tip"><strong>Tip:</strong> If you paid for the goods from the cash drawer, also record the money as a cash out on your shift. See <a href="/guide/closing#cash-in-and-out">Cash in and out of the drawer</a>.</p>
+  <p>A product that has been made inactive cannot be received without an order. Make it active again first (<a href="/guide/products">Products and prices</a>).</p>
+</section>
+
+<section id="costs-and-average-cost">
+  <h2>Costs and the average cost</h2>
+  <p>Each product has one <strong>average cost</strong>. It is what the gross profit on every sale is worked out from, so the unit cost you type on a delivery matters.</p>
+  <ul>
+    <li>Only a delivery (and a few stock corrections) changes the average cost. Selling, writing off or returning stock never changes it.</li>
+    <li>The new average mixes what you already had with what just came in: (units on hand × old average + units into stock × unit cost) ÷ (units on hand + units into stock).</li>
+    <li>Damaged units are not counted, because they did not go into stock.</li>
+  </ul>
+  <p><strong>Example:</strong> you have 200 tablets at an average of ₱1.00. A delivery brings 300 tablets at ₱1.20. The new average is (200 × ₱1.00 + 300 × ₱1.20) ÷ 500 = <strong>₱1.12</strong>.</p>
+  <p>Only the owner sees a product's average cost in the product editor. Anyone who can see the <strong>Inventory valuation</strong> report sees it there (<a href="/guide/reports#stock-value-and-movements">Reports</a>).</p>
+  <p class="warn"><strong>Important:</strong> type the cost the supplier <strong>charged</strong>, per base unit. A cost typed per box instead of per tablet makes every profit figure for that product wrong, and a posted delivery cannot be edited.</p>
+</section>
+
+<section id="batch-tracked-products">
+  <h2>Batch-tracked products on a delivery</h2>
+  <p>Most medicines in the Pharmacy edition are <strong>batch-tracked</strong>: their stock is kept by batch number and expiry date so the earliest expiry is sold first and a recall can find every buyer (<a href="/guide/stock">Stock, expiry and counts</a>).</p>
+  <p class="warn"><strong>Important:</strong> in this version the delivery screen has no boxes for the batch number and expiry date. If a delivery includes a batch-tracked product, <strong>Post delivery</strong> is refused and nothing is saved. The message names each product, for example <em>Paracetamol 500 mg tablet needs a batch number and an expiry date. Batch-tracked stock cannot be received without it.</em></p>
+  <p>Deliveries of products that are not batch-tracked (for example face masks, bandages or cotton) are not affected. If you see this message, keep the supplier's delivery receipt and email <strong>ChachiSoftware@gmail.com</strong> for help recording the delivery. See <a href="/guide/help#get-help">How to get help</a>.</p>
+</section>
+
+<section id="delivery-does-not-match">
+  <h2>When the delivery does not match the order</h2>
+  <p class="who"><strong>Who:</strong> Owner, Manager or Inventory. Some cases need a Manager or Owner to approve.</p>
+  <h3>Less arrived than was ordered</h3>
+  <p>Type what really arrived. The rest stays outstanding and the order becomes <strong>Partly received</strong>. Receive the rest when it comes.</p>
+  <p>If a whole product on the order did not come, the delivery screen will not post (see the note under <a href="#receive-a-delivery">Receive a delivery</a>). What you can do:</p>
+  <ul>
+    <li>If nothing has been received against the order yet: cancel the order with a reason such as "Supplier short, delivered separately", record what came with <strong>Receive without an order</strong>, and raise a new order for what is still missing.</li>
+    <li>If the order is already <strong>Partly received</strong>, it cannot be cancelled. Wait until the missing product arrives, or email support.</li>
+  </ul>
+  <h3>More arrived than was ordered</h3>
+  <p>Type the real quantity. When you click <strong>Post delivery</strong>, extra quantity needs approval:</p>
+  <ul>
+    <li>If you are signed in as a Manager or Owner, your own login is the approval and the delivery posts.</li>
+    <li>If you are signed in as Inventory, a box <strong>PO-204 — authorisation required</strong> opens. A Manager or Owner types their name in <strong>Approver</strong> and their <strong>Password</strong> and clicks <strong>Approve</strong>. Then click <strong>Post delivery</strong> again.</li>
+  </ul>
+  <p>The delivery is marked <strong>over-receipt</strong> on the order.</p>
+  <h3>The price is different from the order</h3>
+  <p>Type the price actually charged. If it is more than 10% above or below the ordered cost, it needs the same approval as above, in a box marked <strong>PO-205 — authorisation required</strong>. The message says how far off it is, for example <em>Face masks 3-ply, box of 50: ₱105.00 is 16.7% above the ordered cost of ₱90.00.</em> The delivery is marked <strong>cost variance</strong>.</p>
+  <p>On a delivery without an order, the price is compared with the product's current average cost instead. The 10% limit is the owner setting <strong>Receipt cost variance needing authorisation, in basis points</strong> under <strong>Purchasing</strong> (1000 means 10%; see <a href="/guide/admin#change-a-setting">Change a setting</a>).</p>
+  <figure class="guide-shot"><img src="/static/guide/buying-authorise.webp" alt="The Receive against PO screen with an authorisation box open under the lines: PO-205 — authorisation required, a sentence saying the cost is above the ordered cost, and Approver and Password boxes with Approve and Cancel buttons." width="1280" height="800" loading="lazy"><figcaption>When an Inventory user posts a price change or extra quantity, a Manager or Owner approves it here with their own password.</figcaption></figure>
+  <p class="tip"><strong>Tip:</strong> If a big price change is a typing mistake, click <strong>Cancel</strong> in the approval box, fix the cost, and post again.</p>
+  <h3>Some items arrived damaged</h3>
+  <p>Type the number in <strong>Damaged</strong> and a short note. Only the good ones go into stock. If the supplier later replaces them, record the replacements with <strong>Receive without an order</strong>.</p>
+  <h3>A product arrived that you did not order</h3>
+  <p>A delivery against an order can only contain products on that order. If you are keeping the extra product, record it separately with <strong>Receive without an order</strong>. If you are sending it back, do not record it.</p>
+  <h3>You posted a delivery with a mistake</h3>
+  <p>A posted delivery cannot be edited or deleted. If the quantity was wrong, correct the stock with a stock adjustment, choosing a reason such as "Data entry correction" (<a href="/guide/stock">Stock, expiry and counts</a>). Tell the owner if the cost was wrong, because it has already changed the product's average cost.</p>
+</section>

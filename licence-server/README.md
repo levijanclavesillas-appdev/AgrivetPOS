@@ -6,12 +6,29 @@ checks offline. The POS works for 30 days between checks, plus 7 days' grace.
 
 | Path | Who | What |
 | :--- | :--- | :--- |
+| `/`, `/privacy` | the public | The site that introduces Chachi POS, and the privacy notice. Static files in `site/`, no script |
 | `/link` | a store owner | Enter the code the POS shows, sign in with Google, approve the device |
 | `/admin` | Chachi's | Stores, devices, the date each is paid to; record a manual payment (GCash, bank transfer); remove a device |
 | `POST /api/v1/device/start`, `/device/poll` | the POS | The device link |
 | `POST /api/v1/licence/renew` | the POS | The silent check, with the device's renewal secret |
 | `POST /api/v1/play/purchase` | the Android app | A Google Play subscription, verified with Google before it counts |
 | `GET /api/v1/public-key` | the build | The key the POS verifies licences with |
+
+## The public site
+
+`site/index.html` and `site/privacy.html`, with their stylesheet, fonts, icons and images under
+`site/static/` (served at `/static/`, cached for a day; the pages themselves are revalidated on every
+visit). Plain HTML under the same CSP as every other page here, so no inline style, no script and
+nothing from another host: the fonts (Inter, Plus Jakarta Sans — OFL) and the Lucide icon sprite
+(ISC) are vendored. The screenshots are of the real Pharmacy edition with an invented demo store.
+
+The privacy notice describes exactly what `src/db.js` stores; **change it when that changes.** Google's
+OAuth consent screen takes `https://pos.chachisoftware.store/` as the home page and
+`https://pos.chachisoftware.store/privacy` as the privacy policy.
+
+After editing anything in `site/`, rebuild the container (`docker compose up -d --build`): the files
+are copied into the image, not mounted. `npm test` fails if a page names a `/static/` file that is
+not there.
 
 ## How a store gets a licence
 
