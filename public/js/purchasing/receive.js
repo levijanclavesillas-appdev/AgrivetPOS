@@ -65,6 +65,9 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
             cost: (line.unit_cost_centavos / 100).toFixed(2),
             orderedCostCentavos: line.unit_cost_centavos,
             damageNote: '',
+            batchTracked: Boolean(line.is_batch_tracked),
+            batchNo: '',
+            expiryDate: '',
           }));
       }
       render();
@@ -78,6 +81,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
     poItemId: null, productId: '', label: '', unitCode: '',
     orderedMilli: 0, outstandingMilli: 0,
     received: '', damaged: '', cost: '', orderedCostCentavos: null, damageNote: '',
+    batchTracked: false, batchNo: '', expiryDate: '',
   });
 
   const milli = (value) => {
@@ -215,7 +219,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
   function lineRow(line, index) {
     const sound = soundMilli(line);
     return h('tr', {}, [
-      h('td', {}, direct()
+      h('td', {}, (direct()
         ? [
           // SCR-802's picker, the same one, for the same reason: a delivery keyed
           // against a line bound to nothing is a delivery refused at post, after the
@@ -225,7 +229,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
           // is bound to a product before they post a delivery against it.
           h('small', { class: 'resolved', text: line.productId ? line.label : '' }),
         ]
-        : [h('span', { text: line.label })]),
+        : [h('span', { text: line.label })]).concat(line.batchTracked ? [batchFields(line, index)] : [])),
 
       direct() ? null : h('td', { class: 'qty', text: quantity(line.outstandingMilli, line.unitCode) }),
 
@@ -273,6 +277,31 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
     ]);
   }
 
+  /**
+   * INV-202: a batch-tracked product arrives with its batch number and expiry, off the
+   * box. The server creates the batch from them; without them it refuses the delivery.
+   * One batch per product on a delivery — a second lot of the same product is received
+   * as a second delivery against the same order.
+   */
+  function batchFields(line, index) {
+    return h('div', { class: 'batch-fields' }, [
+      h('label', { text: 'Batch no.' }, [
+        h('input', {
+          type: 'text', value: line.batchNo, maxlength: 60, required: true,
+          placeholder: 'Lot / batch on the box', 'aria-label': `Batch number on line ${index + 1}`,
+          oninput: (event) => { line.batchNo = event.target.value; },
+        }),
+      ]),
+      h('label', { text: 'Expiry' }, [
+        h('input', {
+          type: 'date', value: line.expiryDate, required: true,
+          'aria-label': `Expiry date on line ${index + 1}`,
+          oninput: (event) => { line.expiryDate = event.target.value; },
+        }),
+      ]),
+    ]);
+  }
+
   /** Recompute the derived cells without rebuilding the row under the cursor. */
   function refreshLine(index) {
     const row = root.querySelectorAll('#gr-lines tr')[index];
@@ -303,7 +332,11 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
         line.productId = product.id;
         line.unitCode = product.base_unit.code;
         line.label = `${product.sku} — ${product.name}`;
-        refreshLine(index);
+        const wasTracked = line.batchTracked;
+        line.batchTracked = Boolean(product.is_batch_tracked);
+        // The batch fields come and go with the product, so the row is drawn again.
+        if (line.batchTracked !== wasTracked) render();
+        else refreshLine(index);
       },
       onClear: () => {
         if (!line.productId) return;
@@ -318,10 +351,10 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
   /**
    * AUD-603 — the approver authenticates as themselves.
    *
-   * `/auth/login` is unauthenticated and issues no session header, so the person doing
-   * the receiving stays signed in and the row records two distinct actors rather than
-   * one asserted twice. The server resolves the username against the users table; the
-   * role this screen holds is only used to say who it has.
+   * The panel's password goes to /auth/approve, which answers with an approval for this
+   * session's next action — not a session — so the person receiving stays signed in and
+   * the row records two distinct actors. The server reads the approver's role from the
+   * approval; the role this screen holds is only used to say who it has.
    */
   function authorisation() {
     return ui.authorisationPanel({
@@ -354,6 +387,16 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
       );
       return false;
     }
+
+    const unbatched = lines.findIndex((line) => line.batchTracked && soundMilli(line) > 0
+      && (!line.batchNo.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(line.expiryDate)));
+    if (unbatched !== -1) {
+      ui.toast(
+        `Line ${unbatched + 1} is batch-tracked: type its batch number and expiry date, as printed on the box (INV-202).`,
+        { kind: 'error' }
+      );
+      return false;
+    }
     return true;
   }
 
@@ -376,6 +419,8 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
           damagedQtyMilli: line.damaged.trim() === '' ? 0 : milli(line.damaged),
           unitCostCentavos: Math.round(Number.parseFloat(line.cost) * 100),
           damageNote: line.damageNote.trim() || null,
+          batchNo: line.batchTracked ? line.batchNo.trim() : null,
+          expiryDate: line.batchTracked ? line.expiryDate : null,
         })),
       });
       const gr = result.goods_receipt;

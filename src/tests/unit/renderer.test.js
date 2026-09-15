@@ -853,8 +853,20 @@ test('AUD-603: the adjustment screen uses the shared authorisation panel', () =>
   // The approver authenticates as themselves, so the row records two distinct actors.
   assert.match(source, /api\.approve\(/);
   assert.equal(/\/auth\/login/.test(source), false, 'an approval, never the approver\'s own session');
-  // And submit stays disabled until they have.
-  assert.match(source, /disabled: Boolean\(refusal\) && !approver/);
+  // And submit stays disabled until they have — and, for a batch-tracked product, until
+  // the batch that was counted is chosen (INV-201).
+  assert.match(source, /disabled: \(Boolean\(refusal\) && !approver\) \|\| \(product\.is_batch_tracked && !chosenBatch\(\)\)/);
+  assert.match(source, /batchId: product\.is_batch_tracked \? batchId : null/);
+});
+
+test('INV-202: the delivery screen asks a batch-tracked line for its batch and expiry, and sends them', () => {
+  const source = codeOf('js/purchasing/receive.js');
+  assert.match(source, /batchTracked: Boolean\(line\.is_batch_tracked\)/, 'an order line says whether it is tracked');
+  assert.match(source, /line\.batchTracked = Boolean\(product\.is_batch_tracked\)/, 'and so does a picked product');
+  assert.match(source, /type: 'date', value: line\.expiryDate/, 'the expiry is a date, sent as YYYY-MM-DD');
+  assert.match(source, /batchNo: line\.batchTracked \? line\.batchNo\.trim\(\) : null/);
+  assert.match(source, /expiryDate: line\.batchTracked \? line\.expiryDate : null/);
+  assert.match(source, /is batch-tracked: type its batch number and expiry date/, 'refused before posting, by line');
 });
 
 test('INV-101: no catalogue screen lets anyone type an on-hand figure', () => {

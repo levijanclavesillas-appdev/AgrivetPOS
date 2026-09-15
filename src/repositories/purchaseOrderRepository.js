@@ -122,7 +122,7 @@ function itemsFor(poId) {
     SELECT i.id, i.po_id, i.line_no, i.product_id, i.product_name_snapshot,
            i.qty_milli, i.order_unit_id, i.order_pack_factor_milli,
            i.unit_cost_centavos, i.line_total_centavos, i.notes,
-           p.sku, u.code AS base_unit_code, ou.code AS order_unit_code,
+           p.sku, p.is_batch_tracked, u.code AS base_unit_code, ou.code AS order_unit_code,
            COALESCE((SELECT SUM(gi.received_qty_milli) FROM goods_receipt_items gi
                       WHERE gi.po_item_id = i.id), 0) AS received_qty_milli,
            COALESCE((SELECT SUM(gi.damaged_qty_milli) FROM goods_receipt_items gi

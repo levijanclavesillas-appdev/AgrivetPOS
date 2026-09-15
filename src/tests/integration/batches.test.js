@@ -466,6 +466,95 @@ test('POST /batches/:id/expire writes the batch off, behind TX-407', async () =>
   assert.equal(inventoryRepository.qtyOnHand(product.id), 0);
 });
 
+// ── The adjustment and the delivery screens, over HTTP (INV-201, INV-202) ────
+
+test('INV-201: a batch-tracked product is adjusted one batch at a time, as the screen sends it', async () => {
+  const product = vaccine();
+  receive({ product, qtyMilli: 5000, unitCostCentavos: 1000, batchNo: 'ADJ-1', expiryDate: days(200) });
+  receive({ product, qtyMilli: 3000, unitCostCentavos: 1000, batchNo: 'ADJ-2', expiryDate: days(400) });
+  const [first, second] = batchesOf(product.id);
+  const adjust = (body) => call('/inventory/adjustments', {
+    token: tokens.INVENTORY, method: 'POST',
+    body: { productId: product.id, reason: 'Physical count correction', ...body },
+  });
+  const refusal = async (response, status) => {
+    assert.equal(response.status, status);
+    return (await response.json()).error;
+  };
+
+  // Which batch was counted is not optional: an unbatched movement would leave the
+  // batches adding up to less than the shelf. Before this, the screen sent no batch
+  // and every batch-tracked product was refused outright.
+  const unnamed = await refusal(await adjust({ qtyMilli: -2000 }), 400);
+  assert.equal(unnamed.rule_id, 'INV-201');
+  assert.match(unnamed.message, /Choose the batch you counted/);
+
+  // Counted 3 in ADJ-1, which the system said held 5.
+  const done = await adjust({ qtyMilli: -2000, batchId: first.id });
+  assert.equal(done.status, 201, JSON.stringify(await done.clone().json()));
+  const after = batchesOf(product.id);
+  assert.equal(after.find((b) => b.batch_no === 'ADJ-1').qty_milli, 3000);
+  assert.equal(after.find((b) => b.batch_no === 'ADJ-2').qty_milli, 3000, 'the other batch untouched');
+  assert.equal(inventoryRepository.qtyOnHand(product.id), 6000);
+  assert.equal(batched(product.id), inventoryRepository.qtyOnHand(product.id), 'INV-201 still holds');
+
+  // Found one more of ADJ-2.
+  assert.equal((await adjust({ qtyMilli: 1000, batchId: second.id })).status, 201);
+  assert.equal(batched(product.id), 7000);
+
+  // A batch cannot go below none, and another product's batch is not this one's.
+  const tooMany = await refusal(await adjust({ qtyMilli: -4000, batchId: first.id }), 409);
+  assert.equal(tooMany.rule_id, 'INV-201');
+  assert.match(tooMany.message, /holds 3 PC/);
+  const other = vaccine();
+  receive({ product: other, qtyMilli: 1000, unitCostCentavos: 1000, batchNo: 'OTHER-1', expiryDate: days(200) });
+  const foreign = await refusal(await adjust({ qtyMilli: -1000, batchId: batchesOf(other.id)[0].id }), 400);
+  assert.equal(foreign.rule_id, 'INV-201');
+  assert.equal(batched(product.id), 7000, 'nothing moved on any refusal');
+
+  // And a product that is not tracked names no batch.
+  const plain = vaccine({ batchTracked: false });
+  const stray = await call('/inventory/adjustments', {
+    token: tokens.INVENTORY, method: 'POST',
+    body: { productId: plain.id, qtyMilli: 1000, reason: 'Physical count correction', batchId: first.id },
+  });
+  assert.equal(stray.status, 400);
+
+  // The trail says which batch.
+  const trail = auditService.browse({ action: 'INVENTORY_ADJUSTED', entityId: product.id }).rows;
+  assert.ok(trail.some((row) => row.after && row.after.batch_no === 'ADJ-1'), 'the batch is on the audit row');
+});
+
+test('INV-202: an order line says it is batch-tracked, and the delivery takes its batch over HTTP', async () => {
+  const purchaseOrderService = require('../../services/purchaseOrderService');
+  const product = vaccine();
+  const draft = purchaseOrderService.create({
+    supplierId: supplier.id, lines: [{ productId: product.id, qtyMilli: 10000, unitCostCentavos: 21000 }],
+  }, sessions.OWNER);
+  const order = purchaseOrderService.submit(draft.id, sessions.OWNER);
+
+  // The screen reads the order to know which lines ask for a batch.
+  const read = await (await call(`/purchase-orders/${order.id}`, { token: tokens.INVENTORY })).json();
+  const line = read.purchase_order.lines[0];
+  assert.equal(line.is_batch_tracked, true);
+
+  const deliver = (extra) => call('/goods-receipts', {
+    token: tokens.INVENTORY, method: 'POST',
+    body: { poId: order.id, lines: [{ poItemId: line.id, receivedQtyMilli: 10000, unitCostCentavos: 21000, ...extra }] },
+  });
+  const unbatched = await deliver({});
+  assert.equal(unbatched.status, 400);
+  assert.equal((await unbatched.json()).error.rule_id, 'INV-202');
+
+  const posted = await deliver({ batchNo: 'LOT-7781', expiryDate: days(540) });
+  assert.equal(posted.status, 201, JSON.stringify(await posted.clone().json()));
+  const [batch] = batchesOf(product.id);
+  assert.equal(batch.batch_no, 'LOT-7781');
+  assert.equal(batch.expiry_date, days(540));
+  assert.equal(batch.qty_milli, 10000);
+  assert.equal(inventoryRepository.qtyOnHand(product.id), 10000);
+});
+
 // ── The other two paths that move batch-tracked stock ───────────────────────
 
 test('POS-401: voiding a sale returns each batch exactly what it gave', () => {

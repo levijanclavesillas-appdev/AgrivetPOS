@@ -52,6 +52,11 @@
 .catalogue-list small { display: block; font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
 .catalogue-list .resolved:not(:empty) { color: var(--md-primary); }
 
+/* INV-202: a batch-tracked line's batch number and expiry, under its product name. */
+.batch-fields { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+.batch-fields label { display: grid; gap: 2px; font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
+.batch-fields input { min-height: var(--touch); padding: 0 var(--space-1); width: 11rem; }
+
 /* PO-202's figure, and the one the eye should land on while sacks are being counted
    off a van. Marked when it is below what arrived, because that is the case worth
    noticing before the delivery note is signed. */

@@ -89,12 +89,14 @@ router.get('/inventory/meta/adjustment-reasons', postAdjustment, (req, res, next
 
 router.post('/inventory/adjustments', postAdjustment, (req, res, next) => {
   try {
-    const { productId, qtyMilli, reason, notes = null, unitCostCentavos = null, approver = null } = req.body || {};
+    const {
+      productId, qtyMilli, reason, notes = null, unitCostCentavos = null, approver = null, batchId = null,
+    } = req.body || {};
 
     // The approver was proved by middleware/auth.js from the approval the owner gave
     // at SCR-203's authorisation panel; the body's own claim never reaches here.
     res.status(201).json(inventoryService.adjust({
-      productId, qtyMilli, reason, notes, unitCostCentavos,
+      productId, qtyMilli, reason, notes, unitCostCentavos, batchId,
       actor: req.session,
       approver,
     }, req.session));

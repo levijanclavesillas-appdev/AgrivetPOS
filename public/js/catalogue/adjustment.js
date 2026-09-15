@@ -9,6 +9,10 @@
 // the person doing the counting — "you counted 12 fewer than the system thinks" is the
 // sentence that catches a miscount before it becomes a movement.
 //
+// A batch-tracked product is adjusted one batch at a time (INV-201): the screen asks
+// which batch was counted, and the on-hand, the counted figure and the variance are
+// that batch's. Its batches must add up to the product, so the movement names one.
+//
 // Above the configured value the inline authorisation panel appears and the submit
 // button stays disabled until an owner has authenticated in it (INV-108, AUD-603). It
 // is the same panel the POS screen uses, from ui.js — a second one would drift, and
@@ -23,6 +27,8 @@ import { quantity } from '../shell/format.js';
 export function createAdjustment({ root, productId, onClose }) {
   let product = null;
   let onHand = null;
+  let batches = [];
+  let batchId = '';
   let reasons = [];
   let approver = null;
   let counted = '';
@@ -43,13 +49,29 @@ export function createAdjustment({ root, productId, onClose }) {
       // an empty on-hand line, which the browser smoke caught and no unit test would.
       onHand = stock.on_hand;
       reasons = meta.reasons || [];
-      counted = quantity(onHand.qty_on_hand_milli);
+      if (product.is_batch_tracked) {
+        // Empty batches too, so stock found of a batch that ran out can be put back —
+        // but not the long-expired ones, which nobody is counting.
+        batches = ((await api.get(`/products/${productId}/batches?includeEmpty=true`)).batches || [])
+          .filter((b) => b.qty_milli > 0 || b.expiry_status !== 'EXPIRED');
+        if (batches.length === 1) batchId = batches[0].id;
+      }
+      counted = baseMilli() === null ? '' : quantity(baseMilli());
       render();
     } catch (err) {
       if (err.isRefusal) ui.refused(root, err);
       else ui.error(root, { message: err.message, retry: load });
     }
   }
+
+  const chosenBatch = () => batches.find((b) => b.id === batchId) || null;
+
+  /** What the system holds of what is being counted: the product, or the chosen batch. */
+  const baseMilli = () => {
+    if (!product.is_batch_tracked) return onHand.qty_on_hand_milli;
+    const batch = chosenBatch();
+    return batch ? batch.qty_milli : null;
+  };
 
   const countedMilli = () => {
     const value = Number.parseFloat(counted);
@@ -59,7 +81,8 @@ export function createAdjustment({ root, productId, onClose }) {
   /** What the movement will be: the difference, signed. */
   const varianceMilli = () => {
     const target = countedMilli();
-    return target === null ? null : target - onHand.qty_on_hand_milli;
+    const base = baseMilli();
+    return target === null || base === null ? null : target - base;
   };
 
   function render() {
@@ -82,8 +105,10 @@ export function createAdjustment({ root, productId, onClose }) {
         class: 'editor-form',
         onsubmit: (event) => { event.preventDefault(); submit(); },
       }, [
+        product.is_batch_tracked ? batchField(unit) : null,
+
         h('div', { class: 'editor-field' }, [
-          h('label', { text: `Counted quantity (${unit})` }),
+          h('label', { text: product.is_batch_tracked ? `Counted in this batch (${unit})` : `Counted quantity (${unit})` }),
           h('input', {
             type: 'text', inputmode: 'decimal', value: counted, autofocus: true,
             'aria-label': `Counted quantity in ${unit}`,
@@ -125,12 +150,39 @@ export function createAdjustment({ root, productId, onClose }) {
             type: 'submit', class: 'primary', text: 'Post adjustment',
             // INV-108: nothing is posted above the threshold until an owner has
             // authenticated in the panel.
-            disabled: Boolean(refusal) && !approver,
+            disabled: (Boolean(refusal) && !approver) || (product.is_batch_tracked && !chosenBatch()),
           }),
           h('button', { type: 'button', text: 'Cancel', onclick: () => onClose() }),
         ]),
       ]),
     ]));
+  }
+
+  /** INV-201: which batch was counted. Choosing one sets the counted figure to what it holds. */
+  function batchField(unit) {
+    if (batches.length === 0) {
+      return h('p', { class: 'muted', text: `${product.name} is batch-tracked and has no batch yet. `
+        + 'Stock arrives with its batch number and expiry on a delivery (Buying → Receive).' });
+    }
+    return h('div', { class: 'editor-field' }, [
+      h('label', { text: 'Batch' }),
+      h('select', {
+        required: true,
+        onchange: (event) => {
+          batchId = event.target.value;
+          counted = baseMilli() === null ? '' : quantity(baseMilli());
+          render();
+        },
+      }, [
+        h('option', { value: '', text: 'Choose the batch you counted…' }),
+        ...batches.map((b) => h('option', {
+          value: b.id, selected: b.id === batchId,
+          text: `${b.batch_no} — expires ${b.expiry_date} — holds ${b.qty_display || `${quantity(b.qty_milli)} ${unit}`}`,
+        })),
+      ]),
+      h('small', { class: 'muted', text: 'A batch-tracked product is adjusted one batch at a time, '
+        + 'so its batches still add up to what is on hand (INV-201).' }),
+    ]);
   }
 
   /** Re-rendered on every keystroke, without rebuilding the form under the cursor. */
@@ -159,9 +211,9 @@ export function createAdjustment({ root, productId, onClose }) {
   /**
    * AUD-603 — the approver authenticates as themselves.
    *
-   * Signing in here does not replace the session: `/auth/login` is unauthenticated and
-   * issues no session header, so the person doing the counting stays signed in and the
-   * row records two distinct actors rather than one asserted twice.
+   * The panel's password goes to /auth/approve, which answers with an approval for this
+   * session's next action — not a session — so the person counting stays signed in and
+   * the row records two distinct actors, proved rather than asserted.
    */
   function authorisation() {
     return ui.authorisationPanel({
@@ -187,6 +239,10 @@ export function createAdjustment({ root, productId, onClose }) {
       ui.toast('Choose a reason.', { kind: 'error' });
       return;
     }
+    if (product.is_batch_tracked && !chosenBatch()) {
+      ui.toast('Choose the batch you counted.', { kind: 'error' });
+      return;
+    }
 
     try {
       await api.post('/inventory/adjustments', {
@@ -194,6 +250,7 @@ export function createAdjustment({ root, productId, onClose }) {
         // The signed movement, not the counted figure: the server posts what it is
         // given and derives the new on-hand from the ledger (INV-101).
         qtyMilli: variance,
+        batchId: product.is_batch_tracked ? batchId : null,
         reason,
         notes: notes.trim() || null,
         approver: approver ? { username: approver.username, token: approver.token } : null,

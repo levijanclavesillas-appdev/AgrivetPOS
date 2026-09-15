@@ -353,7 +353,7 @@ function adjustmentValueCentavos(qtyMilli, avgCostCentavos) {
  */
 function adjust({
   productId, qtyMilli, reason, notes = null, unitCostCentavos = null,
-  actor, approver = null, occurredAt = null,
+  actor, approver = null, occurredAt = null, batchId = null,
 }, session = actor) {
   if (!permissions.can(session, 'TX-407')) {
     throw errors.forbidden(
@@ -367,6 +367,7 @@ function adjust({
 
   const listedReason = assertReasonListed(reason);
   const qty = normaliseQuantity('ADJUSTMENT', qtyMilli);
+  const batch = batchToAdjust(product, batchId, qty);
   const value = adjustmentValueCentavos(qty, product.avg_cost_centavos);
   const threshold = settingsService.get('adjustment_authorisation_centavos');
   const needsOwner = value > threshold;
@@ -410,7 +411,10 @@ function adjust({
       qtyMilli: qty,
       unitCostCentavos,
       actor,
-      reason: fullReason,
+      // INV-201: the adjustment lands on the batch that was counted, as a stock count's
+      // variance does, so the batches still add up to the product's on-hand.
+      batchId: batch ? batch.id : null,
+      reason: batch ? `${fullReason} — batch ${batch.batch_no}` : fullReason,
       referenceType: 'adjustment',
       occurredAt,
       // An adjustment is how a store corrects a wrong figure, including one that is
@@ -428,6 +432,7 @@ function adjust({
       after: {
         qty_on_hand_milli: result.balanceMilli,
         qty_milli: qty,
+        ...(batch ? { batch_no: batch.batch_no, batch_qty_milli: batch.qty_milli + qty } : {}),
         value_centavos: value,
         movement_id: result.movement.id,
         authorisation_required: needsOwner,
@@ -446,6 +451,40 @@ function adjust({
       selfAuthorised,
     };
   });
+}
+
+/**
+ * INV-201 for an adjustment: a batch-tracked product is adjusted one batch at a time,
+ * because its batches must add up to its on-hand. The batch is the product's own, and
+ * an adjustment cannot take it below zero — a batch is boxes on a shelf, and fewer than
+ * none of them is a miscount, not a figure. (The product's on-hand may still go below
+ * zero where the store allows it; that is INV-104's business, not the batch's.)
+ */
+function batchToAdjust(product, batchId, qty) {
+  if (!product.is_batch_tracked) {
+    if (batchId) {
+      throw errors.badRequest(`${product.name} is not batch-tracked, so an adjustment names no batch.`, { ruleId: 'INV-201' });
+    }
+    return null;
+  }
+  if (!batchId) {
+    throw errors.badRequest(
+      `${product.name} is batch-tracked. Choose the batch you counted, and adjust that batch.`,
+      { ruleId: 'INV-201' },
+    );
+  }
+  const batch = batchRepository.withQuantity(batchId);
+  if (!batch || batch.product_id !== product.id) {
+    throw errors.badRequest(`That batch is not one of ${product.name}'s.`, { ruleId: 'INV-201' });
+  }
+  if (batch.qty_milli + qty < 0) {
+    throw errors.conflict(
+      `Batch ${batch.batch_no} holds ${quantity.format(batch.qty_milli, product.base_unit_code)}; `
+      + `an adjustment cannot take it below zero.`,
+      { ruleId: 'INV-201' },
+    );
+  }
+  return batch;
 }
 
 // ── Reading ─────────────────────────────────────────────────────────────────

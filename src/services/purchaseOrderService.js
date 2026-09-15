@@ -201,6 +201,8 @@ function presentLine(row) {
     product_id: row.product_id,
     sku: row.sku,
     product_name: row.product_name_snapshot,
+    // INV-202: the delivery screen asks for a batch number and expiry on these lines.
+    is_batch_tracked: Boolean(row.is_batch_tracked),
     base_unit_code: row.base_unit_code,
     order_unit_code: row.order_unit_code,
     order_pack_factor_milli: row.order_pack_factor_milli,
