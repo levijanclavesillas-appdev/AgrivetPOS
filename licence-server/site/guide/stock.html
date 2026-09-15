@@ -112,18 +112,39 @@
 
 <section id="recall-a-batch">
   <h2>Recall a batch</h2>
-  <p class="who"><strong>Who:</strong> Owner, Manager, Inventory or Cashier. Saving the list as a file: Owner or Manager.</p>
-  <p>When a manufacturer or the FDA recalls a batch, the recall screen lists every sale that took stock from it, with the customer's name and phone number.</p>
+  <p class="who"><strong>Who:</strong> anyone can read the recall list. Putting a batch on recall, returning it and lifting a recall: Owner, Manager or Inventory. Saving the list as a file: Owner or Manager.</p>
+  <p>When a manufacturer or the FDA recalls a batch, do two things at once: stop it being sold, and find the customers who bought it. Both start on the same screen.</p>
   <ol class="steps">
     <li>On <strong>Products</strong>, click <strong>Batches</strong> on the product. If the batch is sold out, tick <strong>Include batches that are used up — a recall still names them</strong>.</li>
     <li>Click <strong>Recall</strong> on the batch named in the notice.</li>
-    <li>The screen <strong>Recall — batch …</strong> shows the product, supplier, expiry, and how much is <strong>Still in the shop</strong>.</li>
+    <li>The screen <strong>Recall — batch …</strong> shows the product, supplier, expiry, and how much is <strong>Still in the shop</strong>. Under it, a line says <strong>Not on recall</strong>.</li>
+    <li>Click <strong>Put on recall</strong>. In <strong>Why</strong>, type the notice, for example “FDA advisory 2026-114”, and click <strong>Put on recall</strong>.</li>
+    <li>The line turns red: <strong>On recall — cannot be sold</strong>, with the date, who did it and why. From now on the counter will not sell this batch.</li>
+    <li>Take the boxes of that batch off the shelf and keep them apart.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/stock-recall-held.webp" alt="The Recall screen for batch MD24-0815 of Paracetamol 500 mg tablet. A red panel says On recall, cannot be sold, since the date and time, by leo, FDA advisory 2026-114, with the buttons Return 250 TAB to the supplier and Lift the recall. Below are the three figures and the list of sales with customers, contact numbers and quantities." width="1280" height="800" loading="lazy"><figcaption>Once a batch is on recall, the counter will not sell it. The list below is who to ring.</figcaption></figure>
+
+  <h3>What the counter does with a recalled batch</h3>
+  <p>The counter sells the product from its other batches, as if the recalled one were not there. If there is not enough in the other batches, the sale does not complete and the cashier sees, for example, <em>Paracetamol 500 mg tablet: 1 TAB short. 250 TAB is on the shelf but recalled (batch MD24-0815) and may not be sold. Take it off the shelf.</em> On <strong>Batches</strong> the batch shows a red <strong>Recalled</strong> tag, and the dashboard warns while any recalled batch still holds stock.</p>
+
+  <h3>Ring the customers</h3>
+  <ol class="steps">
     <li>Read the three figures: <strong>Still out there</strong> (the quantity with customers), <strong>People to ring</strong> (customers with a name) and <strong>Cannot be reached</strong> (walk-in sales).</li>
     <li>Work down the list: <strong>Customer</strong>, <strong>Contact</strong>, <strong>Receipt</strong>, <strong>When</strong>, <strong>Took</strong> and <strong>Still out</strong>. Walk-in sales say “no way to reach them”. Voided sales and part-returned lines stay on the list, marked, because the goods may still be with the customer.</li>
     <li>Click <strong>Export CSV</strong> to save the list as a file you can print or work through by phone.</li>
   </ol>
-  <figure class="guide-shot"><img src="/static/guide/stock-recall.webp" alt="The Recall screen for batch MD24-0815 of Paracetamol 500 mg tablet. At the top are the product, supplier, expiry and the quantity still in the shop, then three large figures: still out there, people to ring and cannot be reached. Below is a list of sales with customer, contact number, receipt number, date and time, quantity taken and quantity still out, with walk-in rows saying no way to reach them." width="1280" height="800" loading="lazy"><figcaption>The walk-in count tells you how many buyers you cannot phone.</figcaption></figure>
-  <p class="warn"><strong>Important:</strong> the recall screen does not stop the counter selling the batch. Pull the boxes off the shelf, then take them out of stock by counting that batch as 0 in a <a href="#count-stock">stock count</a>.</p>
+  <p>When a customer brings recalled goods back, take them as an ordinary return (<a href="/guide/corrections#return-goods">Return goods</a>). They go back into the recalled batch, so they cannot be sold again. Send them back to the supplier with the rest.</p>
+
+  <h3>Send it back to the supplier</h3>
+  <ol class="steps">
+    <li>When the supplier collects the stock, or you send it, open the batch's <strong>Recall</strong> screen.</li>
+    <li>Click <strong>Return … to the supplier</strong>. The button shows how much the batch holds.</li>
+    <li>Add a <strong>Note</strong> if it helps, for example the supplier's return slip number, and click <strong>Return to supplier</strong>.</li>
+  </ol>
+  <p>All that the batch holds leaves stock as <em>Returned to supplier</em>, which the Movement analysis report shows. The batch stays on recall.</p>
+
+  <h3>Lift a recall placed by mistake</h3>
+  <p>If the wrong batch was put on recall, or the manufacturer withdraws the notice, click <strong>Lift the recall</strong>, say why, and confirm. The batch can be sold again at once. The audit trail keeps both the recall and the lift, with who did each and why.</p>
 </section>
 
 <section id="how-stock-is-kept">
