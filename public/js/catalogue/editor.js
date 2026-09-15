@@ -22,6 +22,7 @@ import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, quantity, manila } from '../shell/format.js';
+import * as pictures from '../shell/pictures.js';
 
 const TABS = ['Identity', 'Units', 'Pricing', 'Stock', 'Barcodes'];
 const TAX_CLASSES = ['VATABLE', 'VAT_EXEMPT', 'ZERO_RATED'];
@@ -43,6 +44,9 @@ export function createProductEditor({ root, productId, onClose }) {
   // and vanish in the same frame, which is what the browser smoke caught. Null means
   // "not seeded yet"; a save or a level change sets it back.
   let bandDraft = null;
+  // TASK-052: a picture chosen for a product not yet created, sent once it exists.
+  let pendingPicture = null;
+  let pictureBusy = false;
   const isNew = !productId;
 
   async function load() {
@@ -177,6 +181,7 @@ export function createProductEditor({ root, productId, onClose }) {
         await save(changes);
       },
     }, [
+      pictureField(),
       sku.el, name.el, genericName.el, category.el, brand.el, unit.el, taxClass.el,
       batchTracked.el, statutory.el,
       retail ? retail.el : null,
@@ -188,6 +193,85 @@ export function createProductEditor({ root, productId, onClose }) {
         }),
       ]),
     ]);
+  }
+
+  // ── The picture (TASK-052, IMG-001) ─────────────────────────────────────────
+  //
+  // Saved the moment it is chosen, not with the form: it has its own endpoint, and a
+  // photo taken at the shelf should not wait on somebody remembering to press Save.
+  // A product that does not exist yet keeps its picture here until it is created.
+
+  function pictureField() {
+    const hasPicture = Boolean(pendingPicture || product.image_version);
+    const frame = pendingPicture
+      ? h('span', { class: 'product-picture large' }, [h('img', { src: pendingPicture.preview, alt: '' })])
+      : pictures.productPicture(product, { size: 'image', className: 'product-picture large' });
+
+    return h('div', { class: 'editor-field picture-field' }, [
+      h('label', { text: 'Picture' }),
+      h('div', { class: 'picture-row' }, [
+        frame,
+        h('div', { class: 'picture-actions' }, [
+          h('div', { class: 'picture-buttons' }, [
+            h('button', {
+              type: 'button', icon: 'camera', disabled: pictureBusy,
+              text: pictureBusy ? 'Saving…' : hasPicture ? 'Replace picture' : 'Add a picture',
+              onclick: choosePicture,
+            }),
+            hasPicture ? h('button', {
+              type: 'button', class: 'row-action', icon: 'trash', text: 'Remove', disabled: pictureBusy,
+              onclick: removePicture,
+            }) : null,
+          ]),
+          h('small', { class: 'muted', text: isNew
+            ? 'The box as the shelf shows it. It is saved with the product.'
+            : 'The box as the shelf shows it. Saved as soon as it is chosen; shrunk to 640 px first.' }),
+        ]),
+      ]),
+    ]);
+  }
+
+  async function choosePicture() {
+    const file = await pictures.choosePicture();
+    if (!file) return;
+    pictureBusy = true;
+    render();
+    try {
+      const shrunk = await pictures.shrink(file);
+      if (isNew) {
+        pendingPicture = shrunk;
+      } else {
+        product = { ...product, image_version: await pictures.upload(product.id, shrunk) };
+        URL.revokeObjectURL(shrunk.preview);
+        ui.toast('Picture saved', { kind: 'success' });
+      }
+    } catch (err) {
+      ui.toast(err.isRefusal && err.ruleId ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+    } finally {
+      pictureBusy = false;
+      render();
+    }
+  }
+
+  async function removePicture() {
+    if (pendingPicture) {
+      URL.revokeObjectURL(pendingPicture.preview);
+      pendingPicture = null;
+      render();
+      return;
+    }
+    if (!window.confirm(`Remove the picture of ${product.name}?`)) return;
+    pictureBusy = true;
+    render();
+    try {
+      await pictures.remove(product.id);
+      product = { ...product, image_version: null };
+    } catch (err) {
+      ui.toast(err.isRefusal && err.ruleId ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+    } finally {
+      pictureBusy = false;
+      render();
+    }
   }
 
   /** UOM-003, and the sentence that makes the lock make sense. */
@@ -717,6 +801,17 @@ export function createProductEditor({ root, productId, onClose }) {
     try {
       if (isNew) {
         const created = await api.post('/products', changes);
+        if (pendingPicture) {
+          // The product exists whatever happens to its picture; a failed upload says so
+          // and leaves it to be added again from the product.
+          try {
+            await pictures.upload(created.product.id, pendingPicture);
+          } catch (err) {
+            ui.toast(`${created.product.name} was created, but its picture was not saved: ${err.message}`, { kind: 'error' });
+          }
+          URL.revokeObjectURL(pendingPicture.preview);
+          pendingPicture = null;
+        }
         ui.toast(`${created.product.name} created`, { kind: 'success' });
         onClose(created.product.id);
         return;

@@ -171,6 +171,25 @@ export async function download(path, { method = 'GET', body = null } = {}) {
 }
 
 /**
+ * A picture the server holds, as a Blob — or null when there is none (TASK-052).
+ *
+ * The same reason as `download`: an `<img>` pointed at the API arrives without the
+ * token SEC-7 keeps in memory. Quiet on a 404, because "this product has no picture"
+ * is an answer, not an error a screen should announce.
+ */
+export async function blob(path) {
+  const response = await fetch(`${BASE}${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  }).catch(() => null);
+  if (!response) return null;
+  const refreshed = response.headers.get(SESSION_HEADER);
+  if (refreshed) setToken(refreshed);
+  if (response.status === 404) return null;
+  if (!response.ok) return null;
+  return response.blob();
+}
+
+/**
  * Save what `download` returned, as a file.
  *
  * The renderer has no build step and no file-saving library, and every screen that

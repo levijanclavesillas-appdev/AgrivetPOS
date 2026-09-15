@@ -215,6 +215,11 @@ locked once movements exist per `UOM-003`, with the reason shown — and the pac
 
 *Cost is visible only to `OWNER`* (`TX-412`); the field is absent, not disabled, for others.
 
+**Pictures** (pharmacy edition, `TASK-052`). Identity opens with the product's picture: Add,
+Replace, Remove, saved as soon as a photo is chosen (on Android, from the camera or the gallery).
+The list shows a thumbnail beside each name, and so does the counter's search (`SCR-301`); a
+product without one shows a faint pill in the same frame, so the names stay in one column.
+
 ### `SCR-203` — Inventory adjustment · `FT-207`
 
 Product, current on-hand, counted or new quantity, computed variance, reason from the configured

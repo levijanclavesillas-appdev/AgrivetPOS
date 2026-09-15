@@ -574,3 +574,7 @@
 .signin-store { color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size); margin: -2px 0 var(--space-4); }
 .signin-version { color: var(--md-on-surface-muted); font-size: var(--type-label-md-size);
   text-align: center; margin-top: var(--space-5); }
+
+/* TASK-052: the box beside its name in the search, the size of a thumb. */
+.search-result .result-picture { width: 2.75rem; height: 2.75rem; }
+.search-result .result-name { flex: 1; min-width: 0; }

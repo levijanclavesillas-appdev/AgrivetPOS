@@ -40,6 +40,8 @@ const EXPORTABLE = Object.freeze([
   'units',
   // Catalogue.
   'products',
+  // TASK-052: the pictures, as base64 in the JSON (blobColumnsOf).
+  'product_images',
   'product_barcodes',
   'product_packs',
   'product_prices',
@@ -136,6 +138,17 @@ function columnsOf(table) {
 }
 
 /**
+ * The columns declared BLOB — a product's picture (TASK-052). JSON has no bytes, so the
+ * export writes them as base64 and the import reads them back; asked of SQLite, like
+ * the primary key, so a table given a BLOB later is carried without a list to update.
+ */
+function blobColumnsOf(table) {
+  assertExportable(table);
+  return db.get().prepare(`PRAGMA table_info(${table})`).all()
+    .filter((c) => String(c.type).toUpperCase() === 'BLOB').map((c) => c.name);
+}
+
+/**
  * Every set of columns on which two rows would collide: the primary key, and each
  * UNIQUE index.
  *
@@ -223,6 +236,6 @@ function foreignKeyViolations() {
 
 module.exports = {
   EXPORTABLE, assertExportable,
-  rowsOf, countOf, columnsOf, primaryKeyOf, uniqueKeysOf,
+  rowsOf, countOf, columnsOf, blobColumnsOf, primaryKeyOf, uniqueKeysOf,
   existsByKey, insertRow, replaceRow, foreignKeyViolations,
 };

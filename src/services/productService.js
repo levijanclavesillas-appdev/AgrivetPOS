@@ -183,6 +183,9 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
       && (row.qty_on_hand_milli ?? 0) <= row.min_stock_milli,
     is_batch_tracked: Boolean(row.is_batch_tracked),
     is_active: Boolean(row.is_active),
+    // TASK-052: the picture's version, or null. The renderer fetches
+    // /products/:id/image?v=<version>, so a replaced picture is a new address.
+    image_version: row.image_sha256 ? row.image_sha256.slice(0, 16) : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

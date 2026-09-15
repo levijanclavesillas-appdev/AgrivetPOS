@@ -12,6 +12,7 @@ import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, quantity, packAndBase } from '../shell/format.js';
+import { productPicture } from '../shell/pictures.js';
 import { createCart } from './cart.js';
 import { createScanner } from '../shell/scanner.js';
 import { KEYMAP, HELP_ORDER, actionFor, isMapped } from '../shell/keymap.js';
@@ -381,6 +382,8 @@ export function createPos({ root, session, onPay }) {
           class: 'search-result',
           onclick: async () => { results.hidden = true; search.value = ''; await addProduct(product); },
         }, [
+          // TASK-052: the box, which is how a customer points at what they mean.
+          productPicture(product, { className: 'product-picture result-picture' }),
           // The generic under the brand name: "parac" finds six boxes, and the
           // generic is how the cashier tells the customer which of them is which.
           h('span', { class: 'result-name' }, [

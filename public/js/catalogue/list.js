@@ -16,6 +16,7 @@ import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, quantity } from '../shell/format.js';
+import { productPicture } from '../shell/pictures.js';
 
 const PAGE = 50;
 
@@ -89,6 +90,7 @@ export function createProductList({
       is_out_of_stock: row.is_out_of_stock,
       is_active: true,
       retail_price_centavos: null,
+      image_version: row.image_version ?? null,
     })),
   });
 
@@ -207,16 +209,22 @@ export function createProductList({
         onkeydown: (event) => { if (event.key === 'Enter') onOpen(p.id); },
       }, [
         h('td', { class: 'sku', text: p.sku }),
-        h('td', {}, [
-          h('span', { text: p.name }),
-          p.is_active ? null : h('span', { class: 'tag', text: 'inactive' }),
-          p.generic_name ? h('small', { class: 'generic-name', text: p.generic_name }) : null,
-          p.retail_price_centavos === null && !lowStockOnly()
-            // PR-102: a product with no price cannot be sold, and that is worth seeing
-            // in the list rather than at the counter with a customer waiting.
-            ? h('span', { class: 'tag warn', text: 'no price' })
-            : null,
-        ]),
+        // TASK-052: the box beside its name. The frame is there with or without a picture,
+        // so the names stay in one column. A div inside the cell, because a cell made a
+        // flex box stops being a table cell and its row's lines break.
+        h('td', {}, [h('div', { class: 'product-cell' }, [
+          productPicture(p),
+          h('span', { class: 'product-cell-text' }, [
+            h('span', { text: p.name }),
+            p.is_active ? null : h('span', { class: 'tag', text: 'inactive' }),
+            p.generic_name ? h('small', { class: 'generic-name', text: p.generic_name }) : null,
+            p.retail_price_centavos === null && !lowStockOnly()
+              // PR-102: a product with no price cannot be sold, and that is worth seeing
+              // in the list rather than at the counter with a customer waiting.
+              ? h('span', { class: 'tag warn', text: 'no price' })
+              : null,
+          ]),
+        ])]),
         // An em dash, not an empty cell: a product with no brand and a product whose
         // brand failed to load look the same when the cell is blank (VR-209 makes the
         // brand optional and the category required, so only this one can be absent).

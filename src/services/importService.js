@@ -274,6 +274,7 @@ const REFERENCES = Object.freeze([
   ['customer_prices', 'customer_id', 'customers'],
   ['customer_prices', 'product_id', 'products'],
   ['product_quantity_breaks', 'product_id', 'products'],
+  ['product_images', 'product_id', 'products'],
 ]);
 
 function danglingReferences(parsed) {
@@ -402,11 +403,11 @@ function run(archiveBuffer, { collisionMode = 'SKIP', reason = null } = {}, acto
         }
         try {
           if (collides && mode === 'REPLACE') {
-            dataRepository.replaceRow(table, withoutSecrets(table, row));
+            dataRepository.replaceRow(table, fromArchive(table, withoutSecrets(table, row)));
             counts[table].replaced += 1;
             replaced += 1;
           } else {
-            dataRepository.insertRow(table, withoutSecrets(table, row));
+            dataRepository.insertRow(table, fromArchive(table, withoutSecrets(table, row)));
             counts[table].inserted += 1;
           }
         } catch (err) {
@@ -536,7 +537,26 @@ function withoutSecrets(table, row) {
   return clean;
 }
 
+/**
+ * The bytes the export wrote as base64, as bytes again (TASK-052). A value that is not
+ * base64 is refused rather than written as text into a picture column.
+ */
+function fromArchive(table, row) {
+  const blobs = dataRepository.blobColumnsOf(table);
+  if (blobs.length === 0) return row;
+  const out = { ...row };
+  for (const column of blobs) {
+    const value = out[column];
+    if (value === null || value === undefined) continue;
+    if (typeof value !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
+      throw errors.badRequest(`${table}.${column} in the archive is not base64.`, { ruleId: 'OPS-102' });
+    }
+    out[column] = Buffer.from(value, 'base64');
+  }
+  return out;
+}
+
 module.exports = {
   COLLISION_MODES, REFERENCES,
-  validate, run, danglingReferences, withoutSecrets, asImportRefusal,
+  validate, run, danglingReferences, withoutSecrets, fromArchive, asImportRefusal,
 };

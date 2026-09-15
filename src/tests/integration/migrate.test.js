@@ -150,6 +150,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'stock_count_sessions', 'stock_count_lines',
     // 901_licence — the pharmacy edition's subscription (TASK-048)
     'licence_state',
+    // 902_product_images — the pharmacy edition's product pictures (TASK-052)
+    'product_images',
     // 013_negotiated_pricing
     'customer_prices', 'product_quantity_breaks',
     // 014_batches

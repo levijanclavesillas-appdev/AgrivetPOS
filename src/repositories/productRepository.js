@@ -31,7 +31,10 @@ const JOINED = `
   -- one the list is read for. COALESCE because a product that has never moved has no
   -- inventory row at all — which is 0 on hand, not a missing product (INV-101).
   COALESCE(i.qty_on_hand_milli, 0) AS qty_on_hand_milli,
-  (i.product_id IS NOT NULL) AS has_moved
+  (i.product_id IS NOT NULL) AS has_moved,
+  -- TASK-052: which picture, never the picture. The list reads one short column, stored
+  -- ahead of the BLOBs in 902_product_images.sql so reading it never touches them.
+  pi.sha256 AS image_sha256
 `;
 
 const FROM = `
@@ -40,6 +43,7 @@ const FROM = `
   LEFT JOIN brands b ON b.id = p.brand_id
   JOIN units u ON u.id = p.base_unit_id
   LEFT JOIN inventory i ON i.product_id = p.id
+  LEFT JOIN product_images pi ON pi.product_id = p.id
 `;
 
 function findById(id) {

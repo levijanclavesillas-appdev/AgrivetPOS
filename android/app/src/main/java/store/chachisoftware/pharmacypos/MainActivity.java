@@ -3,6 +3,7 @@ package store.chachisoftware.pharmacypos;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
@@ -38,18 +39,21 @@ import java.net.URL;
  *
  * A WebView over the server NodeRuntime starts on 127.0.0.1, showing exactly the renderer
  * the Windows build shows. What Android needs that a desktop browser gave for free is
- * here: a file picker for the opening workbook and restores, a way to save a download,
- * and a backup folder outside the app's own storage (OPS-001).
+ * here: a file picker for the opening workbook and restores, the camera for a product's
+ * picture (TASK-052), a way to save a download, and a backup folder outside the app's
+ * own storage (OPS-001).
  */
 public class MainActivity extends Activity {
 
     private static final String TAG = "ChachiPOS";
     private static final String ORIGIN = "http://127.0.0.1:" + NodeRuntime.PORT;
     private static final int PICK_FILE = 1;
+    private static final int PICK_PICTURE = 3;
     private static final String BACKUP_FOLDER_NAME = "ChachiPharmacyPOS Backups";
 
     private WebView web;
     private ValueCallback<Uri[]> pendingPick;
+    private File pendingPhoto;
     private boolean askedForStorage = false;
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -83,6 +87,7 @@ public class MainActivity extends Activity {
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (pendingPick != null) pendingPick.onReceiveValue(null);
                 pendingPick = callback;
+                if (acceptsPictures(params)) return choosePicture();
                 Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT)
                         .addCategory(Intent.CATEGORY_OPENABLE)
                         .setType("*/*");
@@ -98,6 +103,41 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(), "ChachiAndroid");
         web.loadData(LOADING, "text/html", "utf-8");
         setContentView(web);
+    }
+
+    private static boolean acceptsPictures(WebChromeClient.FileChooserParams params) {
+        String[] types = params.getAcceptTypes();
+        if (types == null) return false;
+        for (String type : types) if (type != null && type.startsWith("image/")) return true;
+        return false;
+    }
+
+    /**
+     * A product's picture (TASK-052): the camera, or a photo already on the tablet. The
+     * camera writes to a file this app hands it through PhotoProvider; the gallery
+     * answers with its own content URI. Either reaches the page as the chosen file.
+     */
+    private boolean choosePicture() {
+        pendingPhoto = PhotoProvider.newPhoto(this);
+        Uri out = PhotoProvider.uriFor(this, pendingPhoto);
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                .putExtra(MediaStore.EXTRA_OUTPUT, out)
+                .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        camera.setClipData(ClipData.newRawUri("", out));
+        Intent gallery = new Intent(Intent.ACTION_GET_CONTENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("image/*");
+        Intent chooser = Intent.createChooser(gallery, getString(R.string.picture_chooser));
+        if (camera.resolveActivity(getPackageManager()) != null) {
+            chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] {camera});
+        }
+        try {
+            startActivityForResult(chooser, PICK_PICTURE);
+        } catch (Exception e) {
+            pendingPick = null;
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -199,7 +239,18 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != PICK_FILE || pendingPick == null) return;
+        if (pendingPick == null) return;
+        if (requestCode == PICK_PICTURE) {
+            Uri[] chosen = null;
+            if (resultCode == RESULT_OK) {
+                if (data != null && data.getData() != null) chosen = new Uri[] {data.getData()};
+                else if (pendingPhoto != null && pendingPhoto.length() > 0) chosen = new Uri[] {PhotoProvider.uriFor(this, pendingPhoto)};
+            }
+            pendingPick.onReceiveValue(chosen);
+            pendingPick = null;
+            return;
+        }
+        if (requestCode != PICK_FILE) return;
         pendingPick.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
         pendingPick = null;
     }

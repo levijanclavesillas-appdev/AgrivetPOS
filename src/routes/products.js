@@ -17,6 +17,7 @@
 
 const express = require('express');
 const productService = require('../services/productService');
+const productImageService = require('../services/productImageService');
 const errors = require('../services/errors');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
@@ -92,6 +93,44 @@ router.delete('/products/:id', editProduct, (req, res, next) => {
     'A product is never deleted — movements and sales reference it. Deactivate it instead.',
     { ruleId: 'VR-206' }
   ));
+});
+
+// ── The picture (TASK-052, IMG-001 – IMG-002) ────────────────────────────────
+//
+// Read by anyone who reads the catalogue, the cashier included: the counter is where a
+// picture is for. Fetched by the renderer with its token and shown from a blob (SEC-7),
+// so the address carries the version and the answer can be cached for good.
+
+router.get('/products/:id/image', readCatalog, (req, res, next) => {
+  try {
+    const found = productImageService.read(req.params.id, req.query.size);
+    res.set({
+      'Content-Type': found.mime,
+      'Content-Length': String(found.bytes.length),
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'",
+    });
+    res.end(found.bytes);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/products/:id/image', editProduct, (req, res, next) => {
+  try {
+    res.json({ image: productImageService.set(req.params.id, req.body || {}, req.session) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/products/:id/image', editProduct, (req, res, next) => {
+  try {
+    res.json({ image: productImageService.remove(req.params.id, req.session) });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ── Barcodes (VR-205) ───────────────────────────────────────────────────────

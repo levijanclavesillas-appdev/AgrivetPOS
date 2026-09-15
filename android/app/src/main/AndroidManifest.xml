@@ -16,6 +16,15 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
 
+    <!-- TASK-052: the camera app, asked for a product's photo. Declared so Android 11+
+         lets this app see that one exists; the CAMERA permission is not needed, because
+         the photo is taken by the camera app, not by this one. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <!-- allowBackup is off: the store's customers and their balances do not go to a cloud
          backup nobody chose (SEC-10). The store's own backups are OPS-001's. -->
     <application
@@ -39,5 +48,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Where the camera writes a product's photo (TASK-052). Not exported: reached
+             only through the one-time grant on the camera intent. -->
+        <provider
+            android:name=".PhotoProvider"
+            android:authorities="${applicationId}.photos"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

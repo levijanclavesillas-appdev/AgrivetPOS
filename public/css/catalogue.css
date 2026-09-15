@@ -179,3 +179,23 @@
 .breaks-table { max-width: 32rem; }
 .breaks-table input { width: 8rem; min-height: var(--touch); padding: 0 var(--space-1);
   text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── A product's picture (TASK-052) ────────────────────────────────────────────
+   One frame for every size: a square the picture is fitted into, never cropped — the
+   words on a box are what a cashier reads — and a faint pill where there is none, so a
+   list keeps its names in one column whether or not the products have pictures. */
+.product-picture { display: inline-grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem;
+  overflow: hidden; border-radius: var(--shape-sm); border: 1px solid var(--md-outline-variant);
+  background: #fff; color: var(--md-on-surface-muted); }
+.product-picture img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.product-picture.is-empty { background: var(--md-surface-container); }
+.product-picture.is-empty .icon { width: 1.125rem; height: 1.125rem; opacity: .45; }
+.product-picture.large { width: 10rem; height: 10rem; border-radius: var(--shape-md); }
+.product-picture.large.is-empty .icon { width: 2.5rem; height: 2.5rem; }
+
+.catalogue-list .product-cell { display: flex; align-items: center; gap: var(--space-3); }
+.catalogue-list .product-cell-text { min-width: 0; }
+
+.picture-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.picture-actions { display: grid; gap: var(--space-2); flex: 1 1 12rem; }
+.picture-buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); }

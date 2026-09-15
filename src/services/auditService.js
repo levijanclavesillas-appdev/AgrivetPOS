@@ -40,6 +40,8 @@ const ACTIONS = Object.freeze({
   PRODUCT_CREATED: { what: 'Product created', rule: 'AUD-601' },
   PRODUCT_MODIFIED: { what: 'Product modified', rule: 'AUD-601' },
   PRODUCT_DEACTIVATED: { what: 'Product deactivated', rule: 'VR-206' },
+  PRODUCT_IMAGE_SET: { what: 'Product picture set', rule: 'IMG-002' },
+  PRODUCT_IMAGE_REMOVED: { what: 'Product picture removed', rule: 'IMG-002' },
   BARCODE_ATTACHED: { what: 'Barcode attached to a product', rule: 'VR-205' },
   BARCODE_DETACHED: { what: 'Barcode detached from a product', rule: 'VR-205' },
   // Categories, brands and units. Not on AUD-601's list — they are reference data,

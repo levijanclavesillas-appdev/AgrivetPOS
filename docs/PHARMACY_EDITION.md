@@ -1,7 +1,7 @@
 # Pharmacy Edition — Chachi Pharmacy POS
 
 **Branch**: `pharmacy` · **Base**: `main` at `9eb81c2` · **Date**: 2026-09-14 ·
-**Tasks**: `TASK-046`–`TASK-051` (`06_TASKS/README.md`, *Pharmacy edition*)
+**Tasks**: `TASK-046`–`TASK-052` (`06_TASKS/README.md`, *Pharmacy edition*)
 **Scope**: an **over-the-counter** drugstore. Not a dispensing pharmacy — see §5.
 
 This is the agrivet product with the changes a drugstore counter needs, and nothing else.
@@ -26,6 +26,7 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | Opening-data spreadsheet | Three CSV files, emailed as a workbook; categories and units keyed in by hand first | **One `.xlsx`**, downloaded from the app and uploaded back unchanged, with its own tabs for categories, units, brands, suppliers and packs; `generic_name` and `senior_pwd` columns (`TASK-047`) | `openingWorkbookService`, `config/xlsx.js`, `openingDataService` |
 | Setup wizard (`SCR-001`) | Unstyled (it never loaded `tokens.css`); five steps | Styled and fitting 1366×768; an optional **step 6** loads the workbook as the new owner (`TASK-047`) | `setup.html`, `setup.js`, `shell/opening.js` |
 | Customers created by the opening balance load | `FARM` | `REGULAR` | `openingDataService` |
+| Product pictures (`TASK-052`) | None | One per product: on the editor, beside each name in the list and in the counter's search. In the database, so backups and exports carry them (`IMG-001`–`IMG-002`, §7) | `902_product_images.sql`, `productImageService`, `shell/pictures.js` |
 | Subscription (`TASK-048`) | None | A signed licence, renewed online at least every 30 days; no new shift opens once it lapses (`LIC-001`–`LIC-004`, §6). **On**: the build names `pos.chachisoftware.store` | `licenceService`, `901_licence.sql`, `licence-server/` |
 
 ## 2. Recorded decisions
@@ -113,3 +114,17 @@ rest of the gate runs with `AGRIVET_LICENSING=off`.
 **The linking needs no Google code on the POS.** The owner approves a code on
 `pos.chachisoftware.store/link` in any browser. So the Electron and Android builds link the
 same way, and neither holds a Google token.
+
+## 7. Product pictures (`TASK-052`)
+
+| # | Rule |
+| :-: | :--- |
+| `IMG-001` | A picture is a JPEG, PNG or WebP, checked by its first bytes, at most 600 KB, with a thumbnail of at most 64 KB in the same format. The POS shrinks a photo to 640 px (and 128 px) before sending it; the server never decodes one. Never SVG |
+| `IMG-002` | Whoever may edit the product (`TX-410`) sets or removes its picture; anyone who reads the catalogue sees it, the cashier included. Both changes are audited by the picture's hash, never its bytes |
+
+The pictures live in the database (`product_images`), so a backup, a restore and an export carry
+them with nothing else to copy. An export writes them as base64 in `product_images.json`; a real
+photo, shrunk, is roughly 40–80 KB, which leaves an export of several hundred pictured products
+inside the 64 MB an import accepts. The opening workbook (`TASK-047`) carries no pictures: they are
+added per product, from the editor.
+
