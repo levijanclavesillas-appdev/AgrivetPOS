@@ -102,6 +102,10 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
       order && order.can_cancel
         ? h('button', { class: 'row-action danger', text: 'Cancel order', onclick: cancel })
         : null,
+      // PO-106 (TASK-061): part of it came and the rest is not coming.
+      order && order.can_close_short
+        ? h('button', { class: 'row-action', text: 'Close short…', onclick: closeShort })
+        : null,
     ]);
   }
 
@@ -114,6 +118,7 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
       metaField('Revision', String(order.revision)),
       metaField('Total', money(order.total_centavos)),
       order.cancel_reason ? metaField('Cancelled because', order.cancel_reason) : null,
+      order.closed_short_at ? metaField('Closed short', `${manila(order.closed_short_at)} — ${order.close_reason}`) : null,
     ]);
   }
 
@@ -277,13 +282,14 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
   }
 
   function readOnlyLines() {
+    const closedShort = Boolean(order.closed_short_at);
     return h('div', { class: 'table-scroll' }, [
       h('table', { class: 'catalogue-list' }, [
         h('thead', {}, [h('tr', {}, [
           h('th', { text: 'Product' }),
           h('th', { class: 'qty', text: 'Ordered' }),
           h('th', { class: 'qty', text: 'Received' }),
-          h('th', { class: 'qty', text: 'Outstanding' }),
+          h('th', { class: 'qty', text: closedShort ? 'Not delivered' : 'Outstanding' }),
           h('th', { class: 'money', text: 'Unit cost' }),
           h('th', { class: 'money', text: 'Line total' }),
         ])]),
@@ -293,7 +299,7 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
           h('td', { text: `${line.sku} — ${line.product_name}` }),
           h('td', { class: 'qty', text: line.qty_display }),
           h('td', { class: 'qty', text: line.received_display }),
-          h('td', { class: 'qty', text: line.outstanding_display }),
+          h('td', { class: 'qty', text: closedShort ? (line.not_delivered_display || '—') : line.outstanding_display }),
           h('td', { class: 'money', text: money(line.unit_cost_centavos) }),
           h('td', { class: 'money', text: money(line.line_total_centavos) }),
         ]))),
@@ -387,6 +393,31 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
     try {
       await api.post(`/purchase-orders/${poId}/cancel`, { reason: answers.reason });
       ui.toast('Order cancelled', { kind: 'success' });
+      await load();
+    } catch (err) {
+      ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+    }
+  }
+
+  /**
+   * PO-106 — closed short. Not a cancellation (PO-105 forbids that once goods arrived):
+   * what came stays received, and the rest stops being awaited, with the reason kept.
+   */
+  async function closeShort() {
+    const missing = order.lines.filter((line) => line.outstanding_qty_milli > 0)
+      .map((line) => `${line.product_name} (${line.outstanding_display})`).join(', ');
+    const answers = await ui.ask({
+      title: 'Close this order short',
+      message: `The rest of this order will not come: ${missing}. What arrived stays received; `
+        + 'the rest stops being expected, and the order is marked Closed short (PO-106).',
+      fields: [{ name: 'reason', label: 'Why is the rest not coming?', maxLength: 300,
+        hint: 'For example: out of stock at the supplier, ordering elsewhere.' }],
+      submitLabel: 'Close short',
+    });
+    if (!answers || !answers.reason) return;
+    try {
+      await api.post(`/purchase-orders/${poId}/close`, { reason: answers.reason });
+      ui.toast('Order closed short', { kind: 'success' });
       await load();
     } catch (err) {
       ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });

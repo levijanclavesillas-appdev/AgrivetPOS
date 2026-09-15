@@ -121,6 +121,7 @@ const ACTIONS = Object.freeze({
   PURCHASE_ORDER_AMENDED: { what: 'Purchase order amended to a new revision', rule: 'PO-104' },
   PURCHASE_ORDER_SUBMITTED: { what: 'Purchase order sent to the supplier', rule: 'PO-102' },
   PURCHASE_ORDER_CANCELLED: { what: 'Purchase order cancelled', rule: 'PO-102' },
+  PURCHASE_ORDER_CLOSED_SHORT: { what: 'Purchase order closed short', rule: 'PO-106' },
   GOODS_RECEIVED: { what: 'Goods received', rule: 'AUD-601' },
 
   // ── AUD-601: users and access ─────────────────────────────────────────────

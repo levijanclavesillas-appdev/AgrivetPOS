@@ -17,6 +17,7 @@ const COLUMNS = `
   po.id, po.po_no, po.supplier_id, po.status, po.revision, po.ordered_at, po.expected_at,
   po.reference_no, po.notes, po.total_centavos, po.submitted_at, po.submitted_by,
   po.cancelled_at, po.cancelled_by, po.cancel_reason, po.completed_at,
+  po.closed_short_at, po.closed_short_by, po.close_reason,
   po.created_at, po.created_by, po.updated_at, po.updated_by
 `;
 
@@ -95,6 +96,7 @@ const UPDATABLE = [
   'status', 'revision', 'ordered_at', 'expected_at', 'reference_no', 'notes',
   'total_centavos', 'submitted_at', 'submitted_by', 'cancelled_at', 'cancelled_by',
   'cancel_reason', 'completed_at', 'updated_at', 'updated_by',
+  'closed_short_at', 'closed_short_by', 'close_reason',     // PO-106 (TASK-061)
 ];
 
 function updateFields(id, fields) {

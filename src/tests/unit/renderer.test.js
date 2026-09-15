@@ -2443,3 +2443,21 @@ test('TASK-060: Complete over the limit opens the approval panel, which asks a r
   assert.match(codeOf('js/shell/ui.js'), /h\('label', \{ text: 'Reason' \}, \[reason\]\)/);
   assert.match(codeOf('js/pos/view.js'), /api\.approve\(username, password, \(priced\.authorisations \|\| \[\]\)\.map\(\(a\) => a\.rule_id\)\)/);
 });
+
+// ── TASK-061: a delivery short a line; an order closed short ────────────────
+
+test('TASK-061: a line left at 0 is not part of the delivery, and an order can be closed short', () => {
+  const receive = codeOf('js/purchasing/receive.js');
+  assert.match(receive, /const notInDelivery = \(line\) => !direct\(\) && line\.poItemId && \(line\.received\.trim\(\) === '' \|\| milli\(line\.received\) === 0\);/);
+  assert.match(receive, /lines: inDelivery\(\)\.map\(\(line\) => \(\{/, 'only the lines that came are sent');
+  assert.match(receive, /if \(inDelivery\(\)\.length === 0\) \{/);
+  assert.match(receive, /onclick: \(\) => \{ lines\.splice\(index, 1\); render\(\); \}/, 'a direct delivery can drop a line');
+  // A product that did not come has no batch: its fields stop being required, or the
+  // browser refuses the whole form for a box that never arrived.
+  assert.match(receive, /required: !notInDelivery\(line\),/);
+  assert.match(receive, /for \(const input of row\.querySelectorAll\('\.batch-fields input'\)\) input\.required = !notInDelivery\(line\);/);
+  const order = codeOf('js/purchasing/order.js');
+  assert.match(order, /order && order\.can_close_short/);
+  assert.match(order, /api\.post\(`\/purchase-orders\/\$\{poId\}\/close`, \{ reason: answers\.reason \}\)/);
+  assert.match(order, /closedShort \? 'Not delivered' : 'Outstanding'/);
+});

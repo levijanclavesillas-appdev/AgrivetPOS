@@ -42,6 +42,9 @@ const TRANSITIONS = Object.freeze({
   CANCELLED: [],
 });
 
+// PO-106 (TASK-061): RECEIVED with closed_short_at set is "Closed short" on screen. It is
+// not a sixth status — PO-102's machine is untouched, and every reader that asks "is this
+// order still awaiting goods" (OPEN_STATUSES) already gets the right answer.
 const STATUS_LABELS = Object.freeze({
   DRAFT: 'Draft',
   PENDING: 'Sent to supplier',
@@ -193,8 +196,11 @@ const auditLines = (resolved) => resolved.map((line) => ({
 
 // ── The public shape ────────────────────────────────────────────────────────
 
-function presentLine(row) {
-  const outstanding = Math.max(row.qty_milli - row.received_qty_milli, 0);
+function presentLine(row, { closedShort = false } = {}) {
+  const short = Math.max(row.qty_milli - row.received_qty_milli, 0);
+  // PO-106: an order closed short awaits nothing, so nothing on it is outstanding; what
+  // never came is its own figure, the same difference under its own name.
+  const outstanding = closedShort ? 0 : short;
   return {
     id: row.id,
     line_no: row.line_no,
@@ -216,6 +222,8 @@ function presentLine(row) {
     outstanding_qty_milli: outstanding,
     outstanding_display: quantity.format(outstanding, row.base_unit_code),
     is_complete: row.received_qty_milli >= row.qty_milli,
+    not_delivered_qty_milli: closedShort ? short : 0,
+    not_delivered_display: closedShort && short > 0 ? quantity.format(short, row.base_unit_code) : null,
     notes: row.notes,
   };
 }
@@ -235,7 +243,7 @@ function toPublic(row, { lines = null, receipts = null } = {}) {
       terms_days: row.supplier_terms_days,
     },
     status: row.status,
-    status_label: STATUS_LABELS[row.status],
+    status_label: row.closed_short_at ? 'Closed short' : STATUS_LABELS[row.status],
     is_open: OPEN_STATUSES.includes(row.status),
     // PO-104 and PO-105, answered by the server rather than re-derived by a screen
     // that would then be wrong the day either rule changed.
@@ -244,6 +252,9 @@ function toPublic(row, { lines = null, receipts = null } = {}) {
     can_submit: row.status === 'DRAFT',
     can_cancel: TRANSITIONS[row.status].includes('CANCELLED'),
     can_receive: OPEN_STATUSES.includes(row.status),
+    // PO-106: something has arrived and the rest is not coming. Before anything has
+    // arrived the answer is cancelling (PO-105), and the screen offers that instead.
+    can_close_short: row.status === 'PARTIALLY_RECEIVED',
     ordered_at: row.ordered_at,
     expected_at: row.expected_at,
     reference_no: row.reference_no,
@@ -254,8 +265,10 @@ function toPublic(row, { lines = null, receipts = null } = {}) {
     cancelled_at: row.cancelled_at,
     cancel_reason: row.cancel_reason,
     completed_at: row.completed_at,
+    closed_short_at: row.closed_short_at || null,
+    close_reason: row.close_reason || null,
     created_at: row.created_at,
-    ...(lines ? { lines: lines.map(presentLine) } : {}),
+    ...(lines ? { lines: lines.map((line) => presentLine(line, { closedShort: Boolean(row.closed_short_at) })) } : {}),
     ...(receipts ? { receipts } : {}),
   };
 }
@@ -531,6 +544,73 @@ function cancel(id, { reason = null } = {}, actor) {
 }
 
 /**
+ * PO-106 — the rest is not coming (TASK-061).
+ *
+ * A supplier who sends eight lines of ten and will not send the other two left the order
+ * "Partly received" for ever: PO-105 rightly forbids cancelling an order goods arrived
+ * against, and nothing else ended it. Closing it short ends it without pretending: the
+ * order becomes RECEIVED (a transition PO-102 already allows), stamped as closed short
+ * with who and why, and every line keeps what was ordered and what arrived. A reason is
+ * required, because "why did we never get the other ten sacks" is asked months later.
+ */
+function closeShort(id, { reason = null } = {}, actor) {
+  const before = purchaseOrderRepository.findById(id);
+  if (!before) throw errors.notFound('No such purchase order');
+
+  if (before.status === 'PENDING' || before.status === 'DRAFT') {
+    throw errors.conflict(
+      `Nothing has arrived against ${before.po_no} yet. Cancel it instead, with the reason.`,
+      { ruleId: 'PO-106' }
+    );
+  }
+  if (before.status !== 'PARTIALLY_RECEIVED') {
+    throw errors.conflict(
+      `${before.po_no} is ${STATUS_LABELS[before.status].toLowerCase()}; there is nothing outstanding to close.`,
+      { ruleId: 'PO-106' }
+    );
+  }
+  const why = textOrNull(reason, { max: 300 });
+  if (!why) {
+    throw errors.badRequest('Say why the rest of the order is not coming.', { ruleId: 'PO-106' });
+  }
+
+  const lines = purchaseOrderRepository.itemsFor(id);
+  const short = lines
+    .filter((line) => line.received_qty_milli < line.qty_milli)
+    .map((line) => ({
+      line_no: line.line_no,
+      product: line.product_name_snapshot,
+      ordered_qty_milli: line.qty_milli,
+      received_qty_milli: line.received_qty_milli,
+      not_delivered_qty_milli: line.qty_milli - line.received_qty_milli,
+    }));
+  const at = clock.nowUtc();
+
+  return db.transaction(() => {
+    assertTransition(before.status, 'RECEIVED', { ruleId: 'PO-106' });
+    const row = purchaseOrderRepository.updateFields(id, {
+      status: 'RECEIVED',
+      completed_at: at,
+      closed_short_at: at,
+      closed_short_by: actor.id,
+      close_reason: why,
+      updated_at: at,
+      updated_by: actor.id,
+    });
+    auditService.write({
+      actor,
+      action: 'PURCHASE_ORDER_CLOSED_SHORT',
+      entityType: 'purchase_orders',
+      entityId: id,
+      before: { status: before.status },
+      after: { status: row.status, po_no: row.po_no, not_delivered: short },
+      reason: why,
+    });
+    return get(id);
+  });
+}
+
+/**
  * Move the status on after a receipt has been written — called by goodsReceiptService
  * inside the receipt's own transaction (INV-107).
  *
@@ -562,5 +642,5 @@ function refreshStatusAfterReceipt(poId, actor, { at = clock.nowUtc() } = {}) {
 module.exports = {
   STATUSES, TRANSITIONS, STATUS_LABELS, OPEN_STATUSES,
   assertTransition, resolveLines, linesDiffer, presentLine, toPublic,
-  find, get, search, create, update, submit, cancel, refreshStatusAfterReceipt,
+  find, get, search, create, update, submit, cancel, closeShort, refreshStatusAfterReceipt,
 };

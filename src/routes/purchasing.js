@@ -6,6 +6,7 @@
 //   GET  POST     /purchase-orders              TX-409   PO-101, PO-104
 //   POST          /purchase-orders/:id/submit   TX-409   PO-102
 //   POST          /purchase-orders/:id/cancel   TX-409   PO-105
+//   POST          /purchase-orders/:id/close    TX-409   PO-106 — closed short (TASK-061)
 //   POST          /goods-receipts               TX-409   PO-201 – PO-207
 //
 // All of purchasing sits behind `TX-409` — "receive goods" — because §10 has no
@@ -155,6 +156,16 @@ router.post('/purchase-orders/:id/cancel', purchasing, (req, res, next) => {
   try {
     const { reason = null } = req.body || {};
     res.json({ purchase_order: purchaseOrderService.cancel(req.params.id, { reason }, req.session) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PO-106 (TASK-061): something arrived and the rest is not coming.
+router.post('/purchase-orders/:id/close', purchasing, (req, res, next) => {
+  try {
+    const { reason = null } = req.body || {};
+    res.json({ purchase_order: purchaseOrderService.closeShort(req.params.id, { reason }, req.session) });
   } catch (err) {
     next(err);
   }

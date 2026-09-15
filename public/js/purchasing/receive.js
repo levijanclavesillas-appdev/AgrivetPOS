@@ -107,6 +107,12 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
 
   const total = () => lines.reduce((sum, line) => sum + (lineTotal(line) || 0), 0);
 
+  // TASK-061: on an order, a line that did not come is left at 0 (or blank) and is simply
+  // not part of this delivery. Before, every line had to be above zero, so one missing
+  // product stopped the whole van from being received.
+  const notInDelivery = (line) => !direct() && line.poItemId && (line.received.trim() === '' || milli(line.received) === 0);
+  const inDelivery = () => lines.filter((line) => !notInDelivery(line));
+
   function render() {
     clear(root).append(h('section', { class: 'purchasing goods-receipt' }, [
       header(),
@@ -147,6 +153,10 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
             h('tbody', { id: 'gr-lines' }, lines.map((line, index) => lineRow(line, index))),
           ]),
         ]),
+
+        direct() ? null : h('p', { class: 'muted rule-note', text: 'A product that did not come on this '
+          + 'delivery: type 0 in Arrived. It stays outstanding on the order. If it is never coming, '
+          + 'close the order short from the order afterwards (PO-106).' }),
 
         // PO-202, said once and plainly, under the column that computes it.
         h('p', { class: 'muted rule-note', text:
@@ -218,7 +228,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
 
   function lineRow(line, index) {
     const sound = soundMilli(line);
-    return h('tr', {}, [
+    return h('tr', { class: notInDelivery(line) ? 'not-in-delivery' : null }, [
       h('td', {}, (direct()
         ? [
           // SCR-802's picker, the same one, for the same reason: a delivery keyed
@@ -273,6 +283,13 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
           placeholder: 'What was wrong with them', 'aria-label': `Damage note on line ${index + 1}`,
           oninput: (event) => { line.damageNote = event.target.value; },
         }),
+        // A delivery without an order had "Add a line" and no way to take one away.
+        direct() && lines.length > 1
+          ? h('button', {
+            type: 'button', class: 'tender-remove', icon: 'x', 'aria-label': `Remove line ${index + 1}`,
+            onclick: () => { lines.splice(index, 1); render(); },
+          })
+          : null,
       ]),
     ]);
   }
@@ -287,14 +304,14 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
     return h('div', { class: 'batch-fields' }, [
       h('label', { text: 'Batch no.' }, [
         h('input', {
-          type: 'text', value: line.batchNo, maxlength: 60, required: true,
+          type: 'text', value: line.batchNo, maxlength: 60, required: !notInDelivery(line),
           placeholder: 'Lot / batch on the box', 'aria-label': `Batch number on line ${index + 1}`,
           oninput: (event) => { line.batchNo = event.target.value; },
         }),
       ]),
       h('label', { text: 'Expiry' }, [
         h('input', {
-          type: 'date', value: line.expiryDate, required: true,
+          type: 'date', value: line.expiryDate, required: !notInDelivery(line),
           'aria-label': `Expiry date on line ${index + 1}`,
           oninput: (event) => { line.expiryDate = event.target.value; },
         }),
@@ -308,6 +325,10 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
     if (!row) return;
     const line = lines[index];
     const sound = soundMilli(line);
+    row.classList.toggle('not-in-delivery', Boolean(notInDelivery(line)));
+    // A product that did not come has no batch to type: its fields stop being required,
+    // or the browser would refuse the whole delivery for a box that never arrived.
+    for (const input of row.querySelectorAll('.batch-fields input')) input.required = !notInDelivery(line);
     const soundCell = row.querySelector('.sound');
     if (soundCell) {
       soundCell.textContent = sound === null ? '—' : quantity(sound, line.unitCode);
@@ -374,11 +395,16 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
   function usable() {
     if (!supplierId && direct()) { ui.toast('Choose a supplier.', { kind: 'error' }); return false; }
     if (lines.length === 0) { ui.toast('There is nothing left to receive on this order.', { kind: 'error' }); return false; }
+    if (inDelivery().length === 0) {
+      ui.toast('Nothing arrived on any line. Type what came, or go back if the delivery has not arrived.', { kind: 'error' });
+      return false;
+    }
 
-    const bad = lines.findIndex((line) => !line.productId
+    // Numbered as the screen numbers them: the lines left at 0 are skipped, not renumbered.
+    const bad = lines.findIndex((line) => !notInDelivery(line) && (!line.productId
       || !(milli(line.received) > 0)
       || soundMilli(line) === null
-      || !Number.isFinite(Number.parseFloat(line.cost)));
+      || !Number.isFinite(Number.parseFloat(line.cost))));
     if (bad !== -1) {
       ui.toast(
         `Line ${bad + 1} needs a product, a quantity that arrived, and the unit cost charged. `
@@ -388,7 +414,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
       return false;
     }
 
-    const unbatched = lines.findIndex((line) => line.batchTracked && soundMilli(line) > 0
+    const unbatched = lines.findIndex((line) => !notInDelivery(line) && line.batchTracked && soundMilli(line) > 0
       && (!line.batchNo.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(line.expiryDate)));
     if (unbatched !== -1) {
       ui.toast(
@@ -412,7 +438,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
         notes: notes.trim() || null,
         approver: approver ? { username: approver.username, token: approver.token } : null,
         approvalReason: approvalReason || null,
-        lines: lines.map((line) => ({
+        lines: inDelivery().map((line) => ({
           poItemId: line.poItemId,
           productId: line.productId,
           receivedQtyMilli: milli(line.received),

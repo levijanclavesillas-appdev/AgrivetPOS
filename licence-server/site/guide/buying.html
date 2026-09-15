@@ -127,8 +127,8 @@
   <figure class="guide-shot"><img src="/static/guide/buying-receive.webp" alt="The Receive against PO screen: delivery receipt and invoice numbers filled in; each line shows Outstanding, Arrived, Damaged, Into stock, Unit cost with the ordered cost under it, and Value. One line has 2 damaged with a note." width="1280" height="800" loading="lazy"><figcaption>Into stock is arrived minus damaged. The ordered cost under each unit cost helps you spot a price change.</figcaption></figure>
   <p>The order screen then shows <strong>Received</strong> and <strong>Outstanding</strong> for each line and, under <strong>Deliveries against this order</strong>, each delivery with its number, date and value.</p>
   <h3>Part deliveries</h3>
-  <p>If only part of the order came, type what arrived. The order becomes <strong>Partly received</strong> and stays in the list. When the rest comes, click <strong>Receive</strong> again; only the products still outstanding are listed.</p>
-  <p class="warn"><strong>Important:</strong> in this version every product listed on the delivery screen needs an arrived quantity above zero, and there is no button to take a line off. If one product on the order did not come at all, the screen will not post. See <a href="#delivery-does-not-match">When the delivery does not match the order</a>.</p>
+  <p>If only part of the order came, type what arrived. For a product that did not come at all, type <strong>0</strong> in <strong>Arrived</strong>. The line turns grey, it is left out of this delivery, and its batch and expiry boxes are no longer needed. The order becomes <strong>Partly received</strong> and stays in the list. When the rest comes, click <strong>Receive</strong> again; only the products still outstanding are listed.</p>
+  <p>If the rest is never coming, close the order short (see <a href="#close-short">Close an order short</a>).</p>
   <p>Damaged items count as delivered against the order. They reduce what is still outstanding, but they do not go into stock.</p>
 </section>
 
@@ -190,11 +190,16 @@
   <p class="who"><strong>Who:</strong> Owner, Manager or Inventory. Some cases need a Manager or Owner to approve.</p>
   <h3>Less arrived than was ordered</h3>
   <p>Type what really arrived. The rest stays outstanding and the order becomes <strong>Partly received</strong>. Receive the rest when it comes.</p>
-  <p>If a whole product on the order did not come, the delivery screen will not post (see the note under <a href="#receive-a-delivery">Receive a delivery</a>). What you can do:</p>
-  <ul>
-    <li>If nothing has been received against the order yet: cancel the order with a reason such as "Supplier short, delivered separately", record what came with <strong>Receive without an order</strong>, and raise a new order for what is still missing.</li>
-    <li>If the order is already <strong>Partly received</strong>, it cannot be cancelled. Wait until the missing product arrives, or email support.</li>
-  </ul>
+  <p>If a whole product on the order did not come, type <strong>0</strong> in its <strong>Arrived</strong> box and post the rest. It stays outstanding on the order.</p>
+  <h3 id="close-short">Close an order short</h3>
+  <p>When part of an order came and the rest is not coming (the supplier is out of it, or you will buy it elsewhere):</p>
+  <ol class="steps">
+    <li>Open the order. It shows <strong>Partly received</strong>.</li>
+    <li>Click <strong>Close short…</strong>. The box names what will not come.</li>
+    <li>Type why, for example <em>Supplier out of stock until next quarter</em>, and click <strong>Close short</strong>.</li>
+  </ol>
+  <p>The order shows <strong>Closed short</strong> with the date and reason, and a <strong>Not delivered</strong> column in place of <strong>Outstanding</strong>. What arrived stays received and no stock moves. A closed order cannot take another delivery; if the goods turn up later, use <strong>Receive without an order</strong>.</p>
+  <p>An order with nothing received yet is not closed short: click <strong>Cancel order</strong> instead, with the reason. An order that has had goods delivered cannot be cancelled.</p>
   <h3>More arrived than was ordered</h3>
   <p>Type the real quantity. When you click <strong>Post delivery</strong>, extra quantity needs approval:</p>
   <ul>

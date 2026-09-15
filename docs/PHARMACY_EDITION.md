@@ -196,3 +196,16 @@ the opening spreadsheet's Packs tab takes a `barcode` column. A pack with a barc
 removed until the barcode is — read as the base unit, the code would sell a box for the price of a
 tablet again. A pack's code is still unique across the store (`VR-205`).
 
+## 11. An order closed short (`PO-106`, `TASK-061`)
+
+| Rule | Statement |
+| :--- | :--- |
+| `PO-106` | An order with goods received against it may be **closed short** when the rest will not come. A reason is required and audited. The order becomes `RECEIVED` (`PO-102` already allows it), stamped closed short; what was ordered and what arrived are unchanged, the shortfall is their difference, and no stock moves (`PO-103`). An order with nothing received is cancelled instead (`PO-105`) |
+
+`PO-105` forbids cancelling an order once goods have arrived against it, and nothing else ended
+one, so a supplier who sent eight lines of ten left the order *Partly received* for ever.
+`906_po_close_short.sql` adds `closed_short_at`, `closed_short_by` and `close_reason`; the screen
+reads *Closed short* and a *Not delivered* column. With it, a delivery against an order sends only
+the lines that arrived: a line left at 0 is not part of the delivery (its batch fields stop being
+required), where before every line had to be above zero and one missing product stopped the van.
+

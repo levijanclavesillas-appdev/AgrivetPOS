@@ -1245,6 +1245,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `PUT` | `/purchase-orders/:id` | `TX-409` | `PO-104` — a `DRAFT` is edited, a `PENDING` order is amended into a new revision. The server decides which |
 | `POST` | `/purchase-orders/:id/submit` | `TX-409` | `PO-102` — `DRAFT` → `PENDING` |
 | `POST` | `/purchase-orders/:id/cancel` | `TX-409` | `PO-105` — refused once anything has been received |
+| `POST` | `/purchase-orders/:id/close` | `TX-409` | `PO-106` (TASK-061) — closed short: `{ reason }`, only when `PARTIALLY_RECEIVED` |
 | `GET` | `/goods-receipts?supplierId=&poId=&flaggedOnly=&from=&to=` | `TX-409` | `flaggedOnly` finds `PO-204`/`PO-205` exceptions afterwards |
 | `GET` | `/goods-receipts/:id` | `TX-409` | |
 | `POST` | `/goods-receipts` | `TX-409` | `PO-201`–`PO-207`. `poId` absent is the counter purchase and still needs a `supplierId`. The `approver` is a username, resolved against `users` server-side (`SEC-6`) |

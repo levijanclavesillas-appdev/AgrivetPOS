@@ -110,3 +110,7 @@
 .picker-unit, .picker-stock { color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size);
   font-variant-numeric: tabular-nums; }
 .picker-results .no-results { margin: 0; padding: var(--space-2); color: var(--md-on-surface-muted); }
+
+/* TASK-061: a line left at 0 on a delivery against an order — not part of this delivery. */
+.receive-table tr.not-in-delivery td { color: var(--md-on-surface-muted); }
+.receive-table tr.not-in-delivery td .qty { background: var(--md-surface-container-low); }

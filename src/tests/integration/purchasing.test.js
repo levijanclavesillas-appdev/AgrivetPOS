@@ -748,3 +748,80 @@ test('VR-103: the document numbers are gapless, and a rolled-back one is not con
   assert.equal(after.gapless, true);
   assert.equal(sequenceService.auditDay('PURCHASE_ORDER').gapless, true);
 });
+
+// ── TASK-061 — a delivery short a whole line, and an order closed short ─────
+
+test('TASK-061: a delivery against an order may leave out a product that did not come', async () => {
+  const came = makeProduct();
+  const missing = makeProduct();
+  const draft = purchaseOrderService.create({
+    supplierId: makeSupplier().id,
+    lines: [
+      { productId: came.id, qtyMilli: 1000000, unitCostCentavos: 3900 },
+      { productId: missing.id, qtyMilli: 500000, unitCostCentavos: 4100 },
+    ],
+  }, sessions.OWNER);
+  const order = purchaseOrderService.submit(draft.id, sessions.OWNER);
+  const [first] = purchaseOrderService.get(order.id).lines;
+
+  // Only the line that came, over HTTP, by the inventory clerk.
+  const res = await call('/goods-receipts', {
+    token: tokens.INVENTORY, method: 'POST',
+    body: { poId: order.id, lines: [{ poItemId: first.id, receivedQtyMilli: 1000000, unitCostCentavos: 3900 }] },
+  });
+  assert.equal(res.status, 201, JSON.stringify(await res.clone().json()));
+
+  const after = purchaseOrderService.get(order.id);
+  assert.equal(after.status, 'PARTIALLY_RECEIVED');
+  assert.equal(after.lines[1].outstanding_qty_milli, 500000, 'still awaited');
+  assert.equal(after.can_close_short, true);
+  assert.equal(inventoryRepository.qtyOnHand(missing.id), 0);
+});
+
+test('TASK-061: PO-106 — an order the rest of will never come is closed short, with a reason', async () => {
+  const product = makeProduct();
+  const { order } = sentOrder({ product, qtyMilli: 2000000, unitCostCentavos: 3900 });
+
+  // Nothing has arrived: closing short is refused, and cancelling is the answer.
+  const early = await call(`/purchase-orders/${order.id}/close`, { token: tokens.INVENTORY, method: 'POST', body: { reason: 'x' } });
+  assert.equal(early.status, 409);
+  assert.match((await early.json()).error.message, /Cancel it instead/);
+
+  const line = purchaseOrderService.get(order.id).lines[0];
+  goodsReceiptService.post({
+    poId: order.id,
+    lines: [{ poItemId: line.id, receivedQtyMilli: 1200000, unitCostCentavos: 3900 }],
+  }, sessions.OWNER);
+
+  const cashier = await call(`/purchase-orders/${order.id}/close`, { token: tokens.CASHIER, method: 'POST', body: { reason: 'x' } });
+  assert.equal(cashier.status, 403, 'TX-409');
+  const noReason = await call(`/purchase-orders/${order.id}/close`, { token: tokens.INVENTORY, method: 'POST', body: {} });
+  assert.equal(noReason.status, 400);
+
+  const res = await call(`/purchase-orders/${order.id}/close`, {
+    token: tokens.INVENTORY, method: 'POST', body: { reason: 'Mill out of stock until next quarter' },
+  });
+  const { purchase_order: closed } = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(closed.status, 'RECEIVED', "PO-102's own transition");
+  assert.equal(closed.status_label, 'Closed short');
+  assert.equal(closed.is_open, false);
+  assert.equal(closed.can_receive, false);
+  assert.equal(closed.can_close_short, false);
+  assert.equal(closed.close_reason, 'Mill out of stock until next quarter');
+  assert.equal(closed.lines[0].received_qty_milli, 1200000, 'what came stays received');
+  assert.equal(closed.lines[0].outstanding_qty_milli, 0, 'and nothing is awaited');
+  assert.equal(closed.lines[0].not_delivered_qty_milli, 800000);
+  assert.equal(inventoryRepository.qtyOnHand(product.id), 1200000, 'no stock moved (PO-103)');
+
+  const [row] = auditService.list({ action: 'PURCHASE_ORDER_CLOSED_SHORT' });
+  assert.equal(row.reason, 'Mill out of stock until next quarter');
+  assert.equal(JSON.parse(row.after_value).not_delivered[0].not_delivered_qty_milli, 800000);
+
+  // Closed is closed: no second close, no delivery, no cancel.
+  const again = await call(`/purchase-orders/${order.id}/close`, { token: tokens.INVENTORY, method: 'POST', body: { reason: 'y' } });
+  assert.equal(again.status, 409);
+  assert.throws(() => goodsReceiptService.post({
+    poId: order.id, lines: [{ poItemId: line.id, receivedQtyMilli: 1000, unitCostCentavos: 3900 }],
+  }, sessions.OWNER));
+});
