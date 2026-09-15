@@ -77,7 +77,8 @@ function fileNameFor(trigger, at) {
  * uninstaller, which are the three this exists for.
  */
 function folder() {
-  return settingsService.get('backup_folder') || null;
+  // TASK-062: a web copy's folder is the server's volume, known before any setting is.
+  return settingsService.get('backup_folder') || hosting.backupDir() || null;
 }
 
 // ── Taking one ──────────────────────────────────────────────────────────────

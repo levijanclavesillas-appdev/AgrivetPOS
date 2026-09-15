@@ -273,3 +273,18 @@ test('a fresh install migrates without taking a backup of nothing', async () => 
     await server.stop(instance);
   }
 });
+
+test('TASK-063: an installation with no store yet upgrades without a backup (a web copy waiting for its owner)', async () => {
+  const prior = priorInstall(previousVersion());
+  // Migrated by the previous release, never set up: no store, no owner, no backup folder.
+  db.close();
+
+  const instance = await server.start({ listenPort: 0 });
+  try {
+    assert.equal(migrate.schemaVersion(), migrate.binaryVersion(), 'it upgraded');
+    assert.equal(backupRepository.listLog({ limit: 10 }).length, 0, 'with nothing to back up, no backup');
+  } finally {
+    await server.stop(instance);
+  }
+  assert.ok(fs.existsSync(prior.dbPath));
+});

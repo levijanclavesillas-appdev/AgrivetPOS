@@ -60,6 +60,14 @@ function inspect() {
  * the difference between "did not start and here is why" and "crashed" is the whole of
  * what an owner sees on a bad morning.
  */
+function safelyComplete() {
+  try {
+    return require('./setupService').isComplete();
+  } catch {
+    return true;          // cannot tell: take the backup, as before
+  }
+}
+
 function onLaunch({ log = () => {} } = {}) {
   const before = inspect();
 
@@ -76,7 +84,16 @@ function onLaunch({ log = () => {} } = {}) {
 
   let backup = null;
 
-  if (before.state === 'BEHIND') {
+  // An installation that holds no store yet (setup never finished) has nothing a backup
+  // would protect, and no backup folder to put one in. Refusing to upgrade it left a web
+  // copy waiting for its owner unable to start after an update (TASK-062/063).
+  const holdsAStore = before.state === 'BEHIND' ? safelyComplete() : true;
+
+  if (before.state === 'BEHIND' && !holdsAStore) {
+    log(`upgrading an installation with no store yet from schema ${before.current} to ${before.binary}`);
+  }
+
+  if (before.state === 'BEHIND' && holdsAStore) {
     log(`upgrading the database from schema ${before.current} to ${before.binary}`);
 
     // §7: automatically, before the first statement runs. Required at this point and
