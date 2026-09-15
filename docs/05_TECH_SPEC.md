@@ -1183,6 +1183,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | :--- | :--- | :--- | :--- |
 | `POST` | `/auth/login` | — | `SEC-3` lockout |
 | `POST` | `/auth/pin-unlock` | — | `FR_1.3`, shift must be open |
+| `POST` | `/auth/approve` | signed in | `AUD-603`: the approver's own password, `SEC-3` lockout; answers with an approval for this session's next action (5 minutes, once), sent as `approver: { token }`. The body's approver is replaced by who the approval proves (`middleware/auth.js`) |
 | `POST` | `/auth/recover` | — | `SEC-5`, `AUD-604` |
 | `GET` | `/products?q=&category=&low=` | `TX-422` | `NFR_1.3` |
 | `GET` | `/products/barcode/:code` | `TX-401` | `NFR_1.2` |

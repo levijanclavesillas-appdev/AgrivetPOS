@@ -385,8 +385,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
       ruleId: refusal.ruleId,
       requiresRole: refusal.requiresRole,
       onApprove: async ({ username, password }) => {
-        const result = await api.post('/auth/login', { username, password });
-        approver = result.user;
+        approver = await api.approve(username, password);
         ui.toast(`${approver.username} authorised this close`, { kind: 'success' });
         render();
       },
@@ -412,9 +411,7 @@ export function createShift({ root, session, shiftId = null, onClosed }) {
         actualCashCentavos: cash,
         actualByMethod,
         varianceReason: varianceReason.trim() || null,
-        approver: approver
-          ? { id: approver.id, username: approver.username, role: approver.role }
-          : null,
+        approver: approver ? { username: approver.username, token: approver.token } : null,
       });
       onClosed(result);
     } catch (err) {

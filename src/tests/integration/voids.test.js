@@ -539,9 +539,13 @@ test('SEC-6: the void route is the counter’s, and the report is TX-421’s', a
   assert.equal(eligible.self_authorised, false);
   assert.equal(eligible.requires_role, 'MANAGER or OWNER');
 
+  // The manager approves at the cashier's screen with their own password.
+  const approval = await (await call('/auth/approve', {
+    token: tokens.CASHIER, method: 'POST', body: { username: 'manager', password: PASSWORD },
+  })).json();
   const done = await call(`/sales/${sale.sale.id}/void`, {
     token: tokens.CASHIER, method: 'POST',
-    body: { reason: 'Mis-scan at the counter', approver: { username: 'manager' } },
+    body: { reason: 'Mis-scan at the counter', approver: { username: 'manager', token: approval.approval_token } },
   });
   assert.equal(done.status, 201);
   assert.equal((await done.json()).sale.status, 'VOIDED');
@@ -550,4 +554,67 @@ test('SEC-6: the void route is the counter’s, and the report is TX-421’s', a
   const report = await call(`/reports/voids?from=${clock.manilaDate(clock.nowUtc())}`, { token: tokens.OWNER });
   assert.equal(report.status, 200);
   assert.ok((await report.json()).totals.void_count >= 1);
+});
+
+// ── AUD-603: an approval is proved, never asserted ──────────────────────────
+
+test('AUD-603: an approver is proved by their own password, for one session and one action', async () => {
+  const product = stocked();
+  const sell = () => saleService.complete({
+    lines: [{ productId: product.id, qtyMilli: 1000 }],
+    tenders: [{ method: 'CASH', amountCentavos: 10000 }],
+  }, sessions.CASHIER).sale;
+  const approve = async (username, password = PASSWORD, token = tokens.CASHIER) => call('/auth/approve', {
+    token, method: 'POST', body: { username, password },
+  });
+  const voidIt = (sale, approver, reason = 'Mis-scan') => call(`/sales/${sale.id}/void`, {
+    token: tokens.CASHIER, method: 'POST', body: { reason, approver },
+  });
+  const statusOf = (sale) => saleRepository.findById(sale.id).status;
+
+  // Naming a manager, or claiming the owner's role, is not an approval: before this, it was.
+  const first = sell();
+  for (const claim of [{ username: 'manager' }, { username: 'owner', role: 'OWNER' }, { id: sessions.OWNER.id, role: 'OWNER' }]) {
+    const refused = await voidIt(first, claim);
+    assert.equal(refused.status, 403, JSON.stringify(claim));
+    assert.equal((await refused.json()).error.rule_id, 'AUD-603');
+  }
+  assert.equal(statusOf(first), 'COMPLETED');
+
+  // The password is checked like a sign-in's, lockout included.
+  assert.equal((await approve('manager', 'not-the-password')).status, 401);
+  // Approving is for somebody signed in — it is not a way in.
+  assert.equal((await call('/auth/approve', { method: 'POST', body: { username: 'manager', password: PASSWORD } })).status, 401);
+
+  const approval = (await (await approve('manager')).json()).approval_token;
+  // An approval is not a session…
+  assert.equal((await call('/auth/session', { token: approval })).status, 401);
+  // …and is the cashier's: the inventory clerk cannot spend an approval the manager gave the cashier.
+  const clerkTries = await call(`/sales/${first.id}/void`, {
+    token: tokens.INVENTORY, method: 'POST', body: { reason: 'x', approver: { token: approval } },
+  });
+  assert.equal(clerkTries.status, 403);
+
+  // A refused action gives the approval back: the reason was missing, not the manager.
+  const noReason = await voidIt(first, { token: approval }, '');
+  assert.equal(noReason.status, 400);
+  const done = await voidIt(first, { username: 'someone-else', role: 'OWNER', token: approval });
+  assert.equal(done.status, 201);
+  assert.equal(statusOf(first), 'VOIDED');
+  // Recorded as who the approval proves, whatever the body said.
+  assert.equal((await done.json()).authorisation.authorised_by, 'manager');
+
+  // One approval, one action.
+  const second = sell();
+  const again = await voidIt(second, { token: approval });
+  assert.equal(again.status, 403);
+  assert.equal((await again.json()).error.rule_id, 'AUD-603');
+  assert.equal(statusOf(second), 'COMPLETED');
+
+  // The role that counts is the one stored: the inventory clerk's approval, whatever
+  // role the body claims for it, does not void a sale.
+  const clerkApproval = (await (await approve('inventory')).json()).approval_token;
+  const clerk = await voidIt(second, { username: 'inventory', role: 'OWNER', token: clerkApproval });
+  assert.equal(clerk.status, 403);
+  assert.equal(statusOf(second), 'COMPLETED');
 });

@@ -397,8 +397,7 @@ export function createReturn({ root, saleId = null, onBack, onDone }) {
       ruleId: refusal.ruleId,
       requiresRole: refusal.requiresRole,
       onApprove: async ({ username, password }) => {
-        const auth = await api.post('/auth/login', { username, password });
-        approver = auth.user;
+        approver = await api.approve(username, password);
         approvalReason = refusal.message;
         ui.toast(`${approver.username} authorised this return`, { kind: 'success' });
         render();
@@ -434,7 +433,7 @@ export function createReturn({ root, saleId = null, onBack, onDone }) {
       result = await api.post(`/sales/${view.sale.id}/returns`, {
         reason,
         notes: notes.trim() || null,
-        approver: approver ? { username: approver.username } : null,
+        approver: approver ? { username: approver.username, token: approver.token } : null,
         approvalReason: approvalReason || null,
         lines: chosen().map((line) => ({
           saleItemId: line.saleItemId,

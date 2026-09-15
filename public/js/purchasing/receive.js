@@ -329,8 +329,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
       ruleId: refusal.ruleId,
       requiresRole: refusal.requiresRole,
       onApprove: async ({ username, password }) => {
-        const result = await api.post('/auth/login', { username, password });
-        approver = result.user;
+        approver = await api.approve(username, password);
         approvalReason = refusal.message;
         ui.toast(`${approver.username} authorised this delivery`, { kind: 'success' });
         render();
@@ -368,7 +367,7 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
         supplierDrNo: supplierDrNo.trim() || null,
         invoiceNo: invoiceNo.trim() || null,
         notes: notes.trim() || null,
-        approver: approver ? { username: approver.username } : null,
+        approver: approver ? { username: approver.username, token: approver.token } : null,
         approvalReason: approvalReason || null,
         lines: lines.map((line) => ({
           poItemId: line.poItemId,

@@ -169,8 +169,7 @@ export function createAdjustment({ root, productId, onClose }) {
       ruleId: refusal.ruleId,
       requiresRole: refusal.requiresRole,
       onApprove: async ({ username, password }) => {
-        const result = await api.post('/auth/login', { username, password });
-        approver = result.user;
+        approver = await api.approve(username, password);
         ui.toast(`${approver.username} authorised this`, { kind: 'success' });
         render();
       },
@@ -197,7 +196,7 @@ export function createAdjustment({ root, productId, onClose }) {
         qtyMilli: variance,
         reason,
         notes: notes.trim() || null,
-        approver: approver ? { id: approver.id, username: approver.username, role: approver.role } : null,
+        approver: approver ? { username: approver.username, token: approver.token } : null,
       });
       ui.toast('Adjustment posted', { kind: 'success' });
       onClose(productId);

@@ -198,8 +198,7 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
       ruleId: 'POS-403',
       requiresRole: voidable.requires_role || 'MANAGER or OWNER',
       onApprove: async ({ username, password }) => {
-        const auth = await api.post('/auth/login', { username, password });
-        approver = auth.user;
+        approver = await api.approve(username, password);
         ui.toast(`${approver.username} authorised this void`, { kind: 'success' });
         renderActions();
       },
@@ -211,7 +210,7 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
     try {
       voided = await api.post(`/sales/${sale.sale.id}/void`, {
         reason: reason.trim(),
-        approver: approver ? { username: approver.username } : null,
+        approver: approver ? { username: approver.username, token: approver.token } : null,
       });
       voiding = false;
       renderActions();

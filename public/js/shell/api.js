@@ -97,6 +97,16 @@ async function request(method, path, body = null, { signal = null } = {}) {
 
 export const get = (path, opts) => request('GET', path, null, opts);
 export const post = (path, body, opts) => request('POST', path, body ?? {}, opts);
+
+/**
+ * AUD-603: the approver types their own password at the authorisation panel. The answer
+ * is an approval for this session's next action — sent back as `approver: { token }` —
+ * and never the approver's own session, so this screen does not hold their sign-in.
+ */
+export async function approve(username, password) {
+  const { approver, approval_token: token } = await post('/auth/approve', { username, password });
+  return { ...approver, token };
+}
 export const put = (path, body, opts) => request('PUT', path, body ?? {}, opts);
 export const del = (path, opts) => request('DELETE', path, null, opts);
 

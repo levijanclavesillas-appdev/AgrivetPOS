@@ -851,7 +851,8 @@ test('AUD-603: the adjustment screen uses the shared authorisation panel', () =>
   assert.equal(/authorisation-actions|approverPassword/.test(source), false, 'not a second panel');
 
   // The approver authenticates as themselves, so the row records two distinct actors.
-  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /api\.approve\(/);
+  assert.equal(/\/auth\/login/.test(source), false, 'an approval, never the approver\'s own session');
   // And submit stays disabled until they have.
   assert.match(source, /disabled: Boolean\(refusal\) && !approver/);
 });
@@ -1425,7 +1426,8 @@ test('INV-112 / INV-113: the rules are explained before they refuse, and the pan
   // SCR-803, SCR-305 and SCR-304 use. A second panel would drift from the first.
   assert.match(source, /err\.ruleId === 'INV-113'/);
   assert.match(source, /ui\.authorisationPanel/);
-  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /api\.approve\(/);
+  assert.equal(/\/auth\/login/.test(source), false, 'an approval, never the approver\'s own session');
   assert.match(source, /disabled: posting \|\| \(Boolean\(refusal\) && !approver\)/);
 });
 
@@ -1492,7 +1494,8 @@ test('POS-403: a cashier gets the panel, a manager does not, and the submit wait
   const source = codeOf('js/receipt/view.js');
 
   assert.match(source, /ui\.authorisationPanel/);
-  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /api\.approve\(/);
+  assert.equal(/\/auth\/login/.test(source), false, 'an approval, never the approver\'s own session');
   assert.match(source, /voidable\.self_authorised \|\| Boolean\(approver\)/,
     'the submit is disabled until somebody with the authority has signed in');
   assert.match(source, /err\.ruleId === 'POS-403'/, 'and a refusal reopens the panel');
@@ -1601,13 +1604,27 @@ test('POS-305: the refund preview says how it will be paid, and admits it is an 
   assert.match(source, /this screen’s arithmetic/);
 });
 
+test('AUD-603: every screen with the authorisation panel sends the approval, not a name', () => {
+  // The server believes only what an approval proves (middleware/auth.js). A screen that
+  // sent { username } alone would be refused — this says which screen, before a store does.
+  const screens = ['js/catalogue/adjustment.js', 'js/catalogue/count.js', 'js/purchasing/receive.js',
+    'js/receipt/view.js', 'js/returns/view.js', 'js/shift/view.js', 'js/payment/view.js'];
+  for (const file of screens) {
+    const source = codeOf(file);
+    assert.match(source, /approver: approver \? \{ username: approver\.username, token: approver\.token \} : null/, file);
+  }
+  assert.match(codeOf('js/pos/view.js'), /await api\.approve\(username, password\)/);
+  assert.match(codeOf('js/shell/api.js'), /post\('\/auth\/approve'/);
+});
+
 test('AUD-603: the approver authenticates, and the submit stays disabled until they have', () => {
   const source = codeOf('js/returns/view.js');
 
-  // The same shape SCR-803 uses: /auth/login issues no session header, so the cashier
-  // stays signed in and the trail records two distinct actors.
+  // The same shape SCR-803 uses: /auth/approve answers with an approval, not a
+  // session, so the cashier stays signed in and the trail records two distinct actors.
   assert.match(source, /ui\.authorisationPanel/);
-  assert.match(source, /api\.post\('\/auth\/login'/);
+  assert.match(source, /api\.approve\(/);
+  assert.equal(/\/auth\/login/.test(source), false, 'an approval, never the approver\'s own session');
   assert.match(source, /disabled: posting \|\| \(Boolean\(refusal\) && !approver\)/);
   assert.match(source, /\['POS-304', 'POS-307'\]\.includes\(err\.ruleId\)/);
 });

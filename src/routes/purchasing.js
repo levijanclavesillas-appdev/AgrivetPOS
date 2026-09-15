@@ -194,9 +194,8 @@ router.get('/goods-receipts/:id', purchasing, (req, res, next) => {
  * The delivery. `poId` present is FT-503; absent is FT-504's counter purchase, which
  * still needs a `supplierId` (PO-207).
  *
- * The approver is a username the renderer collected in the authorisation panel; the
- * service resolves it against the users table rather than believing the role in the
- * body (SEC-6).
+ * The approver is proved by middleware/auth.js from the approval given at the
+ * authorisation panel, and the service reads their role from the users table (SEC-6).
  */
 router.post('/goods-receipts', purchasing, (req, res, next) => {
   try {

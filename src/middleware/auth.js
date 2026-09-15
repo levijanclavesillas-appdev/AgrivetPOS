@@ -18,6 +18,33 @@ function bearerToken(req) {
 }
 
 /**
+ * AUD-603: the second actor on a request is who an approval proves, never who the body
+ * says. A body naming an `approver` must carry that approver's `token` from
+ * POST /auth/approve; it is checked here, against this session, and the body's
+ * approver is replaced by the verified one — id, username and the role stored now — so
+ * no route or service downstream can read a claimed name or role. A bare `approverRole`
+ * is a claim of the same kind and is dropped; the pricing preview reads the role from
+ * the approver instead.
+ *
+ * One approval, one action: it is spent as the request starts, and given back only if
+ * the request is refused, so a mistyped reason does not send the manager back to the
+ * counter.
+ */
+function provenApprover(req, res) {
+  const body = req.body;
+  if (!body || typeof body !== 'object') return;
+  delete body.approverRole;
+  if (body.approver === null || body.approver === undefined) return;
+
+  const approval = authService.verifyApproval(body.approver && body.approver.token, req.session);
+  const reason = body.approver && typeof body.approver.reason === 'string' ? body.approver.reason : undefined;
+  body.approver = { id: approval.id, username: approval.username, role: approval.role, ...(reason ? { reason } : {}) };
+
+  const giveBack = authService.spendApproval(approval);
+  res.on('finish', () => { if (res.statusCode >= 400) giveBack(); });
+}
+
+/**
  * Verify the session and re-issue it.
  *
  * The re-issue is what makes FR_1.2's "idle timeout" an idle one: every authenticated
@@ -32,6 +59,7 @@ function authenticate(req, res, next) {
 
     const session = authService.verifyToken(token);
     req.session = session;
+    provenApprover(req, res);
     res.set(SESSION_HEADER, authService.issueToken({
       user: { id: session.id, username: session.username, role: session.role },
       scope: session.scope,

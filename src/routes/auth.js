@@ -40,6 +40,18 @@ router.post('/auth/recover', (req, res, next) => {
   }
 });
 
+// AUD-603: a manager approves at the cashier's screen with their own password. The
+// answer is an approval for this session's next action, not a session of their own —
+// the cashier's screen never holds the manager's sign-in.
+router.post('/auth/approve', authenticate, (req, res, next) => {
+  try {
+    const { username, password } = req.body || {};
+    res.json(authService.approve({ username, password }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Who am I. Not in 05_TECH_SPEC.md §4's table — add the row: the renderer must not
 // decode a token to learn its own role, and TASK-015 needs this to choose a landing
 // screen (04_UX_SPEC.md §2).

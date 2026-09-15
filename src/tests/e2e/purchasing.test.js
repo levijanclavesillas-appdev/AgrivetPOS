@@ -44,6 +44,19 @@ const call = (pathname, { method = 'GET', body = null, who = 'boss' } = {}) => f
   ...(body ? { body: JSON.stringify(body) } : {}),
 });
 
+/**
+ * AUD-603: the approver types their own password at the authorisation panel, and the
+ * action carries the approval /auth/approve gave the session asking — never a name.
+ */
+async function approvedBy(username, { who } = {}) {
+  const response = await call('/auth/approve', {
+    method: 'POST', body: { username, password: PASSWORD }, ...(who ? { who } : {}),
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  return { username, token: body.approval_token };
+}
+
 const json = async (res) => {
   const body = await res.json();
   assert.ok(res.ok, `${res.status} ${JSON.stringify(body)}`);
@@ -186,9 +199,9 @@ test('TC-E2E-16 · the owner authorises it and the delivery posts', async () => 
       poId: order.id,
       supplierDrNo: 'DR-9931',
       invoiceNo: 'SI-20260915-114',
-      // The owner signed in on the inline panel; the server resolves the username
-      // against the users table rather than believing anything else in this body.
-      approver: { username: 'boss' },
+      // The owner approved on the inline panel with their own password; the server
+      // believes the approval, not anything else in this body.
+      approver: await approvedBy('boss', { who: 'clerk' }),
       approvalReason: 'Rang the mill — feed corn is up, the price is right',
       lines: [{
         poItemId: line.id,

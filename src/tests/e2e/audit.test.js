@@ -48,6 +48,19 @@ const call = (pathname, { method = 'GET', body = null, who = 'boss', raw = false
   ...(body ? { body: JSON.stringify(body) } : {}),
 });
 
+/**
+ * AUD-603: the approver types their own password at the authorisation panel, and the
+ * action carries the approval /auth/approve gave the session asking — never a name.
+ */
+async function approvedBy(username, { who } = {}) {
+  const response = await call('/auth/approve', {
+    method: 'POST', body: { username, password: PASSWORD }, ...(who ? { who } : {}),
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  return { username, token: body.approval_token };
+}
+
 const json = async (res) => {
   const body = await res.json();
   assert.ok(res.ok, `${res.status} ${JSON.stringify(body)}`);
@@ -142,7 +155,7 @@ test('TC-E2E-15: an authorised adjustment names both actors (AUD-603)', async ()
     body: {
       productId: product.id, qtyMilli: -qty,
       reason: 'Damaged in storage', notes: 'Sacks split in the rain',
-      approver: { id: owner.id, username: owner.username, role: 'OWNER' },
+      approver: await approvedBy(owner.username, { who: 'mgr' }),
     },
   }));
   assert.ok(posted.movement);

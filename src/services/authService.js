@@ -204,6 +204,9 @@ function issueToken({ user, scope = 'FULL', shiftId = null }) {
 function verifyToken(token) {
   try {
     const claims = jwt.verify(token, secrets.sessionSecret());
+    // An approval (below) is signed with the same secret. It proves one person agreed to
+    // one thing; it is not a way in, so it is refused as a session.
+    if (claims.scope === APPROVAL_SCOPE) throw new Error('an approval is not a session');
     return {
       id: claims.sub,
       username: claims.username,
@@ -224,6 +227,16 @@ function verifyToken(token) {
 // ── Login (FR_1.2) ──────────────────────────────────────────────────────────
 
 function login({ username, password }) {
+  const fresh = checkPassword({ username, password });
+  return { token: issueToken({ user: fresh }), user: toPublic(fresh) };
+}
+
+/**
+ * The password check behind login() and approve(): the same refusals, the same lockout
+ * (SEC-3), so a manager's password is no easier to guess at the approval panel than at
+ * the sign-in screen. Returns the user's current row.
+ */
+function checkPassword({ username, password }) {
   const name = typeof username === 'string' ? username.trim() : '';
   const user = name ? userRepository.findByUsername(name) : null;
 
@@ -248,8 +261,7 @@ function login({ username, password }) {
   }
 
   userRepository.clearFailedAttempts(user.id);
-  const fresh = userRepository.findById(user.id);
-  return { token: issueToken({ user: fresh }), user: toPublic(fresh) };
+  return userRepository.findById(user.id);
 }
 
 // ── PIN unlock (FR_1.3, SEC-2) ──────────────────────────────────────────────
@@ -361,6 +373,62 @@ function recover({ username, recoveryCode, newPassword }) {
 }
 
 // ── AUD-603's second actor ──────────────────────────────────────────────────
+//
+// A manager approving at the cashier's screen types their own password into the
+// authorisation panel. That proves who they are to the server once, at
+// POST /auth/approve, which answers with an approval: a token naming the approver and
+// the session that asked for it, good for APPROVAL_MINUTES and for one action. The
+// action then carries the approval, and middleware/auth.js replaces whatever the body
+// said about the approver with who the approval proves. Before this, the body's
+// `{ username }` — or its `role` — was believed, so any signed-in user could name a
+// manager and be approved.
+
+const APPROVAL_SCOPE = 'APPROVAL';
+const APPROVAL_MINUTES = 5;
+const APPROVAL_REFUSAL = 'The approval has expired or was not given. Ask the approver to approve it again.';
+
+// The approvals already used, until they would have expired anyway. Held in memory: a
+// restart forgets them, and by then APPROVAL_MINUTES has all but passed.
+const spentApprovals = new Map();
+
+/** POST /auth/approve: the approver's own password, for the session that asks. */
+function approve({ username, password }, requester) {
+  const approver = checkPassword({ username, password });
+  const token = jwt.sign(
+    { sub: approver.id, scope: APPROVAL_SCOPE, for: requester.id, jti: crypto.randomUUID() },
+    secrets.sessionSecret(),
+    { expiresIn: `${APPROVAL_MINUTES}m` }
+  );
+  return { approver: toPublic(approver), approval_token: token };
+}
+
+/**
+ * The approver an approval proves, for the session presenting it. Refused if it is not
+ * an approval, has expired, was asked for by somebody else, was already used, or names
+ * a user who is no longer active. The role is the stored one, read now.
+ */
+function verifyApproval(token, requester) {
+  let claims;
+  try {
+    claims = jwt.verify(String(token || ''), secrets.sessionSecret());
+  } catch {
+    throw errors.forbidden(APPROVAL_REFUSAL, { ruleId: 'AUD-603' });
+  }
+  if (claims.scope !== APPROVAL_SCOPE || claims.for !== requester.id || spentApprovals.has(claims.jti)) {
+    throw errors.forbidden(APPROVAL_REFUSAL, { ruleId: 'AUD-603' });
+  }
+  const row = userRepository.findById(claims.sub);
+  if (!row || !row.is_active) throw errors.forbidden(APPROVAL_REFUSAL, { ruleId: 'AUD-603' });
+  return { id: row.id, username: row.username, role: row.role, jti: claims.jti, expiresAtMs: claims.exp * 1000 };
+}
+
+/** One action per approval. `undo` puts it back, for an action that was refused. */
+function spendApproval(approval) {
+  const now = Date.now();
+  for (const [jti, until] of spentApprovals) if (until < now) spentApprovals.delete(jti);
+  spentApprovals.set(approval.jti, approval.expiresAtMs);
+  return () => spentApprovals.delete(approval.jti);
+}
 
 /**
  * Resolve an approver against the users table rather than believing the request.
@@ -396,7 +464,7 @@ function resolveApprover(approver, { roles = ['MANAGER', 'OWNER'], ruleId = 'AUD
 
 module.exports = {
   BCRYPT_COST, PIN_LENGTH, PASSWORD_MIN, CREDENTIAL_REFUSAL, workFactor,
-  resolveApprover,
+  resolveApprover, approve, verifyApproval, spendApproval, APPROVAL_MINUTES,
   validateUsername, validatePassword, validatePin,
   hashSecretValue, verifySecretValue, generateRecoveryCode,
   toPublic, lockoutState, issueToken, verifyToken,

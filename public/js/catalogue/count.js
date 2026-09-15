@@ -538,7 +538,7 @@ export function createStockCount({ root, session: user, countId = null, onBack }
     posting = true;
     try {
       result = await api.post(`/stock-counts/${view.session.id}/post`, {
-        approver: approver ? { username: approver.username } : null,
+        approver: approver ? { username: approver.username, token: approver.token } : null,
         reason: `Stock count ${view.session.count_no}`,
       });
       render();
@@ -564,8 +564,7 @@ export function createStockCount({ root, session: user, countId = null, onBack }
       ruleId: refusal.ruleId,
       requiresRole: refusal.requiresRole,
       onApprove: async ({ username, password }) => {
-        const auth = await api.post('/auth/login', { username, password });
-        approver = auth.user;
+        approver = await api.approve(username, password);
         ui.toast(`${approver.username} authorised posting this count`, { kind: 'success' });
         render();
       },

@@ -205,7 +205,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
       // §4.1: sent so the server can compare and reject a stale screen. Never banked.
       clientTotalCentavos: priced.total_centavos,
       acceptDuplicateReference: tenders.anyDuplicateAccepted(),
-      approver: approver ? { id: approver.id, username: approver.username, role: approver.role } : null,
+      approver: approver ? { username: approver.username, token: approver.token } : null,
     };
 
     try {

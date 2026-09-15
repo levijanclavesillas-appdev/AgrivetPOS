@@ -48,6 +48,19 @@ const call = (pathname, { method = 'GET', body = null, who = 'tess' } = {}) => f
   ...(body ? { body: JSON.stringify(body) } : {}),
 });
 
+/**
+ * AUD-603: the approver types their own password at the authorisation panel, and the
+ * action carries the approval /auth/approve gave the session asking — never a name.
+ */
+async function approvedBy(username, { who } = {}) {
+  const response = await call('/auth/approve', {
+    method: 'POST', body: { username, password: PASSWORD }, ...(who ? { who } : {}),
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  return { username, token: body.approval_token };
+}
+
 const json = async (res) => {
   const body = await res.json();
   assert.ok(res.ok, `${res.status} ${JSON.stringify(body)}`);
@@ -163,7 +176,7 @@ test('TC-E2E-18 · Tess cannot undo it alone, and the refusal says so in the rul
 
   // POS-401: and a void with no reason is refused whoever asks.
   await refusal(
-    await call(`/sales/${doomed.id}/void`, { method: 'POST', body: { reason: '', approver: { username: 'rosa' } } }),
+    await call(`/sales/${doomed.id}/void`, { method: 'POST', body: { reason: '', approver: await approvedBy('rosa') } }),
     { status: 400, ruleId: 'POS-401' }
   );
 
@@ -177,7 +190,7 @@ test('TC-E2E-18 · Rosa authorises, and the sale reverses whole', async () => {
 
   const result = await json(await call(`/sales/${doomed.id}/void`, {
     method: 'POST',
-    body: { reason: 'Scanned four sacks, the farmer wanted one', approver: { username: 'rosa' } },
+    body: { reason: 'Scanned four sacks, the farmer wanted one', approver: await approvedBy('rosa') },
   }));
 
   assert.equal(result.sale.status, 'VOIDED');
@@ -249,7 +262,7 @@ test('TC-E2E-18 · a credit sale voids off the account too', async () => {
 
   await json(await call(`/sales/${creditSale.id}/void`, {
     method: 'POST',
-    body: { reason: 'Charged the wrong farm', approver: { username: 'rosa' } },
+    body: { reason: 'Charged the wrong farm', approver: await approvedBy('rosa') },
   }));
 
   // CR-103: the balance derives from the ledger, so it comes back by a compensating
@@ -261,7 +274,7 @@ test('TC-E2E-18 · a credit sale voids off the account too', async () => {
 test('TC-E2E-18 · and it cannot be voided twice, or returned against', async () => {
   await refusal(
     await call(`/sales/${doomed.id}/void`, {
-      method: 'POST', body: { reason: 'Again', approver: { username: 'rosa' } },
+      method: 'POST', body: { reason: 'Again', approver: await approvedBy('rosa') },
     }),
     { status: 409, ruleId: 'POS-404' }
   );
@@ -307,7 +320,7 @@ test('TC-E2E-18 · POS-402 — after the close, the correction is a return', asy
   const error = await refusal(
     await call(`/sales/${goodSale.id}/void`, {
       method: 'POST',
-      body: { reason: 'Thought better of it', approver: { username: 'rosa' } },
+      body: { reason: 'Thought better of it', approver: await approvedBy('rosa') },
     }),
     { status: 409, ruleId: 'POS-402' }
   );

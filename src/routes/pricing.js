@@ -56,7 +56,8 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
       // sent one would be choosing its own tax treatment.
       taxMode: storeProfileService.taxMode(),
       actorRole: req.session.role,
-      approverRole: body.approverRole || null,
+      // Who approved is proved in middleware/auth.js, never taken from the body.
+      approverRole: body.approver ? body.approver.role : null,
       transactionDiscountCentavos: body.transactionDiscountCentavos || 0,
       // TAX-004, previewed on the same terms it is sold on: the cashier sees the
       // refusal — the store does not grant it, no line is eligible, the ID is

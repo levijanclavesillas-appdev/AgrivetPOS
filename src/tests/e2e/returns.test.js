@@ -56,6 +56,19 @@ const call = (pathname, { method = 'GET', body = null, who = 'tess' } = {}) => f
   ...(body ? { body: JSON.stringify(body) } : {}),
 });
 
+/**
+ * AUD-603: the approver types their own password at the authorisation panel, and the
+ * action carries the approval /auth/approve gave the session asking — never a name.
+ */
+async function approvedBy(username, { who } = {}) {
+  const response = await call('/auth/approve', {
+    method: 'POST', body: { username, password: PASSWORD }, ...(who ? { who } : {}),
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  return { username, token: body.approval_token };
+}
+
 const json = async (res) => {
   const body = await res.json();
   assert.ok(res.ok, `${res.status} ${JSON.stringify(body)}`);
@@ -249,9 +262,9 @@ test('TC-E2E-17 · one sack goes back on the shelf and one bottle is written off
     body: {
       reason: 'Wrong item sold',
       notes: 'Wanted the starter, not the grower.',
-      // Rosa authenticated in §4's panel. She is a different user from Tess, so
-      // AUD-603's two actors are real ones.
-      approver: { username: 'rosa' },
+      // Rosa approved in §4's panel with her own password. She is a different user
+      // from Tess, so AUD-603's two actors are real ones.
+      approver: await approvedBy('rosa'),
       approvalReason: 'Bottle unopened and never left the counter.',
       lines: [
         { saleItemId: sack.sale_item_id, qtyMilli: SACK_MILLI, disposition: 'RESTOCK' },

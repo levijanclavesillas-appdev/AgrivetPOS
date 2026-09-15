@@ -91,10 +91,8 @@ router.post('/inventory/adjustments', postAdjustment, (req, res, next) => {
   try {
     const { productId, qtyMilli, reason, notes = null, unitCostCentavos = null, approver = null } = req.body || {};
 
-    // The approver is a session-side identity in v1.0: SCR-203 opens an authorisation
-    // panel and the owner signs in there, so the renderer sends who authorised it.
-    // TASK-011's override prompt will replace this with a re-authentication that
-    // proves it rather than asserting it.
+    // The approver was proved by middleware/auth.js from the approval the owner gave
+    // at SCR-203's authorisation panel; the body's own claim never reaches here.
     res.status(201).json(inventoryService.adjust({
       productId, qtyMilli, reason, notes, unitCostCentavos,
       actor: req.session,
