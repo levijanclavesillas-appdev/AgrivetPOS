@@ -97,10 +97,11 @@ function findByNo(saleNo) {
 function itemsFor(saleId) {
   return db.get().prepare(`
     SELECT i.${columnList(ITEM_COLUMNS).split(', ').join(', i.')},
-           u.code AS sold_unit_code, p.sku AS product_sku
+           u.code AS sold_unit_code, bu.code AS base_unit_code, p.sku AS product_sku
       FROM sale_items i
       JOIN units u ON u.id = i.sold_unit_id
       JOIN products p ON p.id = i.product_id
+      JOIN units bu ON bu.id = p.base_unit_id
      WHERE i.sale_id = ?
      ORDER BY i.line_no
   `).all(saleId);

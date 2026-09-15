@@ -121,7 +121,8 @@ function print(document) {
   if (driver) {
     try {
       driver(record);
-      record.delivered = true;
+      // A LAN printer answers later: the driver marks the record pending and settles it.
+      record.delivered = !record.pending;
     } catch (err) {
       // Queued for reprint (POS-208) rather than failing the operation that produced it.
       record.error = err.message;

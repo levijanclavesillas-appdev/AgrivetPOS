@@ -114,9 +114,15 @@ const divider = (columns, character = '-') => character.repeat(columns);
  */
 function itemLines({ name, qtyDisplay, unitPrice, lineTotal }, columns) {
   const arithmetic = `${qtyDisplay} x ${unitPrice}`;
-  if (columns >= 48) {
-    const room = columns - arithmetic.length - lineTotal.length - 2;
+  const room = columns - arithmetic.length - lineTotal.length - 2;
+  if (columns >= 48 && room >= 12) {
     return [`${truncate(name, room).padEnd(room)} ${arithmetic} ${lineTotal}`];
+  }
+  // TASK-054: a figure is never cut to fit. "1 SACK (50 KG) x 50.00" beside 2,500.00 is
+  // wider than 58 mm paper, and truncating the left side printed the price as "50.0" —
+  // so a line that does not fit puts its amount on the line below, whole.
+  if (`  ${arithmetic}`.length + 1 + lineTotal.length > columns) {
+    return [truncate(name, columns), truncate(`  ${arithmetic}`, columns), leftRight('', lineTotal, columns)];
   }
   return [truncate(name, columns), leftRight(`  ${arithmetic}`, lineTotal, columns)];
 }

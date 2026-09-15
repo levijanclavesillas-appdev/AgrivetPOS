@@ -914,6 +914,26 @@ function reprint(saleId, actor) {
   return { ...view, document, printed };
 }
 
+/**
+ * TASK-054: the original, again, for a sale whose first print failed — out of paper, a
+ * cable out. POS-208 marks every *copy* REPRINT because two unmarked papers for one sale
+ * are a shrinkage tool; a receipt that never came out of the printer is not a copy, and
+ * a customer handed "REPRINT" for a sale rung up a minute ago has been handed a puzzle.
+ * So the original may be printed once more while it is on the failed queue, and never
+ * after it has printed (or the queue is gone, at a restart): then it is a reprint.
+ */
+function printQueuedReceipt(saleId) {
+  const printService = require('./printService');
+  const view = get(saleId);
+  if (!printService.takeQueued('SALE_RECEIPT', view.sale.sale_no)) {
+    throw errors.conflict(
+      `The receipt for ${view.sale.sale_no} already printed. A copy is a reprint, marked REPRINT (POS-208).`,
+      { ruleId: 'POS-208' }
+    );
+  }
+  return printReceipt(saleId);
+}
+
 /** The first print, called by the route after POST /sales returns (INT-1). */
 function printReceipt(saleId) {
   const printService = require('./printService');
@@ -945,6 +965,15 @@ function getByNo(saleNo) {
   return present(sale);
 }
 
+/** "1 BOX (100 TAB)" for a pack line, "12 TAB" for a loose one (UOM-002, UOM-005). */
+function qtyDisplay(item) {
+  const factor = item.sold_pack_factor_milli || 1000;
+  const base = item.base_unit_code || item.sold_unit_code;
+  if (factor === 1000 || item.sold_unit_code === base) return quantity.format(item.qty_milli, base);
+  const packsMilli = Math.round((item.qty_milli * 1000) / factor);
+  return `${quantity.format(packsMilli, item.sold_unit_code)} (${quantity.format(item.qty_milli, base)})`;
+}
+
 function present(sale) {
   const items = saleRepository.itemsFor(sale.id);
   const tenders = saleRepository.tendersFor(sale.id);
@@ -953,9 +982,17 @@ function present(sale) {
   // carries `sale_item_id` and the amount the 20% was taken on, which is what lets a
   // receipt show the VAT it lifted as well as the discount it gave — the two together
   // are what make the printed line add up.
-  const statutoryRows = saleRepository.discountsFor(sale.id).filter((d) => d.discount_type === 'STATUTORY');
+  const discountRows = saleRepository.discountsFor(sale.id);
+  const statutoryRows = discountRows.filter((d) => d.discount_type === 'STATUTORY');
   const statutoryRow = statutoryRows[0] || null;
   const statutoryByItem = new Map(statutoryRows.map((row) => [row.sale_item_id, row]));
+  // The line's own discount (MANUAL_LINE), apart from the 20% and from its share of a
+  // transaction discount — which is one row with no line, and prints once, in the totals.
+  const ownDiscountByItem = new Map();
+  for (const row of discountRows) {
+    if (!row.sale_item_id || row.discount_type === 'STATUTORY') continue;
+    ownDiscountByItem.set(row.sale_item_id, (ownDiscountByItem.get(row.sale_item_id) || 0) + row.discount_centavos);
+  }
 
   return {
     sale: {
@@ -1001,8 +1038,15 @@ function present(sale) {
       sku: item.product_sku,
       name: item.product_name_snapshot,
       qty_milli: item.qty_milli,
-      qty_display: quantity.format(item.qty_milli, item.sold_unit_code),
+      // UOM-002: qty_milli is in base units and the sold unit may be a pack. One box of
+      // a hundred is "1 BOX (100 TAB)" — formatting the hundred with the pack's code
+      // printed "100 BOX" on every pack line.
+      qty_display: qtyDisplay(item),
       unit_price_centavos: item.unit_price_centavos,
+      // What the line came to before anything came off it, which is what the receipt's
+      // item line shows so that "qty x price" is arithmetic the customer can check.
+      gross_centavos: money.mulQty(item.unit_price_centavos, item.qty_milli),
+      line_discount_centavos: ownDiscountByItem.get(item.id) || 0,
       price_level_applied: item.price_level_applied,
       unit_cost_centavos: item.unit_cost_centavos,
       discount_centavos: item.discount_centavos,
@@ -1071,6 +1115,6 @@ const countSearch = (opts = {}) => saleRepository.countSearch(opts);
 module.exports = {
   TENDERS, TENDER_METHODS, STATUS_LABELS,
   complete, get, getByNo, present, forShift, search, countSearch,
-  reprint, printReceipt, duplicateReferences,
+  reprint, printReceipt, printQueuedReceipt, duplicateReferences,
   assertClientTotalMatches, settleTenders, resolveLineQuantity,
 };

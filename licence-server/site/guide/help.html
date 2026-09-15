@@ -77,7 +77,7 @@
 
 <section id="printer-does-not-print">
   <h2>The receipt printer does not print</h2>
-  <p><strong>The sale is saved even if the receipt does not print.</strong> The screen says <em>The receipt did not print (…). It is queued — press Reprint when the printer is ready.</em> The words in brackets tell you why. Do not ring the sale up again.</p>
+  <p><strong>The sale is saved even if the receipt does not print.</strong> Under the receipt preview the screen says why, for example <em>The receipt did not print: the printer is not connected — check its cable and that it is switched on.</em>, or for a network printer <em>…the printer did not answer — check it is switched on and on the network (192.168.1.50:9100).</em> Do not ring the sale up again.</p>
   <h3>Check the printer</h3>
   <ol class="steps">
     <li>Is it switched on, with the cover closed and no error light?</li>
@@ -89,17 +89,17 @@
   <ul>
     <li><strong>How the receipt printer is connected: NONE, USB or LAN.</strong> NONE means no printer is set up; every receipt then says <em>No receipt printer is configured.</em></li>
     <li><strong>USB</strong> (Windows): the Windows printer must be shared, and <strong>USB printer device or share the bridge writes to</strong> holds its share path, written <kbd>\\COMPUTER-NAME\SHARE-NAME</kbd>. If it is empty you see <em>No USB printer device is set.</em></li>
-    <li><strong>LAN</strong> (network printer): <strong>LAN printer address</strong> is the printer's IP address, for example <kbd>192.168.1.50</kbd>, and the port is <kbd>9100</kbd>. Most receipt printers print their IP address on a self-test page (see the printer's manual). The computer and the printer must be on the same network. With a network printer the POS often cannot tell that nothing printed, so there may be no error message at all: check the paper. If your router gives the printer a new address after a restart, set the new address here, or give the printer a fixed address.</li>
+    <li><strong>LAN</strong> (network printer): <strong>LAN printer address</strong> is the printer's IP address, for example <kbd>192.168.1.50</kbd>, and the port is <kbd>9100</kbd>. Most receipt printers print their IP address on a self-test page (see the printer's manual). The computer and the printer must be on the same network. A network printer that is off or unreachable is reported after a few seconds as <em>the printer did not answer</em>. If your router gives the printer a new address after a restart, set the new address here, or give the printer a fixed address.</li>
     <li><strong>Receipt width: 32 columns for 58 mm paper, 48 for 80 mm.</strong> If peso amounts break onto two lines, the width is wrong.</li>
   </ul>
   <h3>Print a test page</h3>
   <ol class="steps">
     <li>After changing a setting, click <strong>Save this section</strong>.</li>
     <li>Click <strong>Print a test page</strong>.</li>
-    <li>Look at the paper, not only the screen. <em>A test page went to the printer. Check the paper.</em> means it was sent. For a network printer that is off, the screen can still say this, so the paper is the real test.</li>
+    <li>Look at the paper, not only the screen. <em>A test page went to the printer. Check the paper.</em> means the printer took it; a printer that did not answer is named on screen. Paper that comes out blank means it is loaded the wrong way round.</li>
   </ol>
   <h3>When it works again</h3>
-  <p>Open <strong>Receipts</strong>, open the sale, and click <strong>Reprint</strong>. The copy is marked REPRINT. See <a href="/guide/corrections">Returns, voids and reprints</a>.</p>
+  <p>If you are still on the sale's receipt screen, click <strong>Print it</strong>: the customer gets the receipt without a REPRINT mark. Later, or after the app was closed, open <strong>Receipts</strong>, open the sale and click <strong>Reprint</strong>; that copy is marked REPRINT. See <a href="/guide/corrections#reprint-a-receipt">Returns, voids and reprints</a>.</p>
   <p class="android"><strong>On Android:</strong> use a network (LAN or Wi-Fi) receipt printer and set the connection to LAN. USB and Bluetooth printers do not work from the tablet.</p>
 </section>
 

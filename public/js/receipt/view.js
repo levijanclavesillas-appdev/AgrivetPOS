@@ -21,6 +21,9 @@ import { h, clear } from '../shell/ui.js';
 import { money } from '../shell/format.js';
 
 export function createReceipt({ root, sale, printed, onNewSale, onBack = null }) {
+  // TASK-054: what happened to the paper when the sale completed — null when this
+  // screen was opened from the receipts list, where the moment has passed.
+  let printState = printed || null;
   const paper = h('pre', { class: 'receipt-paper', 'aria-label': 'Receipt preview' });
   // The sheet is held rather than built inline in `mount`, because `load` below has to
   // put the paper back into it. See the note there.
@@ -60,6 +63,37 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
     } catch (err) {
       ui.error(sheet, { message: err.message, retry: load });
     }
+  }
+
+  /**
+   * TASK-054: the original, once more, for a sale whose first print failed — no REPRINT
+   * stamp on a receipt the customer never had. The server refuses it once the receipt
+   * has printed (POS-208), and then the answer is Reprint.
+   */
+  async function printAgain() {
+    try {
+      const result = await api.post(`/sales/${sale.sale.id}/print`, {});
+      printState = result.printed;
+      ui.toast(printState.delivered ? 'Receipt printed.' : `Still not printed: ${printState.error}`,
+        { kind: printState.delivered ? 'success' : 'error' });
+    } catch (err) {
+      ui.toast(err.isRefusal ? `${err.message}` : err.message, { kind: 'error' });
+    }
+    renderActions();
+  }
+
+  /** One line about the paper, under the preview. */
+  function printStatus() {
+    if (!printState) return null;
+    if (printState.delivered) return h('p', { class: 'print-status ok', text: 'Receipt printed.' });
+    if (printState.transport === 'NONE') {
+      return h('p', { class: 'print-status muted', text: 'No receipt printer is set up, so the receipt is on screen only. '
+        + 'The owner can connect one in Admin → Settings.' });
+    }
+    return h('div', { class: 'print-status failed', role: 'alert' }, [
+      h('span', { text: `The receipt did not print: ${printState.error || 'the printer did not answer'}. ` }),
+      h('button', { icon: 'printer', text: 'Print it', onclick: printAgain }),
+    ]);
   }
 
   async function reprint() {
@@ -112,10 +146,13 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
 
     if (voiding) return voidPanel();
 
-    return h('div', { class: 'receipt-actions' }, [
-      h('button', { class: 'primary', icon: 'plus', text: 'New sale  Enter', onclick: onNewSale }),
-      h('button', { icon: 'printer', text: 'Reprint', onclick: reprint }),
-      voidButton(),
+    return h('div', {}, [
+      printStatus(),
+      h('div', { class: 'receipt-actions' }, [
+        h('button', { class: 'primary', icon: 'plus', text: 'New sale  Enter', onclick: onNewSale }),
+        h('button', { icon: 'printer', text: 'Reprint', onclick: reprint }),
+        voidButton(),
+      ]),
     ]);
   }
 
@@ -265,10 +302,10 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
       h('div', { id: 'receipt-actions' }, [actionsBlock()]),
     ]));
 
-    // INT-1: printing already happened, asynchronously, and did not gate the sale. A
-    // failure is a toast and a queued document, never an unwound sale.
-    if (printed && !printed.delivered) {
-      ui.toast(`The receipt did not print (${printed.error}). It is queued — press Reprint when the printer is ready.`, { kind: 'error' });
+    // INT-1: printing happened after the sale committed and did not gate it. A failure
+    // is a toast, the status line and a queued original, never an unwound sale.
+    if (printState && !printState.delivered && printState.transport !== 'NONE') {
+      ui.toast(`The receipt did not print (${printState.error}). Press Print it when the printer is ready.`, { kind: 'error' });
     }
 
     load();

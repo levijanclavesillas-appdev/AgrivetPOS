@@ -98,53 +98,42 @@ function renderSaleReceipt({ sale, items, tenders, profile, reprint = false, col
     escpos.divider(columns),
   ];
 
+  // **The printed arithmetic closes, top to bottom.** Each item line is quantity × price
+  // = what the line came to before anything came off it; under it, what came off that
+  // line: the VAT a statutory line was relieved of, the 20% (TAX-004), the line's own
+  // discount. The totals then read Subtotal − each kind of deduction = TOTAL, every
+  // figure summed from the lines above it. A receipt that printed the net beside
+  // "1 x 1,120.00" and then took the discounts off it again left a customer holding a
+  // piece of paper that did not add up — on every discounted sale.
+  const gross = (item) => {
+    if (Number.isInteger(item.gross_centavos)) return item.gross_centavos;
+    if (Number.isInteger(item.qty_milli)) return money.mulQty(item.unit_price_centavos, item.qty_milli);
+    return item.line_total_centavos;       // a line described without its quantity
+  };
+  const off = (label, centavos) => escpos.leftRight(label, `-${money.toDisplay(centavos, { symbol: false })}`, columns);
+  const sum = (field) => items.reduce((total, item) => total + (item[field] || 0), 0);
+
   for (const item of items) {
     lines.push(...escpos.itemLines({
       name: item.name,
       qtyDisplay: item.qty_display,
       unitPrice: money.toDisplay(item.unit_price_centavos, { symbol: false }),
-      lineTotal: money.toDisplay(item.line_total_centavos, { symbol: false }),
+      lineTotal: money.toDisplay(gross(item), { symbol: false }),
     }, columns));
-
-    // TAX-004, per line, so the printed arithmetic closes: the VAT lifted, then the
-    // 20%, then whatever else came off. A statutory line whose only sub-line said
-    // "Discount −200.00" beside a total of 800.00 on a 1,120.00 line leaves the
-    // customer to find the missing 120 themselves.
-    if (item.vat_exemption_centavos > 0) {
-      lines.push(escpos.leftRight('  Less VAT', `-${money.toDisplay(item.vat_exemption_centavos, { symbol: false })}`, columns));
-    }
-    if (item.statutory_discount_centavos > 0) {
-      lines.push(escpos.leftRight(
-        `  ${statutoryLabel(sale)} disc`,
-        `-${money.toDisplay(item.statutory_discount_centavos, { symbol: false })}`,
-        columns
-      ));
-    }
-    const voluntary = item.discount_centavos - (item.statutory_discount_centavos || 0);
-    if (voluntary > 0) {
-      lines.push(escpos.leftRight('  Discount', `-${money.toDisplay(voluntary, { symbol: false })}`, columns));
-    }
+    if (item.vat_exemption_centavos > 0) lines.push(off('  Less VAT', item.vat_exemption_centavos));
+    if (item.statutory_discount_centavos > 0) lines.push(off(`  ${statutoryLabel(sale)} disc`, item.statutory_discount_centavos));
+    if (item.line_discount_centavos > 0) lines.push(off('  Discount', item.line_discount_centavos));
   }
 
   lines.push(escpos.divider(columns));
-  lines.push(escpos.leftRight('Subtotal', money.toDisplay(sale.subtotal_centavos, { symbol: false }), columns));
-
-  if (sale.line_discount_centavos > 0) {
-    lines.push(escpos.leftRight('Line discounts', `-${money.toDisplay(sale.line_discount_centavos, { symbol: false })}`, columns));
-  }
-  if (sale.txn_discount_centavos > 0) {
-    lines.push(escpos.leftRight('Discount', `-${money.toDisplay(sale.txn_discount_centavos, { symbol: false })}`, columns));
-  }
-  // TAX-004: printed on its own line and never merged with the discounts above. It is
-  // a different claim — the store deducts it, the others it simply gave away — and the
-  // law requires the beneficiary's record to appear on the document.
-  if (sale.statutory_discount_centavos > 0) {
-    lines.push(escpos.leftRight(
-      `${statutoryLabel(sale)} disc`,
-      `-${money.toDisplay(sale.statutory_discount_centavos, { symbol: false })}`,
-      columns
-    ));
-  }
+  lines.push(escpos.leftRight('Subtotal', money.toDisplay(items.reduce((total, item) => total + gross(item), 0), { symbol: false }), columns));
+  // TAX-004: the VAT relief and the 20% are each on their own line and never merged
+  // with the voluntary discounts. They are different claims — the store deducts the 20%,
+  // the others it simply gave away — and the law wants the beneficiary's on the document.
+  if (sum('vat_exemption_centavos') > 0) lines.push(off(`Less VAT (${statutoryLabel(sale)})`, sum('vat_exemption_centavos')));
+  if (sum('statutory_discount_centavos') > 0) lines.push(off(`${statutoryLabel(sale)} disc`, sum('statutory_discount_centavos')));
+  if (sum('line_discount_centavos') > 0) lines.push(off('Line discounts', sum('line_discount_centavos')));
+  if (sale.txn_discount_centavos > 0) lines.push(off('Discount', sale.txn_discount_centavos));
 
   lines.push(escpos.leftRight('TOTAL', money.toDisplay(sale.total_centavos, { symbol: false }), columns));
   lines.push('');
@@ -484,6 +473,26 @@ function renderClosingSummary({
  * Never throws. INT-1 makes printing best-effort, and every caller of this has already
  * committed its transaction.
  */
+/**
+ * TASK-054: the reason, in words a cashier can act on. "ENOENT" on the receipt screen
+ * told nobody that the printer's cable was out.
+ */
+function plainReason(code, where = '') {
+  const at = where ? ` (${where})` : '';
+  switch (code) {
+    case 'ENOENT': case 'ENODEV': case 'ENXIO':
+      return `the printer is not connected — check its cable and that it is switched on${at}`;
+    case 'EACCES': case 'EPERM':
+      return `this computer is not allowed to use the printer${at}`;
+    case 'EBUSY':
+      return `the printer is busy — wait a moment and try again${at}`;
+    case 'ECONNREFUSED': case 'EHOSTUNREACH': case 'ENETUNREACH': case 'ETIMEDOUT': case 'EHOSTDOWN':
+      return `the printer did not answer — check it is switched on and on the network${at}`;
+    default:
+      return code ? `${code}${at}` : `the printer did not accept the receipt${at}`;
+  }
+}
+
 function send(bytes) {
   const transport = settingsService.get('printer_transport');
 
@@ -501,7 +510,7 @@ function send(bytes) {
       fs.writeFileSync(device, bytes);
       return { delivered: true, transport, device };
     } catch (err) {
-      return { delivered: false, transport, device, error: `${err.code || err.message}` };
+      return { delivered: false, transport, device, error: plainReason(err.code || err.message, device) };
     }
   }
 
@@ -536,8 +545,8 @@ function sendOverTcp(bytes, host, port, { timeoutMs = 4000 } = {}) {
 
     socket.setTimeout(timeoutMs);
     socket.on('connect', () => socket.write(bytes, () => finish(null)));
-    socket.on('timeout', () => finish(`the printer at ${host}:${port} did not answer`));
-    socket.on('error', (err) => finish(err.code || err.message));
+    socket.on('timeout', () => finish(plainReason('ETIMEDOUT', `${host}:${port}`)));
+    socket.on('error', (err) => finish(plainReason(err.code || err.message, `${host}:${port}`)));
   });
 
   return result;
@@ -555,12 +564,29 @@ function sendOverTcp(bytes, host, port, { timeoutMs = 4000 } = {}) {
 function install() {
   documentService.setDriver((record) => {
     const outcome = send(escpos.encode(record.text));
+    record.transport = outcome.transport;
+    // A store with no printer set up has nothing to retry: saying so is the whole
+    // answer, and queueing every receipt of the day as a failure would bury the one
+    // that jammed.
+    if (outcome.transport === 'NONE') throw new Error(outcome.error);
     if (!outcome.delivered && !outcome.pending) {
       // POS-208: queued for reprint rather than lost.
       enqueue(record, outcome.error);
       throw new Error(outcome.error || 'the printer did not accept the document');
     }
-    record.transport = outcome.transport;
+    if (outcome.pending) {
+      // LAN answers later. Until TASK-054 a refused socket was reported as printed and
+      // never queued — the failure was silent. Now the record says it is on its way,
+      // and settles to what the printer said; a failure is queued like any other.
+      record.pending = true;
+      record.settled = outcome.settled.then((result) => {
+        record.pending = false;
+        record.delivered = result.delivered;
+        record.error = result.error;
+        if (!result.delivered) enqueue(record, result.error);
+        return record;
+      });
+    }
   });
 
   // INT-2: the pulse is an ESC/POS command on the same wire as the paper.
@@ -578,9 +604,37 @@ function uninstall() {
   require('./drawerService').setDriver(null);
 }
 
+/**
+ * TASK-054: what the printer said about a document, for a response — waiting for a LAN
+ * printer's answer (its socket times out at four seconds) so the screen says what
+ * happened rather than "sent". The promise itself never leaves the server.
+ */
+async function outcome(record, { waitMs = 4500 } = {}) {
+  if (record.pending && record.settled) {
+    await Promise.race([record.settled, new Promise((resolve) => setTimeout(resolve, waitMs))]);
+  }
+  return {
+    delivered: Boolean(record.delivered),
+    pending: Boolean(record.pending),
+    transport: record.transport || null,
+    error: record.error || null,
+  };
+}
+
 function enqueue(record, error) {
-  queue.push({ ...record, queued_at: clock.nowUtc(), error });
+  const { settled, ...plain } = record;
+  queue.push({ ...plain, queued_at: clock.nowUtc(), error });
   if (queue.length > MAX_QUEUED) queue.shift();
+}
+
+/**
+ * TASK-054: take one document back off the queue — the sale receipt that never printed —
+ * so it can be printed as the original. Null when it is not queued: it printed, or the
+ * application has restarted since, and then the copy is a reprint (POS-208).
+ */
+function takeQueued(kind, documentNo) {
+  const index = queue.findIndex((entry) => entry.kind === kind && entry.document_no === documentNo);
+  return index === -1 ? null : queue.splice(index, 1)[0];
 }
 
 /** What did not print, for SCR-304's reprint list and OPS-007's toast. */
@@ -596,5 +650,5 @@ module.exports = {
   width, header, footer,
   renderSaleReceipt, renderAcknowledgement, renderReturnAcknowledgement, renderClosingSummary,
   renderStatement,
-  send, sendOverTcp, install, uninstall, enqueue, queued, clearQueue,
+  send, sendOverTcp, plainReason, outcome, install, uninstall, enqueue, takeQueued, queued, clearQueue,
 };

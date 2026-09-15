@@ -24,6 +24,7 @@
 
 const express = require('express');
 const saleService = require('../services/saleService');
+const printService = require('../services/printService');
 const voidService = require('../services/voidService');
 const sequenceService = require('../services/sequenceService');
 const errors = require('../services/errors');
@@ -39,7 +40,7 @@ const atTheCounter = [authenticate, requirePermission('TX-401')];
  * parses, authorises, delegates and serialises, and holds no rule of its own
  * (05_TECH_SPEC.md §8.2).
  */
-router.post('/sales', atTheCounter, (req, res, next) => {
+router.post('/sales', atTheCounter, async (req, res, next) => {
   try {
     const body = req.body || {};
     const result = saleService.complete({
@@ -59,7 +60,37 @@ router.post('/sales', atTheCounter, (req, res, next) => {
       statutory: body.statutory || null,
     }, req.session);
 
-    res.status(201).json(result);
+    // FR_3.7 / INT-1: the receipt prints now, after the sale has committed — until
+    // TASK-054 nothing called this, and the first paper a store ever saw of a sale was a
+    // reprint stamped REPRINT. It cannot fail the sale: the money is banked, and a
+    // printer fault is an answer on the receipt screen, not an error.
+    res.status(201).json({ ...result, printed: await firstPrint(result.sale.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** What the receipt screen needs to say about the paper: printed, or why not. */
+async function firstPrint(saleId) {
+  let record;
+  try {
+    record = saleService.printReceipt(saleId).printed;
+  } catch (err) {
+    return { delivered: false, transport: null, error: err.message };
+  }
+  // A LAN printer answers within its own four-second timeout; waiting for it keeps the
+  // screen truthful, and costs the cashier time only when the printer is not there.
+  return printService.outcome(record);
+}
+
+/**
+ * TASK-054: print the original again, for a sale whose first print failed. Refused once
+ * it has printed — a copy then is a reprint, marked, behind TX-430 (POS-208).
+ */
+router.post('/sales/:id/print', atTheCounter, async (req, res, next) => {
+  try {
+    const { printed } = saleService.printQueuedReceipt(req.params.id);
+    res.json({ printed: await printService.outcome(printed) });
   } catch (err) {
     next(err);
   }

@@ -263,6 +263,11 @@ test('TC-INT-102: the ID and the name reach the sale, the receipt and the report
   const printed = saleService.printReceipt(sale.sale.id).document.text;
   assert.match(printed, /SC disc/);
   assert.match(printed, /200\.00/);
+  // TASK-054: and the paper adds up, top to bottom. The item line is 1 × 1,120.00 =
+  // 1,120.00 — it printed 800.00 there and took the 320 off it again underneath — and
+  // the totals close: 1,120.00 − 120.00 VAT − 200.00 = 800.00.
+  assert.match(printed, /1 KG x 1,120\.00\s+1,120\.00\n\s+Less VAT\s+-120\.00\n\s+SC disc\s+-200\.00/);
+  assert.match(printed, /Subtotal\s+1,120\.00\nLess VAT \(SC\)\s+-120\.00\nSC disc\s+-200\.00\nTOTAL\s+800\.00/);
   assert.match(printed, new RegExp(`SC ID ${ID.idNo}`));
   assert.match(printed, new RegExp(`Name ${ID.name}`));
 

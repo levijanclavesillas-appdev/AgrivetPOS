@@ -604,3 +604,166 @@ test('GET /print/queue lists what did not print', async () => {
   assert.equal(body.queued[0].error, 'printer offline');
   printService.clearQueue();
 });
+
+// ── TASK-054: the receipt prints when the sale completes, and adds up ────────
+
+/** Point the printer at a file, as the USB transport writes to a device path. */
+function usbTo(device) {
+  db.transaction(() => {
+    settingsService.set('printer_transport', 'USB', sessions.OWNER);
+    settingsService.set('printer_device', device, sessions.OWNER);
+  });
+}
+function noPrinter() {
+  db.transaction(() => {
+    settingsService.set('printer_transport', 'NONE', sessions.OWNER);
+    settingsService.set('printer_device', '', sessions.OWNER);
+  });
+}
+const sellOverHttp = async (lines, extra = {}) => {
+  const res = await call('/sales', { token: tokens.CASHIER, method: 'POST', body: { lines, ...extra } });
+  const body = await res.json();
+  assert.equal(res.status, 201, JSON.stringify(body));
+  return body;
+};
+const amount = (text) => Number(text.replace(/,/g, ''));
+
+/** The receipt's own arithmetic: Subtotal − each deduction under it = TOTAL. */
+function assertAddsUp(text) {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => l.startsWith('Subtotal'));
+  const end = lines.findIndex((l) => l.startsWith('TOTAL'));
+  assert.ok(at > 0 && end > at, text);
+  const value = (line) => amount(line.trim().split(/\s+/).pop());
+  const deductions = lines.slice(at + 1, end).reduce((sum, l) => sum + value(l), 0);
+  assert.equal(Math.round((value(lines[at]) + deductions) * 100), Math.round(value(lines[end]) * 100),
+    `Subtotal and its deductions do not make TOTAL:\n${text}`);
+  // Every item line is quantity × price = its amount, before anything came off it — the
+  // amount on the same line, or on the line below where the paper is too narrow.
+  const joined = lines.map((l, i) => (/ x [\d.,]+$/.test(l) && /^\s+[\d.,]+$/.test(lines[i + 1] || '')
+    ? `${l} ${lines[i + 1].trim()}` : l));
+  for (const l of joined) {
+    const m = /^\s*([\d.,]+) [A-Z]+(?: \(([\d.,]+) [A-Z]+\))? x ([\d.,]+)\s+([\d.,]+)$/.exec(l);
+    if (!m) continue;
+    const baseQty = amount(m[2] || m[1]);
+    assert.equal(Math.round(baseQty * amount(m[3]) * 100), Math.round(amount(m[4]) * 100), `line does not multiply: ${l}`);
+  }
+}
+
+test('FR_3.7: a completed sale prints its receipt at once, unmarked, and says so', async () => {
+  printService.clearQueue();
+  const device = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'receipt-')), 'lp0');
+  usbTo(device);
+  try {
+    const product = stocked({ retail: 10000 });
+    const sale = await sellOverHttp([{ productId: product.id, qtyMilli: 2000 }],
+      { tenders: [{ method: 'CASH', amountCentavos: 50000 }] });
+
+    // Before TASK-054 nothing printed here: the first paper of any sale was a reprint.
+    assert.deepEqual(sale.printed, { delivered: true, pending: false, transport: 'USB', error: null });
+    const paper = fs.readFileSync(device).toString('latin1');
+    assert.match(paper, new RegExp(sale.sale.sale_no));
+    assert.doesNotMatch(paper, /REPRINT/);
+    assert.equal(printService.queued().length, 0);
+  } finally {
+    noPrinter();
+  }
+});
+
+test('TASK-054: a receipt that did not print prints again as the original, once', async () => {
+  printService.clearQueue();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'receipt-'));
+  usbTo(path.join(dir, 'unplugged', 'lp0'));             // a device that is not there
+  try {
+    const product = stocked({ retail: 10000 });
+    const sale = await sellOverHttp([{ productId: product.id, qtyMilli: 1000 }],
+      { tenders: [{ method: 'CASH', amountCentavos: 10000 }] });
+    assert.equal(sale.printed.delivered, false);
+    // In words a cashier can act on, not "ENOENT".
+    assert.match(sale.printed.error, /^the printer is not connected — check its cable/);
+    assert.equal(printService.queued().length, 1, 'queued, not lost');
+
+    // The printer is back. The customer gets the original — not "REPRINT" on a sale
+    // rung up a minute ago.
+    usbTo(path.join(dir, 'lp0'));
+    const again = await call(`/sales/${sale.sale.id}/print`, { token: tokens.CASHIER, method: 'POST', body: {} });
+    assert.equal(again.status, 200);
+    assert.equal((await again.json()).printed.delivered, true);
+    assert.doesNotMatch(fs.readFileSync(path.join(dir, 'lp0')).toString('latin1'), /REPRINT/);
+    assert.equal(printService.queued().length, 0);
+
+    // Once. After that a copy is a reprint, marked and behind TX-430 (POS-208).
+    const twice = await call(`/sales/${sale.sale.id}/print`, { token: tokens.CASHIER, method: 'POST', body: {} });
+    assert.equal(twice.status, 409);
+    assert.equal((await twice.json()).error.rule_id, 'POS-208');
+  } finally {
+    noPrinter();
+  }
+});
+
+test('TASK-054: with no printer set up, the sale says so and nothing is queued as a failure', async () => {
+  printService.clearQueue();
+  noPrinter();
+  const product = stocked({ retail: 10000 });
+  const sale = await sellOverHttp([{ productId: product.id, qtyMilli: 1000 }],
+    { tenders: [{ method: 'CASH', amountCentavos: 10000 }] });
+  assert.equal(sale.printed.delivered, false);
+  assert.equal(sale.printed.transport, 'NONE');
+  assert.equal(printService.queued().length, 0);
+});
+
+test('TASK-054: a LAN printer\'s answer reaches the sale, and a dead one is queued, not called printed', async () => {
+  printService.clearQueue();
+  const received = [];
+  const listener = net.createServer((socket) => socket.on('data', (chunk) => received.push(chunk)));
+  await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
+  const lan = (port) => db.transaction(() => {
+    settingsService.set('printer_transport', 'LAN', sessions.OWNER);
+    settingsService.set('printer_host', '127.0.0.1', sessions.OWNER);
+    settingsService.set('printer_port', port, sessions.OWNER);
+  });
+  try {
+    const product = stocked({ retail: 10000 });
+    lan(listener.address().port);
+    const good = await sellOverHttp([{ productId: product.id, qtyMilli: 1000 }], { tenders: [{ method: 'CASH', amountCentavos: 10000 }] });
+    assert.equal(good.printed.delivered, true);
+    assert.equal(good.printed.transport, 'LAN');
+
+    lan(1);                                                 // refused, as an unplugged printer is
+    const bad = await sellOverHttp([{ productId: product.id, qtyMilli: 1000 }], { tenders: [{ method: 'CASH', amountCentavos: 10000 }] });
+    // Before TASK-054 this came back "printed": the socket had not answered yet.
+    assert.equal(bad.printed.delivered, false);
+    assert.match(bad.printed.error, /^the printer did not answer — check it is switched on and on the network \(127\.0\.0\.1:1\)/);
+    assert.equal(printService.queued().length, 1);
+  } finally {
+    listener.close();
+    noPrinter();
+    db.transaction(() => settingsService.set('printer_host', '', sessions.OWNER));
+    printService.clearQueue();
+  }
+});
+
+test('UOM-002: a pack line reads "1 SACK (50 KG)", not "50 SACK", and every discounted receipt adds up', async () => {
+  const product = stocked({ retail: 5000 });
+  productService.addPack(product.id, { unitId: ref.sack.id, factorMilli: 50000 }, sessions.OWNER);
+  const other = stocked({ retail: 5000 });
+
+  const sale = saleService.complete({
+    lines: [
+      { productId: product.id, qtyMilli: 1000, packUnitId: ref.sack.id },
+      { productId: other.id, qtyMilli: 4000, discountCentavos: 300, discountReason: 'Regular customer' },
+    ],
+    transactionDiscountCentavos: 100,
+    tenders: [{ method: 'CASH', amountCentavos: 999999 }],
+  }, sessions.CASHIER);
+
+  assert.equal(sale.items[0].qty_display, '1 SACK (50 KG)');
+  const text = saleService.printReceipt(sale.sale.id).document.text;
+  // On 58 mm paper the arithmetic and the amount do not fit one line: the amount goes
+  // below, whole, rather than the price being cut to "50.0".
+  assert.match(text, /  1 SACK \(50 KG\) x 50\.00\n\s+2,500\.00/);
+  assert.doesNotMatch(text, /x 50\.0 /);
+  assert.doesNotMatch(text, /50 SACK/);
+  assert.match(text, /4 KG x 50\.00\s+200\.00\n\s+Discount\s+-3\.00/, 'the line gross, then what came off it');
+  assertAddsUp(text);
+});

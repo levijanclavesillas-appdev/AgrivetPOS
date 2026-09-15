@@ -2308,3 +2308,16 @@ test('TASK-053: a new product starts with the industry\'s ticks', () => {
   assert.match(editor, /is_batch_tracked: productDefaults \? Boolean\(productDefaults\.isBatchTracked\) : true/);
   assert.match(editor, /statutory_discount_eligible: productDefaults \? Boolean\(productDefaults\.statutoryDiscountEligible\) : true/);
 });
+
+// ── TASK-054: the receipt screen says what happened to the paper ──────────────
+
+test('TASK-054: the receipt screen says printed, not set up, or failed — and offers the original once', () => {
+  const view = codeOf('js/receipt/view.js');
+  assert.match(view, /let printState = printed \|\| null/);
+  assert.match(view, /text: 'Receipt printed\.'/);
+  assert.match(view, /No receipt printer is set up/);
+  assert.match(view, /text: 'Print it', onclick: printAgain/);
+  assert.match(view, /api\.post\(`\/sales\/\$\{sale\.sale\.id\}\/print`/);
+  // A store with no printer is not told "failed" after every sale.
+  assert.match(view, /printState\.transport !== 'NONE'/);
+});

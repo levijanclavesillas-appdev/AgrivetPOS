@@ -580,3 +580,9 @@
 /* TASK-052: the box beside its name in the search, the size of a thumb. */
 .search-result .result-picture { width: 2.75rem; height: 2.75rem; }
 .search-result .result-name { flex: 1; min-width: 0; }
+
+/* TASK-054: what happened to the paper, under the receipt preview. */
+.print-status { margin: var(--space-2) 0; font-size: var(--type-body-sm-size); }
+.print-status.ok { color: var(--md-on-success-container, #166534); }
+.print-status.failed { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-radius: var(--shape-md); background: var(--md-error-container); color: var(--md-on-error-container); }

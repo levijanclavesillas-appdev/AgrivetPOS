@@ -32,9 +32,12 @@ const configurePrinter = [authenticate, requirePermission('TX-424')];
  * rule treats an unmarked reprint as a shrinkage risk, and the grant is what makes
  * "who may produce a second copy" answerable.
  */
-router.post('/sales/:id/reprint', reprintReceipt, (req, res, next) => {
+router.post('/sales/:id/reprint', reprintReceipt, async (req, res, next) => {
   try {
-    res.json(saleService.reprint(req.params.id, req.session));
+    const result = saleService.reprint(req.params.id, req.session);
+    // A LAN printer answers later (TASK-054): wait for it, so the screen says what the
+    // printer said rather than "not delivered" with no reason while it is still talking.
+    res.json({ ...result, printed: await printService.outcome(result.printed) });
   } catch (err) {
     next(err);
   }
@@ -68,7 +71,7 @@ router.get('/sales/:id/receipt', reprintReceipt, (req, res, next) => {
  * Subject to TAX-006 like every other document — a test page is still a piece of paper
  * with the store's name on it, and the rule holds for all of them.
  */
-router.post('/print/test', configurePrinter, (req, res, next) => {
+router.post('/print/test', configurePrinter, async (req, res, next) => {
   try {
     const profile = storeProfileService.profile();
     const columns = printService.width();
@@ -87,7 +90,9 @@ router.post('/print/test', configurePrinter, (req, res, next) => {
       ].join('\n'),
     };
 
-    res.json({ document, printed: documentService.print(document) });
+    // The paper is still the real test, but a network printer that is off now says so
+    // (TASK-054) instead of "a test page went to the printer".
+    res.json({ document, printed: await printService.outcome(documentService.print(document)) });
   } catch (err) {
     next(err);
   }
