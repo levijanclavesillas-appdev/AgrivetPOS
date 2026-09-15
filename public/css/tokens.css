@@ -490,7 +490,7 @@ th.money, td.money { text-align: right; }
 /* A touch screen: no keyboard to press F9 on, and no mouse to drag a scrollbar with. The
    key hints go (ui.js wraps them in `.key-hint`), and tab strips scroll by swiping. */
 @media (hover: none) and (pointer: coarse) {
-  .key-hint, .pos-help { display: none; }
+  .key-hint { display: none; }
   .admin-tabs { scrollbar-width: none; }
 }
 @media (max-width: 599px) {

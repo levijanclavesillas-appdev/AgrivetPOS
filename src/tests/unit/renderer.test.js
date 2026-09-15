@@ -2335,3 +2335,19 @@ test('TASK-055: a scan that names a pack adds one of the pack, and the editor sa
   assert.match(editor, /packUnitId: barcodePack \|\| null/);
   assert.match(editor, /Printed on — one scan adds/);
 });
+
+// ── TASK-056: the counter works without a keyboard ──────────────────────────
+
+test('TASK-056: every counter action with no button of its own is a button, with its key as a hint', () => {
+  const pos = codeOf('js/pos/view.js');
+  assert.match(pos, /const TOUCH_ACTIONS = Object\.freeze\(\['F3', 'F4', 'F5', 'F8', 'Delete', 'F6', 'F7'\]\)/);
+  assert.match(pos, /class: 'pos-action', 'aria-keyshortcuts': key/);
+  assert.match(pos, /h\('kbd', \{ class: 'key-hint'/, 'the key is a hint a touch screen hides');
+  // The bar is no longer hidden on a touch screen or a phone — only the key-only hints are.
+  const tokens = fs.readFileSync(path.join(root, 'public', 'css', 'tokens.css'), 'utf8');
+  const posCss = fs.readFileSync(path.join(root, 'public', 'css', 'pos.css'), 'utf8');
+  assert.doesNotMatch(tokens, /\.pos-help \{ display: none/);
+  assert.doesNotMatch(tokens, /\.key-hint, \.pos-help/);
+  assert.doesNotMatch(posCss, /\.pos-help \{ display: none; \}/);
+  assert.match(posCss, /@media \(hover: none\) and \(pointer: coarse\) \{ \.pos-hints \{ display: none; \} \}/);
+});

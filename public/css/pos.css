@@ -307,10 +307,23 @@
 .pos-help-host { display: contents; }
 
 .pos-help {
-  display: flex; flex-wrap: wrap; gap: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
   padding-top: var(--space-2); border-top: 1px solid var(--md-outline-variant);
   font-size: var(--type-body-sm-size); color: var(--md-on-surface-muted);
 }
+/* TASK-056: the counter's actions, as buttons a thumb finds (NFR_4.3's 44 px). */
+.pos-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.pos-action {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-3);
+  border: 1px solid var(--md-outline-variant); border-radius: var(--shape-full, 999px);
+  background: var(--md-surface-container); color: var(--md-on-surface); font: inherit; font-weight: 500; cursor: pointer;
+}
+.pos-action:hover:not(:disabled) { border-color: var(--md-primary); color: var(--md-primary); }
+.pos-action:disabled { opacity: .45; cursor: default; }
+.pos-action kbd { margin: 0; }
+.pos-hints { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+/* The keys nobody on a touch screen can press: hidden there, after the rule above. */
+@media (hover: none) and (pointer: coarse) { .pos-hints { display: none; } }
 .pos-help kbd {
   padding: 1px var(--space-1); margin-right: var(--space-1);
   border: 1px solid var(--md-outline); border-bottom-width: 2px; border-radius: var(--shape-xs);
@@ -358,8 +371,8 @@
 @media (max-width: 599px) {
   /* The pane under the top app bar, less its own padding. */
   .pos { height: calc(100vh - 5.5rem); height: calc(100dvh - 5.5rem); }
-  /* The F-keys, on a device with no keyboard to press them on. */
-  .pos-help { display: none; }
+  /* The key-only hints, on a phone; the action buttons stay (TASK-056). */
+  .pos-hints { display: none; }
 }
 
 /* The one action the screen exists for: M3's filled button, at the size a thumb finds

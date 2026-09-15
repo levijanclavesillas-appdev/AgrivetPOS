@@ -45,7 +45,7 @@
     <li><strong>Left, the cart:</strong> one line per item. Each line shows the quantity, the price per unit, the <strong>price level</strong> used (for example <strong>RETAIL</strong>), the line total, any discount, and <em>stock after</em> — what will be left on the shelf after this sale.</li>
     <li><strong>Right:</strong> the <strong>Customer</strong> (<em>Walk-in</em> until you choose one) and the price level, then <strong>Subtotal</strong>, <strong>Discount</strong>, <strong>VAT</strong> (only in a VAT-registered store) and the <strong>TOTAL</strong>. Under them are <strong>PAY</strong> and <strong>Park &amp; new</strong>.</li>
   </ul>
-  <p>Along the bottom is a bar of the function keys (<kbd>F1</kbd> to <kbd>F12</kbd>). You can finish a whole sale without the mouse — see <a href="#keyboard-shortcuts">Keyboard shortcuts</a>.</p>
+  <p>Along the bottom is a row of buttons for the counter's actions: <strong>Qty</strong>, <strong>Discount</strong>, <strong>Txn discount</strong>, <strong>SC/PWD</strong>, <strong>Remove line</strong>, <strong>Park</strong> and <strong>Retrieve</strong>, each with its function key beside it on a computer. You can finish a whole sale with the keyboard alone, or by touch alone — see <a href="#keyboard-shortcuts">Keyboard shortcuts</a>.</p>
   <figure class="guide-shot"><img src="/static/guide/selling-counter.webp" alt="The counter screen. On the left, the Scan or search box and a cart of three lines, each with quantity, unit price, the word RETAIL, the line total and stock after. On the right, the customer Walk-in, the totals and a large PAY F9 button. A bar of function keys runs along the bottom." width="1280" height="800" loading="lazy"><figcaption>The cart on the left, the customer and the total on the right, the function keys along the bottom.</figcaption></figure>
   <p class="tip"><strong>Tip:</strong> The cart is saved as you go. If the power goes off or the app is closed, the cart comes back when you open the counter again: <em>Your cart was restored</em>.</p>
 </section>
@@ -81,7 +81,7 @@
   <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
   <p>The keys below work on the <strong>selected</strong> line (the highlighted one). Click a line to select it. A line you just added is already selected.</p>
   <ol class="steps">
-    <li>Press <kbd>F3</kbd>. A <strong>Quantity</strong> panel opens for that line.</li>
+    <li>Press <kbd>F3</kbd> or tap <strong>Qty</strong>. A <strong>Quantity</strong> panel opens for that line.</li>
     <li>Type the quantity in <strong>Quantity</strong>.</li>
     <li>If the product is also sold in packs, choose the <strong>Unit</strong>: the single unit (for example <strong>TAB</strong>) or a pack (for example <strong>BLISTER</strong> or <strong>BOX</strong>). Under the field the app shows what that comes to, for example <em>2 BOX = 200 TAB</em>.</li>
     <li>Click <strong>Apply</strong> (or press <kbd>Enter</kbd>). The line and the total update.</li>
@@ -89,7 +89,7 @@
   <ul>
     <li><strong>Selling a pack or single pieces:</strong> to sell 3 tablets out of a box, leave the unit on <strong>TAB</strong> and type <kbd>3</kbd>. To sell a whole box, choose <strong>BOX</strong> and type <kbd>1</kbd>. The line shows both, for example <em>1 BOX (100 TAB)</em>.</li>
     <li><strong>Parts of a unit:</strong> some units can be sold in parts (for example <kbd>0.5</kbd> of a kilo). Units that cannot are marked under the field: <em>… cannot be sold in parts — a whole number of them.</em></li>
-    <li><strong>Remove a line:</strong> select it and press <kbd>Delete</kbd>.</li>
+    <li><strong>Remove a line:</strong> select it and press <kbd>Delete</kbd> or tap <strong>Remove line</strong>.</li>
     <li><strong>Close a panel without changing anything:</strong> press <kbd>Esc</kbd> or click <strong>Cancel</strong>. <kbd>Esc</kbd> never clears the cart.</li>
   </ul>
   <p class="tip"><strong>Tip:</strong> Watch <em>stock after</em> on each line. If it goes below zero, the shelf does not have enough and the sale will be refused at payment (see <a href="#if-the-sale-will-not-complete">If the sale will not complete</a>).</p>
@@ -118,13 +118,13 @@
   <p class="who"><strong>Who:</strong> Cashier, Manager or Owner, each up to their own limit; above it a manager or owner approves</p>
   <h3>On one line</h3>
   <ol class="steps">
-    <li>Select the line and press <kbd>F4</kbd>.</li>
+    <li>Select the line and press <kbd>F4</kbd> or tap <strong>Discount</strong>.</li>
     <li>Type the discount in pesos in <strong>Amount in pesos</strong> (for example <kbd>5</kbd> for ₱5 off the line).</li>
     <li>Click <strong>Apply</strong>. The line shows <em>Discount -₱5.00</em>.</li>
   </ol>
   <h3>On the whole sale</h3>
   <ol class="steps">
-    <li>Press <kbd>F5</kbd>. The <strong>Transaction discount</strong> panel opens.</li>
+    <li>Press <kbd>F5</kbd> or tap <strong>Txn discount</strong>. The <strong>Transaction discount</strong> panel opens.</li>
     <li>Type the amount in pesos and click <strong>Apply</strong>. It is shared across the lines and shown in <strong>Discount</strong> on the right.</li>
   </ol>
   <h3>Discount limits and manager approval</h3>
@@ -151,7 +151,7 @@
   <p>The 20% discount for senior citizens (RA 9994) and persons with disability (RA 10754) is switched on when a pharmacy is set up. It applies only to products marked for it in the product editor (<a href="/guide/products">Products and prices</a>); new products start marked.</p>
   <ol class="steps">
     <li>Ring up the items as usual.</li>
-    <li>Ask for the customer's ID and press <kbd>F8</kbd>. The <strong>20% senior citizen / PWD discount</strong> panel opens.</li>
+    <li>Ask for the customer's ID and press <kbd>F8</kbd> or tap <strong>SC/PWD</strong>. The <strong>20% senior citizen / PWD discount</strong> panel opens.</li>
     <li>Choose the <strong>ID type</strong>: <strong>Senior citizen (RA 9994)</strong> or <strong>PWD (RA 10754)</strong>.</li>
     <li>Type the <strong>ID number</strong> and the <strong>Name on the ID</strong>, exactly as on the card. Both are required.</li>
     <li>Click <strong>Apply</strong>.</li>
@@ -166,8 +166,8 @@
   <p>The receipt shows <em>SC disc</em> (or <em>PWD disc</em>) under each eligible line — after <em>Less VAT</em> in a VAT-registered store — then the discount total, and at the bottom the ID number (<em>SC ID …</em> or <em>PWD ID …</em>) and the name. The app records the ID type, number and name only.</p>
   <ul>
     <li><strong>If no item in the cart is eligible</strong>, the app says <em>None of these products is eligible…</em> and no discount is given.</li>
-    <li><strong>To remove it</strong>, press <kbd>F8</kbd> and click <strong>Remove</strong>.</li>
-    <li><strong>A parked sale does not keep the ID.</strong> When you resume it, press <kbd>F8</kbd> and enter the ID again.</li>
+    <li><strong>To remove it</strong>, press <kbd>F8</kbd> or tap <strong>SC/PWD</strong> and click <strong>Remove</strong>.</li>
+    <li><strong>A parked sale does not keep the ID.</strong> When you resume it, press <kbd>F8</kbd> or tap <strong>SC/PWD</strong> and enter the ID again.</li>
     <li>If the 20% would sell a line below cost, a manager or owner must approve it, as for any discount.</li>
   </ul>
   <p class="agrivet"><strong>Agrivet store:</strong> the discount is switched off when the store is set up, and <kbd>F8</kbd> is not shown in the key bar until the owner turns it on in Settings.</p>
@@ -178,8 +178,8 @@
   <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
   <p>Park a sale when the customer steps away (to get another item, or to find money) and you want to serve the next person.</p>
   <ol class="steps">
-    <li>Press <kbd>F12</kbd> (<strong>Park &amp; new</strong>) or <kbd>F6</kbd> (<strong>Park</strong>). The cart is set aside and you see <em>Parked:</em> with the number of lines and the time. The counter is empty for the next customer.</li>
-    <li>When the customer comes back, press <kbd>F7</kbd> (<strong>Retrieve</strong>).</li>
+    <li>Tap <strong>Park &amp; new</strong> (<kbd>F12</kbd>), or <strong>Park</strong> (<kbd>F6</kbd>). The cart is set aside and you see <em>Parked:</em> with the number of lines and the time. The counter is empty for the next customer.</li>
+    <li>When the customer comes back, press <kbd>F7</kbd> or tap <strong>Retrieve</strong>.</li>
     <li>Under <strong>Parked carts</strong>, click the right one. Its lines and customer come back.</li>
   </ol>
   <ul>
@@ -278,7 +278,7 @@
 
 <section id="keyboard-shortcuts">
   <h2>Keyboard shortcuts</h2>
-  <p>The key bar at the bottom of the counter screen shows <kbd>F1</kbd> to <kbd>F12</kbd>.</p>
+  <p>The buttons at the bottom of the counter screen carry their keys (<kbd>F3</kbd> to <kbd>F8</kbd>, and <kbd>Del</kbd>); the other keys are listed under them.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Key</th><th>On the key bar</th><th>What it does</th></tr></thead>
     <tbody>
@@ -306,7 +306,7 @@
   <ul>
     <li>On a phone, or a tablet held upright, the cart is on top and the <strong>TOTAL</strong> and <strong>PAY</strong> are underneath it, with the customer below them.</li>
     <li>On a phone, the menu is behind the ☰ button at the top left.</li>
-    <li>On a touch screen, the key bar and the key names on buttons are hidden. <strong>PAY</strong>, <strong>Park &amp; new</strong> and <strong>Change</strong> (customer) are buttons you can tap.</li>
+    <li>On a touch screen, the key names are hidden and every action is a button: tap a line to choose it, then <strong>Qty</strong>, <strong>Discount</strong>, <strong>SC/PWD</strong> or <strong>Remove line</strong>. <strong>PAY</strong>, <strong>Park &amp; new</strong> and <strong>Change</strong> (customer) are buttons too.</li>
   </ul>
-  <p class="android"><strong>On Android:</strong> changing a quantity or unit, discounts, the SC/PWD discount, removing a line and retrieving a parked sale are done with the function keys. Connect a USB or Bluetooth keyboard to use them. A USB or Bluetooth barcode scanner in keyboard mode works as on a PC; scanning the same item again adds one more.</p>
+  <p class="android"><strong>On Android:</strong> everything at the counter is done by touch, with the buttons at the bottom of the cart; no keyboard is needed. A USB or Bluetooth barcode scanner in keyboard mode works as on a PC; scanning the same item again adds one more.</p>
 </section>

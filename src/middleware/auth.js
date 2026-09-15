@@ -75,18 +75,26 @@ function authenticate(req, res, next) {
  * Require a TX-* permission. `level` demands a specific grant, so a route that writes
  * refuses a role holding only VIEW.
  *
+ * A list is any one of them (TASK-056). The counter's own reads — look an item up, see
+ * its stock and picture, know which shift is open — are the inventory clerk's by TX-422
+ * and the cashier's by TX-401: a cashier who unlocked with a PIN is scoped to the
+ * counter (SEC-2) and must still be able to sell, without the PIN reaching the
+ * inventory reports TX-422 also opens. A refusal names the first, the route's own.
+ *
  * A refusal is audited (SEC-6). The row names the transaction that was refused, which
  * is what makes an attempt to reach a forbidden route visible afterwards rather than
  * merely blocked at the time.
  */
-function requirePermission(txId, { level = null } = {}) {
-  permissions.assertKnown(txId);
+function requirePermission(txIds, { level = null } = {}) {
+  const list = Array.isArray(txIds) ? txIds : [txIds];
+  list.forEach((id) => permissions.assertKnown(id));
+  const txId = list[0];
 
   return function check(req, res, next) {
     try {
       if (!req.session) throw errors.unauthorized('Sign in to continue.', { ruleId: 'SEC-7' });
 
-      if (permissions.can(req.session, txId, level)) return next();
+      if (list.some((id) => permissions.can(req.session, id, level))) return next();
 
       const pinBlocked = req.session.scope === 'PIN' && !permissions.PIN_SCOPE.includes(txId);
       const holders = permissions.rolesHolding(txId, level);

@@ -195,3 +195,50 @@ test('VR-503: the last active owner cannot be deactivated or demoted, over HTTP'
   assert.equal(now.status, 200);
   assert.equal((await now.json()).user.role, 'MANAGER');
 });
+
+// ── TASK-056: a PIN reaches the counter — all of it, and nothing beyond it ──
+
+test('TC-INT-03 / TASK-056: after a PIN unlock the counter works, and reports, costs and the close do not', async () => {
+  const shiftService = require('../../services/shiftService');
+  const productService = require('../../services/productService');
+  const inventoryService = require('../../services/inventoryService');
+  const cashier = authService.verifyToken(tokens.CASHIER);
+  const owner = authService.verifyToken(tokens.OWNER);
+  const ref = temp.seedCatalog(owner);
+  const product = productService.create({
+    sku: 'PIN-001', name: 'Pin Test Tablet', categoryId: ref.category.id, baseUnitId: ref.piece.id, retailPriceCentavos: 1000,
+  }, owner);
+  inventoryService.postStandalone({ productId: product.id, type: 'RECEIPT', qtyMilli: 50000, unitCostCentavos: 400, actor: owner });
+  const shift = shiftService.open({ actor: cashier, openingFloatCentavos: 100000, confirmed: true }).shift;
+
+  // The cashier stepped away and came back: a PIN, not the password.
+  const unlocked = await (await call('/auth/pin-unlock', { method: 'POST', body: { username: 'cashier', pin: '284917' } })).json();
+  assert.equal(unlocked.scope, 'PIN');
+  const pin = unlocked.token;
+  const status = async (path, options = {}) => (await call(path, { token: pin, ...options })).status;
+
+  // Everything the counter asks for. Before TASK-056 the first of these was refused, and
+  // with it the POS and Receipts screens; so were product search and the stock line.
+  assert.equal(await status('/shifts/current'), 200);
+  assert.equal(await status(`/shifts/${shift.id}`), 200);
+  assert.equal(await status(`/shifts/${shift.id}/expected`), 200);
+  assert.equal(await status('/products?q=pin'), 200);
+  assert.equal(await status(`/products/${product.id}`), 200);
+  assert.equal(await status(`/inventory/${product.id}`), 200);
+  assert.equal(await status(`/products/${product.id}/image`), 404, 'no picture — but not refused');
+  const sold = await call('/sales', { token: pin, method: 'POST', body: {
+    lines: [{ productId: product.id, qtyMilli: 1000 }], tenders: [{ method: 'CASH', amountCentavos: 1000 }],
+  } });
+  assert.equal(sold.status, 201, 'and it sells');
+
+  // The product, seen at the counter: no cost on it, because TX-412 is not the counter's.
+  const seen = (await (await call(`/products/${product.id}`, { token: pin })).json()).product;
+  assert.equal(seen.avg_cost_centavos, undefined);
+
+  // What a PIN does not reach: the reports TX-422 also opens, closing the day, users.
+  for (const [path, method] of [['/inventory/valuation', 'GET'], ['/inventory/low-stock', 'GET'], ['/users', 'GET'], [`/shifts/${shift.id}/close`, 'POST']]) {
+    const res = await call(path, { token: pin, method, ...(method === 'POST' ? { body: {} } : {}) });
+    assert.equal(res.status, 403, `${method} ${path}`);
+    assert.equal((await res.json()).error.rule_id, 'SEC-2', `${method} ${path} is refused as a PIN session`);
+  }
+});

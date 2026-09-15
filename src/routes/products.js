@@ -23,6 +23,10 @@ const { authenticate, requirePermission, SESSION_HEADER } = require('../middlewa
 
 const router = express.Router();
 const readCatalog = [authenticate, requirePermission('TX-422')];
+// TASK-056: looking an item up at the counter is the cashier's by TX-401 as much as the
+// clerk's by TX-422, so a PIN session (SEC-2: the counter only) can still search, see a
+// product and its picture — and still cannot reach what TX-422 alone opens.
+const lookUpAtCounter = [authenticate, requirePermission(['TX-422', 'TX-401'])];
 const scanAtCounter = [authenticate, requirePermission('TX-401')];
 const editProduct = [authenticate, requirePermission('TX-410')];
 const changePrice = [authenticate, requirePermission('TX-411')];
@@ -41,7 +45,7 @@ router.get('/products/barcode/:code', scanAtCounter, (req, res, next) => {
   }
 });
 
-router.get('/products', readCatalog, (req, res, next) => {
+router.get('/products', lookUpAtCounter, (req, res, next) => {
   try {
     res.json(productService.search({
       q: req.query.q,
@@ -55,7 +59,7 @@ router.get('/products', readCatalog, (req, res, next) => {
   }
 });
 
-router.get('/products/:id', readCatalog, (req, res, next) => {
+router.get('/products/:id', lookUpAtCounter, (req, res, next) => {
   try {
     res.json({ product: productService.get(req.params.id, req.session) });
   } catch (err) {
@@ -101,7 +105,7 @@ router.delete('/products/:id', editProduct, (req, res, next) => {
 // picture is for. Fetched by the renderer with its token and shown from a blob (SEC-7),
 // so the address carries the version and the answer can be cached for good.
 
-router.get('/products/:id/image', readCatalog, (req, res, next) => {
+router.get('/products/:id/image', lookUpAtCounter, (req, res, next) => {
   try {
     const found = productImageService.read(req.params.id, req.query.size);
     // Cached for good, so it must not carry the session token authenticate() set: the

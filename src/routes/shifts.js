@@ -21,9 +21,13 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const router = express.Router();
 const ownShift = [authenticate, requirePermission('TX-418')];
 const moveTillCash = [authenticate, requirePermission('TX-420')];
+// TASK-056: reading your own open shift is part of selling on it (TX-401) and of moving
+// till cash (TX-420), both of which a PIN session may do. Opening and closing a shift stay
+// TX-418's, which a PIN session is not given: closing the day takes the password (SEC-2).
+const readOwnShift = [authenticate, requirePermission(['TX-418', 'TX-401', 'TX-420'])];
 
 /** What SCR-301 asks before it will show a cart at all (POS-501). */
-router.get('/shifts/current', ownShift, (req, res, next) => {
+router.get('/shifts/current', readOwnShift, (req, res, next) => {
   try {
     const shift = shiftService.openShiftFor(req.session.id);
     res.json({
@@ -75,7 +79,7 @@ router.post('/shifts/open', ownShift, (req, res, next) => {
   }
 });
 
-router.get('/shifts/:id', ownShift, (req, res, next) => {
+router.get('/shifts/:id', readOwnShift, (req, res, next) => {
   try {
     res.json(shiftService.get(req.params.id));
   } catch (err) {
@@ -83,7 +87,7 @@ router.get('/shifts/:id', ownShift, (req, res, next) => {
   }
 });
 
-router.get('/shifts/:id/expected', ownShift, (req, res, next) => {
+router.get('/shifts/:id/expected', readOwnShift, (req, res, next) => {
   try {
     // A pure read (the task's constraint), so the screen may call it after every
     // change without anything being written as a side effect of looking.

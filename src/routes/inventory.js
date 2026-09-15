@@ -18,6 +18,9 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 const readInventory = [authenticate, requirePermission('TX-422')];
+// TASK-056: one product's stock is what the counter shows as "stock after" — the cashier's
+// by TX-401 too, so a PIN session can sell. The reports stay behind TX-422 alone.
+const stockAtCounter = [authenticate, requirePermission(['TX-422', 'TX-401'])];
 const postAdjustment = [authenticate, requirePermission('TX-407')];
 
 // Before /:productId, or "low-stock" is read as a product id.
@@ -51,7 +54,7 @@ router.get('/inventory/reconciliation', [authenticate, requirePermission('TX-427
   }
 });
 
-router.get('/inventory/:productId', readInventory, (req, res, next) => {
+router.get('/inventory/:productId', stockAtCounter, (req, res, next) => {
   try {
     res.json({ on_hand: inventoryService.onHand(req.params.productId) });
   } catch (err) {

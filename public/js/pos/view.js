@@ -17,6 +17,9 @@ import { createCart } from './cart.js';
 import { createScanner } from '../shell/scanner.js';
 import { KEYMAP, HELP_ORDER, actionFor, isMapped } from '../shell/keymap.js';
 
+// TASK-056: the actions with no button of their own, in the order a sale uses them.
+const TOUCH_ACTIONS = Object.freeze(['F3', 'F4', 'F5', 'F8', 'Delete', 'F6', 'F7']);
+
 export function createPos({ root, session, onPay }) {
   const cart = createCart();
   const catalogue = new Map();
@@ -806,15 +809,37 @@ export function createPos({ root, session, onPay }) {
 
   // ── Mount ─────────────────────────────────────────────────────────────────
 
+  /**
+   * The counter's actions as buttons (TASK-056), with the F-key beside each.
+   *
+   * This bar used to be key hints only, and a touch screen hid it — so on the tablet a
+   * cashier could not change a quantity, give a discount or the senior/PWD 20%, remove a
+   * line or bring back a parked sale at all: the only way to each was a key the tablet
+   * does not have. Now each is a button a finger can press, and the key beside it (a
+   * `.key-hint`, which a touch screen hides) is for whoever has a keyboard. Search,
+   * Customer, Pay and Park & new have their own buttons already, so they stay hints.
+   *
+   * TAX-004 ships off in an agrivet, and a bar that offers a key the store cannot use is
+   * a bar cashiers stop reading: SC/PWD shows where the store grants it.
+   */
   function helpBar() {
-    // TAX-004 ships off, and a foot bar that offers a key most stores cannot use is a
-    // foot bar cashiers stop reading. The key stays mapped either way, and pressing it
-    // in a store that does not grant the discount says so.
-    const keys = HELP_ORDER.filter((key) => key !== 'F8' || policy?.statutory?.enabled);
-    return h('div', { class: 'pos-help' }, keys.map((key) => h('span', { class: 'help-key' }, [
-      h('kbd', { text: key }),
-      h('span', { text: KEYMAP[key].label }),
-    ])));
+    const empty = cart.isEmpty;
+    const needsCart = new Set(['F3', 'F4', 'F5', 'F8', 'Delete', 'F6']);
+    const buttons = TOUCH_ACTIONS.filter((key) => key !== 'F8' || policy?.statutory?.enabled)
+      .map((key) => h('button', {
+        type: 'button', class: 'pos-action', 'aria-keyshortcuts': key,
+        disabled: needsCart.has(key) && empty,
+        onclick: () => { const run = actions[KEYMAP[key].action]; if (run) run(); },
+      }, [
+        h('span', { text: KEYMAP[key].label }),
+        h('kbd', { class: 'key-hint', text: key === 'Delete' ? 'Del' : key }),
+      ]));
+    const hints = HELP_ORDER.filter((key) => !TOUCH_ACTIONS.includes(key))
+      .map((key) => h('span', { class: 'help-key' }, [h('kbd', { text: key }), h('span', { text: KEYMAP[key].label })]));
+    return h('div', { class: 'pos-help' }, [
+      h('div', { class: 'pos-actions', role: 'toolbar', 'aria-label': 'Counter actions' }, buttons),
+      h('div', { class: 'pos-hints key-hint' }, hints),
+    ]);
   }
 
   async function mount() {
