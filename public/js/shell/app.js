@@ -8,6 +8,7 @@
 import * as api from './api.js';
 import * as ui from './ui.js';
 import { h, clear } from './ui.js';
+import { openAccount, renderRecover } from './account.js';
 import { createPos } from '../pos/view.js';
 import { createPayment } from '../payment/view.js';
 import { createReceipt } from '../receipt/view.js';
@@ -92,6 +93,9 @@ const may = (role, tx) => (GRANTS[tx] || []).includes(role);
 
 export function createApp({ root }) {
   let session = null;
+  // 'FULL' after a password, 'PIN' after a PIN unlock (SEC-2): the account panel offers
+  // a PIN session nothing that changes a sign-in (TASK-058).
+  let scope = null;
   let current = null;
   // 04_UX_SPEC.md §3: SCR-101 shows the store name and the version. Both are read
   // before anyone signs in — the store name from /setup and the version from /health,
@@ -164,6 +168,7 @@ export function createApp({ root }) {
             });
             api.setToken(result.token);
             session = result.user;
+            scope = 'FULL';
             start();
           } catch (err) {
             // SEC-3: the same sentence for a wrong username and a wrong password, and
@@ -180,6 +185,14 @@ export function createApp({ root }) {
         problem,
         h('button', { type: 'submit', class: 'primary', icon: 'log-in', text: 'Sign in' }),
       ]),
+      // TASK-058: SEC-5's recovery code had an endpoint and no screen.
+      h('button', {
+        type: 'button', class: 'signin-link', text: 'Forgot the owner password?',
+        onclick: () => renderRecover(root, {
+          onDone: (name) => signIn({ prefillUsername: name, note: 'Sign in with the new password.' }),
+          onBack: () => signIn(),
+        }),
+      }),
       h('p', {
         class: 'signin-version',
         text: installation.app_version ? `Version ${installation.app_version}` : '',
@@ -226,6 +239,7 @@ export function createApp({ root }) {
               const result = await api.post('/auth/pin-unlock', { username, pin: pin.value });
               api.setToken(result.token);
               session = result.user;
+              scope = 'PIN';
               overlay.remove();
             } catch (err) {
               // POS-501: a PIN unlocks an **open shift**. Somebody whose shift is
@@ -261,6 +275,33 @@ export function createApp({ root }) {
 
     document.body.append(overlay);
     queueMicrotask(() => pin.focus());
+  }
+
+  /**
+   * TASK-058: signing out, which there was no way to do. The token is in memory only
+   * (SEC-7), so dropping it is the whole of it; a cart in progress stays on the server
+   * against its shift (POS-105), and the note says so rather than letting it look lost.
+   */
+  function signOut() {
+    if (current?.unmount) current.unmount();
+    current = null;
+    const name = session ? session.username : null;
+    api.setToken(null);
+    session = null;
+    scope = null;
+    shiftOpen = null;
+    signIn({ note: `${name ? `${name} is signed out.` : 'Signed out.'} A cart in progress stays on its shift.` });
+  }
+
+  function account() {
+    setNavigation(false);
+    openAccount({
+      session,
+      scope,
+      onLock: () => lock({ username: session.username }),
+      onSignOut: signOut,
+      onChanged: (user) => { session = { ...session, ...user }; },
+    });
   }
 
   // ── Screens ───────────────────────────────────────────────────────────────
@@ -816,12 +857,14 @@ export function createApp({ root }) {
           onclick: () => { setNavigation(false); show(item.id); },
         }, [h('span', { class: 'rail-label', text: item.label })])),
       h('div', { class: 'rail-spacer' }),
+      // TASK-058: the person's own account — lock, sign out, password, PIN, recovery code.
       h('button', {
         class: 'rail-item rail-user',
-        'aria-label': `${session.username} — lock or change user`,
+        'aria-label': `${session.username} — your account`,
+        'aria-haspopup': 'dialog',
         title: session.username,
         icon: 'circle-user-round',
-        onclick: () => { setNavigation(false); return session.has_pin ? lock({ username: session.username }) : signIn(); },
+        onclick: account,
       }, [h('span', { class: 'rail-label', text: session.username })])
     );
     const active = RAIL.find((item) => item.id === activeId);
@@ -836,8 +879,12 @@ export function createApp({ root }) {
 
   // SEC-7: an expired session locks the screen over whatever was open. The cart is on
   // the server, so nothing is lost by it (POS-105).
+  // Without a PIN there is no keypad to offer (TASK-058: a PIN can now be removed by
+  // its owner), so the password it is, with the username filled in.
   api.onError((err) => {
-    if (err.status === 401 && session) lock({ username: session.username });
+    if (err.status !== 401 || !session) return;
+    if (session.has_pin) lock({ username: session.username });
+    else signIn({ prefillUsername: session.username, note: err.message });
   });
 
   return {

@@ -10,6 +10,10 @@
 // the ledger — the one disagreement a credit system cannot survive. Every number below
 // is rendered as the server sent it.
 //
+// TASK-058: the customer's own details are edited here (PUT /customers/:id, TX-413),
+// which no screen offered — a wrong phone number or a customer who became a reseller
+// could only be fixed by making a second customer.
+//
 // The credit limit is its own action under TX-414, not a field on the customer form.
 // Folding it in would let a TX-413 holder raise a limit as a side effect of correcting
 // a phone number, which is why the API separates them and why this screen does too.
@@ -26,6 +30,8 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
   let statement = { rows: [] };
   let collections = { collections: [] };
   let editingLimit = false;
+  let editingDetails = false;
+  let lists = { customer_types: [], price_levels: [] };   // the server's, for the form
   let agreedPrices = null;    // PR-103, GET /customers/:id/prices
 
   async function load() {
@@ -47,6 +53,10 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
       // PR-103. Failing quietly: a profile that will not render because the price list
       // is unreachable is worse than a profile with no price block on it.
       agreedPrices = await api.get(`/customers/${customerId}/prices`).catch(() => null);
+
+      // The types and price levels the server validates against, for the edit form.
+      const listed = await api.get('/customers?limit=1').catch(() => null);
+      if (listed) lists = { customer_types: listed.customer_types, price_levels: listed.price_levels };
 
       render();
     } catch (err) {
@@ -234,21 +244,114 @@ export function createCustomerProfile({ root, customerId, session = null, onBack
   }
 
   function detailsBlock() {
+    if (editingDetails) return detailsForm();
     return h('dl', { class: 'admin-meta' }, [
       meta('Code', customer.code || '—'),
-      meta('Type', customer.customer_type),
+      meta('Type', customer.customer_type.replace(/_/g, ' ')),
       meta('Price level', customer.price_level),
       meta('Contact', customer.contact_no || '—'),
+      customer.address ? meta('Address', customer.address) : null,
+      customer.notes ? meta('Notes', customer.notes) : null,
       h('div', { class: 'meta-field' }, [
         h('dt', { text: '' }),
-        h('dd', {}, [customer.is_active
-          ? h('button', {
-            class: 'row-action', text: 'Deactivate',
-            onclick: deactivate,
-          })
-          : h('span', { class: 'muted', text: 'This customer is inactive.' })]),
+        h('dd', { class: 'detail-actions' }, [
+          h('button', { class: 'row-action', icon: 'save', text: 'Edit details', onclick: () => { editingDetails = true; render(); } }),
+          customer.is_active
+            ? h('button', { class: 'row-action', text: 'Deactivate', onclick: deactivate })
+            : h('button', { class: 'row-action', text: 'Reactivate', onclick: reactivate }),
+        ]),
       ]),
     ]);
+  }
+
+  /**
+   * TASK-058 — the customer's details. Every field the server takes under TX-413, and
+   * not the limit, which is TX-414's (CR-106). Credit can be turned on here with its
+   * limit and terms, as when adding a customer (VR-303), or off when nothing is owed
+   * (the server refuses while a balance stands, and says so).
+   */
+  function detailsForm() {
+    const name = h('input', { type: 'text', required: true, value: customer.name, maxlength: '120' });
+    const code = h('input', { type: 'text', value: customer.code || '', maxlength: '30' });
+    const contactNo = h('input', { type: 'text', value: customer.contact_no || '' });
+    const address = h('input', { type: 'text', value: customer.address || '', maxlength: '200' });
+    const type = h('select', {}, lists.customer_types.map((t) => h('option', {
+      value: t, text: t.replace(/_/g, ' '), selected: t === customer.customer_type,
+    })));
+    const priceLevel = h('select', {}, lists.price_levels.map((l) => h('option', {
+      value: l, text: l, selected: l === customer.price_level,
+    })));
+    const notes = h('textarea', { rows: '3', maxlength: '500' });
+    notes.value = customer.notes || '';
+    const eligible = h('input', { type: 'checkbox', checked: customer.is_credit_eligible });
+    const becoming = !customer.is_credit_eligible;
+    const limit = h('input', { type: 'text', inputmode: 'decimal', placeholder: '0.00', disabled: true });
+    const terms = h('input', { type: 'text', inputmode: 'numeric', value: '30', disabled: true });
+    eligible.addEventListener('change', () => {
+      limit.disabled = !(becoming && eligible.checked);
+      terms.disabled = !(becoming && eligible.checked);
+    });
+
+    const field = (label, input, note = null) => h('div', { class: 'editor-field' }, [
+      h('label', { text: label }), input,
+      note ? h('small', { class: 'muted', text: note }) : null,
+    ]);
+
+    return h('form', {
+      class: 'editor-form customer-form',
+      onsubmit: async (event) => {
+        event.preventDefault();
+        const body = {
+          name: name.value.trim(),
+          code: code.value.trim() || null,
+          contactNo: contactNo.value.trim() || null,
+          address: address.value.trim() || null,
+          customerType: type.value,
+          priceLevel: priceLevel.value,
+          notes: notes.value.trim() || null,
+          isCreditEligible: eligible.checked,
+        };
+        if (becoming && eligible.checked) {
+          body.creditLimitCentavos = Math.round(Number.parseFloat(limit.value || '0') * 100);
+          body.termsDays = Number.parseInt(terms.value || '0', 10);
+        }
+        try {
+          await api.put(`/customers/${customerId}`, body);
+          ui.toast('Saved.', { kind: 'success' });
+          editingDetails = false;
+          await load();
+        } catch (err) {
+          ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+        }
+      },
+    }, [
+      field('Name', name),
+      field('Code', code, 'What the store calls them in the notebook.'),
+      field('Contact number', contactNo),
+      field('Address', address),
+      field('Type', type),
+      field('Price level', priceLevel, 'Which price list applies to them (PR-101).'),
+      field('Notes', notes),
+      h('label', { class: 'check' }, [eligible, h('span', { text: 'Buys on credit' })]),
+      becoming ? field('Credit limit (₱)', limit) : null,
+      becoming ? field('Terms (days)', terms, '0 means cash on delivery.') : null,
+      becoming ? null : h('small', { class: 'muted', text: 'The credit limit is changed above, with Change credit limit. '
+        + 'Untick to stop credit; the store refuses it while anything is owed.' }),
+      h('div', { class: 'editor-actions' }, [
+        h('button', { type: 'submit', class: 'primary', icon: 'save', text: 'Save' }),
+        h('button', { type: 'button', text: 'Cancel', onclick: () => { editingDetails = false; render(); } }),
+      ]),
+    ]);
+  }
+
+  async function reactivate() {
+    try {
+      await api.put(`/customers/${customerId}`, { isActive: true });
+      ui.toast(`${customer.name} can be chosen at the counter again.`, { kind: 'success' });
+      await load();
+    } catch (err) {
+      ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+    }
   }
 
   const meta = (label, value) => h('div', { class: 'meta-field' }, [

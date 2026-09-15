@@ -2374,3 +2374,29 @@ test('TASK-057: the Backups tab restores a file with no row, and uploads one fro
   assert.match(shellApi, /export const upload = /);
   assert.match(shellApi, /file \? 'application\/zip' : 'application\/json'/);
 });
+
+// ── TASK-058: the missing screens ───────────────────────────────────────────
+
+test('TASK-058: the name at the foot of the rail opens the account, which can sign out', () => {
+  const shell = codeOf('js/shell/app.js');
+  assert.match(shell, /class: 'rail-item rail-user',[\s\S]*?onclick: account,/);
+  assert.match(shell, /function signOut\(\) \{[\s\S]*?api\.setToken\(null\);[\s\S]*?session = null;/);
+  assert.match(shell, /scope = 'PIN';/, 'the shell knows a PIN session from a password one');
+  const account = codeOf('js/shell/account.js');
+  for (const path of ['/auth/password', '/auth/pin', '/auth/recovery-code', '/auth/recover']) {
+    assert.ok(account.includes(`'${path}'`), `${path} has a screen`);
+  }
+  // A PIN session is offered no sign-in change (SEC-2), and passwords are never trimmed.
+  assert.match(account, /pinSession \? null : item\('shield-check', 'Change password'/);
+  assert.doesNotMatch(account, /current\.trim\(\)|next\.trim\(\)|next\.value\.trim\(\)/);
+});
+
+test('TASK-058: the sign-in screen offers the recovery code; the profile edits the customer', () => {
+  const shell = codeOf('js/shell/app.js');
+  assert.match(shell, /text: 'Forgot the owner password\?'/);
+  assert.match(shell, /renderRecover\(root,/);
+  const profile = codeOf('js/customers/profile.js');
+  assert.match(profile, /text: 'Edit details'/);
+  assert.match(profile, /api\.put\(`\/customers\/\$\{customerId\}`, body\)/);
+  assert.match(profile, /api\.put\(`\/customers\/\$\{customerId\}`, \{ isActive: true \}\)/);
+});

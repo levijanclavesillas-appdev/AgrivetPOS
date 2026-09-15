@@ -52,6 +52,35 @@ router.post('/auth/approve', authenticate, (req, res, next) => {
   }
 });
 
+// TASK-058: a person's own sign-in. No TX-*: every role has a password of its own, and
+// the service proves it again before changing anything — and refuses a PIN session.
+router.post('/auth/password', authenticate, (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    res.json(authService.changePassword({ currentPassword, newPassword }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/auth/pin', authenticate, (req, res, next) => {
+  try {
+    const { currentPassword, pin } = req.body || {};
+    res.json(authService.changePin({ currentPassword, newPin: pin }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// The new code is in this response and nowhere else, like the one at setup (SEC-5).
+router.post('/auth/recovery-code', authenticate, (req, res, next) => {
+  try {
+    res.json(authService.renewRecoveryCode({ password: (req.body || {}).password }, req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Who am I. Not in 05_TECH_SPEC.md §4's table — add the row: the renderer must not
 // decode a token to learn its own role, and TASK-015 needs this to choose a landing
 // screen (04_UX_SPEC.md §2).

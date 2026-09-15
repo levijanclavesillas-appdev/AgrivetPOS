@@ -5,6 +5,10 @@
 .customers h2 { font-size: var(--type-title-md-size); margin: var(--space-5) 0 var(--space-2); }
 .customer-form { max-width: 30rem; padding: var(--space-4) 0; }
 .customer-form input, .customer-form select { min-height: var(--touch); width: 100%; }
+/* TASK-058: the edit form's notes, and the row of actions under the details. */
+.customer-form textarea { width: 100%; font: inherit; }
+.customer-form .check input { width: auto; min-height: auto; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .customers .check { display: flex; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-4); }
 
 /* CR-107: an overdue account must not look like every other row. §8: the word

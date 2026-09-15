@@ -376,7 +376,8 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-054](TASK-054-receipt-printing.md) | The receipt prints when the sale completes, unmarked, and adds up | Built, *this commit* | A sale on the store's own printer |
 | [TASK-055](TASK-055-pack-barcodes.md) | The barcode on a box sells a box | Built, *this commit* | Boxes scanned at the store's counter |
 | [TASK-056](TASK-056-pin-and-touch.md) | A PIN reaches the counter; every counter action is a button for touch | Built, `dce4add` | The store's Android tablet at the counter |
-| [TASK-057](TASK-057-new-computer-restore.md) | A store moves to a new computer with its backup: in the wizard, or from the Backups tab | Built, *this commit* | The store's next change of computer |
+| [TASK-057](TASK-057-new-computer-restore.md) | A store moves to a new computer with its backup: in the wizard, or from the Backups tab | Built, `0c7317a` | The store's next change of computer |
+| [TASK-058](TASK-058-account-and-customer-screens.md) | Sign out, your own password and PIN, the recovery code, and editing a customer | Built, *this commit* | Staff changing the passwords the owner set for them |
 
 **`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
 100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription

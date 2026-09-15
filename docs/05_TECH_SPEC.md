@@ -1185,6 +1185,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/auth/pin-unlock` | — | `FR_1.3`, shift must be open |
 | `POST` | `/auth/approve` | signed in | `AUD-603`: the approver's own password, `SEC-3` lockout; answers with an approval for this session's next action (5 minutes, once), sent as `approver: { token }`. The body's approver is replaced by who the approval proves (`middleware/auth.js`) |
 | `POST` | `/auth/recover` | — | `SEC-5`, `AUD-604` |
+| `POST` | `/auth/password` | signed in | TASK-058 — your own password: `{ currentPassword, newPassword }`. Proved with the current one (counts towards `SEC-3`); refused to a PIN session (`SEC-2`). A wrong current password is 403, not 401 |
+| `POST` | `/auth/pin` | signed in | TASK-058 — your own PIN: `{ currentPassword, pin }`, `pin: null` removes it |
+| `POST` | `/auth/recovery-code` | signed in, owner | TASK-058 — `{ password }`; a new `SEC-5` code, shown once, the old one void |
 | `GET` | `/products?q=&category=&low=` | `TX-422` | `NFR_1.3` |
 | `GET` | `/products/barcode/:code` | `TX-401` | `NFR_1.2` |
 | `POST` `PUT` | `/products` `/products/:id` | `TX-410` | cost only under `TX-412` |

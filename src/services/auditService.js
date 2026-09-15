@@ -131,6 +131,10 @@ const ACTIONS = Object.freeze({
   PERMISSION_CHANGED: { what: 'Permission changed', rule: 'AUD-601' },
   PASSWORD_RESET: { what: 'Password reset', rule: 'AUD-601' },
   OWNER_PASSWORD_RECOVERED: { what: 'Owner password recovered offline', rule: 'AUD-604' },
+  // TASK-058: a person changing their own sign-in, from their own account panel.
+  PASSWORD_CHANGED: { what: 'Own password changed', rule: 'AUD-601' },
+  PIN_CHANGED: { what: 'Own PIN changed', rule: 'AUD-601' },
+  RECOVERY_CODE_REISSUED: { what: 'Owner recovery code replaced', rule: 'AUD-601' },
   LOGIN_LOCKED: { what: 'Account locked after failed sign-ins', rule: 'AUD-601' },
 
   // SEC-6 rather than AUD-601: a refusal is not a mutation, but an attempt to reach a

@@ -372,6 +372,108 @@ function recover({ username, recoveryCode, newPassword }) {
   return { user: toPublic(userRepository.findById(user.id)), recoveryCode: replacement };
 }
 
+// ── A person's own sign-in (TASK-058) ──────────────────────────────────────
+//
+// SCR-701 lets the owner reset anybody's password; nothing let a cashier change their
+// own, though the Users screen told the owner "They can change it later". These are
+// that: each proves the person with their current password first — through the same
+// check as the sign-in screen, so it counts towards the same lockout (SEC-3) — and none
+// is open to a PIN session, which is scoped to the counter (SEC-2). A screen left
+// unlocked with a PIN is not a way to take over the account behind it.
+
+function assertOwnSession(session) {
+  if (!session || session.scope === 'PIN') {
+    throw errors.forbidden(
+      'A PIN session cannot change sign-in details. Sign in with your password.',
+      { ruleId: 'SEC-2' }
+    );
+  }
+}
+
+/** The signed-in person, proved again with their password; the row, fresh. */
+function provePassword(session, password) {
+  assertOwnSession(session);
+  const user = userRepository.findById(session.id);
+  if (!user || !user.is_active) throw errors.unauthorized('Your session is not valid.', { ruleId: 'SEC-7' });
+  try {
+    return checkPassword({ username: user.username, password });
+  } catch (err) {
+    // The sign-in screen's sentence names a username; here it can only be the password.
+    // And 403, not 401: the renderer reads a 401 as a session that has ended and locks
+    // the screen, which is not what a mistyped password in a form should do.
+    if (err.status === 401 && err.message === CREDENTIAL_REFUSAL) {
+      throw errors.forbidden('That is not your current password.', { ruleId: 'SEC-3' });
+    }
+    throw err;
+  }
+}
+
+function changePassword({ currentPassword, newPassword }, session) {
+  const user = provePassword(session, currentPassword);
+  validatePassword(newPassword);
+  if (newPassword === currentPassword) {
+    throw errors.badRequest('The new password is the same as the current one.', { ruleId: 'VR-502' });
+  }
+
+  db.transaction(() => {
+    auditService.write({
+      actor: { id: user.id, username: user.username },
+      action: 'PASSWORD_CHANGED',
+      entityType: 'users',
+      entityId: user.id,
+      after: { password_changed: true },          // never the hash (SEC-1)
+    });
+    userRepository.updateFields(user.id, { password_hash: hashSecretValue(newPassword) });
+  });
+  return { user: toPublic(userRepository.findById(user.id)) };
+}
+
+/** A new PIN, or none: `newPin` null or empty clears it. */
+function changePin({ currentPassword, newPin }, session) {
+  const user = provePassword(session, currentPassword);
+  const clearing = newPin === null || newPin === undefined || newPin === '';
+  if (!clearing) validatePin(newPin);
+
+  db.transaction(() => {
+    auditService.write({
+      actor: { id: user.id, username: user.username },
+      action: 'PIN_CHANGED',
+      entityType: 'users',
+      entityId: user.id,
+      after: clearing ? { pin_cleared: true } : { pin_set: true },
+    });
+    userRepository.updateFields(user.id, { pin_hash: clearing ? null : hashSecretValue(newPin) });
+  });
+  return { user: toPublic(userRepository.findById(user.id)) };
+}
+
+/**
+ * SEC-5's code, replaced while the owner still knows the password.
+ *
+ * The code is shown once at setup, and a paper that is lost is a store with no way back
+ * into its owner account the day the password goes too. Issuing a new one makes the
+ * old one worthless, which is also the answer to "somebody may have seen it".
+ */
+function renewRecoveryCode({ password }, session) {
+  const user = provePassword(session, password);
+  if (user.role !== 'OWNER') {
+    throw errors.forbidden('Only the owner has a recovery code.', { ruleId: 'SEC-5', requiresRole: 'OWNER' });
+  }
+  const replacement = generateRecoveryCode();
+
+  db.transaction(() => {
+    auditService.write({
+      actor: { id: user.id, username: user.username },
+      action: 'RECOVERY_CODE_REISSUED',
+      entityType: 'users',
+      entityId: user.id,
+      after: { recovery_code_replaced: true },
+    });
+    userRepository.updateFields(user.id, { recovery_code_hash: hashSecretValue(replacement) });
+  });
+  return { recoveryCode: replacement };
+}
+
 // ── AUD-603's second actor ──────────────────────────────────────────────────
 //
 // A manager approving at the cashier's screen types their own password into the
@@ -477,5 +579,5 @@ module.exports = {
   validateUsername, validatePassword, validatePin,
   hashSecretValue, verifySecretValue, generateRecoveryCode,
   toPublic, lockoutState, issueToken, verifyToken,
-  login, pinUnlock, recover,
+  login, pinUnlock, recover, changePassword, changePin, renewRecoveryCode,
 };

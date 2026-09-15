@@ -149,7 +149,7 @@ export function createUsers({ root }) {
       h('div', { class: 'editor-field' }, [
         h('label', { text: isNew ? 'Password' : 'New password' }), password,
         h('small', { class: 'muted', text: isNew
-          ? 'They can change it later; you cannot read it back.'
+          ? 'They can change it themselves from their name at the foot of the menu. You cannot read it back.'
           : 'Leave blank to keep the current one. Setting a new one also clears a lockout.' }),
       ]),
       h('div', { class: 'editor-field' }, [

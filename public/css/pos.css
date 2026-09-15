@@ -599,3 +599,19 @@
 .print-status.ok { color: var(--md-on-success-container, #166534); }
 .print-status.failed { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3); border-radius: var(--shape-md); background: var(--md-error-container); color: var(--md-on-error-container); }
+
+/* ── TASK-058: your own account, and the forgotten owner password ────────────
+   The panel is a dialog of actions, one per row, the sign-out last and apart. */
+.ask label input[type="password"] { display: block; width: 100%; min-height: var(--touch);
+  margin-top: var(--space-1); }
+.account-items { display: grid; gap: var(--space-2); }
+.account-item { width: 100%; min-height: var(--touch); justify-content: flex-start; text-align: left; }
+.account-item.sign-out { margin-top: var(--space-2); color: var(--md-error); }
+.account-note { margin: var(--space-3) 0 0; font-size: var(--type-body-sm-size); }
+.account-remove { margin-top: calc(var(--space-2) * -1); color: var(--md-error); }
+.ask .code, .signin .code { font-size: 1.25rem; letter-spacing: .06em; overflow-wrap: anywhere; margin: var(--space-3) 0; }
+.recovery-input { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; }
+.signin .signin-link { background: none; border: 0; box-shadow: none; color: var(--md-primary);
+  width: auto; margin: var(--space-3) auto 0; display: flex; padding: 0 var(--space-2); }
+.signin .check { display: flex; gap: var(--space-2); align-items: center; margin: var(--space-3) 0; }
+.signin .check input { width: 1.15rem; min-height: auto; height: 1.15rem; flex: none; }
