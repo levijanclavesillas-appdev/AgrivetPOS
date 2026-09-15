@@ -61,7 +61,10 @@ function createApp() {
 
   // TASK-063: a device's push can carry product pictures; its own parser, ahead of the
   // 1 MB one every other route has (which then leaves the parsed body alone).
+  // TASK-064: so can an import archive or an opening workbook. Behind the 1 MB parser,
+  // any archive over about 750 KB was refused before routes/data.js's own 64 MB one ran.
   app.use(`${API_BASE}/sync`, express.json({ limit: '64mb' }));
+  app.use(`${API_BASE}/data`, express.json({ limit: '64mb' }));
   app.use(express.json({ limit: '1mb' }));
 
   // Every authenticated answer carries a fresh session token (middleware/auth.js), so no
@@ -147,10 +150,15 @@ function createApp() {
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     const status = err.status || 500;
+    // The body parser's own refusals carry a type, not a code.
+    const parser = {
+      'entity.too.large': { code: 'TOO_LARGE', message: 'That is too large to send in one request.' },
+      'entity.parse.failed': { code: 'BAD_REQUEST', message: 'The request was not valid JSON.' },
+    }[err.type];
     res.status(status).json({
       error: {
-        code: err.code || 'INTERNAL_ERROR',
-        message: status === 500 ? 'Something went wrong. The error has been logged.' : err.message,
+        code: err.code || (parser && parser.code) || 'INTERNAL_ERROR',
+        message: status === 500 ? 'Something went wrong. The error has been logged.' : (parser ? parser.message : err.message),
         rule_id: err.ruleId || null,
         requires_role: err.requiresRole || null,
       },

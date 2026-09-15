@@ -464,6 +464,28 @@ test('SEC-6: export is TX-426, import is TX-427, and a manager holds neither', a
   assert.equal('_parsed' in body, false, 'the parsed rows are not the caller’s');
 });
 
+test('TASK-064: an archive over 1 MB reaches the import, and an oversized body is a sentence', async () => {
+  // A store with pictures exports well past 1 MB. Incompressible padding makes this one
+  // so; validation ignores an entry the manifest does not list.
+  const entries = zip.unzipMany(archive);
+  const padded = zip.zipMany([...entries, { name: 'padding.bin', content: require('crypto').randomBytes(1536 * 1024) }]);
+  assert.ok(padded.length > 1024 * 1024);
+
+  const validated = await call('/data/import/validate', {
+    token: tokens.OWNER, method: 'POST',
+    body: { archive: padded.toString('base64'), collisionMode: 'ABORT' },
+  });
+  assert.equal(validated.status, 200);
+  assert.ok((await validated.json()).summary.collisions > 0);
+
+  // Anywhere else the 1 MB limit stands, and says so in words.
+  const tooLarge = await call('/customers', { token: tokens.OWNER, method: 'POST', body: { name: 'x'.repeat(1536 * 1024) } });
+  assert.equal(tooLarge.status, 413);
+  const refusal = (await tooLarge.json()).error;
+  assert.equal(refusal.code, 'TOO_LARGE');
+  assert.match(refusal.message, /too large/);
+});
+
 // ── TC-INT-95 — the rollback ────────────────────────────────────────────────
 //
 // Last, deliberately: it opens a database of its own, because proving "the database is
