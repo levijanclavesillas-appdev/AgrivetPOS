@@ -1,0 +1,12 @@
+# The web version's image (web/Dockerfile) needs package*.json, src and public only.
+.git
+node_modules
+dist
+android
+build
+docs
+licence-server
+tools
+web
+*.md
+src/tests

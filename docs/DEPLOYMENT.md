@@ -385,3 +385,75 @@ export and restore is on it, with both actors where an override was involved.
 ---
 
 > Chachi's Software Development Service — DTI BN `8089738` · BIR OCN `111RC20260000002455`
+
+---
+
+## 11. The web version (`TASK-062`)
+
+One copy of the POS per store, in a container on Chachi's server, at
+`<store>.pos.chachisoftware.store`. The store opens the address in a browser; nothing is
+installed. It is the same application as the Windows and Android builds, started in
+**hosted mode** (`src/config/hosting.js`).
+
+**What the store must agree to first.** The web version needs the internet to sell: when the
+store's connection is down, the counter stops. A store that has to trade through outages
+takes the Windows or Android app instead. A cash drawer on the receipt printer cannot be
+opened from a browser.
+
+### What hosted mode changes
+
+| | Store PC | Web version |
+| :--- | :--- | :--- |
+| Listens on | `127.0.0.1` (`SEC-8`) | `0.0.0.0` inside its container; published on the host's `127.0.0.1` only, behind nginx and TLS |
+| Setup wizard | The first person to open it | Needs the store's one-time **setup code** (`AGRIVET_SETUP_CODE`); five wrong codes in 15 minutes pause it |
+| Backups | A folder the owner chooses | `/backups`, a volume of its own, not changeable from the browser; the owner downloads copies (Admin → Backups → Download) |
+| Printing | USB or LAN, from the PC | `BROWSER`: each document opens the device's print dialog, to the printer installed on that device |
+| Everything else | — | The same: users, roles, sales, stock, credit, reports, the subscription |
+
+### Setting up the server (once)
+
+1. `docker` with the compose plugin, `nginx`, `certbot`, and Node on the host (for the script).
+2. DNS: one wildcard A record, **`*.pos.chachisoftware.store` → the server's address**.
+   Without it each store needs its own record.
+3. Build the image: `web/store.sh build` (from the repository, on the release commit).
+
+### A new store
+
+```
+web/store.sh create <store>        # e.g. botika-chachi
+```
+
+This writes `/srv/chachi-pos/<store>/.env` (its port and setup code, mode 600), makes
+`/var/lib/chachi-pos/<store>/{data,backups}`, starts `chachi-pos-<store>` on the next free
+port from 8801, and — once the name resolves to this machine — writes its nginx vhost,
+checks it with `nginx -t`, reloads nginx and asks certbot for the certificate. If DNS is not
+there yet it says which record is missing; `web/store.sh nginx <store>` finishes the job
+later. It prints the **setup code**: send it to the owner with the address, by a different
+channel from anything public.
+
+Then, with the owner: open the address, type the setup code, finish the wizard, **link the
+subscription** (Admin → Subscription), and set the receipt printer up on the counter device
+(the guide's *Set up the receipt printer*, BROWSER). Make a test sale and print it.
+
+### Running them
+
+| | |
+| :--- | :--- |
+| `web/store.sh list` | every store, its port and health |
+| `web/store.sh code <store>` | the setup code again, before the store is set up |
+| `web/store.sh logs <store>` | its log |
+| `web/store.sh upgrade` | rebuild the image, restart every store on it; each takes a verified backup before it migrates |
+
+**Backups of the server itself.** Each store backs itself up at every shift close and daily
+into its `/backups` volume, and the owner downloads copies. Chachi's should also copy
+`/var/lib/chachi-pos` off the server (a droplet snapshot or an off-site sync): a server that is
+lost takes every store's `/backups` volume with it.
+
+**Removing a store** is deliberately not a command, because it deletes a business's records.
+Stop its container (`docker compose -p chachi-pos-<store> down`), keep
+`/var/lib/chachi-pos/<store>`, and remove its vhost by hand.
+
+**Moving a store off the web** is a restore: download its newest backup and restore it on the
+PC in the setup wizard (the guide's *Moving to a new computer*). Moving a PC store onto the web
+is the same the other way: `web/store.sh create`, then restore its backup in the wizard.
+

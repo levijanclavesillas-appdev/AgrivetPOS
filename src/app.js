@@ -43,6 +43,20 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+
+  // TASK-062: the headers a page's own <meta> CSP cannot set. The pages already allow only
+  // their own scripts, styles and connections; these add that no other site may frame
+  // them (a sign-in inside somebody else's page is how a password is taken), that a file
+  // is only ever read as the type it was sent as, and that no address leaks in a
+  // Referer. Harmless on a store's PC; necessary once the web version is on the internet.
+  app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('X-Frame-Options', 'DENY');
+    res.set('Content-Security-Policy', "frame-ancestors 'none'");
+    res.set('Referrer-Policy', 'no-referrer');
+    next();
+  });
+
   app.use(express.json({ limit: '1mb' }));
 
   // Every authenticated answer carries a fresh session token (middleware/auth.js), so no

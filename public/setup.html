@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Set up Chachi POS</title>
+  <!-- TASK-062: the same policy as the shell (index.html). The wizard is the page a hosted
+       copy shows the internet before it has an owner. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <!-- tokens.css first, as in index.html: app.css reads every colour, space and shape
        from it, and without it the wizard renders as unstyled browser defaults. -->
   <link rel="stylesheet" href="/css/tokens.css">
@@ -44,6 +48,11 @@
             <button type="button" id="to-restore">Restore a backup</button>
           </div>
           <h2>1 · Your store</h2>
+          <!-- TASK-062: a hosted copy asks for the code Chachi's sent with its address. -->
+          <label class="setup-code" hidden>Setup code <span class="req" aria-hidden="true">*</span>
+            <input name="setupCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX">
+            <small class="muted">The code Chachi's sent you with this store's web address. It keeps anybody else from setting up your store.</small>
+          </label>
           <!-- TASK-053: one application; what kind of store is chosen here, once. -->
           <fieldset class="industries">
             <legend>What kind of store is this? <span class="req" aria-hidden="true">*</span></legend>
@@ -124,7 +133,12 @@
         <!-- 5 — Backup folder (OPS-001) -->
         <section class="step" data-step="backup" hidden>
           <h2>5 · Backup folder</h2>
-          <p class="muted">
+          <p class="muted hosted-backup" hidden>
+            This store is on the web. Its backups are kept on Chachi's server, apart from its
+            data, at every shift close and once a day. Download a copy every week from
+            Admin → Backups to keep one yourself.
+          </p>
+          <p class="muted local-backup">
             Backups run at every shift close and once a day. This folder must be
             <strong>outside</strong> the application's own folder — ideally another drive — so a
             backup survives losing the computer's disk.
@@ -168,6 +182,9 @@
           named <code>chachipos_backup_…zip</code>, from the old computer's backup folder or the USB
           stick you copied it to.
         </p>
+        <label class="setup-code" hidden><span>Setup code <span class="req" aria-hidden="true">*</span></span>
+          <input id="restore-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX">
+        </label>
         <label><span>Backup file <span class="req" aria-hidden="true">*</span></span>
           <input type="file" id="restore-file" accept=".zip,application/zip">
         </label>

@@ -1,0 +1,22 @@
+# One store's web POS (TASK-062). Started by web/store.sh, which writes the store's .env:
+#
+#   STORE=<slug>  PORT=<host port>  SETUP_CODE=<one-time code>  STORE_ROOT=/var/lib/chachi-pos/<slug>
+#
+#   docker compose -p chachi-pos-<slug> --env-file /srv/chachi-pos/<slug>/.env -f web/compose.yml up -d
+
+services:
+  pos:
+    image: chachi-pos:${POS_IMAGE_TAG:-latest}
+    container_name: chachi-pos-${STORE}
+    restart: unless-stopped
+    environment:
+      AGRIVET_SETUP_CODE: ${SETUP_CODE}
+    # The host's loopback only: nginx is the way in, with TLS.
+    ports:
+      - "127.0.0.1:${PORT}:8080"
+    volumes:
+      - ${STORE_ROOT}/data:/data
+      - ${STORE_ROOT}/backups:/backups
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

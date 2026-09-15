@@ -128,8 +128,9 @@
   <p>The printer settings are in the <strong>Sales and the till</strong> section of <strong>Admin → Settings</strong>. Until a printer is set up, nothing prints, but every sale still saves normally.</p>
   <ol class="steps">
     <li>Set <strong>Receipt width: 32 columns for 58 mm paper, 48 for 80 mm</strong> to match your paper roll.</li>
-    <li>Set <strong>How the receipt printer is connected: NONE, USB or LAN</strong>.</li>
+    <li>Set <strong>How the receipt printer is connected: NONE, USB, LAN, or BROWSER (the print dialog)</strong>. The web version is set to <strong>BROWSER</strong> for you.</li>
     <li>For a <strong>USB</strong> printer on Windows, type the printer's shared name on this PC in <strong>USB printer device or share the bridge writes to</strong>, in the form \\COMPUTER-NAME\PRINTER-NAME, for example \\SHOPPC\POS-58. The printer must be shared in Windows. Chachi's sets this up when installing.</li>
+    <li>For <strong>BROWSER</strong>, install the receipt printer on the computer or tablet with its own driver, as you would for any printer. Each receipt then opens the browser's print box with the receipt on it: choose the receipt printer, and the first time set <strong>Margins</strong> to <strong>None</strong> and untick <strong>Headers and footers</strong>. The browser remembers them. The receipt screen says <em>Receipt sent to this device's print dialog.</em></li>
     <li>For a <strong>LAN</strong> (network) printer, type its address, such as 192.168.1.50, in <strong>LAN printer address</strong>. Leave <strong>LAN printer port</strong> at 9100 unless the printer's manual says otherwise.</li>
     <li>Press <strong>Save this section</strong>. The test uses the saved settings, so save first.</li>
     <li>Press <strong>Print a test page</strong>. A slip headed <strong>PRINTER TEST</strong> should come out.</li>
@@ -238,6 +239,9 @@
   </ol>
   <figure class="guide-shot"><img src="/static/guide/admin-backups.webp" alt="The Backups tab. A Back up now button at the top right, the line Last verified backup with a date, the backup folder path, a box headed Two things worth knowing, and a table of backups with the columns Taken, Trigger, Verified, Size and File, and a Restore button on each verified row." width="1280" height="800" loading="lazy"><figcaption>The backup list. Only rows marked Verified can be restored.</figcaption></figure>
   <p>If it fails, the message says why, for example that the folder cannot be written to. Check that the drive is plugged in, or choose another folder in Settings.</p>
+  <h3>Download a copy</h3>
+  <p>The owner sees <strong>Download</strong> beside <strong>Restore…</strong> on each verified backup. It saves the backup file to the computer's Downloads, from where you can copy it to a USB stick or a cloud folder. The download is recorded in the audit trail, because the file holds every price, customer and peso.</p>
+  <p>On the web version this is your own copy of the store's data: download the newest backup every week. It is also the file you would restore on a PC if you ever move the store off the web (<a href="/guide/help#new-computer">Moving to a new computer</a>).</p>
 </section>
 
 <section id="copy-backups-off">

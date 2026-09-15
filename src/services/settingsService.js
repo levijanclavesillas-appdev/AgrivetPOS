@@ -284,8 +284,12 @@ const REGISTRY = Object.freeze({
   },
   printer_transport: {
     type: 'STRING', value: 'NONE', group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
-    what: 'How the receipt printer is connected: NONE, USB or LAN',
-    oneOf: ['NONE', 'USB', 'LAN'],
+    what: 'How the receipt printer is connected: NONE, USB, LAN, or BROWSER (the print dialog)',
+    // BROWSER (TASK-062): the page prints the document through the browser's own print
+    // dialog, to whatever printer the device has installed. The web version needs it —
+    // the server is not in the store — and a PC whose receipt printer has a Windows
+    // driver can use it too. It cannot open a cash drawer.
+    oneOf: ['NONE', 'USB', 'LAN', 'BROWSER'],
   },
   printer_device: {
     type: 'STRING', value: '', group: 'SALES', ruleId: 'INT-1', ownerOnly: false,
@@ -461,6 +465,17 @@ function coerce(key, raw) {
  */
 function validateBackupFolder(text) {
   if (text === '') return text;
+
+  // TASK-062: on a hosted copy the folder is the server's volume, set when the copy was
+  // made. A path typed into a browser names a folder inside a container nobody can see.
+  const hostedDir = require('../config/hosting').backupDir();
+  if (hostedDir && require('path').resolve(text) !== require('path').resolve(hostedDir)) {
+    throw errors.badRequest(
+      'On the hosted POS, backups are kept on Chachi\'s server and the folder cannot be changed. '
+      + 'Download a copy from Admin → Backups to keep one yourself.',
+      { ruleId: 'OPS-001' }
+    );
+  }
 
   const path_ = require('path');
   const paths = require('../config/paths');

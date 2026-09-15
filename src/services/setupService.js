@@ -18,6 +18,7 @@ const ids = require('../config/ids');
 const clock = require('../config/clock');
 const paths = require('../config/paths');
 const industries = require('../config/industries');
+const hosting = require('../config/hosting');
 const errors = require('./errors');
 const authService = require('./authService');
 const auditService = require('./auditService');
@@ -69,6 +70,9 @@ function status() {
       value, label: mode.label, sentence: mode.sentence,
     })),
     suggested_backup_folder: complete ? null : suggestBackupFolder(),
+    // TASK-062: the wizard asks for the setup code, and does not ask for a backup folder.
+    hosted: hosting.isHosted(),
+    setup_code_required: hosting.isHosted() && !complete,
     store_name: profile ? profile.store_name : null,
     tax_mode: profile ? profile.tax_mode : null,
     // TASK-053: what kind of store — the sign-in screen's "Chachi POS (Pharmacy)", the
@@ -98,6 +102,49 @@ function assertNotComplete() {
   }
 }
 
+// ── The setup code of a hosted copy (TASK-062) ─────────────────────────────
+
+/**
+ * On the internet, "the first person to open the wizard becomes the owner" means the first
+ * person to find the address. A hosted copy is started with a one-time code that Chachi's
+ * gives the store's owner; without it nothing in the wizard writes. Wrong codes are
+ * counted, and after five in fifteen minutes the wizard stops listening for a while — the
+ * code is sixteen characters, so this is about noise more than guessing.
+ */
+const CODE_TRIES = 5;
+const CODE_WINDOW_MS = 15 * 60 * 1000;
+let codeFailures = [];
+
+function assertSetupCode(given) {
+  if (!hosting.isHosted()) return;
+  if (!hosting.setupCode()) {
+    throw errors.forbidden(
+      'This hosted POS has not been given a setup code yet. Ask Chachi\'s to finish setting it up.',
+      { ruleId: 'SEC-8' }
+    );
+  }
+  const now = Date.now();
+  codeFailures = codeFailures.filter((at) => now - at < CODE_WINDOW_MS);
+  if (codeFailures.length >= CODE_TRIES) {
+    const minutes = Math.ceil((CODE_WINDOW_MS - (now - codeFailures[0])) / 60000);
+    throw errors.locked(
+      `Too many wrong setup codes. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+      { ruleId: 'SEC-8' }
+    );
+  }
+  if (!hosting.setupCodeMatches(given)) {
+    codeFailures.push(now);
+    throw errors.forbidden(
+      'That setup code is not right. It is the code Chachi\'s sent with this store\'s address.',
+      { ruleId: 'SEC-8' }
+    );
+  }
+  codeFailures = [];
+}
+
+/** For the tests: a fresh count of wrong codes. */
+function resetSetupCodeFailures() { codeFailures = []; }
+
 // ── Backup folder (OPS-001) ─────────────────────────────────────────────────
 
 /**
@@ -109,6 +156,8 @@ function assertNotComplete() {
  * the same failed disk and the same uninstaller as the thing it was backing up.
  */
 function suggestBackupFolder() {
+  // TASK-062: a hosted copy's backups go to its own volume, and are not a choice.
+  if (hosting.isHosted()) return hosting.backupDir();
   // On Android the app knows where shared storage is and the server does not, so the
   // app says (TASK-049). The rule the wizard enforces is the same: outside the data folder.
   if (process.env.AGRIVET_BACKUP_SUGGESTION) return process.env.AGRIVET_BACKUP_SUGGESTION;
@@ -162,8 +211,9 @@ function validateBackupFolder(folder) {
  * behind an explicit acknowledgement, and a forgotten one is replaced through
  * `POST /auth/recover`, never re-read.
  */
-function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedRecoveryCode = false, industry } = {}) {
+function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedRecoveryCode = false, industry, setupCode } = {}) {
   assertNotComplete();
+  assertSetupCode(setupCode);
 
   // Step 1's industry (TASK-053), step 2 (TAX-001) and step 3 (VR-501, VR-502), refused
   // before any work.
@@ -189,7 +239,7 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
     );
   }
 
-  const folder = validateBackupFolder(backupFolder);
+  const folder = validateBackupFolder(hosting.isHosted() ? hosting.backupDir() : backupFolder);
   const recoveryCode = authService.generateRecoveryCode();
   const at = clock.nowUtc();
 
@@ -219,7 +269,9 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
     const seeded = settingsService.seedDefaults({
       at,
       by: ownerRow.id,
-      overrides: { backup_folder: folder },
+      // TASK-062: a hosted copy prints through the browser — the printer is in the store,
+      // not beside the server.
+      overrides: { backup_folder: folder, ...(hosting.isHosted() ? { printer_transport: 'BROWSER' } : {}) },
       // TASK-053: the defaults a store of this kind would otherwise change on day one.
       industry,
     });
@@ -247,6 +299,6 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
 
 module.exports = {
   SETUP_ACTOR, STEPS,
-  isComplete, status, assertComplete, assertNotComplete,
+  isComplete, status, assertComplete, assertNotComplete, assertSetupCode, resetSetupCodeFailures,
   suggestBackupFolder, isInsideDataDir: paths.isInsideDataDir, validateBackupFolder, complete,
 };

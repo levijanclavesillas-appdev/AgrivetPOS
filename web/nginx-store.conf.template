@@ -1,0 +1,45 @@
+# Chachi POS web — __HOST__ (TASK-062). Written by web/store.sh; the container is
+# chachi-pos-__STORE__ on 127.0.0.1:__PORT__. certbot --nginx adds 443 and the redirect.
+#
+# The app sets its own X-Frame-Options, nosniff, Referrer-Policy and CSP.
+
+server {
+    server_name __HOST__;
+
+    # A data import is JSON up to 64 MB; everything else is small.
+    client_max_body_size 80m;
+
+    location ~ ^/(\.env|\.git|data|backups) {
+        deny all;
+        return 404;
+    }
+
+    # Sign-in and the setup code, per address: the accounts lock themselves (SEC-3), and
+    # this keeps one address from trying a thousand usernames a minute.
+    location ~ ^/api/v1/(auth/(login|pin-unlock|recover)|setup/code)$ {
+        limit_req zone=chachi_pos_auth burst=20 nodelay;
+        limit_req_status 429;
+        proxy_read_timeout 60s;
+        proxy_pass http://127.0.0.1:__PORT__;
+        include /etc/nginx/snippets/chachi-pos-proxy.conf;
+    }
+
+    # A backup, uploaded to restore (TASK-057): streamed to the app, not buffered here.
+    location ~ ^/api/v1/(setup/restore|backups/files)$ {
+        client_max_body_size 600m;
+        proxy_request_buffering off;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_pass http://127.0.0.1:__PORT__;
+        include /etc/nginx/snippets/chachi-pos-proxy.conf;
+    }
+
+    location / {
+        proxy_read_timeout 120s;
+        proxy_pass http://127.0.0.1:__PORT__;
+        include /etc/nginx/snippets/chachi-pos-proxy.conf;
+    }
+
+    listen 80;
+    listen [::]:80;
+}

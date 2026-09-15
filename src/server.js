@@ -11,7 +11,12 @@ const { createApp } = require('./app');
 // SEC-8: 127.0.0.1 only in v1.0, and not configurable. A POS API on an open LAN
 // with no client authentication is a store-wide compromise; the bind address opens
 // up in v1.3, when device authentication arrives with it.
+//
+// TASK-062: the one exception is a hosted copy (config/hosting.js), which listens inside
+// its own container — published on the host's loopback only, behind nginx and TLS. HOST
+// stays the address this process is reached at from itself, for the health probe.
 const HOST = '127.0.0.1';
+const hosting = require('./config/hosting');
 const DEFAULT_PORT = 47800;
 
 function port() {
@@ -55,10 +60,10 @@ async function start({ listenPort = port(), log = () => {} } = {}) {
 
   const app = createApp();
   const server = await new Promise((resolve, reject) => {
-    const s = app.listen(listenPort, HOST, () => resolve(s));
+    const s = app.listen(listenPort, hosting.listenHost(), () => resolve(s));
     s.on('error', reject);
   });
-  log(`listening on http://${HOST}:${server.address().port}/api/v1`);
+  log(`listening on http://${hosting.listenHost()}:${server.address().port}/api/v1${hosting.isHosted() ? ' (hosted)' : ''}`);
   return server;
 }
 

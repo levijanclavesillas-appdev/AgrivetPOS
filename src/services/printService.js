@@ -500,6 +500,13 @@ function send(bytes) {
     return { delivered: false, transport, error: 'No receipt printer is configured.' };
   }
 
+  // TASK-062: the page prints it, through the browser's print dialog. Nothing leaves the
+  // server; the document's text goes back in the response (outcome, below). A drawer
+  // pulse has no paper to ride on here, and says so.
+  if (transport === 'BROWSER') {
+    return { delivered: false, transport, browser: true, error: null };
+  }
+
   if (transport === 'USB') {
     // The node printer bridge writes to a device on Linux (/dev/usb/lp0) and to a
     // share on Windows. Both are a path this writes bytes to; TASK-018 configures
@@ -565,6 +572,9 @@ function install() {
   documentService.setDriver((record) => {
     const outcome = send(escpos.encode(record.text));
     record.transport = outcome.transport;
+    // TASK-062: handed to the browser, which prints it. Not a failure, and not queued:
+    // whether the paper came out is the person at the print dialog's to see.
+    if (outcome.browser) return;
     // A store with no printer set up has nothing to retry: saying so is the whole
     // answer, and queueing every receipt of the day as a failure would bury the one
     // that jammed.
@@ -592,6 +602,9 @@ function install() {
   // INT-2: the pulse is an ESC/POS command on the same wire as the paper.
   const drawerService = require('./drawerService');
   drawerService.setDriver(() => {
+    if (settingsService.get('printer_transport') === 'BROWSER') {
+      throw new Error('a cash drawer cannot be opened from a browser; open it with its key');
+    }
     const outcome = send(escpos.drawerPulse());
     if (!outcome.delivered && !outcome.pending) {
       throw new Error(outcome.error || 'the drawer did not open');
@@ -618,6 +631,8 @@ async function outcome(record, { waitMs = 4500 } = {}) {
     pending: Boolean(record.pending),
     transport: record.transport || null,
     error: record.error || null,
+    // TASK-062: for the browser to print. Only on BROWSER, where the page is the printer.
+    ...(record.transport === 'BROWSER' ? { text: record.text } : {}),
   };
 }
 

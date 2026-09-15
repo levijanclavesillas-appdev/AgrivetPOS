@@ -2368,7 +2368,8 @@ test('TASK-057: the wizard offers a restore, and sends the file as bytes rather 
   assert.match(html, /data-step="restored"/);
   const wizard = codeOf('js/setup.js');
   assert.match(wizard, /\/api\/v1\/setup\/restore\?/);
-  assert.match(wizard, /'content-type': 'application\/zip' \}, body: file/);
+  assert.match(wizard, /'content-type': 'application\/zip',/);
+  assert.match(wizard, /body: file,/);
 });
 
 test('TASK-057: the Backups tab restores a file with no row, and uploads one from the device', () => {
@@ -2460,4 +2461,30 @@ test('TASK-061: a line left at 0 is not part of the delivery, and an order can b
   assert.match(order, /order && order\.can_close_short/);
   assert.match(order, /api\.post\(`\/purchase-orders\/\$\{poId\}\/close`, \{ reason: answers\.reason \}\)/);
   assert.match(order, /closedShort \? 'Not delivered' : 'Outstanding'/);
+});
+
+// ── TASK-062: the web version ───────────────────────────────────────────────
+
+test('TASK-062: a document for the browser to print is printed once, from the one place responses arrive', () => {
+  const shellApi = codeOf('js/shell/api.js');
+  assert.match(shellApi, /import \{ printIfBrowser \} from '\.\/print\.js';/);
+  assert.match(shellApi, /if \(response\.ok\) \{\s*printIfBrowser\(payload\);\s*return payload;/);
+  const print = codeOf('js/shell/print.js');
+  assert.match(print, /printed\.transport === 'BROWSER' && printed\.text/);
+  assert.match(print, /window\.print\(\)/);
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'print.css'), 'utf8');
+  assert.match(css, /body\.printing-document > \*:not\(#print-sheet\) \{ display: none !important; \}/);
+  assert.match(fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8'), /href="\/css\/print\.css"/);
+});
+
+test('TASK-062: the wizard asks a hosted copy for its setup code, and carries the same CSP as the shell', () => {
+  const html = fs.readFileSync(path.join(root, 'public', 'setup.html'), 'utf8');
+  assert.match(html, /name="setupCode"/);
+  assert.match(html, /id="restore-code"/);
+  assert.match(html, /http-equiv="Content-Security-Policy"/);
+  const wizard = codeOf('js/setup.js');
+  assert.match(wizard, /hosted = Boolean\(status\.hosted\);/);
+  assert.match(wizard, /fetch\('\/api\/v1\/setup\/code'/);
+  assert.match(wizard, /'x-setup-code': document\.querySelector\('#restore-code'\)\.value\.trim\(\)/);
+  assert.match(wizard, /setupCode: hosted \? value\('setupCode'\) : undefined,/);
 });

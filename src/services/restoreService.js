@@ -406,7 +406,9 @@ function keepFolder(folderHere, actor) {
  */
 function restoreAtSetup({ archivePath, fileName = null, backupFolder }) {
   setupService.assertNotComplete();
-  const folder = setupService.validateBackupFolder(backupFolder);
+  // TASK-062: a hosted copy's backups go to its own volume, whatever the form said.
+  const hostedDir = require('../config/hosting').backupDir();
+  const folder = setupService.validateBackupFolder(hostedDir || backupFolder);
   const name = typeof fileName === 'string' && fileName.trim() ? path.basename(fileName.trim()) : 'the backup';
   const check = assertRestorable(archivePath, name);
 

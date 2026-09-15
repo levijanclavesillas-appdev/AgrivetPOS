@@ -122,6 +122,8 @@ const ACTIONS = Object.freeze({
   PURCHASE_ORDER_SUBMITTED: { what: 'Purchase order sent to the supplier', rule: 'PO-102' },
   PURCHASE_ORDER_CANCELLED: { what: 'Purchase order cancelled', rule: 'PO-102' },
   PURCHASE_ORDER_CLOSED_SHORT: { what: 'Purchase order closed short', rule: 'PO-106' },
+  // TASK-062: the whole store's database leaving the server — AUD-601's "data export".
+  BACKUP_DOWNLOADED: { what: 'Backup downloaded', rule: 'AUD-601' },
   GOODS_RECEIVED: { what: 'Goods received', rule: 'AUD-601' },
 
   // ── AUD-601: users and access ─────────────────────────────────────────────

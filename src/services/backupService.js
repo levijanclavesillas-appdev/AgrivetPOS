@@ -38,6 +38,7 @@ const errors = require('./errors');
 const settingsService = require('./settingsService');
 const auditService = require('./auditService');
 const backupRepository = require('../repositories/backupRepository');
+const hosting = require('../config/hosting');
 
 /** OPS-001's triggers, matching the backups table's CHECK. */
 const TRIGGERS = Object.freeze([
@@ -293,8 +294,11 @@ function overdue({ now = clock.nowUtc() } = {}) {
       overdue: true, last_verified_at: null, hours_since: null, period_hours: periodHours,
       // A store that has never had a verified backup is the most exposed state this
       // product has, and it is also the easiest one to be in on day one.
-      message: 'No backup has ever been verified on this machine. Run one now, and copy the '
-        + 'backup folder to a USB stick before the end of the day.',
+      message: hosting.isHosted()
+        // TASK-062: the web version's own copy is a download, not a USB stick.
+        ? 'No backup has been verified yet. Run one now in Admin → Backups, and download a copy to keep.'
+        : 'No backup has ever been verified on this machine. Run one now, and copy the '
+          + 'backup folder to a USB stick before the end of the day.',
     };
   }
 
@@ -361,6 +365,9 @@ function list({ limit = 30 } = {}) {
       + 'has that drive. It contains every price, every customer and every peso the store has '
       + 'taken. Keep it somewhere you would keep the cash box.',
     inside_app_data: target ? isInsideAppData(target) : false,
+    // TASK-062: on the web version the folder is on Chachi's server, and the owner's own
+    // copy is a download rather than a USB stick.
+    hosted: hosting.isHosted(),
     backups: logged_,
     // Files nobody here wrote — a copy from another machine, or the backup a restore
     // came from. Each can be restored once it has been checked (TASK-057); they are
@@ -435,6 +442,33 @@ function addFile({ archivePath, fileName }) {
   return { file_name: name, size_bytes: bytes.length, store_name: check.storeName };
 }
 
+/**
+ * TASK-062 — a verified backup, for the owner to keep somewhere else.
+ *
+ * On the web version this is the only off-server copy the store has; on a PC it saves a
+ * USB-stick trip. It is the whole database — every price, customer and password hash —
+ * so it is the owner's (the route asks TX-427) and it is audited like an export.
+ */
+function forDownload(id, actor) {
+  const row = backupRepository.logExists() ? backupRepository.findLog(id) : null;
+  if (!row) throw errors.notFound('No such backup');
+  if (row.verification_result !== 'OK') {
+    throw errors.conflict(`${row.filename} did not pass verification, so it is not a backup.`, { ruleId: 'OPS-002' });
+  }
+  if (!row.path || !fs.existsSync(row.path)) {
+    throw errors.conflict(`${row.filename} is no longer in the backup folder.`, { ruleId: 'OPS-004' });
+  }
+  auditService.write({
+    actor: { id: actor.id, username: actor.username },
+    action: 'BACKUP_DOWNLOADED',
+    entityType: 'backup',
+    entityId: row.id,
+    after: { file_name: row.filename, size_bytes: row.size_bytes },
+    reason: 'Downloaded to keep a copy away from this machine (SEC-9)',
+  });
+  return { path: row.path, file_name: row.filename, size_bytes: fs.statSync(row.path).size };
+}
+
 function isInsideAppData(target) {
   const data = path.resolve(paths.dataDir());
   const resolved = path.resolve(target);
@@ -444,5 +478,5 @@ function isInsideAppData(target) {
 module.exports = {
   TRIGGERS, FILE_PREFIX,
   assertTrigger, fileNameFor, folder, isInsideAppData,
-  run, prune, lastVerified, overdue, list, folderFile, addFile,
+  run, prune, lastVerified, overdue, list, folderFile, addFile, forDownload,
 };

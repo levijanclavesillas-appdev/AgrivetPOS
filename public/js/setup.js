@@ -37,6 +37,7 @@ const RESTORING = ['restore', 'restored'];
 let signedIn = null;          // { user } once the new owner is signed in, for step 6
 let signingIn = null;         // the sign-in in flight, which step 6 waits for
 let loaded = false;           // step 6 has landed a load
+let hosted = false;           // TASK-062: a web copy — a setup code, no folder to choose
 
 const sectionFor = (name) => document.querySelector(`.step[data-step="${name}"]`);
 const field = (name) => form.elements[name];
@@ -99,7 +100,10 @@ function render() {
   showError('');
 
   // An input before a button: step 1 opens with the restore offer above its first field.
-  const first = sectionFor(current()).querySelector('input') || sectionFor(current()).querySelector('button');
+  // The first one on screen: the setup code's input is in the page on a PC, hidden.
+  const visible = (el) => el.offsetParent !== null;
+  const first = [...sectionFor(current()).querySelectorAll('input')].find(visible)
+    || [...sectionFor(current()).querySelectorAll('button')].find(visible);
   if (first) first.focus();
 }
 
@@ -143,6 +147,7 @@ function renderIndustries(list) {
 
 const CHECKS = {
   store() {
+    if (hosted && value('setupCode').replace(/[^A-Za-z0-9]/g, '').length < 8) return 'Type the setup code Chachi\'s sent you.';
     if (!form.elements.industry || !form.elements.industry.value) return 'Choose what kind of store this is.';
     if (value('storeName').length < 2) return 'Enter the store name.';
     return null;
@@ -193,6 +198,7 @@ function payload() {
     },
     backupFolder: value('backupFolder'),
     acknowledgedRecoveryCode: field('acknowledgedRecoveryCode').checked,
+    setupCode: hosted ? value('setupCode') : undefined,
   };
 }
 
@@ -304,7 +310,13 @@ async function restoreBackup() {
   try {
     const query = `fileName=${encodeURIComponent(file.name)}&backupFolder=${encodeURIComponent(folder)}`;
     const res = await fetch(`/api/v1/setup/restore?${query}`, {
-      method: 'POST', headers: { 'content-type': 'application/zip' }, body: file,
+      method: 'POST',
+      headers: {
+        'content-type': 'application/zip',
+        // TASK-062: in a header, checked before the upload is read.
+        ...(hosted ? { 'x-setup-code': document.querySelector('#restore-code').value.trim() } : {}),
+      },
+      body: file,
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return restoreError(body.error ? body.error.message : `The restore failed (${res.status}).`);
@@ -329,6 +341,9 @@ async function restoreBackup() {
 
 document.querySelector('#to-restore').addEventListener('click', () => {
   phase = 'restore';
+  if (hosted && !document.querySelector('#restore-code').value) {
+    document.querySelector('#restore-code').value = value('setupCode');
+  }
   if (!document.querySelector('#restore-folder').value) {
     document.querySelector('#restore-folder').value = value('backupFolder');
   }
@@ -351,6 +366,18 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const problem = CHECKS[STEPS[index]]();
   if (problem) return showError(problem);
+
+  // TASK-062: the setup code, checked now rather than at the last step.
+  if (hosted && STEPS[index] === 'store') {
+    const res = await fetch('/api/v1/setup/code', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ setupCode: value('setupCode') }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      const body = res ? await res.json().catch(() => ({})) : {};
+      return showError(body.error ? body.error.message : 'The application did not answer.');
+    }
+  }
 
   if (index === STEPS.length - 1) return complete();
   index += 1;
@@ -385,6 +412,16 @@ try {
     renderTaxModes(status.tax_modes);
     renderIndustries(status.industries);
     if (status.suggested_backup_folder) field('backupFolder').value = status.suggested_backup_folder;
+    // TASK-062: a web copy asks for its setup code, and its backup folder is the server's.
+    hosted = Boolean(status.hosted);
+    if (hosted) {
+      for (const el of document.querySelectorAll('.setup-code, .hosted-backup')) el.hidden = false;
+      for (const el of document.querySelectorAll('.local-backup')) el.hidden = true;
+      field('backupFolder').readOnly = true;
+      document.querySelector('#restore-folder').readOnly = true;
+      document.querySelector('.wizard-foot').textContent = 'This store is on the web: open its address from any '
+        + 'device. Selling needs the internet; so does the monthly subscription check.';
+    }
     render();
   }
 } catch (err) {

@@ -1,0 +1,15 @@
+/* TASK-062 — the browser print dialog's sheet (js/shell/print.js).
+   On screen it is not there; in print it is the only thing there. The text is the
+   document the receipt printer would have received: monospaced, one line per line,
+   as wide as the store's receipt width in characters. */
+#print-sheet { display: none; }
+
+@media print {
+  body.printing-document > *:not(#print-sheet) { display: none !important; }
+  body.printing-document #print-sheet {
+    display: block; margin: 0; padding: 0;
+    font: 9pt/1.25 "Courier New", ui-monospace, monospace;
+    white-space: pre; color: #000; background: #fff;
+  }
+  @page { margin: 3mm; }
+}

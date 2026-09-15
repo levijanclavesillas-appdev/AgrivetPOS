@@ -218,3 +218,8 @@ dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--md-on-surface);
 .wizard-body > .step[data-step="restore"], .wizard-body > .step[data-step="restored"] { display: flex; flex-direction: column; flex: 1; }
 .wizard-body > .step[data-step="restore"][hidden], .wizard-body > .step[data-step="restored"][hidden] { display: none; }
 .step[data-step="restore"] label { display: grid; gap: var(--space-1); margin: 0 0 var(--space-4); }
+
+/* TASK-062: the hosted copy's setup code, at the top of step 1 and of the restore. */
+.step .setup-code { display: grid; gap: var(--space-1); margin: 0 0 var(--space-4); }
+.step .setup-code input { font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.step .setup-code[hidden], .step p[hidden] { display: none; }

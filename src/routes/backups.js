@@ -6,6 +6,7 @@
 //   POST /backups                  TX-428   OPS-001, OPS-002 — a manual backup
 //   GET  /backups/restore/preflight TX-427  what must be true before a restore
 //   POST /backups/:id/restore      TX-427   OPS-004 — owner only
+//   GET  /backups/:id/download     TX-427   TASK-062 — the owner's own copy
 //   POST /backups/files            TX-427   TASK-057 — a backup from elsewhere, into the folder
 //   POST /backups/files/restore    TX-427   TASK-057 — restore a file in the folder, by name
 //   GET  /alerts                   —        OPS-007, any signed-in user
@@ -58,6 +59,19 @@ router.get('/backups/restore/preflight', restorePermission, (req, res, next) => 
       backupId: req.query.backupId || null,
       fileName: req.query.fileName || null,
     }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** TASK-062: the file itself, as a download. Owner only; audited as an export. */
+router.get('/backups/:id/download', restorePermission, (req, res, next) => {
+  try {
+    const file = backupService.forDownload(req.params.id, req.session);
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Length', String(file.size_bytes));
+    res.set('Content-Disposition', `attachment; filename="${file.file_name.replace(/"/g, '')}"`);
+    require('fs').createReadStream(file.path).on('error', next).pipe(res);
   } catch (err) {
     next(err);
   }

@@ -10,6 +10,8 @@
 // replaced from the X-Session-Token header on every reply, which is what makes the
 // timeout an idle one.
 
+import { printIfBrowser } from './print.js';
+
 const BASE = '/api/v1';
 const SESSION_HEADER = 'x-session-token';
 
@@ -80,7 +82,12 @@ async function request(method, path, body = null, { signal = null } = {}) {
   if (response.status === 204) return null;
 
   const payload = await response.json().catch(() => null);
-  if (response.ok) return payload;
+  if (response.ok) {
+    // TASK-062: a document for this device to print (the printer is set to BROWSER).
+    // Here, once, rather than in each of the six screens that print something.
+    printIfBrowser(payload);
+    return payload;
+  }
 
   const error = new ApiError({
     status: response.status,

@@ -126,9 +126,14 @@ export function createBackup({ root, session }) {
     return h('div', { class: 'backup-warning' }, [
       h('h2', { text: 'Two things worth knowing' }),
       h('p', { text: data.shared_drive_warning }),
-      h('p', { text: 'Backups on this machine do not survive this machine. Copy the backup folder '
-        + 'to a USB stick every week and keep it somewhere else. Nothing in this application does '
-        + 'that for you, and nothing will remind you at the right moment.' }),
+      data.hosted
+        // TASK-062: the web version's backups are on Chachi's server.
+        ? h('p', { text: 'These backups are kept on Chachi\'s server, apart from the store\'s data. '
+          + 'Download the newest one every week with Download, and keep it somewhere safe: it is '
+          + 'your own copy if you ever move the store to a PC.' })
+        : h('p', { text: 'Backups on this machine do not survive this machine. Copy the backup folder '
+          + 'to a USB stick every week and keep it somewhere else, or use Download on the newest one. '
+          + 'Nothing in this application does that for you, and nothing will remind you at the right moment.' }),
     ]);
   }
 
@@ -153,6 +158,10 @@ export function createBackup({ root, session }) {
         h('td', {}, [
           b.verified && b.on_disk && session.role === 'OWNER'
             ? h('button', { class: 'restore', icon: 'archive-restore', text: 'Restore…', onclick: () => askToRestore(b) })
+            : null,
+          // TASK-062: the owner's own copy, off this machine.
+          b.verified && b.on_disk && session.role === 'OWNER'
+            ? h('button', { class: 'restore', icon: 'download', text: 'Download', onclick: () => download(b) })
             : null,
           !b.on_disk && b.pruned_at ? h('span', { class: 'muted', text: 'pruned' }) : null,
           !b.on_disk && !b.pruned_at ? h('span', { class: 'muted', text: 'not in folder' }) : null,
@@ -185,6 +194,15 @@ export function createBackup({ root, session }) {
         ]))),
       ])]),
     ]);
+  }
+
+  async function download(backup) {
+    ui.toast(`Preparing ${backup.file_name}…`);
+    try {
+      api.saveAs(await api.download(`/backups/${backup.id}/download`));
+    } catch (err) {
+      ui.toast(err.message, { kind: 'error' });
+    }
   }
 
   async function runBackup() {

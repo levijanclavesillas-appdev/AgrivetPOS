@@ -27,12 +27,26 @@ router.get('/setup', (req, res, next) => {
 
 router.post('/setup', (req, res, next) => {
   try {
-    const { store, taxMode, owner, backupFolder, acknowledgedRecoveryCode, industry } = req.body || {};
-    const result = setupService.complete({ store, taxMode, owner, backupFolder, acknowledgedRecoveryCode, industry });
+    const { store, taxMode, owner, backupFolder, acknowledgedRecoveryCode, industry, setupCode } = req.body || {};
+    const result = setupService.complete({ store, taxMode, owner, backupFolder, acknowledgedRecoveryCode, industry, setupCode });
 
     // SEC-5: the recovery code is in this response and in no other. It is not stored
     // in plaintext, not logged, and cannot be requested again.
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * TASK-062: a hosted copy's setup code, checked when the owner leaves step 1 rather than
+ * at "Finish setup" four steps later. The same count of wrong codes as the real thing.
+ */
+router.post('/setup/code', (req, res, next) => {
+  try {
+    setupService.assertNotComplete();
+    setupService.assertSetupCode((req.body || {}).setupCode);
+    res.status(204).end();
   } catch (err) {
     next(err);
   }
@@ -47,6 +61,9 @@ router.post('/setup', (req, res, next) => {
 const beforeSetup = (req, res, next) => {
   try {
     setupService.assertNotComplete();
+    // TASK-062: a hosted copy's code, checked before a byte of the upload is read. In a
+    // header rather than the query string, so it is not written into an access log.
+    setupService.assertSetupCode(req.get('x-setup-code'));
     next();
   } catch (err) {
     next(err);

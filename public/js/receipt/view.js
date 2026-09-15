@@ -85,6 +85,10 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
   /** One line about the paper, under the preview. */
   function printStatus() {
     if (!printState) return null;
+    // TASK-062: the device's print dialog opened with the receipt on it.
+    if (printState.transport === 'BROWSER') {
+      return h('p', { class: 'print-status ok', text: 'Receipt sent to this device’s print dialog. Choose the receipt printer there.' });
+    }
     if (printState.delivered) return h('p', { class: 'print-status ok', text: 'Receipt printed.' });
     if (printState.transport === 'NONE') {
       return h('p', { class: 'print-status muted', text: 'No receipt printer is set up, so the receipt is on screen only. '
@@ -103,7 +107,7 @@ export function createReceipt({ root, sale, printed, onNewSale, onBack = null })
       // POS-208: stamped and audited. The toast says so, because a reprint the cashier
       // did not realise was a reprint is the thing the rule exists to prevent.
       ui.toast(result.printed.delivered
-        ? 'Reprinted and marked REPRINT.'
+        ? (result.printed.transport === 'BROWSER' ? 'Marked REPRINT and sent to the print dialog.' : 'Reprinted and marked REPRINT.')
         : `Marked REPRINT. ${result.printed.error}`, { kind: result.printed.delivered ? 'success' : 'error' });
     } catch (err) {
       ui.toast(err.message, { kind: 'error' });
