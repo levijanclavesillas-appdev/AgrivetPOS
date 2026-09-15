@@ -141,6 +141,7 @@
     <li>Choose the <strong>Supplier</strong>. A delivery always needs one. If it is a new source, add it first under <strong>Suppliers</strong>.</li>
     <li>Type the <strong>Delivery receipt no.</strong> and <strong>Invoice no.</strong> if there are any.</li>
     <li>On the first line, type in the <strong>Product</strong> box and choose the product from the list.</li>
+    <li>If the product is batch-tracked, <strong>Batch no.</strong> and <strong>Expiry</strong> appear under it: type them from the box (see <a href="#batch-tracked-products">Batch-tracked products on a delivery</a>).</li>
     <li>Type <strong>Arrived</strong>, any <strong>Damaged</strong>, and the <strong>Unit cost</strong> you paid.</li>
     <li>Click <strong>Add a line</strong> for each further product.</li>
     <li>Click <strong>Post delivery</strong>.</li>
@@ -166,8 +167,22 @@
 <section id="batch-tracked-products">
   <h2>Batch-tracked products on a delivery</h2>
   <p>Most medicines in the Pharmacy edition are <strong>batch-tracked</strong>: their stock is kept by batch number and expiry date so the earliest expiry is sold first and a recall can find every buyer (<a href="/guide/stock">Stock, expiry and counts</a>).</p>
-  <p class="warn"><strong>Important:</strong> in this version the delivery screen has no boxes for the batch number and expiry date. If a delivery includes a batch-tracked product, <strong>Post delivery</strong> is refused and nothing is saved. The message names each product, for example <em>Paracetamol 500 mg tablet needs a batch number and an expiry date. Batch-tracked stock cannot be received without it.</em></p>
-  <p>Deliveries of products that are not batch-tracked (for example face masks, bandages or cotton) are not affected. If you see this message, keep the supplier's delivery receipt and email <strong>ChachiSoftware@gmail.com</strong> for help recording the delivery. See <a href="/guide/help#get-help">How to get help</a>.</p>
+  <p>On the delivery screen, a batch-tracked line has two more boxes under the product's name: <strong>Batch no.</strong> and <strong>Expiry</strong>. Products that are not batch-tracked (face masks, bandages, cotton) do not have them.</p>
+  <ol class="steps">
+    <li>Find the batch or lot number printed on the box, usually beside <em>Lot</em>, <em>Batch</em> or <em>B.N.</em>, and type it exactly in <strong>Batch no.</strong></li>
+    <li>Choose the expiry date printed on the box in <strong>Expiry</strong>.</li>
+    <li>Fill in the rest of the line as usual and click <strong>Post delivery</strong>. The batch is created with its expiry date, and from then on the earliest expiry is sold first.</li>
+  </ol>
+  <figure class="guide-shot"><img src="/static/guide/buying-batch.webp" alt="Receiving an order for Cetirizine 10 mg tablet. Under the product name are a Batch no. box holding CT-2611 and an Expiry date box holding 03/31/2028. The rest of the line shows 100 TAB outstanding, 100 arrived, 0 damaged, 100 TAB into stock at a unit cost of 4.00, worth ₱400.00." width="1280" height="800" loading="lazy"><figcaption>The batch number and expiry go under the product's name, as printed on the box.</figcaption></figure>
+  <p><strong>Post delivery</strong> does not go ahead while a batch-tracked line has either box empty. If the same batch number arrives again on a later delivery, its stock is added to the same batch.</p>
+  <h3>Two batches of the same product</h3>
+  <p>A delivery takes one batch per product. When a product arrives in two batches (for example 3 boxes expiring in March and 2 expiring in June), receive them one after the other:</p>
+  <ol class="steps">
+    <li>Receive the first batch: type only its quantity in <strong>Arrived</strong>, with its batch number and expiry, and post. The order becomes <strong>Partly received</strong>.</li>
+    <li>Click <strong>Receive</strong> again on the same order. Type the second batch's quantity, number and expiry, and post.</li>
+  </ol>
+  <p>For a delivery without an order, record each batch as its own delivery.</p>
+  <p class="warn"><strong>Important:</strong> check the expiry date before you post. A date that has already passed is accepted, but that stock is expired as soon as it arrives and cannot be sold. Refuse expired stock at the door instead of receiving it.</p>
 </section>
 
 <section id="delivery-does-not-match">

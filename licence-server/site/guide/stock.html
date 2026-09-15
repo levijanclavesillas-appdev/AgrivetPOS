@@ -28,10 +28,11 @@
 <section id="adjust-stock">
   <h2>Adjust stock</h2>
   <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
-  <p>Use an adjustment when the stock figure for one product is wrong: a thermometer was dropped, a box was used in the store, or a delivery was never recorded. You type what is really on the shelf, and the app records the difference with a reason. This works for products that are not tracked by batch; for batch-tracked products see the note below.</p>
+  <p>Use an adjustment when the stock figure for one product is wrong: a thermometer was dropped, a box was used in the store, or a delivery was never recorded. You type what is really on the shelf, and the app records the difference with a reason. A product tracked by batch is adjusted one batch at a time.</p>
   <ol class="steps">
     <li>On <strong>Products</strong>, click <strong>Adjust</strong> on the product's row. The <strong>Adjust stock</strong> screen shows the product, <strong>On hand now</strong> and the base unit.</li>
-    <li>Count the product on the shelf and type the total in <strong>Counted quantity</strong>. Type what is there, not the difference.</li>
+    <li>For a batch-tracked product, choose the <strong>Batch</strong> you counted. The list shows each batch's number, expiry date and what it holds, and the counted box starts at that figure.</li>
+    <li>Count the product (or that batch) on the shelf and type the total in <strong>Counted quantity</strong> (<strong>Counted in this batch</strong> for a batch-tracked product). Type what is there, not the difference.</li>
     <li>Read the line under it, for example “−1 PC — there is less on the shelf than the system thinks.” If it says “The count matches. Nothing to post.”, there is nothing to do.</li>
     <li>Choose a <strong>Reason</strong>. You can only pick from the list.</li>
     <li>Add <strong>Notes</strong> if the reason does not say enough.</li>
@@ -41,7 +42,9 @@
   <figure class="guide-shot"><img src="/static/guide/stock-adjust.webp" alt="The Adjust stock screen for Digital thermometer. It shows 9 PC on hand now. The Counted quantity box holds 8, a line below says minus 1 PC, there is less on the shelf than the system thinks, and the Reason list shows Damaged in storage. At the bottom are the Post adjustment and Cancel buttons." width="1280" height="800" loading="lazy"><figcaption>You type what you counted; the app works out the difference and shows it before you post.</figcaption></figure>
   <h3>If an owner has to approve</h3>
   <p>An adjustment worth more than ₱5,000 at average cost needs the owner (the owner can change this limit in <strong>Admin → Settings</strong>, under <strong>Adjustment value above which owner authorisation is required</strong>). When you click <strong>Post adjustment</strong>, a panel opens instead. The owner types their username in <strong>Approver</strong> and their <strong>Password</strong>, and clicks <strong>Approve</strong>. Then click <strong>Post adjustment</strong> again. Both names are recorded. An owner who posts the adjustment themselves does not need a second person.</p>
-  <p class="warn"><strong>Important:</strong> the Adjust screen does not work for a product tracked by batch. It refuses with a message ending “is batch-tracked, so a adjustment movement must name its batch.” For those products, correct the stock with a <a href="#count-stock">stock count</a>, counting only that product's batches, or write off an expired batch from its <a href="#write-off">Batches</a> screen.</p>
+  <h3>Batch-tracked products</h3>
+  <figure class="guide-shot"><img src="/static/guide/stock-adjust-batch.webp" alt="Adjust stock for Paracetamol 500 mg tablet, 500 TAB on hand. The Batch list shows MD24-0815, expires 2028-03-08, holds 250 TAB. Counted in this batch holds 248, the line below says minus 2 TAB, there is less on the shelf than the system thinks, and the reason is Damaged in storage." width="1280" height="800" loading="lazy"><figcaption>Choose the batch, then type what is on the shelf of that batch. Only that batch changes.</figcaption></figure>
+  <p>The adjustment changes only the batch you chose, so the product's batches still add up to what is on hand. It cannot take a batch below zero: if you count fewer than none, the count is wrong, and the app says how many the batch holds. A batch appears in the list once its stock has arrived on a delivery. Stock of a batch that never arrived is received as a delivery (<a href="/guide/buying#batch-tracked-products">Batch-tracked products on a delivery</a>), not adjusted in. To write off a batch that has expired, use its <a href="#write-off">Batches</a> screen.</p>
 </section>
 
 <section id="count-stock">
@@ -104,7 +107,7 @@
   </ol>
   <p>The stock is recorded as expired, not deleted, so the Movement analysis report shows what left the shelf through expiry (see <a href="/guide/reports#stock-value-and-movements">Stock value and movements</a>). The <strong>Write off</strong> button appears only on expired batches that still hold stock. A cashier sees the batches but not the button.</p>
   <h3>Damaged stock</h3>
-  <p>For a product not tracked by batch, post an <a href="#adjust-stock">adjustment</a> with the reason <strong>Damaged in storage</strong>. For a batch-tracked product, count the damaged batch at what is left in a <a href="#count-stock">stock count</a>. Damaged goods a customer brings back are handled as a return (see <a href="/guide/corrections#return-goods">Return goods</a>).</p>
+  <p>Post an <a href="#adjust-stock">adjustment</a> with the reason <strong>Damaged in storage</strong>. For a batch-tracked product, choose the batch that was damaged. Damaged goods a customer brings back are handled as a return (see <a href="/guide/corrections#return-goods">Return goods</a>).</p>
 </section>
 
 <section id="recall-a-batch">
@@ -126,5 +129,5 @@
 <section id="how-stock-is-kept">
   <h2>How the stock figure is kept</h2>
   <p>Nobody types the stock figure. Every change is recorded as a movement with its type and reason: opening stock, goods received, sold, sale voided, customer return, adjustment, expired, stock count difference. Stock on hand is the total of those movements, and a batch's quantity is the same total for that batch. A movement is never edited or deleted; a mistake is corrected by a new movement beside it, so the record shows what really happened, mistakes included. You can read them in the Movement analysis report (see <a href="/guide/reports#stock-value-and-movements">Stock value and movements</a>).</p>
-  <p class="agrivet"><strong>Agrivet edition:</strong> the product screen does not offer batch tracking, so products are normally not tracked by batch. The Adjust screen then works for every product, and the Batches button does not appear.</p>
+  <p class="agrivet"><strong>Agrivet edition:</strong> the product screen does not offer batch tracking, so products are normally not tracked by batch. The Adjust screen then asks for no batch, and the Batches button does not appear.</p>
 </section>

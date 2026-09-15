@@ -5,6 +5,7 @@
   <li><a href="#forgot-owner-password">I forgot the owner password</a></li>
   <li><a href="#user-forgot-password">A user forgot their password or PIN</a></li>
   <li><a href="#account-locked">"This account is locked"</a></li>
+  <li><a href="#approval-expired">"The approval has expired or was not given"</a></li>
   <li><a href="#printer-does-not-print">The receipt printer does not print</a></li>
   <li><a href="#drawer-does-not-open">The cash drawer does not open</a></li>
   <li><a href="#scanner-problems">The scanner types nothing, or the wrong thing</a></li>
@@ -61,6 +62,17 @@
   <p class="warn"><strong>Important:</strong> the count of wrong tries only goes back to zero after a successful sign-in. When the lock ends, one more wrong try locks the account again for another 15 minutes.</p>
   <p>The number of tries and the minutes are owner settings under <strong>Admin</strong> → <strong>Settings</strong> → <strong>Security and sessions</strong> (<a href="/guide/admin#change-a-setting">Change a setting</a>).</p>
   <p>Not the same thing: after 15 minutes without use, the screen locks by itself (<em>Screen locked</em>). That is not a locked account. Sign in again with your password; see <a href="/guide/getting-started#when-the-screen-locks">When the screen locks</a>.</p>
+</section>
+
+<section id="approval-expired">
+  <h2>"The approval has expired or was not given"</h2>
+  <p>When a manager or owner approves something at the counter (a void, a big discount, a return, a delivery over the order), their approval is good for <strong>5 minutes</strong> and for <strong>that one action</strong>. You see this message when:</p>
+  <ul>
+    <li>more than 5 minutes passed between the approval and pressing the final button, for example while the customer looked for their GCash reference;</li>
+    <li>the same approval was used for an action that is already done, since each void or override needs its own approval.</li>
+  </ul>
+  <p>Ask the manager or owner to approve again. Nothing was saved by the refused attempt. If an action is refused for another reason, such as a missing reason, the approval is still good and you can try again.</p>
+  <p>A wrong password at the approval panel counts toward that manager's or owner's lock-out, the same as at the sign-in screen (see <a href="#account-locked">above</a>). It does not sign you out.</p>
 </section>
 
 <section id="printer-does-not-print">
