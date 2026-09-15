@@ -11,9 +11,9 @@
 ; It emits a throwaway binary and proves nothing about the finished installer. What it
 ; proves is that every macro in build/installer.nsh parses and that its bodies compile.
 
-Name "ChachiAgrivetPOS installer macro check"
+Name "ChachiPOS installer macro check"
 OutFile "chachi-nsh-check.exe"
-InstallDir "$LOCALAPPDATA\ChachiAgrivetPOS"
+InstallDir "$LOCALAPPDATA\ChachiPOS"
 RequestExecutionLevel user          ; requirement 1: asInvoker, never administrator
 
 !include "..\..\build\installer.nsh"

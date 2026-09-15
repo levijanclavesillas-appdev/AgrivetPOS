@@ -59,6 +59,7 @@ test('TC-E2E-02: a store opens with feed in stock and a farm on the books', asyn
   await json(await call('/setup', {
     method: 'POST',
     body: {
+      industry: 'PHARMACY',
       store: { storeName: 'Chachi Agrivet Supply', address: 'Poblacion' },
       taxMode: 'NON_VAT',
       owner: { fullName: 'Aling Nena', username: 'nena', password: PASSWORD },

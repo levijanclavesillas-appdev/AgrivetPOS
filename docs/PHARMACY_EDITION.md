@@ -1,12 +1,14 @@
-# Pharmacy Edition — Chachi Pharmacy POS
+# Industries — Chachi POS (formerly the Pharmacy Edition)
 
-**Branch**: `pharmacy` · **Base**: `main` at `9eb81c2` · **Date**: 2026-09-14 ·
-**Tasks**: `TASK-046`–`TASK-052` (`06_TASKS/README.md`, *Pharmacy edition*)
-**Scope**: an **over-the-counter** drugstore. Not a dispensing pharmacy — see §5.
+**Branch**: `main` (was `pharmacy`) · **Date**: 2026-09-15 · **Tasks**: `TASK-046`–`TASK-053`
+(`06_TASKS/README.md`) · **Scope of the pharmacy industry**: an **over-the-counter** drugstore.
+Not a dispensing pharmacy — see §5.
 
-This is the agrivet product with the changes a drugstore counter needs, and nothing else.
-Every rule in `03_BUSINESS_RULES.md` still holds unless this file names it. The branch is
-kept small on purpose, so `main` can be merged into it without a fight.
+**Since `TASK-053` there is one product, Chachi POS**, and what kind of store it runs is chosen in
+the setup wizard (§9). This file began as the record of the pharmacy edition, a branch of the
+agrivet product; §1–§8 are that record, and still say what a pharmacy store gets. §9 says how the
+two editions became one application and what an industry decides. Every rule in
+`03_BUSINESS_RULES.md` still holds unless this file names it.
 
 ---
 
@@ -42,6 +44,11 @@ kept small on purpose, so `main` can be merged into it without a fight.
 | P-6 | **Internal names are kept**: `agrivet.db`, the `AGRIVET_*` environment variables, and the export format id `chachi-agrivet-pos-export`. | No owner sees them. Renaming them would change the backup, restore and import code without benefiting any user. |
 
 ## 3. Branches, and the migration number
+
+> **Superseded by `TASK-053` (owner, 2026-09-15).** One application is published, so the
+> branches are one: `pharmacy` was fast-forwarded into `main`, and the pharmacy features are now
+> every store's, with what differs by industry decided at setup (§9). The history below is kept
+> because the migration ranges it set up still hold.
 
 **Decision (owner, 2026-09-14): `main` is the base product and the pharmacy features stay on
 this branch.** `main` is merged into `pharmacy` and never the other way. The generic-name
@@ -146,3 +153,35 @@ recall sets them back to null, and the audit trail keeps both events. Goods a cu
 return to the batch they came from (`POS-303`), so recalled goods returned are held too, and are
 sent back in turn. Only a recalled batch is returned to the supplier from here; returning good
 stock to a supplier is a purchasing question for another screen.
+
+## 9. One application, the industry chosen at setup (`TASK-053`)
+
+A Play Store listing is one app, so Chachi Agrivet POS and Chachi Pharmacy POS became **Chachi
+POS**: one Android package (`store.chachisoftware.pos`), one Windows installer
+(`ChachiPOS-Setup-<version>.exe`), one data folder (`%LOCALAPPDATA%\ChachiPOS`), and backups named
+`chachipos_backup_….zip`. No store was live on either edition when this was done, so nothing is
+migrated from the old names.
+
+The setup wizard's first step asks **what kind of store this is**. The choice is
+`store_profile.industry` (`904_store_industry.sql`), **fixed once made** (owner's decision: a store
+set up as the wrong kind is set up again), and shown at sign-in as *Chachi POS **(Pharmacy)***.
+Motorcycle shops and wholesale & retail are listed as coming soon and cannot be chosen yet.
+
+**What an industry decides is small, on purpose.** Every feature is in every store — generic
+names, batches and expiry, recall, pictures, packs, credit, the subscription, the Android app. An
+industry decides only the defaults a store would otherwise change on day one, and the words it
+sees. All of it is in `src/config/industries.js`:
+
+| | Pharmacy | Agrivet |
+| :--- | :--- | :--- |
+| Senior citizen / PWD discount (`statutory_discount_enabled`, P-1) | On | Off — a question for the accountant |
+| Return reasons (`POS-302`) | …"Seal broken or packaging tampered", "Adverse reaction reported"… | …"Animal refused the feed"… |
+| Return write-off categories (`POS-304`) | Medicines, OTC Medicines, Vitamins, Supplements, Vaccines, Biologics | Veterinary, Veterinary Medicines, Medicines, Vaccines, Biologics |
+| A new product in the editor (P-2) | Batch-tracked and senior/PWD-eligible, ticked | Both unticked |
+| Customers from the opening credit balances | `REGULAR` | `FARM` |
+| The opening spreadsheet's examples and Read me | Paracetamol, boxes of 100 tablets | Hog feed, sacks of 50 kg |
+| Sign-in, sidebar mark | *Chachi POS (Pharmacy)*, pill | *Chachi POS (Agrivet)*, sprout |
+
+The settings are **seeded** from the industry at setup and are ordinary settings afterwards: the
+owner can change any of them. Adding an industry is a block in `industries.js` with
+`available: true`; the column's CHECK already names the two on the roadmap.

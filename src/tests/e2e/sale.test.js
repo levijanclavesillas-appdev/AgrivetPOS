@@ -59,6 +59,7 @@ test('TC-E2E-01: a store is set up, stocked and opened for trade', async () => {
   await json(await call('/setup', {
     method: 'POST',
     body: {
+      industry: 'PHARMACY',
       store: { storeName: 'Chachi Agrivet Supply' },
       taxMode: 'VAT',
       owner: { fullName: 'Aling Nena', username: 'nena', password: PASSWORD },

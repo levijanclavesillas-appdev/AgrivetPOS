@@ -92,12 +92,12 @@ val appVersion: String = Regex("\"version\"\\s*:\\s*\"([^\"]+)\"")
     .find(File(repoRoot, "package.json").readText())?.groupValues?.get(1) ?: "0.0.0"
 
 android {
-    namespace = "store.chachisoftware.pharmacypos"
+    namespace = "store.chachisoftware.pos"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "store.chachisoftware.pharmacypos"
+        applicationId = "store.chachisoftware.pos"
         // Android 8.0. Every tablet sold as a POS in the last several years is newer.
         minSdk = 26
         targetSdk = 35

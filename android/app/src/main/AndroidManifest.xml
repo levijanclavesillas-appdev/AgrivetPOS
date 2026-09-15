@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Chachi Pharmacy POS for Android — TASK-049. See android/README.md. -->
+<!-- Chachi POS for Android — TASK-049. See android/README.md. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 

@@ -25,8 +25,8 @@ router.get('/setup', (req, res, next) => {
 
 router.post('/setup', (req, res, next) => {
   try {
-    const { store, taxMode, owner, backupFolder, acknowledgedRecoveryCode } = req.body || {};
-    const result = setupService.complete({ store, taxMode, owner, backupFolder, acknowledgedRecoveryCode });
+    const { store, taxMode, owner, backupFolder, acknowledgedRecoveryCode, industry } = req.body || {};
+    const result = setupService.complete({ store, taxMode, owner, backupFolder, acknowledgedRecoveryCode, industry });
 
     // SEC-5: the recovery code is in this response and in no other. It is not stored
     // in plaintext, not logged, and cannot be requested again.

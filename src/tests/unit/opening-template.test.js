@@ -173,3 +173,19 @@ test('the same workbook twice is the same bytes, and the tool writes the one the
   assert.ok(workbook().equals(workbook()));
   assert.ok(tool.workbook().equals(workbook()));
 });
+
+test('TASK-053: the examples and the title are the industry\'s — paracetamol or hog feed', () => {
+  const text = (industry) => zip.unzipMany(workbook({ industry }))
+    .map((entry) => entry.content.toString('utf8')).join('\n');
+  const pharmacy = text('PHARMACY');
+  const agrivet = text('AGRIVET');
+
+  assert.match(pharmacy, /Opening data for Chachi POS \(Pharmacy\)/);
+  assert.match(pharmacy, /e\.g\. PARA-500/);
+  assert.match(agrivet, /Opening data for Chachi POS \(Agrivet\)/);
+  assert.match(agrivet, /e\.g\. HG-50/);
+  assert.match(agrivet, /e\.g\. SACK/, 'a pack is a sack');
+  assert.doesNotMatch(agrivet, /PARA-500/);
+  // The columns are the same product's, whatever the industry.
+  assert.deepEqual(filesFromWorkbook(workbook({ industry: 'AGRIVET' })), filesFromWorkbook(workbook({ industry: 'PHARMACY' })));
+});

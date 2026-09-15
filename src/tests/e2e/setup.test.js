@@ -64,7 +64,7 @@ test('TC-E2E-00: a fresh install answers the wizard at the root', async () => {
   assert.equal(page.status, 200);
 
   const html = await page.text();
-  assert.match(html, /Set up Chachi Pharmacy POS/, 'SCR-001, not the application shell');
+  assert.match(html, /Set up Chachi POS/, 'SCR-001, not the application shell');
   for (const step of ['Your store', 'Tax', 'Owner account', 'Recovery code', 'Backup folder']) {
     assert.ok(html.includes(step), `the wizard shows the "${step}" step`);
   }
@@ -110,6 +110,7 @@ test('TC-E2E-00: a refused completion writes nothing and the wizard starts again
   const res = await call('/setup', {
     method: 'POST',
     body: {
+      industry: 'PHARMACY',
       store: { storeName: STORE },
       taxMode: 'VAT',
       owner: OWNER,
@@ -134,6 +135,7 @@ test('TC-E2E-00: completing the wizard installs the store, the owner and the set
   const res = await call('/setup', {
     method: 'POST',
     body: {
+      industry: 'PHARMACY',
       store: { storeName: STORE, address: 'Poblacion, Sultan Kudarat', contactNo: '0917 000 0000' },
       taxMode: 'VAT',
       owner: OWNER,
@@ -170,6 +172,7 @@ test('TC-E2E-00: the wizard cannot be run twice', async () => {
   const res = await call('/setup', {
     method: 'POST',
     body: {
+      industry: 'PHARMACY',
       store: { storeName: 'Someone Else Supply' },
       taxMode: 'NONE',
       owner: { ...OWNER, username: 'intruder' },
@@ -210,7 +213,7 @@ test('TC-E2E-00: the owner signs in and reaches the application', async () => {
 test('TC-E2E-00: the root now serves the application, and the login screen knows the store', async () => {
   const page = await fetch(`${ORIGIN}/`);
   const html = await page.text();
-  assert.doesNotMatch(html, /Set up Chachi Pharmacy POS/, 'the wizard is behind us');
+  assert.doesNotMatch(html, /Set up Chachi POS/, 'the wizard is behind us');
 
   // SCR-101 shows the store name before anyone has signed in, so it is readable
   // without a session — and nothing else about the installation is.

@@ -15,6 +15,7 @@ const clock = require('../config/clock');
 const errors = require('./errors');
 const auditService = require('./auditService');
 const settingsRepository = require('../repositories/settingsRepository');
+const industries = require('../config/industries');
 
 // Groups are the sections of SCR-702 (04_UX_SPEC.md §3), one per subject.
 const GROUPS = Object.freeze({
@@ -160,10 +161,10 @@ const REGISTRY = Object.freeze({
   // against `categories.name` — which is UNIQUE NOCASE (VR-209), so a name is an
   // unambiguous handle.
   //
-  // Pharmacy edition: the names a drugstore files its shelves under. A medicine that
-  // left the counter is one whose storage nobody can vouch for — the heat of a jeepney,
-  // a bathroom cabinet — so everything taken internally defaults to write-off. A store
-  // that files paracetamol under "Analgesics" edits this list on SCR-702.
+  // The default is the store's industry's (config/industries.js, TASK-053): a
+  // drugstore's shelves or an agrivet's. The value below is what a store with no
+  // industry yet reads. A store that files paracetamol under "Analgesics" edits this
+  // list on SCR-702.
   return_write_off_categories: {
     type: 'JSON', group: 'SALES', ruleId: 'POS-304', ownerOnly: true,
     what: 'Categories whose returns default to write-off rather than restock',
@@ -202,13 +203,12 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 10000, group: 'PRICING', ruleId: 'PR-201', ownerOnly: true,
     what: 'Highest discount an owner may apply, in basis points', min: 0, max: 10000,
   },
-  // TAX-004 — pharmacy edition: this ships **on**. RA 9994 and RA 10754 name
-  // medicines for the beneficiary's own use as the first thing the 20% and the VAT
-  // exemption cover, so for a drugstore it is not a question for an accountant but an
-  // obligation from the day it opens. The agrivet default was off because feed for a
-  // farm is not for the beneficiary's own use; nothing on a pharmacy shelf is that
-  // ambiguous. Which products it reaches is still per product
-  // (`statutory_discount_eligible`), and the owner can still turn it off, audited
+  // TAX-004 — the default is the store's industry's (config/industries.js, TASK-053):
+  // **on** for a pharmacy, where RA 9994 and RA 10754 name medicines for the
+  // beneficiary's own use first, and **off** for an agrivet, where feed for a farm is
+  // not for the beneficiary's own use and turning it on is a question for the store's
+  // accountant. Which products it reaches is still per product
+  // (`statutory_discount_eligible`), and the owner can still change it, audited
   // (AUD-601).
   //
   // The 20% itself is not here: it is statute, and it lives in taxService beside the
@@ -499,16 +499,29 @@ function validateBackupFolder(text) {
  * has to migrate settings rows to be usable.
  */
 function get(key) {
-  const declared = declaration(key);
+  declaration(key);
   const row = settingsRepository.get(key);
-  if (!row) return declared.value;
+  if (!row) return defaultOf(key);
   try {
     return decode(row.value, row.value_type);
   } catch {
     // A corrupted row is not worth taking the application down for; the declared
     // default is always a safe figure, and the health panel reports the row (OPS-006).
-    return declared.value;
+    return defaultOf(key);
   }
+}
+
+/** The store's industry, read without the store profile service (which reads settings). */
+const currentIndustry = () => require('../repositories/storeProfileRepository').industry();
+
+/**
+ * TASK-053: a key's default for an industry — the industry's own where it declares one
+ * (config/industries.js), the registry's otherwise.
+ */
+function defaultOf(key, industry = currentIndustry()) {
+  const declared = declaration(key);
+  const own = industry ? industries.get(industry)?.settings : null;
+  return own && Object.prototype.hasOwnProperty.call(own, key) ? own[key] : declared.value;
 }
 
 /** Every setting with the metadata SCR-702 renders: group, rule, bounds, default. */
@@ -526,7 +539,7 @@ function describe({ includeOwnerOnly = true } = {}) {
         group_label: GROUPS[declared.group],
         rule_id: declared.ruleId,
         what: declared.what,
-        default_value: declared.value,
+        default_value: defaultOf(key),
         min: declared.min ?? null,
         max: declared.max ?? null,
         one_of: declared.oneOf ?? null,
@@ -572,13 +585,13 @@ function put(key, value, { updatedAt = null, updatedBy = null } = {}) {
  * re-seeding after an upgrade adds the new keys without resetting the operator's
  * figures.
  */
-function seedDefaults({ at = clock.nowUtc(), by = null, overrides = {} } = {}) {
+function seedDefaults({ at = clock.nowUtc(), by = null, overrides = {}, industry = null } = {}) {
   const written = [];
   for (const key of KEYS) {
     if (settingsRepository.get(key)) continue;
     const value = Object.prototype.hasOwnProperty.call(overrides, key)
       ? coerceForSeed(key, overrides[key])
-      : REGISTRY[key].value;
+      : defaultOf(key, industry || currentIndustry());
     put(key, value, { updatedAt: at, updatedBy: by });
     written.push(key);
   }
@@ -660,5 +673,5 @@ function assertMayChange(session, key) {
 module.exports = {
   GROUPS, REGISTRY, KEYS, validateBackupFolder,
   decode, encode, coerce, declaration,
-  get, describe, put, seedDefaults, set, setMany, assertMayChange,
+  get, defaultOf, describe, put, seedDefaults, set, setMany, assertMayChange,
 };

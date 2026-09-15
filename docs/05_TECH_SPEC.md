@@ -1,6 +1,6 @@
 # 05 — Technical Specification
 
-**Product**: Chachi Agrivet POS · **Version**: 2.0 · **Date**: 2026-09-07
+**Product**: Chachi POS (Chachi Agrivet POS until TASK-053) · **Version**: 2.0 · **Date**: 2026-09-07
 **Owns**: architecture, stack, ERD and schema, API contracts, integrations (`INT-*`), security
 (`SEC-*`), infrastructure and DR, coding standards. Behaviour is owned by
 `03_BUSINESS_RULES.md`; this document states implementation and cites rule IDs.
@@ -63,7 +63,7 @@ to something a grep can enforce (`TC-UT-99`).
 | ID | UUIDv7 | — | Time-ordered, index-friendly, migration-stable (`VR-101`) |
 | Frontend | Vanilla ES modules + CSS custom properties | — | No build step; a store PC gets a folder that runs |
 | Design system | Material 3, as tokens in `public/css/tokens.css` | — | The specification, not the library — see `04_UX_SPEC.md` §0 |
-| Packaging | electron-builder NSIS | ^25.1 | `ChachiAgrivetPOS-Setup-<version>.exe` |
+| Packaging | electron-builder NSIS | ^25.1 | `ChachiPOS-Setup-<version>.exe` |
 | Tests | `node:test` + a project runner | — | `07_TEST_PLAN.md` |
 
 **Deliberately absent**: no ORM (the repository layer is the abstraction), no frontend framework,
@@ -1387,7 +1387,7 @@ position and the Official Receipt boundary: `03_BUSINESS_RULES.md` `TAX-006`.
 npm ci
 npm run test:all                 # gate: 07_TEST_PLAN.md §Release
 ./tools/installer/check.sh       # the NSIS macros compile and say what §7 requires
-npm run build:exe                # -> dist/ChachiAgrivetPOS-Setup-<version>.exe
+npm run build:exe                # -> dist/ChachiPOS-Setup-<version>.exe
 npm rebuild better-sqlite3       # see below — do this before running the tests again
 ```
 
@@ -1408,10 +1408,10 @@ shortcuts, `requestedExecutionLevel: asInvoker` — the app never needs administ
 ### Runtime layout on the store PC
 
 ```text
-%LOCALAPPDATA%\ChachiAgrivetPOS\
+%LOCALAPPDATA%\ChachiPOS\
   agrivet.db              agrivet.db-wal      agrivet.db-shm
   session.key             logs\app-YYYY-MM-DD.log      (30-day rotation)
-<configured backup folder, default Documents\ChachiAgrivetPOS Backups>\
+<configured backup folder, default Documents\ChachiPOS Backups>\
   agrivet_backup_YYYY-MM-DD_HH-mm.zip                  (OPS-001, retention 30)
 ```
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Set up Chachi Pharmacy POS</title>
+  <title>Set up Chachi POS</title>
   <!-- tokens.css first, as in index.html: app.css reads every colour, space and shape
        from it, and without it the wizard renders as unstyled browser defaults. -->
   <link rel="stylesheet" href="/css/tokens.css">
@@ -22,14 +22,15 @@
   -->
   <main class="wizard">
     <aside class="wizard-rail">
-      <p class="wizard-brand"><span class="wizard-mark" aria-hidden="true"></span> Chachi Pharmacy POS</p>
+      <p class="wizard-brand"><span class="wizard-mark" aria-hidden="true"></span> Chachi POS</p>
       <h1>Set up your store</h1>
       <p class="muted" id="wizard-lede">Five steps. Nothing is saved until the last one.</p>
       <p class="wizard-progress" id="wizard-progress" aria-live="polite"></p>
       <div class="wizard-bar" aria-hidden="true"><span id="wizard-bar"></span></div>
       <ol class="steps" id="steps" aria-label="Setup progress"></ol>
       <p class="wizard-foot muted">
-        Everything stays on this computer. No internet connection is needed, today or later.
+        Your sales, stock and customers stay on this computer. The subscription is checked online
+        once a month; selling never needs the internet.
       </p>
     </aside>
 
@@ -38,7 +39,13 @@
         <!-- 1 — Store -->
         <section class="step" data-step="store" hidden>
           <h2>1 · Your store</h2>
-          <p class="muted">As it should read at the top of every printed record.</p>
+          <!-- TASK-053: one application; what kind of store is chosen here, once. -->
+          <fieldset class="industries">
+            <legend>What kind of store is this? <span class="req" aria-hidden="true">*</span></legend>
+            <div id="industries" class="choice-grid"></div>
+            <p class="muted">This sets the defaults a store like yours starts with. It cannot be changed after setup.</p>
+          </fieldset>
+          <p class="muted">The store's name and details, as they should read at the top of every printed record.</p>
           <div class="field-grid">
             <label class="span-2">Store name <span class="req" aria-hidden="true">*</span>
               <input name="storeName" required maxlength="120" autocomplete="organization">

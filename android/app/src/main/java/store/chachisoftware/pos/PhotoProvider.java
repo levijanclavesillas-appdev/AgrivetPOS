@@ -1,4 +1,4 @@
-package store.chachisoftware.pharmacypos;
+package store.chachisoftware.pos;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;

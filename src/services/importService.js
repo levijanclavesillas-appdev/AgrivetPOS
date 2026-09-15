@@ -127,7 +127,7 @@ function validate(archiveBuffer, { collisionMode = 'SKIP' } = {}) {
     problems.push({
       rule_id: 'OPS-102',
       message: `This archive was written by a database with migration ${unknownMigrations.join(', ')}, which `
-        + 'this version of Chachi Pharmacy POS does not have. It was written by a newer '
+        + 'this version of Chachi POS does not have. It was written by a newer '
         + 'installation. Install the current version before importing it — running an older '
         + 'build against newer data loses data.',
     });
@@ -142,7 +142,7 @@ function validate(archiveBuffer, { collisionMode = 'SKIP' } = {}) {
     problems.push({
       rule_id: 'OPS-102',
       message: `This archive is at schema version ${manifest.schema_version}, but this version `
-        + `of Chachi Pharmacy POS only knows up to ${binary}. It was written by a newer `
+        + `of Chachi POS only knows up to ${binary}. It was written by a newer `
         + 'installation. Install the current version before importing it — running an older '
         + 'build against newer data loses data.',
     });

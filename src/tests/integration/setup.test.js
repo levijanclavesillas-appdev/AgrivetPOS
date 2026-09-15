@@ -36,6 +36,7 @@ function backupFolder(label) {
 }
 
 const validPayload = (label, over = {}) => ({
+  industry: 'PHARMACY',
   store: { storeName: 'Chachi Agrivet Supply', address: 'Poblacion', tin: '752-951-092-00000' },
   taxMode: 'NON_VAT',
   owner: { ...OWNER },
@@ -64,7 +65,7 @@ test('a fresh database reports that setup is required, and names the five steps'
 
 test('a store profile without an owner is not a set-up installation', () => {
   temp.openMigrated('setup-half');
-  storeProfileService.create({ storeName: 'Half Built', taxMode: 'NONE' });
+  storeProfileService.create({ storeName: 'Half Built', taxMode: 'NONE', industry: 'PHARMACY' });
 
   // Either half alone is a state the wizard must finish: a profile with no owner
   // cannot be signed into at all.
@@ -309,3 +310,56 @@ test('completing setup is audited by an actor that does not exist yet (AUD-606)'
 });
 
 test.after(() => temp.cleanup());
+
+// ── TASK-053: one application, the industry chosen at setup ─────────────────
+
+test('TASK-053: setup asks what kind of store, offers what is available, and refuses the rest', () => {
+  temp.openMigrated('setup-industry-status');
+  const status = setupService.status();
+  assert.equal(status.product_name, 'Chachi POS');
+  assert.deepEqual(status.industries.map((i) => [i.code, i.available]),
+    [['PHARMACY', true], ['AGRIVET', true], ['MOTORCYCLE', false], ['RETAIL', false]]);
+  assert.equal(status.industry, null, 'nothing is chosen before setup');
+
+  for (const industry of [undefined, '', 'HARDWARE', 'MOTORCYCLE']) {
+    assert.throws(() => setupService.complete(validPayload(`industry-${industry}`, { industry })),
+      (err) => err.status === 400 && /Choose what kind of store this is: Pharmacy or Agrivet/.test(err.message),
+      String(industry));
+  }
+  assert.equal(storeProfileRepository.count(), 0, 'and nothing was written');
+});
+
+test('TASK-053: an agrivet store starts with an agrivet store\'s defaults, and says so at sign-in', () => {
+  temp.openMigrated('setup-industry-agrivet');
+  setupService.complete(validPayload('agrivet', { industry: 'AGRIVET' }));
+
+  assert.equal(storeProfileService.industry(), 'AGRIVET');
+  assert.equal(settingsService.get('statutory_discount_enabled'), false, 'P-1 is the pharmacy\'s');
+  assert.ok(settingsService.get('return_reasons').includes('Animal refused the feed'));
+  assert.ok(!settingsService.get('return_reasons').includes('Adverse reaction reported'));
+  assert.deepEqual(settingsService.get('return_write_off_categories').slice(0, 2), ['Veterinary', 'Veterinary Medicines']);
+
+  const status = setupService.status();
+  assert.equal(status.industry.display_name, 'Chachi POS (Agrivet)');
+  assert.deepEqual(status.industry.product_defaults, { isBatchTracked: false, statutoryDiscountEligible: false });
+  assert.equal(status.industries, null, 'the choice is made');
+
+  // Still settings: the owner can change any of them afterwards.
+  const owner = { id: userRepository.findByUsername(OWNER.username).id, username: OWNER.username, role: 'OWNER' };
+  settingsService.set('statutory_discount_enabled', true, owner);
+  assert.equal(settingsService.get('statutory_discount_enabled'), true);
+});
+
+test('TASK-053: a pharmacy starts with a pharmacy\'s, and the industry is fixed once chosen', () => {
+  temp.openMigrated('setup-industry-pharmacy');
+  setupService.complete(validPayload('pharmacy', { industry: 'PHARMACY' }));
+
+  assert.equal(settingsService.get('statutory_discount_enabled'), true);
+  assert.ok(settingsService.get('return_reasons').includes('Adverse reaction reported'));
+  assert.equal(setupService.status().industry.display_name, 'Chachi POS (Pharmacy)');
+
+  const owner = { id: userRepository.findByUsername(OWNER.username).id, username: OWNER.username, role: 'OWNER' };
+  assert.throws(() => storeProfileService.update({ industry: 'AGRIVET' }, owner),
+    (err) => err.status === 409 && /cannot be changed/.test(err.message));
+  assert.equal(storeProfileService.industry(), 'PHARMACY');
+});

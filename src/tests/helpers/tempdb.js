@@ -71,13 +71,26 @@ const SETUP_ACTOR = require('../../services/setupService').SETUP_ACTOR;
  * whether it meant to or not. Cases that *are* about the wizard use a bare
  * openMigrated() and drive setupService themselves.
  */
-function seedStore({ storeName = 'Test Agrivet Supply', taxMode = 'NONE', withOwner = true } = {}) {
+function seedStore({ storeName = 'Test Agrivet Supply', taxMode = 'NONE', withOwner = true, industry = 'PHARMACY' } = {}) {
   const storeProfileService = require('../../services/storeProfileService');
   const settingsService = require('../../services/settingsService');
   const userRepository = require('../../repositories/userRepository');
 
-  const profile = storeProfileService.create({ storeName, taxMode });
-  settingsService.seedDefaults();
+  // TASK-053: the suite was written against the pharmacy's defaults, so that is the
+  // store a case gets unless it asks for another. A case that migrated only as far as
+  // an older release (before 904 added the column) gets that release's row instead —
+  // the service speaks the current schema.
+  const db = require('../../config/database');
+  const hasIndustry = db.get().prepare('PRAGMA table_info(store_profile)').all().some((c) => c.name === 'industry');
+  let profile;
+  if (hasIndustry) {
+    profile = storeProfileService.create({ storeName, taxMode, industry });
+  } else {
+    db.get().prepare(`INSERT INTO store_profile (id, store_name, tax_mode, currency, created_at)
+      VALUES (?, ?, ?, 'PHP', ?)`).run(require('../../config/ids').uuidv7(), storeName, taxMode, new Date().toISOString());
+    profile = storeProfileService.find();
+  }
+  settingsService.seedDefaults({ industry: hasIndustry ? industry : null });
 
   // setupService.isComplete() is profile AND active owner, so an installation without
   // one is still behind the gate. Cases that seed their own owner pass withOwner:false

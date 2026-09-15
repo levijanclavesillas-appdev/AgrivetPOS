@@ -1,4 +1,4 @@
-# Chachi Pharmacy POS for Android
+# Chachi POS for Android
 
 **TASK-049**: the whole store on one tablet, with no PC. The app is the same server and
 the same screens as the Windows build. `src/` and `public/` are packaged into the APK
@@ -55,7 +55,7 @@ and build with `./gradlew assembleRelease`. The APK is
 ## On the tablet
 
 - **First launch** asks where backups may go. Allow *all files access*: backups then go to
-  `Documents/ChachiPharmacyPOS Backups`, which survives the app being removed and can be
+  `Documents/ChachiPOS Backups`, which survives the app being removed and can be
   copied off over USB. If you say *Not now*, backups go to the app's own folder and are
   **deleted if the app is uninstalled**. `05_TECH_SPEC.md` §7 still applies: a copy off the
   tablet is the owner's job, and matters more when the tablet is the only machine.

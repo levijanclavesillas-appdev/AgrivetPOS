@@ -1,4 +1,4 @@
-// Chachi Pharmacy POS for Android — TASK-049, a standalone store on the tablet.
+// Chachi POS for Android — TASK-049, a standalone store on the tablet.
 // Build instructions: android/README.md.
 
 pluginManagement {
@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ChachiPharmacyPOS"
+rootProject.name = "ChachiPOS"
 include(":app")

@@ -166,7 +166,7 @@ function recordBackup(backup, log) {
 }
 
 const aheadMessage = ({ current, binary }) => 'This database was written by a newer version of '
-  + `Chachi Pharmacy POS (it is at version ${current}; this copy of the application understands `
+  + `Chachi POS (it is at version ${current}; this copy of the application understands `
   + `up to ${binary}). Install the newer version again — running the older one would damage the `
   + 'data. Nothing has been changed.';
 

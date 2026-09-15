@@ -17,6 +17,7 @@ const db = require('../config/database');
 const ids = require('../config/ids');
 const clock = require('../config/clock');
 const paths = require('../config/paths');
+const industries = require('../config/industries');
 const errors = require('./errors');
 const authService = require('./authService');
 const auditService = require('./auditService');
@@ -70,6 +71,11 @@ function status() {
     suggested_backup_folder: complete ? null : suggestBackupFolder(),
     store_name: profile ? profile.store_name : null,
     tax_mode: profile ? profile.tax_mode : null,
+    // TASK-053: what kind of store — the sign-in screen's "Chachi POS (Pharmacy)", the
+    // rail's icon and a new product's ticks. Before setup, the choices the wizard offers.
+    product_name: industries.PRODUCT_NAME,
+    industry: profile ? industries.describe(profile.industry) : null,
+    industries: complete ? null : industries.catalogue(),
   };
 }
 
@@ -106,7 +112,7 @@ function suggestBackupFolder() {
   // On Android the app knows where shared storage is and the server does not, so the
   // app says (TASK-049). The rule the wizard enforces is the same: outside the data folder.
   if (process.env.AGRIVET_BACKUP_SUGGESTION) return process.env.AGRIVET_BACKUP_SUGGESTION;
-  return path.join(os.homedir(), 'Documents', 'ChachiPharmacyPOS Backups');
+  return path.join(os.homedir(), 'Documents', 'ChachiPOS Backups');
 }
 
 /**
@@ -156,10 +162,12 @@ function validateBackupFolder(folder) {
  * behind an explicit acknowledgement, and a forgotten one is replaced through
  * `POST /auth/recover`, never re-read.
  */
-function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedRecoveryCode = false } = {}) {
+function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedRecoveryCode = false, industry } = {}) {
   assertNotComplete();
 
-  // Step 2 (TAX-001) and step 3 (VR-501, VR-502), refused before any work.
+  // Step 1's industry (TASK-053), step 2 (TAX-001) and step 3 (VR-501, VR-502), refused
+  // before any work.
+  storeProfileService.assertIndustry(industry);
   storeProfileService.assertMode(taxMode);
   const username = authService.validateUsername(owner.username);
   authService.validatePassword(owner.password);
@@ -192,6 +200,7 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
       contactNo: store.contactNo,
       tin: store.tin,
       taxMode,
+      industry,
     }, { at });
 
     const ownerRow = userRepository.insert({
@@ -211,6 +220,8 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
       at,
       by: ownerRow.id,
       overrides: { backup_folder: folder },
+      // TASK-053: the defaults a store of this kind would otherwise change on day one.
+      industry,
     });
 
     auditService.write({

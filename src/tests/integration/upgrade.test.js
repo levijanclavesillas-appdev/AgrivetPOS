@@ -68,6 +68,22 @@ function priorInstall(toVersion) {
 }
 
 /**
+ * The store a previous release set up, written with the columns 001 declared: the
+ * current store profile service speaks the current schema, and the day the newest
+ * migration adds a column to store_profile (904, the industry, did) it cannot write a
+ * row into the previous release's table — the same reason the product below is written
+ * by hand.
+ */
+function priorStore({ withOwner }) {
+  db.get().prepare(`
+    INSERT INTO store_profile (id, store_name, tax_mode, currency, created_at)
+    VALUES (?, 'Test Agrivet Supply', 'NONE', 'PHP', ?)
+  `).run(ids.uuidv7(), clock.nowUtc());
+  settingsService.seedDefaults();
+  if (withOwner) temp.seedUser({ username: 'installowner', role: 'OWNER', fullName: 'Install Owner' });
+}
+
+/**
  * The schema the previous release shipped: the second-to-last migration file. Not
  * `binaryVersion() - 1` — this edition's own migrations are numbered from 900
  * (config/migrate.js), so the number below the newest is usually not a file at all.
@@ -85,7 +101,7 @@ test('TC-INST-01: an upgrade preserves the data, backs up first, and migrates on
 
   const prior = priorInstall(previousVersion());
 
-  temp.seedStore({ withOwner: false, taxMode: 'NONE' });
+  priorStore({ withOwner: false });
   const ref = temp.seedCatalog();
   temp.seedUser({ username: 'owner', role: 'OWNER', password: PASSWORD });
   const owner = authService.verifyToken(authService.login({ username: 'owner', password: PASSWORD }).token);
@@ -176,7 +192,7 @@ test('TC-INST-01: a second launch is a no-op — no backup, no migration', async
 test('TC-INST-01: a failed pre-migration backup stops the upgrade and changes nothing', async () => {
   const version = migrate.binaryVersion();
   const prior = priorInstall(previousVersion());
-  temp.seedStore({ withOwner: true, taxMode: 'NONE' });
+  priorStore({ withOwner: true });
 
   // No backup folder: the shape of an unplugged drive or a full disk.
   db.transaction(() => settingsService.set('backup_folder', '', require('../../services/setupService').SETUP_ACTOR));
@@ -216,7 +232,7 @@ test('TC-INST-02: a database ahead of the binary refuses to start, plainly', asy
   await assert.rejects(
     () => server.start({ listenPort: 0 }),
     (err) => {
-      assert.match(err.message, /newer version of Chachi Pharmacy POS/);
+      assert.match(err.message, /newer version of Chachi POS/);
       assert.match(err.message, /Install the newer version again/);
       assert.match(err.message, /Nothing has been changed/);
       // Running an older binary against a newer schema is how a column that exists

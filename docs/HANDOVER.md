@@ -1,4 +1,4 @@
-# Handover — Chachi Pharmacy POS v1.0
+# Handover — Chachi POS v1.0
 
 **For:** the store owner · **From:** Chachi's Software Development Service
 **Installed on:** ______________________  **Handed over:** ______________________
@@ -89,7 +89,7 @@ from the period you just undid is in it.
 
 ## 4. If the PC dies
 
-1. Install Chachi Pharmacy POS on the replacement machine.
+1. Install Chachi POS on the replacement machine.
 2. Copy your most recent backup from the USB stick to the new machine.
 3. Set the backup folder in **Settings**, open **Admin → Backups**, and restore from it.
 4. Re-key any sales made after that backup, from the receipts.

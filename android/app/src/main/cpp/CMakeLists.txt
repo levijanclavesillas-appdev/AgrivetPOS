@@ -11,7 +11,7 @@
 # LIBNODE_DIR and BETTER_SQLITE3_DIR come from app/build.gradle.kts.
 
 cmake_minimum_required(VERSION 3.22.1)
-project(chachi_pharmacy_pos LANGUAGES C CXX)
+project(chachi_pos LANGUAGES C CXX)
 
 if(NOT EXISTS "${LIBNODE_DIR}/include/node/node.h")
   message(FATAL_ERROR "The Node runtime is not in ${LIBNODE_DIR}. Gradle downloads it on the "

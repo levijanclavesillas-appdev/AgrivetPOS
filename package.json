@@ -1,8 +1,8 @@
 {
   "name": "chachi-agrivet-pos",
-  "productName": "Chachi Pharmacy POS",
+  "productName": "Chachi POS",
   "version": "1.0.0",
-  "description": "Local-first point of sale and inventory for a Philippine drugstore (over-the-counter)",
+  "description": "Local-first point of sale and inventory for Philippine stores: pharmacy, agrivet and more",
   "author": "Chachi's Software Development Service",
   "license": "UNLICENSED",
   "private": true,
@@ -29,9 +29,9 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "store.chachisoftware.pharmacypos",
-    "productName": "ChachiPharmacyPOS",
-    "artifactName": "ChachiPharmacyPOS-Setup-${version}.${ext}",
+    "appId": "store.chachisoftware.pos",
+    "productName": "ChachiPOS",
+    "artifactName": "ChachiPOS-Setup-${version}.${ext}",
     "files": [
       "main.js",
       "src/**/*",
@@ -64,10 +64,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Chachi Pharmacy POS",
+      "shortcutName": "Chachi POS",
       "deleteAppDataOnUninstall": false,
       "include": "build/installer.nsh",
-      "uninstallDisplayName": "Chachi Pharmacy POS",
+      "uninstallDisplayName": "Chachi POS",
       "runAfterFinish": true
     },
     "extraMetadata": {

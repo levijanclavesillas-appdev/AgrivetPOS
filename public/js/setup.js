@@ -105,10 +105,29 @@ function renderTaxModes(modes) {
     </label>`).join('');
 }
 
+// ── The industry (TASK-053) ─────────────────────────────────────────────────
+
+/**
+ * One application, the industry chosen here and fixed from then on. The list is the
+ * server's (config/industries.js), so the wizard, the sign-in screen and the public site
+ * name the same kinds of store; the ones not offered yet are shown, and cannot be picked.
+ */
+function renderIndustries(list) {
+  document.querySelector('#industries').innerHTML = (list || []).map((industry) => `
+    <label class="choice${industry.available ? '' : ' is-soon'}">
+      <input type="radio" name="industry" value="${industry.code}"${industry.available ? '' : ' disabled'}>
+      <span class="choice-body">
+        <strong>${industry.label}${industry.available ? '' : ' <small class="soon">coming soon</small>'}</strong>
+        <small class="muted">${industry.blurb}</small>
+      </span>
+    </label>`).join('');
+}
+
 // ── Per-step checks ─────────────────────────────────────────────────────────
 
 const CHECKS = {
   store() {
+    if (!form.elements.industry || !form.elements.industry.value) return 'Choose what kind of store this is.';
     if (value('storeName').length < 2) return 'Enter the store name.';
     return null;
   },
@@ -142,6 +161,7 @@ const CHECKS = {
 
 function payload() {
   return {
+    industry: form.elements.industry.value,
     store: {
       storeName: value('storeName'),
       address: value('address'),
@@ -267,7 +287,8 @@ for (const id of ['#go-to-app', '#skip-data']) {
   });
 }
 
-document.querySelector('.wizard-mark').innerHTML = iconSvg('pill');
+// TASK-053: one product for every kind of store, so a neutral mark rather than the pill.
+document.querySelector('.wizard-mark').innerHTML = iconSvg('store');
 
 try {
   const res = await fetch('/api/v1/setup');
@@ -279,6 +300,7 @@ try {
     window.location.href = '/';
   } else {
     renderTaxModes(status.tax_modes);
+    renderIndustries(status.industries);
     if (status.suggested_backup_folder) field('backupFolder').value = status.suggested_backup_folder;
     render();
   }

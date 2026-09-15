@@ -68,6 +68,7 @@ test('TC-E2E-10: a fresh install is set up through the wizard', async () => {
   const setup = await json(await call('/setup', {
     method: 'POST', tok: null,
     body: {
+      industry: 'PHARMACY',
       store: {
         storeName: 'Chachi Agrivet', address: 'Poblacion, Sultan Kudarat',
         contactNo: '09171234567', tin: null,

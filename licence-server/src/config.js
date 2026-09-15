@@ -34,7 +34,7 @@ function fromEnv(env = process.env) {
       clientSecret: env.GOOGLE_CLIENT_SECRET || null,
     },
     play: {
-      packageName: env.PLAY_PACKAGE_NAME || 'store.chachisoftware.pharmacypos',
+      packageName: env.PLAY_PACKAGE_NAME || 'store.chachisoftware.pos',
       serviceAccountFile: env.PLAY_SERVICE_ACCOUNT_FILE || null,
       // Product ids that count as this subscription, comma-separated.
       products: (env.PLAY_PRODUCTS || 'pos_monthly').split(',').map((s) => s.trim()).filter(Boolean),

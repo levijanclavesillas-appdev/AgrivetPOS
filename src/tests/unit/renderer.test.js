@@ -2277,3 +2277,34 @@ test('TC-UI-10: every screen in 04_UX_SPEC.md §3 has a view', () => {
   assert.deepEqual(missing, [], `${missing.length} specified screen(s) have no view`);
   assert.ok(specified.length >= 26, `only ${specified.length} screens parsed from the spec`);
 });
+
+// ── TASK-053: one application, the industry beside its name ──────────────────
+
+test('TASK-053: sign-in reads "Chachi POS (Industry)", and nothing on screen names an edition', () => {
+  const app = codeOf('js/shell/app.js');
+  assert.match(app, /const PRODUCT_NAME = 'Chachi POS'/);
+  assert.match(app, /class: 'signin-industry', text: ` \(\$\{installation\.industry\.label\}\)`/);
+  assert.match(app, /industry: status\?\.industry \|\| null/, 'read from GET /setup before anybody signs in');
+  assert.match(app, /productDefaults: installation\.industry\?\.product_defaults/);
+  for (const file of ['js/shell/app.js', 'index.html', 'setup.html', 'js/setup.js']) {
+    assert.equal(/Chachi (Pharmacy|Agrivet) POS|Chachi Pharmacy'/.test(codeOf(file)), false, `${file} names an edition`);
+  }
+});
+
+test('TASK-053: the wizard asks what kind of store first, and sends it', () => {
+  const setup = codeOf('js/setup.js');
+  const html = codeOf('setup.html');
+  assert.match(html, /id="industries"/);
+  assert.match(html, /cannot be changed after setup/);
+  assert.match(setup, /renderIndustries\(status\.industries\)/);
+  assert.match(setup, /industry\.available \? '' : ' disabled'/, 'coming-soon kinds are shown and cannot be picked');
+  assert.match(setup, /industry: form\.elements\.industry\.value/);
+  assert.match(setup, /Choose what kind of store this is/);
+});
+
+test('TASK-053: a new product starts with the industry\'s ticks', () => {
+  const editor = codeOf('js/catalogue/editor.js');
+  assert.match(editor, /productDefaults = null/);
+  assert.match(editor, /is_batch_tracked: productDefaults \? Boolean\(productDefaults\.isBatchTracked\) : true/);
+  assert.match(editor, /statutory_discount_eligible: productDefaults \? Boolean\(productDefaults\.statutoryDiscountEligible\) : true/);
+});

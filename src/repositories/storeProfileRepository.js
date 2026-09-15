@@ -9,7 +9,9 @@ const db = require('../config/database');
 const COLUMNS = 'id, store_name, address, contact_no, tin, tax_mode, currency, created_at, updated_at, updated_by';
 
 function find() {
-  return db.get().prepare(`SELECT ${COLUMNS} FROM store_profile LIMIT 1`).get() || null;
+  const row = db.get().prepare(`SELECT ${COLUMNS} FROM store_profile LIMIT 1`).get() || null;
+  // TASK-053's column, read on its own so a database from before 904 still reads.
+  return row ? { ...row, industry: industry() } : null;
 }
 
 function count() {
@@ -18,8 +20,8 @@ function count() {
 
 function insert(row) {
   db.get().prepare(`
-    INSERT INTO store_profile (id, store_name, address, contact_no, tin, tax_mode, currency, created_at)
-    VALUES (@id, @store_name, @address, @contact_no, @tin, @tax_mode, @currency, @created_at)
+    INSERT INTO store_profile (id, store_name, address, contact_no, tin, tax_mode, currency, industry, created_at)
+    VALUES (@id, @store_name, @address, @contact_no, @tin, @tax_mode, @currency, @industry, @created_at)
   `).run(row);
   return find();
 }
@@ -36,4 +38,18 @@ function updateFields(id, fields) {
   return find();
 }
 
-module.exports = { find, count, insert, updateFields };
+/**
+ * The industry alone (TASK-053), for settingsService, which the store profile service
+ * itself reads. Null before setup, and on a database from before 904_store_industry.sql.
+ */
+function industry() {
+  try {
+    const row = db.get().prepare('SELECT industry FROM store_profile LIMIT 1').get();
+    return row ? row.industry : null;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = {
+  industry, find, count, insert, updateFields };

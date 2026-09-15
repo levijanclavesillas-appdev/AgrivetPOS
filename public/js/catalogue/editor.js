@@ -32,7 +32,7 @@ const PRICE_LEVELS = ['RETAIL', 'WHOLESALE', 'DEALER'];
 // server put in the payload, not by a role check here. TX-412 omits cost entirely for
 // anyone who may not see it, so the editor cannot render it by mistake — and there is no
 // role variable in scope for a future change to start branching on.
-export function createProductEditor({ root, productId, onClose }) {
+export function createProductEditor({ root, productId, onClose, productDefaults = null }) {
   let product = null;
   let reference = { categories: [], brands: [], units: [] };
   let tab = 'Identity';
@@ -71,16 +71,18 @@ export function createProductEditor({ root, productId, onClose }) {
     }
   }
 
-  // Pharmacy edition: a new product starts batch-tracked and eligible for the senior
-  // citizen / PWD discount, because on a drugstore shelf that is nearly everything —
-  // and the costly mistake runs one way. Forgetting batch tracking cannot be undone once
+  // P-2, by industry (TASK-053, config/industries.js): in a pharmacy a new product starts
+  // batch-tracked and eligible for the senior citizen / PWD discount, because on a
+  // drugstore shelf that is nearly everything — and the costly mistake runs one way; in
+  // an agrivet both start off. Unknown (a store from before TASK-053) reads as pharmacy. Forgetting batch tracking cannot be undone once
   // stock arrives (INV-207); forgetting eligibility denies a statutory discount at the
   // counter. Unticking the cotton balls is the cheaper chore.
   const blank = () => ({
     id: null, sku: '', name: '', generic_name: null, description: '',
     category: { id: null }, brand: null, base_unit: { id: null },
     tax_class: 'VATABLE', min_stock_milli: 0, is_active: true,
-    is_batch_tracked: true, statutory_discount_eligible: true,
+    is_batch_tracked: productDefaults ? Boolean(productDefaults.isBatchTracked) : true,
+    statutory_discount_eligible: productDefaults ? Boolean(productDefaults.statutoryDiscountEligible) : true,
     qty_on_hand_milli: 0, has_moved: false, base_unit_locked: false,
     barcodes: [], packs: [], prices: { RETAIL: null, WHOLESALE: null, DEALER: null },
   });

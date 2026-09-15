@@ -12,6 +12,7 @@
 const db = require('../config/database');
 const clock = require('../config/clock');
 const ids = require('../config/ids');
+const industries = require('../config/industries');
 const errors = require('./errors');
 const auditService = require('./auditService');
 const storeProfileRepository = require('../repositories/storeProfileRepository');
@@ -73,17 +74,39 @@ function profile() {
   return row;
 }
 
+/**
+ * TASK-053: the kind of store this is — a code from config/industries.js, chosen in the
+ * setup wizard and fixed from then on. Null before setup.
+ */
+function industry() {
+  const row = find();
+  return row ? row.industry : null;
+}
+
+/** TASK-053: only an industry that is offered may be chosen. */
+function assertIndustry(code) {
+  const known = industries.get(code);
+  if (!known || !known.available) {
+    throw errors.badRequest(
+      `Choose what kind of store this is: ${industries.AVAILABLE.map((c) => industries.get(c).label).join(' or ')}.`,
+      { ruleId: 'VR-501' }
+    );
+  }
+  return code;
+}
+
 /** The mode in force. Every tax decision in the product reads this, never a literal. */
 function taxMode() {
   return profile().tax_mode;
 }
 
-function create({ storeName, address = null, contactNo = null, tin = null, taxMode: mode, currency = 'PHP' }, { at = clock.nowUtc() } = {}) {
+function create({ storeName, address = null, contactNo = null, tin = null, taxMode: mode, currency = 'PHP', industry: code }, { at = clock.nowUtc() } = {}) {
   const name = typeof storeName === 'string' ? storeName.trim() : '';
   if (name.length < 2 || name.length > 120) {
     throw errors.badRequest('The store name is required', { ruleId: 'VR-501' });
   }
   assertMode(mode);
+  assertIndustry(code);
 
   if (storeProfileRepository.count() > 0) {
     throw errors.conflict('This installation already has a store profile.', { ruleId: 'FR_1.1' });
@@ -97,6 +120,7 @@ function create({ storeName, address = null, contactNo = null, tin = null, taxMo
     tin: typeof tin === 'string' && tin.trim() ? tin.trim() : null,
     tax_mode: mode,
     currency,
+    industry: code,
     created_at: at,
   });
 }
@@ -108,6 +132,11 @@ function create({ storeName, address = null, contactNo = null, tin = null, taxMo
  */
 function update(changes, actor) {
   const current = profile();
+  // TASK-053: the owner's decision — the industry is chosen once, at setup. A store set
+  // up as the wrong kind is set up again; nothing on a live store's shelves is re-read.
+  if (changes.industry !== undefined && changes.industry !== current.industry) {
+    throw errors.conflict('The kind of store is chosen when the store is set up and cannot be changed.', { ruleId: 'VR-501' });
+  }
   const fields = {};
   const before = {};
   const after = {};
@@ -188,5 +217,5 @@ function setTaxMode(mode, actor, { reason = null } = {}) {
 
 module.exports = {
   TAX_MODES, MODES,
-  assertMode, computesTax, find, profile, taxMode, create, update, setTaxMode,
+  assertMode, assertIndustry, computesTax, find, profile, taxMode, industry, create, update, setTaxMode,
 };

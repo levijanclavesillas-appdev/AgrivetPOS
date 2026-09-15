@@ -82,6 +82,7 @@ test('TC-E2E-21: a fresh install is set up, and its catalogue is empty', async (
   await json(await call('/setup', {
     method: 'POST', tok: null,
     body: {
+      industry: 'PHARMACY',
       store: {
         storeName: 'Chachi Agrivet — Second Store', address: 'Isulan, Sultan Kudarat',
         contactNo: '09171234567', tin: null,

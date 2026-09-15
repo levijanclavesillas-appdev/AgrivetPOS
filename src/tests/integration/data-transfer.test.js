@@ -261,7 +261,7 @@ test('TC-INT-94: every invalid archive refuses before a single row is written', 
       const m = jsonOf(entries, 'manifest.json');
       m.schema_versions = [...m.schema_versions, 19];
       return rebuild(withEntry(entries, 'manifest.json', m));
-    }, /migration 19, which this version of Chachi Pharmacy POS does not have/],
+    }, /migration 19, which this version of Chachi POS does not have/],
 
     ['a dangling reference', () => {
       const items = jsonOf(entries, 'sale_items.json');

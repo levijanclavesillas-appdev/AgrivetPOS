@@ -25,7 +25,7 @@ fi
 
 echo
 echo "— requirement 6: the uninstaller never removes the store's data —"
-grep -q 'LOCALAPPDATA\\ChachiAgrivetPOS' "$NSH"; check $? "the uninstall message names where the database stays"
+grep -q 'LOCALAPPDATA\\ChachiPOS' "$NSH"; check $? "the uninstall message names where the database stays"
 grep -q 'backup folder is not touched' "$NSH"; check $? "and says the backup folder is untouched"
 ! grep -qE 'RMDir[^\n]*LOCALAPPDATA' "$NSH"; check $? "no macro deletes the application data folder"
 ! grep -qiE 'Delete[^\n]*agrivet\.db' "$NSH"; check $? "no macro deletes the database"
@@ -48,7 +48,7 @@ b.nsis.createStartMenuShortcut ? ok("start-menu shortcut") : fail("start-menu sh
 b.nsis.deleteAppDataOnUninstall === false ? ok("uninstall keeps the data folder") : fail("deleteAppDataOnUninstall must be false");
 b.nsis.include === "build/installer.nsh" ? ok("the macros are included in the build") : fail("installer.nsh is not included");
 b.win.publish === null ? ok("no publish target — NFR_5.1, nothing can self-update") : fail("a publish target would enable auto-update");
-b.artifactName.includes("ChachiAgrivetPOS-Setup-") ? ok("artifact name") : fail("artifact name");
+b.artifactName.includes("ChachiPOS-Setup-") ? ok("artifact name") : fail("artifact name");
 ' || fails=$((fails+1))
 
 echo

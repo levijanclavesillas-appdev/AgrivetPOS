@@ -372,6 +372,7 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-050](TASK-050-lucide-icons.md) | Lucide icons, vendored, beside the words they illustrate | Closed, `c6cd9b4` | — |
 | [TASK-051](TASK-051-responsive-layout.md) | Every screen fits a phone, a tablet and a desktop | Built | Use on the client's phone |
 | [TASK-052](TASK-052-product-pictures.md) | A picture of each product: editor, list, counter search; the camera on Android | Built, *this commit* | Photos taken on the store's own phone |
+| [TASK-053](TASK-053-one-app-industries.md) | One application, Chachi POS; the industry (pharmacy, agrivet) chosen at setup | Built, *this commit* | The Play Store listing under `store.chachisoftware.pos` |
 
 **`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
 100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription

@@ -53,7 +53,7 @@ void redirect(int fd, Pipe &pipe) {
 }  // namespace
 
 extern "C" JNIEXPORT jint JNICALL
-Java_store_chachisoftware_pharmacypos_NodeRuntime_startNodeWithArguments(
+Java_store_chachisoftware_pos_NodeRuntime_startNodeWithArguments(
     JNIEnv *env, jclass /* clazz */, jobjectArray arguments) {
   const jsize count = env->GetArrayLength(arguments);
 

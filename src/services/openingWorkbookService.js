@@ -46,6 +46,8 @@
 // step. Cells are inline strings throughout: a shared-string table would be smaller and
 // is exactly the optimisation that turns a readable generator into one nobody changes.
 
+const industries = require('../config/industries');
+const storeProfileRepository = require('../repositories/storeProfileRepository');
 const zip = require('../config/zip');
 const csv = require('../config/csv');
 const xlsx = require('../config/xlsx');
@@ -128,8 +130,20 @@ function requirement(kind, header) {
 }
 
 /** Row 2's whole cell: the requirement, and the example beside it when there is one. */
+/**
+ * TASK-053: the industry this workbook is being written for — the store's, or the one a
+ * template emailed before installation names. Set by workbook() for the one synchronous
+ * build; null reads the declared examples and the product name alone.
+ */
+let building = null;
+
 function legendText(kind, header, column) {
-  const example = KINDS[kind].example[1] ? KINDS[kind].example[1][column] : '';
+  // TASK-053: the example is the store's kind of stock — paracetamol for a pharmacy,
+  // hog feed for an agrivet — and the declared one where the industry names none.
+  const own = (industries.get(building) || {}).examples;
+  const example = own && own[kind] && own[kind][header] !== undefined
+    ? own[kind][header]
+    : (KINDS[kind].example[1] ? KINDS[kind].example[1][column] : '');
   return example ? `${requirement(kind, header)} · e.g. ${example}` : requirement(kind, header);
 }
 
@@ -173,31 +187,31 @@ function dataSheet(kind) {
 function readMe() {
   const P = (text) => [{ value: text, style: S.PROSE }];
   const H = (text) => [{ value: text, style: S.TITLE }];
+  // TASK-053: the examples in the prose are the store's kind of stock.
+  const say = (industries.get(building) || industries.INDUSTRIES.PHARMACY).readme;
 
   const rows = [
-    H('Opening data for Chachi Pharmacy POS'),
+    H(`Opening data for ${industries.displayName(building)}`),
     P('Fill in what the store has today, tab by tab. Leave a tab empty if it has none of that.'),
     P('Row 1 of every tab is the column name — do not change it. Row 2 says whether the column is'),
     P('required and shows an example. Type your own data from row 3 down.'),
     [],
     H('1. Categories, Units, Brands, Suppliers — the lists everything else points at'),
-    P('Categories: how the shelves are grouped — Medicines, Vitamins, Personal Care.'),
-    P('Units: what things are counted and sold in — TAB, CAP, BOX, BOT, ML. Write yes under fractions'),
-    P('only for units that can be sold in part, like millilitres. Tablets and boxes cannot.'),
+    P(`Categories: how the shelves are grouped — ${say.categories}.`),
+    P(`Units: what things are counted and sold in — ${say.units}. Write yes under fractions`),
+    P(say.fractions),
     P('Brands: optional. Suppliers: who you buy from; the code is a short name the stock tab can use.'),
     P('Anything the store already has is left as it is, so sending this workbook twice is safe.'),
     [],
     H('2. Products — everything the shop sells'),
     P('One row per product. A product with no stock still goes here. Its category, base_unit and brand'),
     P('must be on the tabs above, or already in the system, spelled the same way.'),
-    P('generic_name: the generic on the box — Paracetamol for Biogesic. Leave blank if it has none.'),
-    P('batch_tracked: write yes for goods sold by expiry date — medicines, vitamins. Leave blank for'),
-    P('goods with no expiry, like cotton balls. This cannot be changed once the stock is loaded.'),
-    P('senior_pwd: write yes for goods the senior citizen / PWD 20% discount covers — medicines and'),
-    P('vitamins for the buyer’s own use. Leave blank for the rest.'),
+    P(say.generic),
+    ...say.batch.map(P),
+    ...say.senior.map(P),
     [],
     H('3. Packs — selling one product in more than one size'),
-    P('One row per pack: PARA-500, BOX, 100 means one box holds 100 tablets. The product is still'),
+    P(say.pack),
     P('counted in its base unit; the pack is a way of selling several at once.'),
     [],
     H('4. Opening stock — what is on the shelf at cutover'),
@@ -265,8 +279,20 @@ function stylesXml() {
     + `</styleSheet>`;
 }
 
-/** The workbook, as bytes. Deterministic, because `zipMany` is (OPS-101's reasoning). */
-function workbook() {
+/**
+ * The workbook, as bytes. Deterministic, because `zipMany` is (OPS-101's reasoning).
+ * Written for the store's industry, or for `industry` where one is named (the tool).
+ */
+function workbook({ industry } = {}) {
+  building = industry !== undefined ? industry : storeProfileRepository.industry();
+  try {
+    return build();
+  } finally {
+    building = null;
+  }
+}
+
+function build() {
   const sheets = SHEETS.map((sheet, index) => ({
     ...sheet,
     id: index + 1,

@@ -1,4 +1,4 @@
-package store.chachisoftware.pharmacypos;
+package store.chachisoftware.pos;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
     private static final String ORIGIN = "http://127.0.0.1:" + NodeRuntime.PORT;
     private static final int PICK_FILE = 1;
     private static final int PICK_PICTURE = 3;
-    private static final String BACKUP_FOLDER_NAME = "ChachiPharmacyPOS Backups";
+    private static final String BACKUP_FOLDER_NAME = "ChachiPOS Backups";
 
     private WebView web;
     private ValueCallback<Uri[]> pendingPick;
@@ -323,7 +323,7 @@ public class MainActivity extends Activity {
             + "h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#475569;line-height:1.5}</style>";
 
     private static final String LOADING = PAGE_STYLE
-            + "<main><h1>Chachi Pharmacy POS</h1><p>Starting the store…</p></main>";
+            + "<main><h1>Chachi POS</h1><p>Starting the store…</p></main>";
 
     private static String failed(String why) {
         String safe = why == null ? "" : why.replace("&", "&amp;").replace("<", "&lt;");

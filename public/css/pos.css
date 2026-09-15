@@ -572,6 +572,8 @@
 
 /* SCR-101 — the store's own name, and the version a support call will ask for. */
 .signin-store { color: var(--md-on-surface-muted); font-size: var(--type-body-sm-size); margin: -2px 0 var(--space-4); }
+/* TASK-053: "Chachi POS (Pharmacy)" — the industry is the emphasis. */
+.signin-industry { color: var(--md-primary); font-weight: 700; }
 .signin-version { color: var(--md-on-surface-muted); font-size: var(--type-label-md-size);
   text-align: center; margin-top: var(--space-5); }
 

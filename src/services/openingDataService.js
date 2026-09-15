@@ -44,6 +44,8 @@
 const db = require('../config/database');
 const clock = require('../config/clock');
 const csv = require('../config/csv');
+const industries = require('../config/industries');
+const storeProfileService = require('./storeProfileService');
 const errors = require('./errors');
 const money = require('./money');
 const permissions = require('./permissions');
@@ -1195,10 +1197,9 @@ function run({
           name: row.name,
           code: row.code,
           contactNo: row.contactNo,
-          // A drugstore's account customers are regulars — a clinic, a health centre,
-          // a family on a tab — not farms. FARM stays a valid type (004's CHECK), it is
-          // just not what a pharmacy's notebook is full of.
-          customerType: 'REGULAR',
+          // TASK-053: the store's industry says what its notebook is full of — a
+          // pharmacy's regulars (a clinic, a family on a tab), an agrivet's farms.
+          customerType: (industries.get(storeProfileService.industry()) || industries.INDUSTRIES.PHARMACY).customerType,
           priceLevel: 'RETAIL',
           isCreditEligible: true,
           creditLimitCentavos: row.creditLimitCentavos,

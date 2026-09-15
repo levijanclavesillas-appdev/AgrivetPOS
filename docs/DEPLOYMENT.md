@@ -1,4 +1,4 @@
-# Deployment — Chachi Pharmacy POS v1.0
+# Deployment — Chachi POS v1.0
 
 > Pharmacy edition (`pharmacy` branch). What differs from the agrivet build, and why, is in
 > `PHARMACY_EDITION.md`.
@@ -55,7 +55,7 @@ git clone <repo> && cd AgrivetPOS
 npm ci
 npm run test:all                 # the release gate — 07_TEST_PLAN.md §10
 ./tools/installer/check.sh       # the NSIS macros compile and say what they must
-npm run build:exe                # -> dist/ChachiPharmacyPOS-Setup-1.0.0.exe
+npm run build:exe                # -> dist/ChachiPOS-Setup-1.0.0.exe
 ```
 
 Signing is configured through electron-builder's standard environment variables and is not
@@ -76,7 +76,7 @@ is exactly the moment you want them to trust the thing you just handed them.
 
 ### What the build produces
 
-`dist/ChachiPharmacyPOS-Setup-1.0.0.exe` — an NSIS installer with `oneClick: false`, a
+`dist/ChachiPOS-Setup-1.0.0.exe` — an NSIS installer with `oneClick: false`, a
 selectable install directory, desktop and start-menu shortcuts, and
 `requestedExecutionLevel: asInvoker`. It carries no updater and no publish target: the
 application can never update itself, because a store PC that self-updates mid-shift is an
@@ -95,7 +95,7 @@ outage at the counter with a queue in front of it (`NFR_5.1`).
 It creates, on first run:
 
 ```text
-%LOCALAPPDATA%\ChachiPharmacyPOS\
+%LOCALAPPDATA%\ChachiPOS\
   agrivet.db  agrivet.db-wal  agrivet.db-shm
   session.key
 ```
@@ -130,8 +130,8 @@ server, not just in the browser — you cannot click past it.
 
 ### The backup folder
 
-Default it to `Documents\ChachiPharmacyPOS Backups`. It must be **outside**
-`%LOCALAPPDATA%\ChachiPharmacyPOS` (`OPS-001`) — a backup inside the folder being backed up
+Default it to `Documents\ChachiPOS Backups`. It must be **outside**
+`%LOCALAPPDATA%\ChachiPOS` (`OPS-001`) — a backup inside the folder being backed up
 survives a mistake and none of the things a backup is actually for. The application refuses a
 folder inside its own data directory and says so.
 
@@ -345,11 +345,11 @@ is the pre-migration one you just took.
 
 ## 9. Uninstalling
 
-Windows **Settings → Apps → Chachi Pharmacy POS → Uninstall**.
+Windows **Settings → Apps → Chachi POS → Uninstall**.
 
 It removes the application. It does **not** remove:
 
-- `%LOCALAPPDATA%\ChachiPharmacyPOS\` — the database lives here;
+- `%LOCALAPPDATA%\ChachiPOS\` — the database lives here;
 - the backup folder, whose location the installer has never been told.
 
 The uninstaller says both on screen before it does anything. Reinstalling finds the same data

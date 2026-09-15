@@ -124,7 +124,7 @@ function classifyBarcode(raw) {
       ruleId: 'VR-205',
       reason:
         'This is a weight-embedded barcode — the kind a scale prints, where part of the '
-        + 'number is the weight. Chachi Pharmacy POS cannot read those yet, and storing it as '
+        + 'number is the weight. Chachi POS cannot read those yet, and storing it as '
         + 'an ordinary code would make every weighing scan as a different product. Use the '
         + "product's own barcode, or search for it by name.",
     };

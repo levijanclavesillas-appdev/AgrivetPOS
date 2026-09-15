@@ -97,7 +97,10 @@ export function createApp({ root }) {
   // before anyone signs in — the store name from /setup and the version from /health,
   // which are the two endpoints that answer unauthenticated — because the version is
   // the first thing a support call needs and the last thing anyone can find.
-  let installation = { store_name: null, app_version: null };
+  // TASK-053: one application, and the store's industry beside its name — "Chachi POS
+  // (Pharmacy)" — read from GET /setup before anybody signs in.
+  let installation = { store_name: null, app_version: null, industry: null };
+  const PRODUCT_NAME = 'Chachi POS';
   const main = h('main', { class: 'screen' });
   const railHost = h('nav', { class: 'rail', id: 'rail', 'aria-label': 'Sections' });
 
@@ -143,9 +146,12 @@ export function createApp({ root }) {
     const problem = h('p', { class: 'error', role: 'alert', hidden: true });
 
     clear(root).append(h('div', { class: 'signin' }, [
-      h('h1', { text: installation.store_name || 'Chachi Pharmacy POS' }),
+      h('h1', { text: installation.store_name || PRODUCT_NAME }),
       installation.store_name
-        ? h('p', { class: 'signin-store', text: 'Chachi Pharmacy POS' })
+        ? h('p', { class: 'signin-store' }, [
+          h('span', { text: PRODUCT_NAME }),
+          installation.industry ? h('strong', { class: 'signin-industry', text: ` (${installation.industry.label})` }) : null,
+        ])
         : null,
       note ? h('p', { class: 'signin-note', text: note }) : null,
       h('form', {
@@ -352,6 +358,8 @@ export function createApp({ root }) {
     current = createProductEditor({
       root: host(),
       productId,
+      // TASK-053 / P-2: the ticks a new product starts with are the store's industry's.
+      productDefaults: installation.industry?.product_defaults || null,
       // A newly created product reopens in the editor rather than dropping back to the
       // list: its packs, prices and barcodes are the next four things anybody does.
       onClose: (createdId) => (createdId ? showProductEditor(createdId) : showProducts()),
@@ -786,7 +794,13 @@ export function createApp({ root }) {
 
   function renderRail(activeId) {
     clear(railHost).append(
-      h('div', { class: 'rail-brand', icon: 'pill', text: 'Chachi Pharmacy' }),
+      // The store's kind, as its mark (TASK-053). @icons pill sprout
+      h('div', {
+        class: 'rail-brand',
+        icon: installation.industry?.code === 'AGRIVET' ? 'sprout' : 'pill',
+        text: PRODUCT_NAME,
+        title: installation.industry ? installation.industry.display_name : PRODUCT_NAME,
+      }),
       ...RAIL
         // §2: items the role cannot reach are hidden, not disabled.
         .filter((item) => may(session.role, item.tx))
@@ -811,7 +825,7 @@ export function createApp({ root }) {
       }, [h('span', { class: 'rail-label', text: session.username })])
     );
     const active = RAIL.find((item) => item.id === activeId);
-    appbarTitle.textContent = active ? active.label : 'Chachi Pharmacy';
+    appbarTitle.textContent = active ? active.label : PRODUCT_NAME;
   }
 
   function start() {
@@ -838,6 +852,7 @@ export function createApp({ root }) {
       installation = {
         store_name: status?.store_name || null,
         app_version: health?.app_version || null,
+        industry: status?.industry || null,
       };
       signIn();
     },
