@@ -191,7 +191,7 @@ every audit row will name the wrong person.
 | :--- | :--- | :--- |
 | `CASHIER` | The counter, their own shift's figures. **No cost prices, no settings** | Everyone on the till |
 | `INVENTORY` | Products, stock and buying, no sales | A stock clerk, if there is one |
-| `MANAGER` | Everything except user administration and settings | A supervisor |
+| `MANAGER` | The day to day: approvals, stock, reports, and in **Admin** the day-to-day settings, backups (not restore), export (not import), the audit trail and health. Not users, cost prices, write-offs, the tax mode or the owner-only settings | A supervisor |
 | `OWNER` | Everything, including restore | One person |
 
 Give every cashier a 6-digit PIN: it unlocks the screen after an idle timeout without losing

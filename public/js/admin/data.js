@@ -44,17 +44,26 @@ export function createData({ root, session }) {
   // does not drop a workbook somebody has just chosen.
   const openingRoot = h('div');
   const opening = createOpeningLoad({ root: openingRoot });
+  // TASK-059: a manager exports (TX-426). Import and the opening load write another
+  // source's data into the store, which is TX-427's, and TX-427 is the owner's alone.
+  const mayImport = !session || session.role === 'OWNER';
 
-  function mount() { opening.mount(); render(); }
+  function mount() { if (mayImport) opening.mount(); render(); }
 
   function render() {
-    clear(root).append(h('section', { class: 'data-transfer' }, [
-      exportBlock(),
-      h('hr'),
-      result ? resultBlock() : importBlock(),
-      h('hr'),
-      openingRoot,
-    ]));
+    clear(root).append(h('section', { class: 'data-transfer' }, mayImport
+      ? [
+        exportBlock(),
+        h('hr'),
+        result ? resultBlock() : importBlock(),
+        h('hr'),
+        openingRoot,
+      ]
+      : [
+        exportBlock(),
+        h('p', { class: 'muted', text: 'Importing an archive and loading opening data replace or add '
+          + 'to the store’s records, so only the owner can do them (TX-427).' }),
+      ]));
   }
 
   // ── Export ────────────────────────────────────────────────────────────────

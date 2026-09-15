@@ -24,7 +24,8 @@ import { manila } from '../shell/format.js';
 const ROLES = [
   ['CASHIER', 'Sells at the counter. No cost prices, no settings.'],
   ['INVENTORY', 'Products and stock. No sales screen.'],
-  ['MANAGER', 'Everything except users and settings.'],
+  ['MANAGER', 'Runs the day: approvals, stock, reports, backups, export, the audit trail and '
+    + 'the day-to-day settings. Not users, costs, write-offs, the tax mode, restore or import.'],
   ['OWNER', 'Everything, including restore and cost prices.'],
 ];
 

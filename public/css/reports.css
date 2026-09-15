@@ -409,3 +409,7 @@
 .backup-others { margin-top: var(--space-5); }
 .backup-others h2 { font-size: var(--type-title-md-size); margin: 0 0 var(--space-1); }
 .backup-others > p { margin: 0 0 var(--space-3); }
+
+/* TASK-059: an owner-only setting, seen by a manager — there, readable, not editable. */
+.setting.is-locked input, .setting.is-locked select, .setting.is-locked textarea {
+  background: var(--md-surface-container-low); color: var(--md-on-surface-muted); cursor: not-allowed; }

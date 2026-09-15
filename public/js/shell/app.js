@@ -68,7 +68,10 @@ const RAIL = [
   // manager and the inventory clerk, and never a cashier.
   { id: 'buying', label: 'Buying', tx: 'TX-409', screen: 'SCR-801', icon: 'truck' },
   { id: 'reports', label: 'Reports', tx: 'TX-421', screen: 'SCR-601', icon: 'chart-column' },
-  { id: 'admin', label: 'Admin', tx: 'TX-423', screen: 'SCR-701', icon: 'settings' },
+  // TASK-059: shown to anybody who holds one of its tabs, not to the owner alone. §10
+  // gives the manager limited settings, backups, export and the audit trail; hiding the
+  // whole section left them with rights and no screen to use them from.
+  { id: 'admin', label: 'Admin', tx: ['TX-423', 'TX-424', 'TX-426', 'TX-428', 'TX-429'], screen: 'SCR-701', icon: 'settings' },
 ];
 
 /**
@@ -87,9 +90,17 @@ const GRANTS = {
   'TX-421': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-422': ['OWNER', 'MANAGER', 'CASHIER', 'INVENTORY'],
   'TX-423': ['OWNER'],
+  // TASK-059: the Admin tabs. TX-424 is LIMITED for a manager — the owner-only settings
+  // are locked on the screen and refused by the server (settingsService.assertMayChange).
+  'TX-424': ['OWNER', 'MANAGER'],
+  'TX-426': ['OWNER', 'MANAGER'],
+  'TX-427': ['OWNER'],
+  'TX-428': ['OWNER', 'MANAGER'],
+  'TX-429': ['OWNER', 'MANAGER'],
 };
 
-const may = (role, tx) => (GRANTS[tx] || []).includes(role);
+/** Any one of `tx` (a TX id or a list of them) is enough. */
+const may = (role, tx) => [].concat(tx).some((one) => (GRANTS[one] || []).includes(role));
 
 export function createApp({ root }) {
   let session = null;
@@ -627,16 +638,20 @@ export function createApp({ root }) {
    * here, and the rest of the section says so rather than offering a dead button.
    */
   const ADMIN_PANELS = [
-    { id: 'users', label: 'Users', screen: 'SCR-701', create: createUsers },
-    { id: 'settings', label: 'Settings', screen: 'SCR-702', create: createSettings },
-    { id: 'audit', label: 'Audit', screen: 'SCR-703', create: createAudit },
-    { id: 'backup', label: 'Backups', screen: 'SCR-704', create: createBackup },
+    // Each tab carries the TX it needs, and a role sees the tabs it holds (TASK-059).
+    // Inside a tab, what the role may not do is hidden or locked by the tab itself —
+    // restore and import are the owner's, and so are the owner-only settings.
+    { id: 'users', label: 'Users', screen: 'SCR-701', tx: 'TX-423', create: createUsers },
+    { id: 'settings', label: 'Settings', screen: 'SCR-702', tx: 'TX-424', create: createSettings },
+    { id: 'audit', label: 'Audit', screen: 'SCR-703', tx: 'TX-429', create: createAudit },
+    { id: 'backup', label: 'Backups', screen: 'SCR-704', tx: 'TX-428', create: createBackup },
     // SCR-706. Beside the backups because they answer the same question from two
     // sides: how a store's data survives this machine.
-    { id: 'data', label: 'Export / import', screen: 'SCR-706', create: createData },
-    { id: 'health', label: 'Health', screen: 'SCR-705', create: createHealth },
+    { id: 'data', label: 'Export / import', screen: 'SCR-706', tx: 'TX-426', create: createData },
+    { id: 'health', label: 'Health', screen: 'SCR-705', tx: 'TX-428', create: createHealth },
     // SCR-707 (TASK-048): the store's subscription — linking this POS, and its state.
-    { id: 'subscription', label: 'Subscription', screen: 'SCR-707', create: createLicence },
+    // Readable by whoever holds settings; linking and "Check now" are the owner's (LIC-004).
+    { id: 'subscription', label: 'Subscription', screen: 'SCR-707', tx: 'TX-424', create: createLicence },
   ];
   // Users first: on the day a store is installed it is the first thing anybody needs,
   // and leaving it further in is how a store ends up trading on the owner login.
@@ -645,9 +660,13 @@ export function createApp({ root }) {
   function showAdmin() {
     const screen = h('div', { class: 'admin-screen' });
     const panelHost = h('div', { class: 'admin-panel' });
+    const panels = ADMIN_PANELS.filter((panel) => may(session.role, panel.tx));
+    // The last tab chosen may belong to somebody else's role — the owner signed out on
+    // Users, and a manager signed in.
+    if (!panels.some((panel) => panel.id === adminPanel)) adminPanel = panels[0].id;
 
     const tabs = h('nav', { class: 'admin-tabs', 'aria-label': 'Admin sections' },
-      ADMIN_PANELS.map((panel) => h('button', {
+      panels.map((panel) => h('button', {
         class: `admin-tab${panel.id === adminPanel ? ' is-active' : ''}`,
         'aria-current': panel.id === adminPanel ? 'page' : null,
         text: panel.label,
@@ -660,7 +679,7 @@ export function createApp({ root }) {
     const active = tabs.querySelector('.is-active');
     if (active && tabs.scrollWidth > tabs.clientWidth) active.scrollIntoView({ block: 'nearest', inline: 'center' });
 
-    const chosen = ADMIN_PANELS.find((panel) => panel.id === adminPanel);
+    const chosen = panels.find((panel) => panel.id === adminPanel);
     if (current?.unmount) current.unmount();
     current = chosen.create({ root: panelHost, session });
     current.mount();

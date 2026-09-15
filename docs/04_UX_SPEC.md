@@ -699,6 +699,12 @@ with its rule ID in a tooltip — **Audit** (filter by actor, action, entity, da
 **Backup** (last backup and its verification status, manual backup, restore behind typed
 confirmation per `OPS-004`), **Health** (`OPS-006`).
 
+**Who sees it (TASK-059).** Admin is on the rail for any role holding one of its tabs, and each
+tab shows for the role that holds its own `TX`. A manager therefore gets every tab except Users.
+Inside a tab, what the role may not do is hidden or locked: the owner-only settings are shown
+disabled with their tag, the tax mode is stated rather than offered, there is no restore on the
+Backups tab, and Export / import has only the export.
+
 ### `SCR-707` — Subscription · `TASK-048` — pharmacy edition
 
 The store's subscription in words: its state (active, ending soon, grace period, lapsed, not

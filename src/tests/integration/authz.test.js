@@ -242,3 +242,30 @@ test('TC-INT-03 / TASK-056: after a PIN unlock the counter works, and reports, c
     assert.equal((await res.json()).error.rule_id, 'SEC-2', `${method} ${path} is refused as a PIN session`);
   }
 });
+
+test('TASK-059: a manager reaches every Admin tab they hold, and not the owner\'s', async () => {
+  const manager = tokens.MANAGER;
+  const status = async (path, { method = 'GET', body = null } = {}) => {
+    const res = await call(path, { token: manager, method, body });
+    const payload = res.status === 200 ? null : await res.json().catch(() => null);
+    return { status: res.status, rule: payload?.error?.rule_id ?? null };
+  };
+
+  // What the Settings, Audit, Backups, Export, Health and Subscription tabs load with.
+  for (const path of ['/settings', '/store-profile', '/audit', '/backups', '/health/panel', '/licence']) {
+    assert.equal((await status(path)).status, 200, `GET ${path}`);
+  }
+  assert.equal((await status('/data/export', { method: 'POST', body: {} })).status, 200, 'export');
+
+  // TX-424 is LIMITED: a day-to-day figure saves, an owner-only one is refused by name.
+  assert.equal((await status('/settings', { method: 'PUT', body: { near_expiry_days: 60 } })).status, 200);
+  const ownerOnly = await status('/settings', { method: 'PUT', body: { idle_timeout_minutes: 30 } });
+  assert.deepEqual(ownerOnly, { status: 403, rule: 'TX-424' });
+
+  // The owner's alone, and the tabs that would offer them are not shown to a manager.
+  assert.equal((await status('/users')).status, 403, 'users');
+  assert.equal((await status('/store-profile/tax-mode', { method: 'PUT', body: { taxMode: 'VAT' } })).status, 403, 'tax mode');
+  assert.equal((await status('/data/import/validate', { method: 'POST', body: { archive: '' } })).status, 403, 'import');
+  assert.equal((await status('/backups/files/restore', { method: 'POST', body: { fileName: 'x', confirmFilename: 'x' } })).status, 403, 'restore');
+  assert.deepEqual(await status('/licence/link', { method: 'POST', body: {} }), { status: 403, rule: 'LIC-004' });
+});

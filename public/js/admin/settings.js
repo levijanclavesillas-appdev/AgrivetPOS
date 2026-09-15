@@ -12,6 +12,10 @@
 // old ones. A screen that knew the registry independently would be the second place
 // OPS-005 exists to prevent.
 //
+// TASK-059: a manager opens this too, at TX-424's LIMITED. The owner-only settings are
+// shown, locked, with the tag that says whose they are, and left out of a section's save;
+// the tax mode (TX-425) is stated rather than offered. The server refuses both regardless.
+//
 // It also validates nothing the server validates. Bounds, enumerations and the
 // owner-only guard are all refused server-side with the rule named (SEC-6); this
 // renders the refusal against the field that caused it.
@@ -21,7 +25,9 @@ import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { manila } from '../shell/format.js';
 
-export function createSettings({ root }) {
+export function createSettings({ root, session = null }) {
+  const isOwner = !session || session.role === 'OWNER';
+  const locked = (setting) => setting.owner_only && !isOwner;
   let groups = {};
   let settings = [];
   let profile = null;
@@ -112,6 +118,14 @@ export function createSettings({ root }) {
 
   /** TAX-001 — owner only (TX-425), and the consequence stated before the control. */
   function taxSection() {
+    if (!isOwner) {
+      return h('div', { class: 'tax-mode' }, [
+        h('h3', { text: 'Tax mode' }),
+        h('p', { class: 'muted', text: `The store is ${profile.tax_mode}`
+          + `${taxModes[profile.tax_mode] ? ` — ${taxModes[profile.tax_mode].label}` : ''}. Only the owner changes it.` }),
+        h('p', { class: 'refusal-rule', text: 'TAX-001 · TX-425' }),
+      ]);
+    }
     // TAX-001 ships a label and a plain-language sentence per mode. Both are used:
     // "NON_VAT" means nothing to a shopkeeper, and the sentence is the thing that
     // makes the choice answerable.
@@ -175,18 +189,22 @@ export function createSettings({ root }) {
   function section(group, rows) {
     const isPrinter = rows.some((r) => r.key === 'printer_transport');
 
+    // A section of nothing but owner-only figures has nothing a manager can save.
+    const open = rows.filter((row) => !locked(row));
     return h('div', { class: 'settings-group' }, [
       h('h2', { text: groups[group] || group }),
       ...rows.map(control),
 
       isPrinter ? printTest() : null,
 
-      h('div', { class: 'editor-actions' }, [
-        h('button', {
-          class: 'primary', icon: 'save', text: 'Save this section',
-          onclick: () => save(rows),
-        }),
-      ]),
+      open.length > 0
+        ? h('div', { class: 'editor-actions' }, [
+          h('button', {
+            class: 'primary', icon: 'save', text: 'Save this section',
+            onclick: () => save(open),
+          }),
+        ])
+        : null,
     ]);
   }
 
@@ -262,9 +280,10 @@ export function createSettings({ root }) {
       });
     }
 
+    if (locked(setting)) input.disabled = true;
     const problem = problems.get(setting.key);
 
-    return h('div', { class: `setting${problem ? ' has-problem' : ''}` }, [
+    return h('div', { class: `setting${problem ? ' has-problem' : ''}${locked(setting) ? ' is-locked' : ''}` }, [
       h('label', { for: id, class: 'setting-label' }, [
         h('span', { text: setting.what }),
         // OPS-005's own id, visible rather than hidden in a tooltip: reading it down

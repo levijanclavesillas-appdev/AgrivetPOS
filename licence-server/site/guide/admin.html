@@ -28,8 +28,9 @@
 
 <section id="open-admin">
   <h2>Open the Admin screens</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
-  <p>Choose <strong>Admin</strong> in the menu. Only the owner sees it. It has seven tabs: <strong>Users</strong>, <strong>Settings</strong>, <strong>Audit</strong>, <strong>Backups</strong>, <strong>Export / import</strong>, <strong>Health</strong> and <strong>Subscription</strong>. On a phone the tabs scroll sideways.</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
+  <p>Choose <strong>Admin</strong> in the menu. The owner sees seven tabs: <strong>Users</strong>, <strong>Settings</strong>, <strong>Audit</strong>, <strong>Backups</strong>, <strong>Export / import</strong>, <strong>Health</strong> and <strong>Subscription</strong>. On a phone the tabs scroll sideways.</p>
+  <p>A manager sees the same tabs without <strong>Users</strong>, and inside them only what a manager may do. Settings marked <strong>owner only</strong> are greyed out and the tax mode cannot be changed. There is no <strong>Restore</strong> on the Backups tab and no import on Export / import. On Subscription, only the owner can link the POS or press <strong>Check now</strong>. Cashiers and inventory clerks do not see Admin.</p>
   <p class="tip"><strong>Tip:</strong> when the app refuses something, the message often ends with a code in brackets, such as (VR-503). Read it out when you call Chachi's. It names the exact rule.</p>
 </section>
 
@@ -85,7 +86,7 @@
 
 <section id="change-a-setting">
   <h2>Change a setting</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner; Manager for the settings not marked owner only</p>
   <p><strong>Admin → Settings</strong> holds every figure the store runs on, in sections: <strong>The store</strong> (with <strong>Tax mode</strong>), <strong>Security and sessions</strong>, <strong>Sales and the till</strong>, <strong>Reports and alerts</strong>, <strong>Discounts and rounding</strong>, <strong>Inventory</strong>, <strong>Credit</strong>, <strong>Purchasing</strong> and <strong>Backup</strong>.</p>
   <ol class="steps">
     <li>Find the setting. A small grey line under it gives its internal name, the values allowed, the default, and when it was last changed.</li>
@@ -99,7 +100,7 @@
 
 <section id="store-details">
   <h2>Change the store's details and the receipt heading</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
   <p>The top of every receipt prints the store name, address, contact number and TIN (when set). The bottom always says <strong>This is not an official receipt</strong>. That line is required for these receipts and cannot be changed. Chachi POS does not print BIR official receipts, and there is no other custom header or footer.</p>
   <ol class="steps">
     <li>In <strong>Admin → Settings</strong>, go to <strong>The store</strong>.</li>
@@ -123,7 +124,7 @@
 
 <section id="receipt-printer">
   <h2>Set up the receipt printer and print a test page</h2>
-  <p class="who"><strong>Who:</strong> Owner, usually with Chachi's on installation day</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager, usually with Chachi's on installation day</p>
   <p>The printer settings are in the <strong>Sales and the till</strong> section of <strong>Admin → Settings</strong>. Until a printer is set up, nothing prints, but every sale still saves normally.</p>
   <ol class="steps">
     <li>Set <strong>Receipt width: 32 columns for 58 mm paper, 48 for 80 mm</strong> to match your paper roll.</li>
@@ -141,7 +142,7 @@
 
 <section id="cash-drawer">
   <h2>Connect the cash drawer</h2>
-  <p class="who"><strong>Who:</strong> Owner, usually with Chachi's</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager, usually with Chachi's</p>
   <p>There is no drawer setting. The drawer's cable plugs into the drawer port on the receipt printer, not into the computer, and the printer opens it. It opens for a cash sale, a cash payment on a customer's account, a cash refund, cash handed back on a void, and cash in or out of the till.</p>
   <ol class="steps">
     <li>Plug the drawer cable into the printer's drawer port.</li>
@@ -184,7 +185,7 @@
 
 <section id="other-settings">
   <h2>All the other settings</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner; Manager for the settings not marked owner only</p>
   <p>Labels as they appear on the screen. Leave a setting at its default unless you have a reason to change it.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Section</th><th>Setting</th><th>Default</th></tr></thead>
@@ -220,7 +221,7 @@
 
 <section id="automatic-backups">
   <h2>How automatic backups work</h2>
-  <p class="who"><strong>Who:</strong> automatic; the owner checks them</p>
+  <p class="who"><strong>Who:</strong> automatic; the owner or a manager checks them</p>
   <p>Chachi POS backs itself up every time a shift is closed, and once a day after the configured hour (9:00 pm unless changed) while the app is running. It also takes a backup just before a restore, an import, an opening-data load or an update.</p>
   <p>Each backup is a .zip file named <strong>pharmacy_backup_</strong> plus the date, time and cause, in the folder shown on <strong>Admin → Backups</strong>. The app opens and checks each one straight away. Only one that passes shows <strong>Verified</strong>, and only verified backups count. The newest 30 are kept.</p>
   <p>If no backup has been verified for 36 hours, a red warning appears on the dashboard and the Backups tab. It cannot be dismissed. It usually means the backup folder's drive is unplugged or missing.</p>
@@ -229,7 +230,7 @@
 
 <section id="back-up-now">
   <h2>Make a backup now</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
   <ol class="steps">
     <li>Open <strong>Admin → Backups</strong>.</li>
     <li>Press <strong>Back up now</strong>. The message says <strong>Backing up and verifying…</strong>, then the file name and <strong>verified</strong>.</li>
@@ -241,7 +242,7 @@
 
 <section id="copy-backups-off">
   <h2>Copy backups off the computer</h2>
-  <p class="who"><strong>Who:</strong> Owner, once a week</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager, once a week</p>
   <p>Backups on the shop computer do not survive losing that computer to fire, theft, flood or a failed disk. The app cannot copy them elsewhere for you, and will not remind you.</p>
   <ol class="steps">
     <li>Plug in a USB stick.</li>
@@ -275,7 +276,7 @@
 
 <section id="export-data">
   <h2>Export all the store's data</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
   <p>An export is one .zip archive holding every record as readable files, for keeping a copy other programs can read or for moving the data into another Chachi POS. It is not a backup; to put the store back as it was, <a href="#restore-a-backup">restore a backup</a>.</p>
   <ol class="steps">
     <li>Open <strong>Admin → Export / import</strong>.</li>
@@ -301,7 +302,7 @@
 
 <section id="audit-trail">
   <h2>Read the audit trail</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
   <p>The audit trail answers "who changed this, and what was it before?" It records price and cost changes, credit limits, stock adjustments, voids, returns, reprints, user and settings changes, exports and restores, shift opens and closes, cash in and out, and approvals. Nothing on it can be changed or removed.</p>
   <ol class="steps">
     <li>Open <strong>Admin → Audit</strong>. The newest rows are first, 50 to a page. Use <strong>Newer</strong> and <strong>Older</strong> to move between pages.</li>
@@ -316,7 +317,7 @@
 
 <section id="health-panel">
   <h2>Check the health panel</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner or Manager</p>
   <p><strong>Admin → Health</strong> tells you whether this installation is safe to trade on. Open it first when something seems wrong.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Line</th><th>What it tells you</th></tr></thead>
@@ -336,7 +337,7 @@
 
 <section id="subscription">
   <h2>The subscription screen and its warnings</h2>
-  <p class="who"><strong>Who:</strong> Owner</p>
+  <p class="who"><strong>Who:</strong> Owner links it; a Manager can see its state</p>
   <p><strong>Admin → Subscription</strong> shows whether this POS is covered. Linking it the first time is in <a href="/guide/getting-started#link-your-subscription">Link your subscription and start the free trial</a>. Once linked, it shows the store, <strong>Owner</strong> (the Google account), <strong>Paid until</strong>, <strong>Last checked</strong> and <strong>Check again by</strong>.</p>
   <p>The POS checks by itself whenever it has the internet. Press <strong>Check now</strong> to check at once, for example after Chachi's has recorded your payment. <strong>Link again</strong> repeats the link with a new code; you rarely need it.</p>
   <div class="table-wrap"><table>

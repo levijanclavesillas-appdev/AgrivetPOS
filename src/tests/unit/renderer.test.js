@@ -2188,8 +2188,9 @@ test('TC-UI-13: no operation is more than three screen transitions away', () => 
   // restated here: a spec that names a rail item the renderer does not render, or gives
   // a role a door the matrix closes, is a spec that proves nothing.
   const shell = codeOf('js/shell/app.js');
-  const rail = [...shell.matchAll(/\{ id: '[^']+', label: '[^']+', tx: '(TX-\d{3})', screen: '(SCR-\d{3})'[^}]*\}/g)]
-    .map(([, tx, screen]) => ({ tx, screen }));
+  // A rail item's tx is one id or, since TASK-059, a list of them (Admin: any of its tabs).
+  const rail = [...shell.matchAll(/\{ id: '[^']+', label: '[^']+', tx: ('TX-\d{3}'|\[[^\]]+\]), screen: '(SCR-\d{3})'[^}]*\}/g)]
+    .map(([, tx, screen]) => ({ tx: [...tx.matchAll(/TX-\d{3}/g)].map((m) => m[0]), screen }));
   assert.equal(rail.length, 9, 'the nine rail items are parsed');
   assert.deepEqual([...railScreens].sort(), rail.map((item) => item.screen).sort(),
     'the table’s rail items are the shell’s rail items');
@@ -2219,7 +2220,7 @@ test('TC-UI-13: no operation is more than three screen transitions away', () => 
     // Only the rail items this role is shown. A screen unreachable for a role is not
     // necessarily a defect — a cashier has no business in Buying — so what is asserted
     // is the distance to what they *can* reach.
-    const roots = rail.filter((item) => (grants[item.tx] || []).includes(role)).map((item) => item.screen);
+    const roots = rail.filter((item) => item.tx.some((tx) => (grants[tx] || []).includes(role))).map((item) => item.screen);
     assert.ok(roots.includes(landing), `${role} lands on a screen their rail contains`);
 
     const depth = walk(landing, roots);
@@ -2229,7 +2230,7 @@ test('TC-UI-13: no operation is more than three screen transitions away', () => 
 
   // The inventory clerk in particular, because they have the narrowest rail of the four
   // and are the role a stock screen is for.
-  const clerkRoots = rail.filter((item) => (grants[item.tx] || []).includes('INVENTORY')).map((i) => i.screen);
+  const clerkRoots = rail.filter((item) => item.tx.some((tx) => (grants[tx] || []).includes('INVENTORY'))).map((i) => i.screen);
   const clerk = walk('SCR-201', clerkRoots);
   for (const screen of ['SCR-202', 'SCR-203', 'SCR-204', 'SCR-205', 'SCR-206', 'SCR-207']) {
     assert.ok(clerk.has(screen), `the inventory clerk can reach ${screen}`);
@@ -2399,4 +2400,26 @@ test('TASK-058: the sign-in screen offers the recovery code; the profile edits t
   assert.match(profile, /text: 'Edit details'/);
   assert.match(profile, /api\.put\(`\/customers\/\$\{customerId\}`, body\)/);
   assert.match(profile, /api\.put\(`\/customers\/\$\{customerId\}`, \{ isActive: true \}\)/);
+});
+
+// ── TASK-059: a manager's Admin ─────────────────────────────────────────────
+
+test('TASK-059: Admin shows to a manager, with the tabs their grants reach', () => {
+  const shell = codeOf('js/shell/app.js');
+  assert.match(shell, /id: 'admin', label: 'Admin', tx: \['TX-423', 'TX-424', 'TX-426', 'TX-428', 'TX-429'\]/);
+  assert.match(shell, /const may = \(role, tx\) => \[\]\.concat\(tx\)\.some/);
+  for (const [tab, tx] of [['users', 'TX-423'], ['settings', 'TX-424'], ['audit', 'TX-429'], ['backup', 'TX-428'],
+    ['data', 'TX-426'], ['health', 'TX-428'], ['subscription', 'TX-424']]) {
+    assert.match(shell, new RegExp(`id: '${tab}',[^}]*tx: '${tx}'`), `${tab} needs ${tx}`);
+  }
+  assert.match(shell, /const panels = ADMIN_PANELS\.filter\(\(panel\) => may\(session\.role, panel\.tx\)\)/);
+  assert.match(shell, /'TX-423': \['OWNER'\]/, 'Users stays the owner\'s');
+  assert.match(shell, /'TX-427': \['OWNER'\]/, 'and so do restore and import');
+
+  const settings = codeOf('js/admin/settings.js');
+  assert.match(settings, /const locked = \(setting\) => setting\.owner_only && !isOwner;/);
+  assert.match(settings, /if \(locked\(setting\)\) input\.disabled = true;/);
+  assert.match(settings, /onclick: \(\) => save\(open\)/, 'a section saves only what the role may change');
+  const data = codeOf('js/admin/data.js');
+  assert.match(data, /const mayImport = !session \|\| session\.role === 'OWNER';/);
 });
