@@ -457,3 +457,17 @@ Stop its container (`docker compose -p chachi-pos-<store> down`), keep
 PC in the setup wizard (the guide's *Moving to a new computer*). Moving a PC store onto the web
 is the same the other way: `web/store.sh create`, then restore its backup in the wizard.
 
+### The web and devices together (`TASK-063`)
+
+A store on the web can also have phones and PCs that sell offline, and a store that began on a
+phone can go on the web; `PHARMACY_EDITION.md` §12 has the rules. For Chachi's:
+
+- **Web first:** create the store (`web/store.sh create`), set it up with the owner, then on each
+  phone or PC choose *Connect to a store on the web* in its setup and sign in as the owner.
+- **Mobile first:** create the web store but **do not set it up**. Give the owner the address and
+  setup code; on the phone, *Admin → Web & devices → Put this store on the web* uploads the store
+  into it and makes the phone device A.
+- Each device links its own subscription seat (*Admin → Subscription*), and so does the web copy.
+- **Upgrade the web copy first.** A device syncs only on the same version (`SYNC-002`); a device
+  updated before its web copy waits, still selling, until the web copy catches up.
+

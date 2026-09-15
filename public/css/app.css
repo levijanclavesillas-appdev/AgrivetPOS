@@ -215,9 +215,12 @@ dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--md-on-surface);
   margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4);
   border: 1px solid var(--md-outline-variant); border-radius: var(--shape-md); background: var(--md-surface-container-low); }
 .step .move-note p { margin: 0; flex: 1 1 16rem; }
-.wizard-body > .step[data-step="restore"], .wizard-body > .step[data-step="restored"] { display: flex; flex-direction: column; flex: 1; }
-.wizard-body > .step[data-step="restore"][hidden], .wizard-body > .step[data-step="restored"][hidden] { display: none; }
-.step[data-step="restore"] label { display: grid; gap: var(--space-1); margin: 0 0 var(--space-4); }
+.wizard-body > .step[data-step="restore"], .wizard-body > .step[data-step="restored"],
+.wizard-body > .step[data-step="connect"], .wizard-body > .step[data-step="connected"] { display: flex; flex-direction: column; flex: 1; }
+.wizard-body > .step[data-step="restore"][hidden], .wizard-body > .step[data-step="restored"][hidden],
+.wizard-body > .step[data-step="connect"][hidden], .wizard-body > .step[data-step="connected"][hidden] { display: none; }
+.step[data-step="restore"] label, .step[data-step="connect"] label { display: grid; gap: var(--space-1); margin: 0 0 var(--space-4); }
+.move-note + .move-note { margin-top: calc(var(--space-3) * -1); }
 
 /* TASK-062: the hosted copy's setup code, at the top of step 1 and of the restore. */
 .step .setup-code { display: grid; gap: var(--space-1); margin: 0 0 var(--space-4); }

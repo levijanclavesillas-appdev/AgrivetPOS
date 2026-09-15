@@ -2488,3 +2488,24 @@ test('TASK-062: the wizard asks a hosted copy for its setup code, and carries th
   assert.match(wizard, /'x-setup-code': document\.querySelector\('#restore-code'\)\.value\.trim\(\)/);
   assert.match(wizard, /setupCode: hosted \? value\('setupCode'\) : undefined,/);
 });
+
+// ── TASK-063: one store on the web and its devices ─────────────────────────
+
+test('TASK-063: the wizard connects a fresh install to a web store; Admin has Web & devices; the rail shows sync', () => {
+  const html = fs.readFileSync(path.join(root, 'public', 'setup.html'), 'utf8');
+  assert.match(html, /id="to-connect"/);
+  assert.match(html, /data-step="connect"/);
+  const wizard = codeOf('js/setup.js');
+  assert.match(wizard, /fetch\('\/api\/v1\/setup\/connect'/);
+  assert.match(wizard, /document\.querySelector\('\.connect-note'\)\.hidden = true;/, 'a web copy does not connect to another');
+
+  const shell = codeOf('js/shell/app.js');
+  assert.match(shell, /\{ id: 'devices', label: 'Web & devices', screen: 'SCR-708', tx: 'TX-423', create: createDevices \}/);
+  assert.match(shell, /class: 'rail-item rail-sync', hidden: true/);
+  assert.match(shell, /api\.get\('\/sync\/status'\)/);
+
+  const devices = codeOf('js/admin/devices.js');
+  for (const route of ["'/sync/status'", "'/sync/devices'", "/sync/devices/${d.id}/revoke", "'/sync/now'", "'/sync/go-online'"]) {
+    assert.ok(devices.includes(route), `${route} has a screen`);
+  }
+});

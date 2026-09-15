@@ -1281,6 +1281,12 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/setup/restore?fileName=&backupFolder=` | — | TASK-057 — before setup only, like `POST /setup`: a new computer restores the old one's backup instead of the wizard's five steps. The body is the file's bytes. TASK-062: a hosted copy wants `X-Setup-Code` |
 | `POST` | `/setup/code` | — | TASK-062 — a hosted copy's setup code, checked when the owner leaves step 1; the same count of wrong codes as `POST /setup` (`{ setupCode }` there) |
 | `GET` | `/backups/:id/download` | `TX-427` | TASK-062 — a verified backup as a download, the owner's own copy; audited `BACKUP_DOWNLOADED` |
+| `POST` | `/setup/connect` | — | TASK-063 — before setup only: a fresh install joins a store on the web (`{ hubUrl, username, password, deviceName }`, the owner's) |
+| `POST` | `/sync/devices` · `GET` · `PUT /:id` · `POST /:id/revoke` | `TX-423` | TASK-063, on the hub — connect, list, rename, remove a device (`SYNC-001`, `SYNC-003`) |
+| `GET` | `/sync/snapshot` | device | TASK-063 — the store for a device to start from; `X-Sync-Version` |
+| `POST` | `/sync/push` · `GET /sync/pull?since=` | device | TASK-063 — a device's changes up, everybody's since a version down (`SYNC-002`) |
+| `GET` | `/sync/status` · `POST /sync/now` | signed in | TASK-063 — where this installation is; sync a device now |
+| `POST` | `/sync/go-online` | `TX-427` | TASK-063 — a standalone store uploads itself to its waiting web copy and becomes its device A |
 | `GET` | `/alerts` | signed in | `OPS-007` |
 | `POST` | `/alerts/dismiss` | signed in | `OPS-007` — never the undismissible three |
 | `POST` | `/health/integrity-check` | `TX-428` | `OPS-006` |

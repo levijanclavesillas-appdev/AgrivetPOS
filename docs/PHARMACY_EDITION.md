@@ -209,3 +209,48 @@ reads *Closed short* and a *Not delivered* column. With it, a delivery against a
 the lines that arrived: a line left at 0 is not part of the delivery (its batch fields stop being
 required), where before every line had to be above zero and one missing product stopped the van.
 
+## 12. One store on the web and on its devices (`TASK-063`)
+
+A store can run on the web (its hosted copy, `TASK-062`) and on phones and PCs at once, whichever
+it started on. The web copy is the **hub**: its database is the store's record. Each connected
+phone or PC is a **device**: it keeps the whole store in its own database, sells from it with or
+without the internet, and syncs with the hub when it can. A store with one device and no web copy
+is **standalone**, and nothing here runs for it.
+
+| Rule | Statement |
+| :--- | :--- |
+| `SYNC-001` | A device syncs only with its own hub, proving itself with the secret it was given when the owner connected it (`Authorization: Device <id>.<secret>`; the hub keeps a hash). A device the owner removes is refused at once |
+| `SYNC-002` | Hub and device exchange rows only on the same schema version; otherwise the older side is told to update |
+| `SYNC-003` | Only the owner connects a device or puts a store on the web. Each device gets a letter (A, B, … without I and O) that every document it numbers carries: `SALE-A-20260915-000012`. Each series is gapless on its own (`POS-108`); the hub keeps the store's original series |
+| `SYNC-004` | A device that cannot reach its hub keeps trading; its changes wait and go when the hub answers |
+| `SYNC-005` | Offline, a device sells, takes payments on account, processes returns, moves cash, opens and closes shifts, receives deliveries, adjusts and counts stock, raises orders, and adds or edits customers. Products and prices, users and sign-in details, settings, the store profile, and loading data wait for a connection, so no two devices can disagree about them |
+
+**What is exchanged is rows.** A trigger on every synced table captures each insert, update and
+delete into `sync_changes` (`907_sync.sql`); an update names the columns that moved.
+- **Ledgers** (sales and their lines, tenders, stock movements, credit transactions, audit rows,
+  deliveries, returns, counts) are only ever added to, with ids made where they were written, so
+  they merge without conflict.
+- **Other rows** take the value that reached the hub last, **column by column**: a price changed on
+  the web and a customer's phone number changed on a device are both kept.
+- **Worked out on the hub** from its merged ledgers, and pulled by every device: stock on hand
+  (`INV-101`), customer balances (`CR-103`) and a purchase order's status (`PO-102`, `PO-106`).
+- **Average cost** (`INV-106`) is not recomputed — a manual cost change (`TX-412`) is not in the
+  ledger — so two devices receiving the same product offline leave the average of whichever
+  receipt synced last. Each movement's `balance_after` is the balance as the device that wrote it
+  saw it.
+- **Conflicts.** Two customers given one code offline both stay, the second's code gaining its
+  device's letter (`NENA-B`). A row whose parent the hub does not have is not applied. Both are
+  audited as `SYNC_CONFLICT`.
+- **The machine's own.** Its carts, backups, licence seat, clock checks, dismissed alerts, and its
+  printer and backup-folder settings are never synced.
+
+**Starting points.** Web first: a fresh install chooses *Connect to a store on the web*, the
+owner signs in, and the device downloads the store. Mobile first: *Put this store on the web*
+uploads the store to its new, waiting web copy (with the setup code) and makes this device its
+device A; what is sold during the upload is captured and sent after it. Either way, more devices
+connect the same way as the first.
+
+**Restoring.** A web copy restored from a backup has a history its devices have moved past: its
+devices must connect again. A web copy's backup restored on a PC makes that PC standalone (the
+store moving off the web).
+

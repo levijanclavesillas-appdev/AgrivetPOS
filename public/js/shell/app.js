@@ -9,6 +9,7 @@ import * as api from './api.js';
 import * as ui from './ui.js';
 import { h, clear } from './ui.js';
 import { openAccount, renderRecover } from './account.js';
+import { manila } from './format.js';
 import { createPos } from '../pos/view.js';
 import { createPayment } from '../payment/view.js';
 import { createReceipt } from '../receipt/view.js';
@@ -18,6 +19,7 @@ import { createReport } from '../reports/report.js';
 import { createBackup } from '../admin/backup.js';
 import { createHealth } from '../admin/health.js';
 import { createLicence } from '../admin/licence.js';
+import { createDevices } from '../admin/devices.js';
 import { createUsers } from '../admin/users.js';
 import { createSettings } from '../admin/settings.js';
 import { createAudit } from '../admin/audit.js';
@@ -652,6 +654,8 @@ export function createApp({ root }) {
     // SCR-707 (TASK-048): the store's subscription — linking this POS, and its state.
     // Readable by whoever holds settings; linking and "Check now" are the owner's (LIC-004).
     { id: 'subscription', label: 'Subscription', screen: 'SCR-707', tx: 'TX-424', create: createLicence },
+    // TASK-063: the store on the web and its devices — the owner's.
+    { id: 'devices', label: 'Web & devices', screen: 'SCR-708', tx: 'TX-423', create: createDevices },
   ];
   // Users first: on the day a store is installed it is the first thing anybody needs,
   // and leaving it further in is how a store ends up trading on the owner login.
@@ -876,6 +880,8 @@ export function createApp({ root }) {
           onclick: () => { setNavigation(false); show(item.id); },
         }, [h('span', { class: 'rail-label', text: item.label })])),
       h('div', { class: 'rail-spacer' }),
+      // TASK-063: on a store's device, whether it is in step with the web copy.
+      syncChip,
       // TASK-058: the person's own account — lock, sign out, password, PIN, recovery code.
       h('button', {
         class: 'rail-item rail-user',
@@ -890,8 +896,40 @@ export function createApp({ root }) {
     appbarTitle.textContent = active ? active.label : PRODUCT_NAME;
   }
 
+  // ── TASK-063: a device's sync, at the foot of the rail ─────────────────────
+  const syncChip = h('button', { class: 'rail-item rail-sync', hidden: true, icon: 'refresh-cw', title: 'Sync now',
+    onclick: async () => { renderSync({ syncing: true }); renderSync(await api.post('/sync/now', {}).catch((err) => ({ error: err.message }))); } },
+  [h('span', { class: 'rail-label' })]);
+  let syncTimer = null;
+
+  function renderSync(sync) {
+    if (!sync || (sync.role && sync.role !== 'DEVICE')) { syncChip.hidden = true; return; }
+    syncChip.hidden = false;
+    const label = syncChip.querySelector('.rail-label');
+    const waiting = sync.pending ? ` · ${sync.pending} waiting` : '';
+    const text = sync.syncing ? 'Syncing…'
+      : sync.error || sync.last_error ? `Offline${waiting}`
+        : `Synced${waiting}`;
+    label.textContent = text;
+    syncChip.classList.toggle('is-offline', Boolean(sync.error || sync.last_error));
+    syncChip.setAttribute('aria-label', `${text}. ${sync.last_error || sync.error || ''} Sync now`.trim());
+    syncChip.title = sync.last_error || sync.error || (sync.last_sync_at ? `Last synced ${manila(sync.last_sync_at)}` : 'Sync now');
+  }
+
+  async function watchSync() {
+    clearInterval(syncTimer);
+    const first = await api.get('/sync/status').catch(() => null);
+    renderSync(first);
+    if (!first || first.role !== 'DEVICE') return;
+    syncTimer = setInterval(async () => {
+      if (!session) { clearInterval(syncTimer); return; }
+      renderSync(await api.get('/sync/status').catch(() => null));
+    }, 20000);
+  }
+
   function start() {
     setNavigation(false);
+    watchSync();
     clear(root).append(shellEl);
     show(LANDING[session.role] || 'pos');
   }

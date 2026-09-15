@@ -124,6 +124,10 @@ const ACTIONS = Object.freeze({
   PURCHASE_ORDER_CLOSED_SHORT: { what: 'Purchase order closed short', rule: 'PO-106' },
   // TASK-062: the whole store's database leaving the server — AUD-601's "data export".
   BACKUP_DOWNLOADED: { what: 'Backup downloaded', rule: 'AUD-601' },
+  // TASK-063: a store's devices, and what their sync could not merge as sent.
+  SYNC_DEVICE_LINKED: { what: 'Device connected to the store', rule: 'AUD-601' },
+  SYNC_DEVICE_REVOKED: { what: 'Device removed from the store', rule: 'AUD-601' },
+  SYNC_CONFLICT: { what: 'Sync conflict resolved', rule: 'AUD-601' },
   GOODS_RECEIVED: { what: 'Goods received', rule: 'AUD-601' },
 
   // ── AUD-601: users and access ─────────────────────────────────────────────

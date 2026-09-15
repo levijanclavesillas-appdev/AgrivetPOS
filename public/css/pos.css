@@ -615,3 +615,8 @@
   width: auto; margin: var(--space-3) auto 0; display: flex; padding: 0 var(--space-2); }
 .signin .check { display: flex; gap: var(--space-2); align-items: center; margin: var(--space-3) 0; }
 .signin .check input { width: 1.15rem; min-height: auto; height: 1.15rem; flex: none; }
+
+/* TASK-063: a device's sync at the foot of the rail — quiet when in step, amber when not. */
+.rail-sync { font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
+.rail-sync.is-offline { color: var(--md-warning, #b45309); }
+.device-list td small { display: block; }

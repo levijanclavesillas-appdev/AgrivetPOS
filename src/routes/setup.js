@@ -76,6 +76,25 @@ router.post('/setup/restore', beforeSetup, receiveFile(), (req, res, next) => {
       archivePath: req.file.path,
       fileName: req.query.fileName || null,
       backupFolder: req.query.backupFolder,
+      // TASK-063: a store going online from its first device (syncClient.goOnline).
+      firstDevice: req.get('x-sync-first-device') === '1',
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * TASK-063: a fresh install joining a store that is already on the web — the third way
+ * out of the wizard, beside setting up a new store and restoring a backup. The owner
+ * signs in to the web copy from here; this device downloads the store and starts from it.
+ */
+router.post('/setup/connect', async (req, res, next) => {
+  try {
+    setupService.assertNotComplete();
+    const { hubUrl, username, password, deviceName } = req.body || {};
+    res.status(201).json(await require('../services/syncClient').linkToHub({
+      hubUrl, username, password, deviceName, appVersion: require('../../package.json').version,
     }));
   } catch (err) {
     next(err);

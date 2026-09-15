@@ -152,6 +152,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'licence_state',
     // 902_product_images — the pharmacy edition's product pictures (TASK-052)
     'product_images',
+    // 907_sync — one store on the web and its devices (TASK-063)
+    'sync_changes', 'sync_devices', 'sync_identity', 'sync_state',
     // 013_negotiated_pricing
     'customer_prices', 'product_quantity_breaks',
     // 014_batches

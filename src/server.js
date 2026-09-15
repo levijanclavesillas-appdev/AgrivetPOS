@@ -58,6 +58,11 @@ async function start({ listenPort = port(), log = () => {} } = {}) {
   }
   require('./services/scheduleService').start();
 
+  // TASK-063: the triggers and role this installation has (a hosted copy is its store's
+  // hub), and a device's sync loop.
+  require('./services/syncService').reconcileRole();
+  require('./services/syncClient').start();
+
   const app = createApp();
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(listenPort, hosting.listenHost(), () => resolve(s));
@@ -108,6 +113,7 @@ async function waitForHealth({ listenPort = port(), attempts = 50, intervalMs = 
 
 function stop(server) {
   require('./services/scheduleService').stop();
+  require('./services/syncClient').stop();
   return new Promise((resolve) => {
     if (!server) return resolve();
     server.close(() => {

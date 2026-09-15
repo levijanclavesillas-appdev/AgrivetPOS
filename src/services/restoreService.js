@@ -251,6 +251,9 @@ function restore({ backupId = null, fileName = null, confirmFilename, actor }) {
   const stillExists = schemaRepository.userExists(actor.id);
   const recordedAs = stillExists ? { id: actor.id, username: actor.username } : { id: null, username: actor.username };
   keepFolder(folderHere, recordedAs);
+  // TASK-063: a web copy restored has a history its devices have moved past, so they link
+  // again; anywhere else the role follows the machine (a hub's backup on a PC is standalone).
+  afterSwapSync();
   const migrated = swapped.migrated;
 
   // AUD-601. Written after the reopen, so it lands in the restored database — which is
@@ -392,6 +395,31 @@ function keepFolder(folderHere, actor) {
   }));
 }
 
+function afterSwapSync() {
+  const syncService = require('./syncService');
+  const syncRepository = require('../repositories/syncRepository');
+  if (!syncRepository.identity()) return;
+  if (syncService.isHub()) {
+    syncRepository.clearChanges();
+    syncRepository.deleteAll('sync_devices');
+  }
+  syncService.reconcileRole();
+}
+
+/**
+ * TASK-063: a device starting from its hub's snapshot. Checked like any restore, then
+ * put in place of this installation's empty database (setup has not happened here).
+ */
+function installSnapshot(archivePath) {
+  const check = backupRepository.verify(archivePath);
+  if (!check.ok) {
+    throw errors.conflict(`The store's copy could not be opened and checked (${check.error}).`, { ruleId: 'OPS-002' });
+  }
+  const problem = refusalFor(check, 'the store\'s copy');
+  if (problem) throw problem;
+  return swapIn(archivePath);
+}
+
 // ── On a new computer, before setup (TASK-057) ─────────────────────────────
 
 /**
@@ -404,7 +432,7 @@ function keepFolder(folderHere, actor) {
  * this computer is taken straight after, so the store is protected here from its first
  * minute rather than from its first shift close.
  */
-function restoreAtSetup({ archivePath, fileName = null, backupFolder }) {
+function restoreAtSetup({ archivePath, fileName = null, backupFolder, firstDevice = false }) {
   setupService.assertNotComplete();
   // TASK-062: a hosted copy's backups go to its own volume, whatever the form said.
   const hostedDir = require('../config/hosting').backupDir();
@@ -420,6 +448,10 @@ function restoreAtSetup({ archivePath, fileName = null, backupFolder }) {
   }
 
   keepFolder(folder, setupService.SETUP_ACTOR);
+  // TASK-063: a store arriving from its first device becomes that device's hub; any other
+  // restore here just takes the role this machine has.
+  if (firstDevice) require('./syncService').afterRestoreFromDevice();
+  else afterSwapSync();
   const at = clock.nowUtc();
   const after = { schema_version: migrate.schemaVersion(), size_bytes: db.sizeBytes(), sales: countSales() };
 
@@ -466,4 +498,4 @@ function restoreAtSetup({ archivePath, fileName = null, backupFolder }) {
 
 const countSales = () => schemaRepository.countOf('sales');
 
-module.exports = { preflight, restore, restoreAtSetup };
+module.exports = { preflight, restore, restoreAtSetup, installSnapshot };

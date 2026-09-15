@@ -33,7 +33,7 @@ let index = 0;
 // 'steps' → the five; 'done' → the recovery code; 'data' → step 6;
 // 'restore' → a backup instead of the five; 'restored' → then to the sign-in (TASK-057).
 let phase = 'steps';
-const RESTORING = ['restore', 'restored'];
+const RESTORING = ['restore', 'restored', 'connect', 'connected'];
 let signedIn = null;          // { user } once the new owner is signed in, for step 6
 let signingIn = null;         // the sign-in in flight, which step 6 waits for
 let loaded = false;           // step 6 has landed a load
@@ -54,11 +54,13 @@ const mark = (state, n) => (state === 'done' ? `${iconSvg('check')}<span class="
 
 function renderProgress() {
   if (RESTORING.includes(phase)) {
-    const state = phase === 'restored' ? 'done' : 'current';
+    const finished = phase === 'restored' || phase === 'connected';
+    const what = phase.startsWith('connect') ? 'Connect to the web store' : 'Restore a backup';
+    const state = finished ? 'done' : 'current';
     stepList.innerHTML = `<li class="${state}"${state === 'current' ? ' aria-current="step"' : ''}>`
-      + `<span>${mark(state, 1)}</span> Restore a backup</li>`;
-    document.querySelector('#wizard-progress').textContent = phase === 'restored' ? 'Restored' : 'Restore a backup';
-    document.querySelector('#wizard-bar').style.width = phase === 'restored' ? '100%' : '50%';
+      + `<span>${mark(state, 1)}</span> ${what}</li>`;
+    document.querySelector('#wizard-progress').textContent = finished ? 'Done' : what;
+    document.querySelector('#wizard-bar').style.width = finished ? '100%' : '50%';
     return;
   }
   const saved = phase !== 'steps';
@@ -95,6 +97,7 @@ function render() {
   document.querySelector('#wizard-lede').textContent = phase === 'steps'
     ? 'Five steps. Nothing is saved until the last one.'
     : phase === 'restore' ? 'The store from its old computer, from its backup.'
+      : phase === 'connect' ? 'This device joins a store that is on the web.'
       : 'The store is set up and saved.';
   renderProgress();
   showError('');
@@ -360,6 +363,53 @@ document.querySelector('#restored-go').addEventListener('click', () => {
   window.location.href = '/';
 });
 
+// ── Or: connect to a store already on the web (TASK-063) ───────────────────
+
+function connectError(message) {
+  const box = document.querySelector('#connect-error');
+  box.textContent = message;
+  box.hidden = !message;
+}
+
+async function connect() {
+  const go = document.querySelector('#connect-go');
+  const read = (id) => document.querySelector(id).value.trim();
+  if (!read('#connect-url')) return connectError('Type the store\'s web address.');
+  if (!read('#connect-username') || !document.querySelector('#connect-password').value) return connectError('Sign in as the store\'s owner.');
+  if (!read('#connect-name')) return connectError('Name this device.');
+  connectError('');
+  go.disabled = true;
+  go.textContent = 'Downloading the store…';
+  try {
+    const res = await fetch('/api/v1/setup/connect', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        hubUrl: read('#connect-url'), username: read('#connect-username'),
+        password: document.querySelector('#connect-password').value, deviceName: read('#connect-name'),
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return connectError(body.error ? body.error.message : `It did not connect (${res.status}).`);
+    document.querySelector('#connect-password').value = '';
+    phase = 'connected';
+    document.querySelector('#connected-detail').textContent = `${body.store_name || 'The store'} is on this device as `
+      + `"${body.device.name}", letter ${body.device.series}. Sign in with your username and password from the web store. `
+      + 'Then link this device\'s subscription seat under Admin → Subscription.';
+    render();
+  } catch (err) {
+    connectError(`The application did not answer (${err.message}). Close it and start it again.`);
+  } finally {
+    go.disabled = false;
+    go.textContent = 'Connect';
+  }
+  return undefined;
+}
+
+document.querySelector('#to-connect').addEventListener('click', () => { phase = 'connect'; render(); });
+document.querySelector('#connect-back').addEventListener('click', () => { phase = 'steps'; connectError(''); render(); });
+document.querySelector('#connect-go').addEventListener('click', connect);
+document.querySelector('#connected-go').addEventListener('click', () => { window.location.href = '/'; });
+
 // ── Wiring ──────────────────────────────────────────────────────────────────
 
 form.addEventListener('submit', async (event) => {
@@ -415,6 +465,8 @@ try {
     // TASK-062: a web copy asks for its setup code, and its backup folder is the server's.
     hosted = Boolean(status.hosted);
     if (hosted) {
+      // A web copy is the store; it does not connect to another one.
+      document.querySelector('.connect-note').hidden = true;
       for (const el of document.querySelectorAll('.setup-code, .hosted-backup')) el.hidden = false;
       for (const el of document.querySelectorAll('.local-backup')) el.hidden = true;
       field('backupFolder').readOnly = true;

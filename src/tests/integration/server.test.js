@@ -72,7 +72,9 @@ test('GET /api/v1/health/panel reports OPS-006’s six figures, behind TX-428', 
     'sale_discounts', 'sale_item_batches', 'sale_items', 'sale_return_items', 'sale_returns',
     'sale_tenders', 'sales',
     'schema_migrations', 'stock_count_lines', 'stock_count_sessions',
-    'store_profile', 'suppliers', 'system_events', 'system_settings',
+    'store_profile', 'suppliers',
+    'sync_changes', 'sync_devices', 'sync_identity', 'sync_state',
+    'system_events', 'system_settings',
     'till_movements', 'units', 'users',
   ]);
   // One row per migration file, not "the highest version": the edition's own are

@@ -47,6 +47,11 @@
             <p><strong>Moving from another computer?</strong> Restore its backup instead of setting up a new store.</p>
             <button type="button" id="to-restore">Restore a backup</button>
           </div>
+          <!-- TASK-063: a store already on the web; this install becomes one of its devices. -->
+          <div class="move-note connect-note">
+            <p><strong>Your store is already on the web?</strong> Connect this device to it instead.</p>
+            <button type="button" id="to-connect">Connect to a store on the web</button>
+          </div>
           <h2>1 · Your store</h2>
           <!-- TASK-062: a hosted copy asks for the code Chachi's sent with its address. -->
           <label class="setup-code" hidden>Setup code <span class="req" aria-hidden="true">*</span>
@@ -199,6 +204,42 @@
         <div class="wizard-actions">
           <button type="button" id="restore-back">Set up a new store instead</button>
           <button type="button" id="restore-go" class="primary">Restore</button>
+        </div>
+      </section>
+
+      <!-- TASK-063 — join a store on the web as one of its devices. -->
+      <section class="step" data-step="connect" hidden>
+        <h2>Connect to a store on the web</h2>
+        <p class="muted">
+          This device downloads the store from its web copy and becomes one of its devices: it
+          sells with or without the internet and keeps in step with the web and the store's other
+          devices. Sign in as the store's owner.
+        </p>
+        <label><span>Store's web address <span class="req" aria-hidden="true">*</span></span>
+          <input id="connect-url" autocomplete="off" spellcheck="false" placeholder="yourstore.pos.chachisoftware.store">
+        </label>
+        <label><span>Owner username <span class="req" aria-hidden="true">*</span></span>
+          <input id="connect-username" autocomplete="username" autocapitalize="none">
+        </label>
+        <label><span>Password <span class="req" aria-hidden="true">*</span></span>
+          <input id="connect-password" type="password" autocomplete="current-password">
+        </label>
+        <label><span>Name for this device <span class="req" aria-hidden="true">*</span></span>
+          <input id="connect-name" maxlength="60" value="Counter">
+          <small class="muted">Shown in the store's list of devices. Its receipts carry the letter it is given.</small>
+        </label>
+        <p class="error" id="connect-error" role="alert" hidden></p>
+        <div class="wizard-actions">
+          <button type="button" id="connect-back">Set up a new store instead</button>
+          <button type="button" id="connect-go" class="primary">Connect</button>
+        </div>
+      </section>
+
+      <section class="step" data-step="connected" hidden>
+        <h2>This device is connected</h2>
+        <p id="connected-detail"></p>
+        <div class="wizard-actions">
+          <button type="button" id="connected-go" class="primary">Go to sign-in</button>
         </div>
       </section>
 

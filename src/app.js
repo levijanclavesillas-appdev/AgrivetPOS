@@ -34,6 +34,8 @@ const returnRoutes = require('./routes/returns');
 const stockCountRoutes = require('./routes/stockCounts');
 const dataRoutes = require('./routes/data');
 const licenceRoutes = require('./routes/licence');
+const syncRoutes = require('./routes/sync');
+const { offlinePolicy, nudgeAfterWrite } = require('./middleware/sync');
 const setupService = require('./services/setupService');
 const { requireSetup } = require('./middleware/setup');
 
@@ -57,6 +59,9 @@ function createApp() {
     next();
   });
 
+  // TASK-063: a device's push can carry product pictures; its own parser, ahead of the
+  // 1 MB one every other route has (which then leaves the parsed body alone).
+  app.use(`${API_BASE}/sync`, express.json({ limit: '64mb' }));
   app.use(express.json({ limit: '1mb' }));
 
   // Every authenticated answer carries a fresh session token (middleware/auth.js), so no
@@ -69,6 +74,9 @@ function createApp() {
   // installation has. The gate is mounted before every route rather than checked
   // inside them, so a route added later is refused by default rather than by memory.
   app.use(API_BASE, requireSetup);
+
+  // TASK-063: on a store's device, what waits for a connection, and a sync after a write.
+  app.use(API_BASE, offlinePolicy, nudgeAfterWrite);
 
   app.use(API_BASE, setupRoutes);
   app.use(API_BASE, healthRoutes);
@@ -95,6 +103,7 @@ function createApp() {
   app.use(API_BASE, stockCountRoutes);
   app.use(API_BASE, dataRoutes);
   app.use(API_BASE, licenceRoutes);
+  app.use(API_BASE, syncRoutes);
 
   // The renderer. Vanilla ES modules, no build step (05_TECH_SPEC.md §2).
   //

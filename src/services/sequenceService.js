@@ -33,7 +33,7 @@ const SEQUENCES = Object.freeze({
 });
 
 const WIDTH = 6;
-const PATTERN = /^([A-Z]+)-(\d{8})-(\d{6})$/;
+const PATTERN = /^([A-Z]+(?:-[A-Z])?)-(\d{8})-(\d{6})$/;   // TASK-063: SALE-A-… on a device
 
 function assertKind(kind) {
   if (!Object.prototype.hasOwnProperty.call(SEQUENCES, kind)) {
@@ -47,7 +47,7 @@ function dateKey(at) {
   return clock.manilaDate(at).replace(/-/g, '');
 }
 
-function format(kind, at, counter) {
+function format(kind, at, counter, series = deviceSeries()) {
   assertKind(kind);
   if (!Number.isInteger(counter) || counter < 1) {
     throw new RangeError(`a document counter is a positive integer, got ${counter}`);
@@ -61,8 +61,24 @@ function format(kind, at, counter) {
       { ruleId: SEQUENCES[kind].rule }
     );
   }
-  return `${SEQUENCES[kind].prefix}-${dateKey(at)}-${String(counter).padStart(WIDTH, '0')}`;
+  return `${prefixFor(kind, series)}-${dateKey(at)}-${String(counter).padStart(WIDTH, '0')}`;
 }
+
+/**
+ * TASK-063: a store's devices sell offline at the same time, so each numbers its own
+ * documents — SALE-A-20260915-000012 on device A — and every series stays gapless on
+ * its own (POS-108). The web copy and a store with one device keep SALE-20260915-…
+ */
+function deviceSeries() {
+  try {
+    const identity = require('../repositories/syncRepository').identity();
+    return identity && identity.role === 'DEVICE' && identity.series ? identity.series : null;
+  } catch {
+    return null;
+  }
+}
+
+const prefixFor = (kind, series = deviceSeries()) => (series ? `${SEQUENCES[kind].prefix}-${series}` : SEQUENCES[kind].prefix);
 
 function parse(documentNo) {
   const match = PATTERN.exec(String(documentNo || ''));
@@ -81,10 +97,11 @@ function parse(documentNo) {
  */
 function next(kind, { at = clock.nowUtc() } = {}) {
   assertKind(kind);
-  const { table, column, prefix } = SEQUENCES[kind];
-  const highest = sequenceRepository.highestForDay({ table, column, prefix, dateKey: dateKey(at) });
+  const { table, column } = SEQUENCES[kind];
+  const series = deviceSeries();
+  const highest = sequenceRepository.highestForDay({ table, column, prefix: prefixFor(kind, series), dateKey: dateKey(at) });
   const counter = highest === null ? 1 : highest + 1;
-  return format(kind, at, counter);
+  return format(kind, at, counter, series);
 }
 
 /**
@@ -94,10 +111,11 @@ function next(kind, { at = clock.nowUtc() } = {}) {
  * test so the same check can run on a real store's day: "are there gaps in today's
  * sale numbers" is a question an owner is entitled to ask.
  */
-function auditDay(kind, { at = clock.nowUtc() } = {}) {
+function auditDay(kind, { at = clock.nowUtc(), series = deviceSeries() } = {}) {
   assertKind(kind);
-  const { table, column, prefix } = SEQUENCES[kind];
-  const numbers = sequenceRepository.numbersForDay({ table, column, prefix, dateKey: dateKey(at) });
+  const { table, column } = SEQUENCES[kind];
+  // One series at a time: this installation's own, or the one asked for (TASK-063).
+  const numbers = sequenceRepository.numbersForDay({ table, column, prefix: prefixFor(kind, series), dateKey: dateKey(at) });
 
   const counters = numbers.map((n) => parse(n)).filter(Boolean).map((p) => p.counter).sort((a, b) => a - b);
   const gaps = [];

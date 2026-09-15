@@ -381,7 +381,9 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-059](TASK-059-manager-admin.md) | A manager's Admin: every tab but Users, with the owner's parts locked | Built, `7be4ea2` | The store's manager running a backup and the day's settings |
 | [TASK-060](TASK-060-over-limit-credit.md) | Over the credit limit, approved at the payment screen, by an approval given for it | Built, `d6bfee0` | A manager approving utang past a limit at the store's counter |
 | [TASK-061](TASK-061-short-deliveries.md) | A delivery can leave out a product that did not come; an order the rest of will not come is closed short | Built, `b1e9ce0` | The store's next short delivery |
-| [TASK-062](TASK-062-web-version.md) | The web version: one container per store, hosted mode, browser printing, backup downloads | Built, *this commit*; a `demo` store runs on the server, not yet on the internet | A wildcard DNS record `*.pos.chachisoftware.store`; the first store's owner agreeing it needs the internet |
+| [TASK-062](TASK-062-web-version.md) | The web version: one container per store, hosted mode, browser printing, backup downloads | Built, `cb43666`; a `demo` store runs on the server, not yet on the internet | A wildcard DNS record `*.pos.chachisoftware.store`; the first store's owner agreeing it needs the internet |
+| [TASK-063](TASK-063-web-and-devices.md) | One store on the web and its devices, synced; devices sell offline | Built, *this commit* | A store using the web and a phone together; `*.pos.chachisoftware.store` DNS |
+| [TASK-064](TASK-064-restaurant-pos-review.md) | Review back-end.store (restaurant POS): integration and data migration | Queued | The store owner's go-ahead after TASK-063 |
 
 **`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
 100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription
