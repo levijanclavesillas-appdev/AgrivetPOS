@@ -6,6 +6,8 @@
 //   POST /backups                  TX-428   OPS-001, OPS-002 — a manual backup
 //   GET  /backups/restore/preflight TX-427  what must be true before a restore
 //   POST /backups/:id/restore      TX-427   OPS-004 — owner only
+//   POST /backups/files            TX-427   TASK-057 — a backup from elsewhere, into the folder
+//   POST /backups/files/restore    TX-427   TASK-057 — restore a file in the folder, by name
 //   GET  /alerts                   —        OPS-007, any signed-in user
 //   POST /alerts/dismiss           —        OPS-007, never the undismissible three
 //
@@ -20,6 +22,7 @@ const restoreService = require('../services/restoreService');
 const alertService = require('../services/alertService');
 const systemService = require('../services/systemService');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { receiveFile } = require('../middleware/upload');
 
 const router = express.Router();
 const manageBackups = [authenticate, requirePermission('TX-428')];
@@ -51,7 +54,36 @@ router.post('/backups', manageBackups, (req, res, next) => {
 
 router.get('/backups/restore/preflight', restorePermission, (req, res, next) => {
   try {
-    res.json(restoreService.preflight({ backupId: req.query.backupId || null }));
+    res.json(restoreService.preflight({
+      backupId: req.query.backupId || null,
+      fileName: req.query.fileName || null,
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Before /backups/:id/restore, which would otherwise take "files" for an id.
+
+/** The body is the file's bytes and its name is in the query (middleware/upload.js). */
+router.post('/backups/files', [...restorePermission, receiveFile()], (req, res, next) => {
+  try {
+    res.status(201).json(backupService.addFile({
+      archivePath: req.file.path, fileName: req.query.fileName || null,
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/backups/files/restore', restorePermission, (req, res, next) => {
+  try {
+    const body = req.body || {};
+    res.json(restoreService.restore({
+      fileName: typeof body.fileName === 'string' ? body.fileName : null,
+      confirmFilename: body.confirmFilename,
+      actor: req.session,
+    }));
   } catch (err) {
     next(err);
   }

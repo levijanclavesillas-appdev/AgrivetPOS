@@ -362,9 +362,77 @@ function list({ limit = 30 } = {}) {
       + 'taken. Keep it somewhere you would keep the cash box.',
     inside_app_data: target ? isInsideAppData(target) : false,
     backups: logged_,
-    // Files nobody here wrote — a copy from another machine, or a restore in progress.
-    unrecognised: [...onDisk.keys()].filter((name) => !known.has(name)),
+    // Files nobody here wrote — a copy from another machine, or the backup a restore
+    // came from. Each can be restored once it has been checked (TASK-057); they are
+    // checked when someone asks, not here, because unpacking every one on every visit
+    // to this screen would make it the slowest screen in the product.
+    unrecognised: [...onDisk.entries()]
+      .filter(([name]) => !known.has(name))
+      .map(([name, file]) => ({ file_name: name, size_bytes: file.size_bytes, modified_at: file.modified_at }))
+      .sort((a, b) => (a.modified_at < b.modified_at ? 1 : a.modified_at > b.modified_at ? -1 : 0)),
   };
+}
+
+// ── A backup from somewhere else (TASK-057) ────────────────────────────────
+
+/**
+ * A file in the backup folder, by its name alone.
+ *
+ * The name arrives from a request, so it may not carry a directory — in either
+ * spelling, since the folder may be on Windows — and it must be one of this
+ * application's backups by name. Anything else is refused as not found rather than
+ * resolved: a restore reads the file it is pointed at, and it is pointed only here.
+ */
+function folderFile(fileName) {
+  const name = typeof fileName === 'string' ? fileName : '';
+  const target = folder();
+  const plain = name && path.win32.basename(name) === name && path.posix.basename(name) === name
+    && name.startsWith(FILE_PREFIX) && /\.zip$/i.test(name);
+  const filePath = plain && target ? path.join(target, name) : null;
+  if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    throw errors.notFound(`${name || 'That file'} is not in the backup folder.`);
+  }
+  return filePath;
+}
+
+/**
+ * Put a backup brought from elsewhere into the backup folder, where it can be restored.
+ *
+ * The same as copying it there by hand, for the computers where that is awkward — a
+ * tablet, or a folder on another drive. It is checked first and refused if it is not a
+ * backup at all, so the folder never fills with files nobody can use. A file of the
+ * same name already there is kept, and this one is saved beside it: two different
+ * files with one name is how the wrong one gets restored.
+ */
+function addFile({ archivePath, fileName }) {
+  const target = folder();
+  if (!target) {
+    throw errors.conflict('No backup folder is configured. Set one in Settings first (OPS-001).', { ruleId: 'OPS-001' });
+  }
+
+  const check = backupRepository.verify(archivePath);
+  if (!check.ok) {
+    throw errors.badRequest(
+      `That file is not a Chachi POS backup this computer can read (${check.error}).`,
+      { ruleId: 'OPS-002' }
+    );
+  }
+
+  const given = typeof fileName === 'string' ? path.win32.basename(path.posix.basename(fileName)) : '';
+  const stem = /^[\w .()-]+\.zip$/i.test(given) && given.startsWith(FILE_PREFIX)
+    ? given.slice(0, -4)
+    : `${FILE_PREFIX}_copied_${clock.nowUtc().slice(0, 19).replace('T', '_').replace(/:/g, '-')}`;
+
+  fs.mkdirSync(target, { recursive: true });
+  const bytes = fs.readFileSync(archivePath);
+  let name = `${stem}.zip`;
+  for (let n = 2; fs.existsSync(path.join(target, name)); n += 1) {
+    if (fs.readFileSync(path.join(target, name)).equals(bytes)) break;   // already here
+    name = `${stem}-${n}.zip`;
+  }
+  fs.writeFileSync(path.join(target, name), bytes, { mode: 0o600 });
+
+  return { file_name: name, size_bytes: bytes.length, store_name: check.storeName };
 }
 
 function isInsideAppData(target) {
@@ -376,5 +444,5 @@ function isInsideAppData(target) {
 module.exports = {
   TRIGGERS, FILE_PREFIX,
   assertTrigger, fileNameFor, folder, isInsideAppData,
-  run, prune, lastVerified, overdue, list,
+  run, prune, lastVerified, overdue, list, folderFile, addFile,
 };

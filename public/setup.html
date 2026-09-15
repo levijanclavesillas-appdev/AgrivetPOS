@@ -38,6 +38,11 @@
       <form id="wizard" novalidate>
         <!-- 1 — Store -->
         <section class="step" data-step="store" hidden>
+          <!-- TASK-057: a store that already exists, on a computer that died. -->
+          <div class="move-note">
+            <p><strong>Moving from another computer?</strong> Restore its backup instead of setting up a new store.</p>
+            <button type="button" id="to-restore">Restore a backup</button>
+          </div>
           <h2>1 · Your store</h2>
           <!-- TASK-053: one application; what kind of store is chosen here, once. -->
           <fieldset class="industries">
@@ -152,6 +157,42 @@
           <button type="submit" id="next" class="primary">Next</button>
         </nav>
       </form>
+
+      <!-- TASK-057 — restore a backup from the old computer instead of the five steps.
+           Outside the form, like step 6: nothing here submits it. -->
+      <section class="step" data-step="restore" hidden>
+        <h2>Restore a backup</h2>
+        <p class="muted">
+          This brings the store over from its old computer: products, stock, customers, sales and
+          users, as they were when the backup was taken. Use the newest backup you have — a file
+          named <code>chachipos_backup_…zip</code>, from the old computer's backup folder or the USB
+          stick you copied it to.
+        </p>
+        <label><span>Backup file <span class="req" aria-hidden="true">*</span></span>
+          <input type="file" id="restore-file" accept=".zip,application/zip">
+        </label>
+        <label><span>Backup folder on this computer <span class="req" aria-hidden="true">*</span></span>
+          <input id="restore-folder" spellcheck="false">
+          <small class="muted">
+            Where this computer keeps the store's backups from now on. Outside the application's own
+            folder, ideally on another drive. It is created if it does not exist.
+          </small>
+        </label>
+        <p class="error" id="restore-error" role="alert" hidden></p>
+        <div class="wizard-actions">
+          <button type="button" id="restore-back">Set up a new store instead</button>
+          <button type="button" id="restore-go" class="primary">Restore</button>
+        </div>
+      </section>
+
+      <section class="step" data-step="restored" hidden>
+        <h2>Your store is on this computer</h2>
+        <p id="restored-detail"></p>
+        <p class="muted" id="restored-backup"></p>
+        <div class="wizard-actions">
+          <button type="button" id="restored-go" class="primary">Go to sign-in</button>
+        </div>
+      </section>
 
       <!-- 6 — The store's existing data (TASK-047). Outside the form: nothing here submits it. -->
       <section class="step" data-step="data" hidden>

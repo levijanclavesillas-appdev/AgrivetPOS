@@ -9,6 +9,8 @@
 
 const express = require('express');
 const setupService = require('../services/setupService');
+const restoreService = require('../services/restoreService');
+const { receiveFile } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -31,6 +33,33 @@ router.post('/setup', (req, res, next) => {
     // SEC-5: the recovery code is in this response and in no other. It is not stored
     // in plaintext, not logged, and cannot be requested again.
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * TASK-057: the store already exists, on a computer that died. The body is the backup
+ * file's bytes; its name and this computer's backup folder ride in the query, since
+ * the body is not JSON. Refused before a byte is read once the installation has a
+ * store, so it is reachable exactly as long as `POST /setup` is.
+ */
+const beforeSetup = (req, res, next) => {
+  try {
+    setupService.assertNotComplete();
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+router.post('/setup/restore', beforeSetup, receiveFile(), (req, res, next) => {
+  try {
+    res.status(201).json(restoreService.restoreAtSetup({
+      archivePath: req.file.path,
+      fileName: req.query.fileName || null,
+      backupFolder: req.query.backupFolder,
+    }));
   } catch (err) {
     next(err);
   }

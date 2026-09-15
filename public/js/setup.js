@@ -6,6 +6,10 @@
 // actually enforced (SEC-6) — VR-501, VR-502, TAX-001, SEC-5 and OPS-001 all refuse
 // again in setupService, and this file cannot weaken any of them.
 //
+// TASK-057 added the other way through: a store moving from a computer that died
+// restores its backup here instead of taking the five steps, and goes to the sign-in
+// screen with the users and passwords it already had.
+//
 // TASK-047 added a sixth step after the five: the store's existing data, loaded with the
 // same panel SCR-706 shows. It runs as the new owner — the wizard signs in with the
 // credentials it was just given, keeps the token in memory only (SEC-7), and forgets the
@@ -26,8 +30,10 @@ const nextButton = document.querySelector('#next');
 const nav = document.querySelector('.wizard-nav');
 
 let index = 0;
-// 'steps' → the five; 'done' → the recovery code; 'data' → step 6.
+// 'steps' → the five; 'done' → the recovery code; 'data' → step 6;
+// 'restore' → a backup instead of the five; 'restored' → then to the sign-in (TASK-057).
 let phase = 'steps';
+const RESTORING = ['restore', 'restored'];
 let signedIn = null;          // { user } once the new owner is signed in, for step 6
 let signingIn = null;         // the sign-in in flight, which step 6 waits for
 let loaded = false;           // step 6 has landed a load
@@ -46,6 +52,14 @@ function showError(message) {
 const mark = (state, n) => (state === 'done' ? `${iconSvg('check')}<span class="sr-only">${n}</span>` : n);
 
 function renderProgress() {
+  if (RESTORING.includes(phase)) {
+    const state = phase === 'restored' ? 'done' : 'current';
+    stepList.innerHTML = `<li class="${state}"${state === 'current' ? ' aria-current="step"' : ''}>`
+      + `<span>${mark(state, 1)}</span> Restore a backup</li>`;
+    document.querySelector('#wizard-progress').textContent = phase === 'restored' ? 'Restored' : 'Restore a backup';
+    document.querySelector('#wizard-bar').style.width = phase === 'restored' ? '100%' : '50%';
+    return;
+  }
   const saved = phase !== 'steps';
   const five = STEPS.map((name, i) => {
     const state = saved || i < index ? 'done' : i === index ? 'current' : 'todo';
@@ -68,22 +82,24 @@ function renderProgress() {
 const current = () => (phase === 'steps' ? STEPS[index] : phase);
 
 function render() {
-  for (const name of [...STEPS, 'done', 'data']) sectionFor(name).hidden = true;
+  for (const name of [...STEPS, 'done', 'data', ...RESTORING]) sectionFor(name).hidden = true;
   sectionFor(current()).hidden = false;
 
   nav.hidden = phase !== 'steps';
-  // Step 6 lives outside the form; the form's sections are all hidden by then, but an
-  // empty form still takes its share of the card's height.
-  form.hidden = phase === 'data';
+  // Step 6 and the restore live outside the form; the form's sections are all hidden by
+  // then, but an empty form still takes its share of the card's height.
+  form.hidden = phase === 'data' || RESTORING.includes(phase);
   backButton.hidden = index === 0;
   nextButton.textContent = index === STEPS.length - 1 ? 'Finish setup' : 'Next';
   document.querySelector('#wizard-lede').textContent = phase === 'steps'
     ? 'Five steps. Nothing is saved until the last one.'
-    : 'The store is set up and saved.';
+    : phase === 'restore' ? 'The store from its old computer, from its backup.'
+      : 'The store is set up and saved.';
   renderProgress();
   showError('');
 
-  const first = sectionFor(current()).querySelector('input, button');
+  // An input before a button: step 1 opens with the restore offer above its first field.
+  const first = sectionFor(current()).querySelector('input') || sectionFor(current()).querySelector('button');
   if (first) first.focus();
 }
 
@@ -261,6 +277,73 @@ async function openDataStep() {
   }
   render();
 }
+
+// ── Or: restore the store from its old computer (TASK-057) ─────────────────
+
+function restoreError(message) {
+  const box = document.querySelector('#restore-error');
+  box.textContent = message;
+  box.hidden = !message;
+}
+
+/**
+ * The file goes as it is, not in JSON: a backup carries every product picture and can
+ * be hundreds of megabytes. The server checks it exactly as a restore on the Backups
+ * screen does, and refuses one a newer version made.
+ */
+async function restoreBackup() {
+  const go = document.querySelector('#restore-go');
+  const file = document.querySelector('#restore-file').files[0];
+  const folder = document.querySelector('#restore-folder').value.trim();
+  if (!file) return restoreError('Choose the backup file.');
+  if (!folder) return restoreError("Choose a folder for this computer's backups.");
+
+  restoreError('');
+  go.disabled = true;
+  go.textContent = 'Checking and restoring…';
+  try {
+    const query = `fileName=${encodeURIComponent(file.name)}&backupFolder=${encodeURIComponent(folder)}`;
+    const res = await fetch(`/api/v1/setup/restore?${query}`, {
+      method: 'POST', headers: { 'content-type': 'application/zip' }, body: file,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return restoreError(body.error ? body.error.message : `The restore failed (${res.status}).`);
+
+    phase = 'restored';
+    const owners = body.owners && body.owners.length ? ` (the owner: ${body.owners.join(', ')})` : '';
+    document.querySelector('#restored-detail').textContent = `${body.store_name}, with ${body.sales} sales`
+      + `${body.last_recorded_at_manila ? `, last recorded ${body.last_recorded_at_manila}` : ''}. `
+      + `Sign in with the username and password you used on the old computer${owners}.`;
+    document.querySelector('#restored-backup').textContent = body.first_backup.ok
+      ? `This computer's first backup of it is in ${body.backup_folder}.`
+      : `This computer's first backup did not work (${body.first_backup.error}) Open Admin → Backups after signing in.`;
+    render();
+  } catch (err) {
+    restoreError(`The application did not answer (${err.message}). Close it and start it again.`);
+  } finally {
+    go.disabled = false;
+    go.textContent = 'Restore';
+  }
+  return undefined;
+}
+
+document.querySelector('#to-restore').addEventListener('click', () => {
+  phase = 'restore';
+  if (!document.querySelector('#restore-folder').value) {
+    document.querySelector('#restore-folder').value = value('backupFolder');
+  }
+  render();
+});
+document.querySelector('#restore-back').addEventListener('click', () => {
+  phase = 'steps';
+  restoreError('');
+  render();
+});
+document.querySelector('#restore-go').addEventListener('click', restoreBackup);
+document.querySelector('#restore-file').addEventListener('change', () => restoreError(''));
+document.querySelector('#restored-go').addEventListener('click', () => {
+  window.location.href = '/';
+});
 
 // ── Wiring ──────────────────────────────────────────────────────────────────
 

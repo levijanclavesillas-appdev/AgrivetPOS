@@ -50,6 +50,8 @@ export function onError(listener) {
 }
 
 async function request(method, path, body = null, { signal = null } = {}) {
+  // A file goes as its own bytes (TASK-057: a backup is too large to carry in JSON).
+  const file = typeof Blob !== 'undefined' && body instanceof Blob;
   let response;
   try {
     response = await fetch(`${BASE}${path}`, {
@@ -57,9 +59,9 @@ async function request(method, path, body = null, { signal = null } = {}) {
       signal,
       headers: {
         ...(token ? { authorization: `Bearer ${token}` } : {}),
-        ...(body === null ? {} : { 'content-type': 'application/json' }),
+        ...(body === null ? {} : { 'content-type': file ? 'application/zip' : 'application/json' }),
       },
-      ...(body === null ? {} : { body: JSON.stringify(body) }),
+      ...(body === null ? {} : { body: file ? body : JSON.stringify(body) }),
     });
   } catch (cause) {
     // The server is in-process on this machine (05_TECH_SPEC.md §1), so this is not
@@ -108,6 +110,8 @@ export async function approve(username, password) {
   return { ...approver, token };
 }
 export const put = (path, body, opts) => request('PUT', path, body ?? {}, opts);
+/** A file the person chose, sent as it is (TASK-057). The path carries anything else. */
+export const upload = (path, file, opts) => request('POST', path, file, opts);
 export const del = (path, opts) => request('DELETE', path, null, opts);
 
 /**

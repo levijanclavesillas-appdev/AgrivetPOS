@@ -2351,3 +2351,26 @@ test('TASK-056: every counter action with no button of its own is a button, with
   assert.doesNotMatch(posCss, /\.pos-help \{ display: none; \}/);
   assert.match(posCss, /@media \(hover: none\) and \(pointer: coarse\) \{ \.pos-hints \{ display: none; \} \}/);
 });
+
+// ── TASK-057: a store moves to a new computer with its backup ───────────────
+
+test('TASK-057: the wizard offers a restore, and sends the file as bytes rather than JSON', () => {
+  const html = fs.readFileSync(path.join(root, 'public', 'setup.html'), 'utf8');
+  assert.match(html, /id="to-restore"/);
+  assert.match(html, /data-step="restore"/);
+  assert.match(html, /data-step="restored"/);
+  const wizard = codeOf('js/setup.js');
+  assert.match(wizard, /\/api\/v1\/setup\/restore\?/);
+  assert.match(wizard, /'content-type': 'application\/zip' \}, body: file/);
+});
+
+test('TASK-057: the Backups tab restores a file with no row, and uploads one from the device', () => {
+  const backups = codeOf('js/admin/backup.js');
+  assert.match(backups, /api\.upload\(`\/backups\/files\?fileName=/);
+  assert.match(backups, /\/backups\/restore\/preflight\?fileName=/);
+  assert.match(backups, /api\.post\('\/backups\/files\/restore', \{ fileName: backup\.file_name/);
+  assert.match(backups, /'Other backups in the folder'/);
+  const shellApi = codeOf('js/shell/api.js');
+  assert.match(shellApi, /export const upload = /);
+  assert.match(shellApi, /file \? 'application\/zip' : 'application\/json'/);
+});

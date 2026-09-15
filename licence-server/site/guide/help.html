@@ -199,25 +199,29 @@
 <section id="new-computer">
   <h2>Moving to a new computer</h2>
   <p class="who"><strong>Who:</strong> Owner</p>
-  <p>The <strong>Backups</strong> tab can only restore backups that the same computer made, so it is for going back in time on one computer (<a href="/guide/admin#restore-a-backup">Restore a backup</a>). To move the store to another computer, use <strong>Export / import</strong> (<a href="/guide/admin#export-data">Export</a> and <a href="/guide/admin#import-data">Import</a>). If you are unsure about any step, contact us at <strong>ChachiSoftware@gmail.com</strong> before you move.</p>
-  <h3>On the old computer</h3>
+  <p>Move the store with a backup. The new computer gets everything as it was when the backup was taken: products, stock, customers, sales, users and their passwords, settings and the subscription. If you are unsure about any step, contact us at <strong>ChachiSoftware@gmail.com</strong> before you move.</p>
+  <h3>On the old computer, if it still works</h3>
   <ol class="steps">
     <li>Close every open shift.</li>
-    <li>Open <strong>Admin</strong> → <strong>Export / import</strong> and click <strong>Export everything</strong>. You see <em>Exported as … Keep it somewhere other than this machine.</em></li>
-    <li>Copy that .zip file to a USB stick. Copy the backup folder too, as a spare.</li>
+    <li>Open <strong>Admin</strong> → <strong>Backups</strong> and click <strong>Back up now</strong>. Wait for <em>… verified</em>.</li>
+    <li>Copy the newest file in the backup folder to a USB stick. It is named <kbd>chachipos_backup_…zip</kbd>, with the date in the name.</li>
+    <li>Stop selling on the old computer. Anything sold on it after that backup does not move.</li>
   </ol>
+  <p>If the old computer is broken, use the newest backup on your USB stick. What was sold after it is not in it; enter those sales again from the receipts.</p>
   <h3>On the new computer</h3>
   <ol class="steps">
-    <li>Install Chachi POS and run the setup wizard (<a href="/guide/getting-started">Getting started</a>). <strong>Give the owner a different username from the one on the old computer</strong>, for example add a 2. Two users cannot share a username, and the import stops if they do.</li>
-    <li>Sign in as the new owner and open <strong>Admin</strong> → <strong>Export / import</strong>.</li>
-    <li>Under <strong>Import</strong>, choose the .zip file in <strong>Archive</strong>. Leave <strong>If a row is already here</strong> on <strong>Keep what is here, skip the archive's</strong>.</li>
-    <li>Read the summary. When it says <strong>Ready to import</strong>, click <strong>Import this archive</strong>. A backup is taken first, and the import either completes fully or changes nothing.</li>
-    <li>Imported users arrive <strong>without passwords</strong>. In <strong>Admin</strong> → <strong>Users</strong>, set a new password (and PIN) for each person, including your old owner account if you want to keep using it.</li>
-    <li>Check <strong>Admin</strong> → <strong>Settings</strong>: the new computer keeps its own settings, so set the printer, receipt width and your other figures as they were.</li>
-    <li>Link the new computer: <strong>Admin</strong> → <strong>Subscription</strong> → <strong>Link this POS</strong>. If the old computer will not be used again, tell Chachi's so its link can be removed.</li>
-    <li>Make a test sale and print a receipt before you open for the day.</li>
+    <li>Install Chachi POS (<a href="/guide/getting-started">Getting started</a>). The setup wizard opens.</li>
+    <li>At the top of step 1, beside <strong>Moving from another computer?</strong>, click <strong>Restore a backup</strong>.</li>
+    <li>In <strong>Backup file</strong>, choose the backup on the USB stick. In <strong>Backup folder on this computer</strong>, keep the suggested folder or type another. It is where this computer keeps the store's backups from now on.</li>
+    <li>Click <strong>Restore</strong>. The file is checked first. A file that is not a backup, or one made by a newer version of Chachi POS, is refused and nothing changes. When it is done you see <strong>Your store is on this computer</strong>, with the store's name and number of sales.</li>
+    <li>Click <strong>Go to sign-in</strong> and sign in with the <strong>same username and password as on the old computer</strong>. Everyone's passwords and PINs came with the backup, and the owner's recovery code still works.</li>
+    <li>If a shift was open when the backup was taken, it is still open. Close it from <strong>Shift</strong> and count the drawer before selling.</li>
+    <li>The settings came with the backup, including the printer. A new computer may name its printer differently, so check it in <strong>Admin</strong> → <strong>Settings</strong>, then make a test sale and print a receipt before you open for the day.</li>
+    <li>The subscription came with the backup too. If the app says <em>The licence on this POS is not valid for it</em>, press <strong>Link again</strong> under <strong>Admin</strong> → <strong>Subscription</strong>.</li>
   </ol>
-  <p class="warn"><strong>Important:</strong> if the old computer is broken and you have no export, keep your latest backup files (named <kbd>pharmacy_backup_…zip</kbd>) safe and email support. Backups copied from another computer show as <strong>Unrecognised files</strong> on the Backups tab and cannot be restored from there.</p>
+  <p class="android"><strong>On Android:</strong> <strong>Backup file</strong> opens the tablet's file picker. Copy the backup to the tablet first (for example into <strong>Downloads</strong>), or choose it on a USB stick connected with an adapter.</p>
+  <p class="tip"><strong>Already set up the new computer as a new store?</strong> You can still bring the old one over: open <strong>Admin</strong> → <strong>Backups</strong>, click <strong>Restore from a file…</strong>, choose the backup and follow <a href="/guide/admin#restore-a-backup">Restore a backup</a>. It replaces the new store, and afterwards you sign in with a username from the old one.</p>
+  <p>To bring only some records into a store that is already trading, use <strong>Export / import</strong> instead (<a href="/guide/admin#export-data">Export</a> and <a href="/guide/admin#import-data">Import</a>).</p>
 </section>
 
 <section id="wrong-date-time">

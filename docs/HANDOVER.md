@@ -89,10 +89,15 @@ from the period you just undid is in it.
 
 ## 4. If the PC dies
 
-1. Install Chachi POS on the replacement machine.
-2. Copy your most recent backup from the USB stick to the new machine.
-3. Set the backup folder in **Settings**, open **Admin → Backups**, and restore from it.
+1. Install Chachi POS on the replacement machine. The setup wizard opens.
+2. At the top of its first step, press **Restore a backup**. Choose your most recent backup on
+   the USB stick, and the folder where this machine should keep its backups.
+3. The backup is checked, then restored. Sign in with the same usernames and passwords as
+   before — they came with it, and so did the settings and the subscription.
 4. Re-key any sales made after that backup, from the receipts.
+
+If the new machine was already set up as a fresh store, the same backup can be restored from
+**Admin → Backups → Restore from a file…** instead. It replaces the fresh store.
 
 The most you can lose is the trading since your last shift close, because a backup runs at
 every close.

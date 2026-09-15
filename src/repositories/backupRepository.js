@@ -19,6 +19,7 @@ const { openDatabase } = require('../config/sqlite');
 const db = require('../config/database');
 const ids = require('../config/ids');
 const zip = require('../config/zip');
+const migrate = require('../config/migrate');
 
 /**
  * Snapshot the live database to `filePath`.
@@ -122,7 +123,7 @@ function verify(filePath) {
       counts[table] = copy.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get().n;
     }
 
-    return { ok: true, schemaVersion: version, rowCounts: counts };
+    return { ok: true, schemaVersion: version, rowCounts: counts, ...describe(copy) };
   } catch (err) {
     return { ok: false, error: err.message };
   } finally {
@@ -133,6 +134,43 @@ function verify(filePath) {
       } catch { /* as above */ }
     }
   }
+}
+
+/**
+ * What a restore needs to know about a backup before it replaces anything (TASK-057).
+ *
+ * Which store it holds and who can sign into it, because a backup copied from another
+ * computer carries no row in this one's log to say so; when it was last written to; and
+ * which migrations it has that this build does not ship — a newer build wrote it, and
+ * restoring it would leave a database this one cannot open (05_TECH_SPEC.md §3.5).
+ */
+function describe(copy) {
+  const one = (sql) => {
+    try {
+      return copy.prepare(sql).get() || null;
+    } catch {
+      return null;
+    }
+  };
+  const profile = one('SELECT store_name FROM store_profile LIMIT 1');
+  const latest = one(`
+    SELECT MAX(at) AS at FROM (
+      SELECT MAX(occurred_at) AS at FROM sales
+      UNION ALL SELECT MAX(occurred_at) FROM audit_logs
+    )
+  `);
+  let owners = [];
+  try {
+    owners = copy.prepare("SELECT username FROM users WHERE role = 'OWNER' AND is_active = 1 ORDER BY username")
+      .all().map((row) => row.username);
+  } catch { /* no users table: not a store */ }
+
+  return {
+    storeName: profile ? profile.store_name : null,
+    owners,
+    lastRecordedAt: latest ? latest.at : null,
+    unknownMigrations: migrate.status({ handle: copy }).unknown,
+  };
 }
 
 // ── The log (OPS-002, OPS-003, OPS-006) ─────────────────────────────────────

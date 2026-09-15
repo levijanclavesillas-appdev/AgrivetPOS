@@ -1272,6 +1272,9 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `POST` | `/backups` | `TX-428` | `OPS-001`, `OPS-002` |
 | `GET` | `/backups/restore/preflight` | `TX-427` | what must be true before a restore |
 | `POST` | `/backups/:id/restore` | `TX-427` | `OPS-004` — owner only, typed filename |
+| `POST` | `/backups/files?fileName=` | `TX-427` | TASK-057 — a backup from elsewhere, the body its bytes (`application/zip`, not JSON). Checked, then saved into the backup folder |
+| `POST` | `/backups/files/restore` | `TX-427` | TASK-057 — `OPS-004` for a file in the folder with no row in the log: `{ fileName, confirmFilename }`. The preflight takes `?fileName=` and opens it first |
+| `POST` | `/setup/restore?fileName=&backupFolder=` | — | TASK-057 — before setup only, like `POST /setup`: a new computer restores the old one's backup instead of the wizard's five steps. The body is the file's bytes |
 | `GET` | `/alerts` | signed in | `OPS-007` |
 | `POST` | `/alerts/dismiss` | signed in | `OPS-007` — never the undismissible three |
 | `POST` | `/health/integrity-check` | `TX-428` | `OPS-006` |

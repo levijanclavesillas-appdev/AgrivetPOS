@@ -266,7 +266,11 @@
   </ol>
   <figure class="guide-shot"><img src="/static/guide/admin-restore-dialog.webp" alt="The Restore this backup? box over the Backups tab. It says the database will be replaced by a named backup taken on a given date, that every sale, payment, stock movement and customer change since then will be gone, and that a backup of the current database is taken first. A box to type the filename, the filename under it, and Cancel and Restore buttons." width="1280" height="800" loading="lazy"><figcaption>Typing the file name makes you read the date before anything is replaced.</figcaption></figure>
   <p>If your user did not exist yet in that backup, the app restarts and you sign in as a user that did.</p>
-  <p><strong>Restore…</strong> appears only on verified backups still in the backup folder. Rows marked <strong>pruned</strong> or <strong>not in folder</strong> cannot be restored. To move the store to a new computer, see <a href="/guide/help">Troubleshooting</a>.</p>
+  <p><strong>Restore…</strong> appears only on verified backups still in the backup folder. Rows marked <strong>pruned</strong> or <strong>not in folder</strong> cannot be restored.</p>
+  <h3>A backup from another computer</h3>
+  <p>Backup files in the folder that are not in the list appear below it, under <strong>Other backups in the folder</strong>. They were copied there from another computer, or made here before the last restore. To use a backup on a USB stick or elsewhere on this device, click <strong>Restore from a file…</strong> at the top of the tab and choose it. The app checks it and saves a copy into the backup folder.</p>
+  <p>Press <strong>Restore…</strong> on the file. The box opens it first and shows the <strong>Store</strong> it holds, when it <strong>Last recorded</strong> anything, and the <strong>Owner sign-in</strong>. Read them, then type the file name and press <strong>Restore</strong> as above. A file that is not a backup, or one made by a newer version of Chachi POS, cannot be restored, and the box says why. After restoring another store's backup, sign in with a username from that backup.</p>
+  <p>A restore never changes the backup folder: this computer keeps backing up to the folder it was using. To move the store to a new computer, see <a href="/guide/help#new-computer">Moving to a new computer</a>.</p>
 </section>
 
 <section id="export-data">
