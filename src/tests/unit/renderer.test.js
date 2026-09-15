@@ -589,7 +589,8 @@ test('05_TECH_SPEC.md §2: no build step, no framework, no bundler', () => {
   }
   // The renderer is loaded as modules straight from public/.
   const html = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
-  assert.match(html, /<script type="module" src="\/js\/boot\.js">/);
+  // TASK-065: relative, so the same page works at / on a PC and at /s/<store>/ on the web.
+  assert.match(html, /<script type="module" src="js\/boot\.js">/);
 });
 
 test('the shell declares a same-origin CSP, and nothing in it needs an exception', () => {
@@ -1771,7 +1772,7 @@ test('SCR-001 loads the design system, before the stylesheet that reads it', () 
   // installed a store — the one page every store sees first.
   const html = fs.readFileSync(path.join(root, 'public', 'setup.html'), 'utf8');
   const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(sheets, ['/css/tokens.css', '/css/icons.css', '/css/app.css']);
+  assert.deepEqual(sheets, ['css/tokens.css', 'css/icons.css', 'css/app.css']);
 });
 
 test('[hidden] hides, whatever display the element was given', () => {
@@ -2367,7 +2368,7 @@ test('TASK-057: the wizard offers a restore, and sends the file as bytes rather 
   assert.match(html, /data-step="restore"/);
   assert.match(html, /data-step="restored"/);
   const wizard = codeOf('js/setup.js');
-  assert.match(wizard, /\/api\/v1\/setup\/restore\?/);
+  assert.match(wizard, /`api\/v1\/setup\/restore\?/);
   assert.match(wizard, /'content-type': 'application\/zip',/);
   assert.match(wizard, /body: file,/);
 });
@@ -2474,7 +2475,7 @@ test('TASK-062: a document for the browser to print is printed once, from the on
   assert.match(print, /window\.print\(\)/);
   const css = fs.readFileSync(path.join(root, 'public', 'css', 'print.css'), 'utf8');
   assert.match(css, /body\.printing-document > \*:not\(#print-sheet\) \{ display: none !important; \}/);
-  assert.match(fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8'), /href="\/css\/print\.css"/);
+  assert.match(fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8'), /href="css\/print\.css"/);
 });
 
 test('TASK-062: the wizard asks a hosted copy for its setup code, and carries the same CSP as the shell', () => {
@@ -2484,7 +2485,7 @@ test('TASK-062: the wizard asks a hosted copy for its setup code, and carries th
   assert.match(html, /http-equiv="Content-Security-Policy"/);
   const wizard = codeOf('js/setup.js');
   assert.match(wizard, /hosted = Boolean\(status\.hosted\);/);
-  assert.match(wizard, /fetch\('\/api\/v1\/setup\/code'/);
+  assert.match(wizard, /fetch\('api\/v1\/setup\/code'/);
   assert.match(wizard, /'x-setup-code': document\.querySelector\('#restore-code'\)\.value\.trim\(\)/);
   assert.match(wizard, /setupCode: hosted \? value\('setupCode'\) : undefined,/);
 });
@@ -2496,7 +2497,7 @@ test('TASK-063: the wizard connects a fresh install to a web store; Admin has We
   assert.match(html, /id="to-connect"/);
   assert.match(html, /data-step="connect"/);
   const wizard = codeOf('js/setup.js');
-  assert.match(wizard, /fetch\('\/api\/v1\/setup\/connect'/);
+  assert.match(wizard, /fetch\('api\/v1\/setup\/connect'/);
   assert.match(wizard, /document\.querySelector\('\.connect-note'\)\.hidden = true;/, 'a web copy does not connect to another');
 
   const shell = codeOf('js/shell/app.js');
@@ -2509,3 +2510,23 @@ test('TASK-063: the wizard connects a fresh install to a web store; Admin has We
     assert.ok(devices.includes(route), `${route} has a screen`);
   }
 });
+
+// ── TASK-065: web stores at /s/<store>/ ─────────────────────────────────────
+
+test('TASK-065: no page, script or sheet names an absolute path, so a store works under any prefix', () => {
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(js|html|css)$/.test(entry.name)) files.push(full);
+    }
+  };
+  walk(path.join(root, 'public'));
+  const absolute = /(?:fetch\(\s*[`'"]|href=["'`]|src=["'`]|href:\s*`|BASE\s*=\s*'|location\.href\s*=\s*')\/(?!\/)/;
+  const offenders = files.filter((file) => absolute.test(fs.readFileSync(file, 'utf8')
+    .replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '')))
+    .map((file) => path.relative(root, file));
+  assert.deepEqual(offenders, []);
+});
+

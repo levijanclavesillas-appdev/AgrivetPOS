@@ -60,12 +60,28 @@ const SCHEMA = [
      created_at TEXT NOT NULL)`,
 ];
 
+/**
+ * Columns added after a table was first made. ADD COLUMN has no IF NOT EXISTS, so each is
+ * added only when missing — the same file opens a new database and an old one alike.
+ */
+const COLUMNS = [
+  // TASK-065: where a store's web copy is, so the owner's Google sign-in can list it.
+  ['device_links', 'web_url', 'TEXT'],
+  ['installations', 'web_url', 'TEXT'],
+  // TASK-065: where Google sign-in returns to: a link being approved, or "Your stores".
+  ['oauth_states', 'return_to', 'TEXT'],
+];
+
 function open(file) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   for (const statement of SCHEMA) db.exec(statement);
+  for (const [table, column, type] of COLUMNS) {
+    const has = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+    if (!has) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
   return db;
 }
 

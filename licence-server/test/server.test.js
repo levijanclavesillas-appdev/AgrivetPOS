@@ -16,6 +16,8 @@ const guide = require('../src/guide');
 
 const PASSWORD = 'correct-horse-battery-staple';
 
+const rawFetch = global.fetch;
+
 /** A server on a random port with its own clock, database and key. */
 async function boot({ playVerify = null, googleClaims = { sub: 'g-owner-1', email: 'rosa@example.com', name: 'Rosa' } } = {}) {
   let clock = new Date('2026-09-15T00:00:00.000Z');
@@ -302,3 +304,76 @@ test('Google ID tokens are verified by signature, issuer, audience, expiry and n
   await assert.rejects(google.verifyIdToken(mint(good, { key: other }), { nonce: 'n1' }), /signature is not valid/);
   await assert.rejects(google.verifyIdToken(mint(good, { kid: 'k9' }), { nonce: 'n1' }), /does not publish/);
 });
+
+// ── TASK-065: web stores on this host ──────────────────────────────────────
+
+test('TASK-065: a web copy that links is listed on its owner\'s "Your stores", and only a store path is accepted', async () => {
+  const s = await boot();
+  try {
+    // Not signed in: the page offers Google.
+    const signIn = await (await fetch(`${s.base}/stores`)).text();
+    assert.match(signIn, /Continue with Google/);
+    assert.match(signIn, /href="\/auth\/google\?next=stores"/);
+
+    // A web copy starts its link with its address; a phone does not have one.
+    const web = await (await post(s.base, '/api/v1/device/start', {
+      installation_id: 'inst-web-0001', store_name: 'Botika sa Web', platform: 'Web',
+      web_url: 'http://licence.test/s/botika-web/',
+    })).json();
+    // An address anywhere else is not kept: "Your stores" would link the owner to it.
+    const elsewhere = await (await post(s.base, '/api/v1/device/start', {
+      installation_id: 'inst-web-0002', store_name: 'Elsewhere', platform: 'Web', web_url: 'https://evil.test/s/x',
+    })).json();
+
+    const toGoogle = await fetch(`${s.base}/auth/google?next=stores`, { redirect: 'manual' });
+    const state = new URL(toGoogle.headers.get('location')).searchParams.get('state');
+    const back = await fetch(`${s.base}/auth/google/callback?code=good&state=${state}`, { redirect: 'manual' });
+    assert.equal(back.headers.get('location'), '/stores', 'Google sign-in returns to Your stores');
+
+    // The owner cookie is set for the pages that read it, never for the whole site.
+    const setCookies = back.headers.getSetCookie();
+    const paths = setCookies.filter((c) => c.startsWith('cps_owner=') && !/Max-Age=0/.test(c)).map((c) => /Path=([^;]+)/.exec(c)[1]);
+    assert.deepEqual(paths.sort(), ['/link', '/logout', '/stores']);
+    assert.ok(setCookies.some((c) => /Path=\/;/.test(c) && /Max-Age=0/.test(c)), 'and a whole-site copy is cleared');
+    const cookie = cookieOf(back);
+
+    for (const [started, name] of [[web, 'Botika sa Web'], [elsewhere, 'Elsewhere']]) {
+      const code = started.user_code;
+      const approvePage = await (await fetch(`${s.base}/link?code=${code}`, { headers: { cookie } })).text();
+      const approved = await form(s.base, '/link/approve', { csrf: csrfIn(approvePage), code, store_id: '', store_name: name }, cookie);
+      assert.equal(approved.status, 200);
+      // The POS collects its licence, which is when it becomes one of the store's installations.
+      assert.equal((await (await post(s.base, '/api/v1/device/poll', { device_code: started.device_code })).json()).status, 'approved');
+    }
+
+    const stores = await (await fetch(`${s.base}/stores`, { headers: { cookie } })).text();
+    assert.match(stores, /Botika sa Web/);
+    assert.match(stores, /href="http:\/\/licence\.test\/s\/botika-web\/">Open on the web/);
+    assert.doesNotMatch(stores, /evil\.test/, 'an address outside this site is not shown');
+    assert.match(stores, /Not on the web/);
+  } finally {
+    await s.close();
+  }
+});
+
+test('TASK-065: pages behind a sign-in answer a page load, never a script', async () => {
+  const s = await boot();
+  try {
+    for (const path of ['/stores', '/link', '/admin', '/admin/login', '/logout']) {
+      // What a browser sends for a script's fetch from a page on this host (a store's, at /s/…).
+      const script = await rawFetch(`${s.base}${path}`, { headers: { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'cors' }, redirect: 'manual' });
+      assert.equal(script.status, 403, `${path} refuses a fetch`);
+    }
+    // A page load, as a browser sends it (Node's fetch cannot say "navigate", so plain http).
+    const navigated = await new Promise((resolve, reject) => require('http')
+      .get(`${s.base}/stores`, { headers: { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate' } }, (r) => { r.resume(); resolve(r.statusCode); })
+      .on('error', reject));
+    assert.equal(navigated, 200, 'and opens as a page');
+    // The public site and the API are not behind a cookie, and answer scripts as before.
+    assert.equal((await rawFetch(`${s.base}/api/v1/health`)).status, 200);
+    assert.equal((await rawFetch(`${s.base}/`)).status, 200);
+  } finally {
+    await s.close();
+  }
+});
+

@@ -1,7 +1,8 @@
 'use strict';
 
 // TASK-062 — the web version: one copy of the POS per store, in a container on Chachi's
-// server, at `<store>.pos.chachisoftware.store`, with the host's nginx and TLS in front.
+// server, at `https://pos.chachisoftware.store/s/<store>/` (TASK-065), behind the host's nginx
+// and TLS.
 //
 // Everything that differs between a store's own PC and a hosted copy is decided here,
 // from the environment the container is started with, so no service has to guess:
@@ -15,6 +16,9 @@
 //                           internet it is whoever found the address first
 //   AGRIVET_BACKUP_DIR      where backups go: a volume of its own, not the data volume
 //                           (OPS-001), and not a folder anybody picks from a browser
+//   AGRIVET_PUBLIC_URL      where the store is on the web (TASK-065):
+//                           https://pos.chachisoftware.store/s/<store>. Sent when its
+//                           subscription is linked, so the owner's Google sign-in lists it
 //
 // On a store's PC none of these is set and nothing here changes anything: SEC-8's
 // 127.0.0.1, the wizard as it was, the backup folder the owner chooses.
@@ -36,6 +40,13 @@ function listenHost() {
 /** The fixed backup folder of a hosted copy, or null on a PC (the owner chooses). */
 function backupDir() {
   return isHosted() ? (process.env.AGRIVET_BACKUP_DIR || '/backups') : null;
+}
+
+/** The store's own address on the web, without a trailing slash, or null. */
+function publicUrl() {
+  if (!isHosted()) return null;
+  const url = String(process.env.AGRIVET_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  return /^https?:\/\//.test(url) ? url : null;
 }
 
 function setupCode() {
@@ -67,7 +78,7 @@ function newSetupCode() {
   return groups.join('-');
 }
 
-module.exports = { isHosted, listenHost, backupDir, setupCode, setupCodeMatches, newSetupCode };
+module.exports = { isHosted, listenHost, backupDir, publicUrl, setupCode, setupCodeMatches, newSetupCode };
 
 if (require.main === module && process.argv[2] === 'new-setup-code') {
   process.stdout.write(`${newSetupCode()}\n`);

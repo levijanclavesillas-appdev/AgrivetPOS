@@ -391,8 +391,11 @@ export and restore is on it, with both actors where an override was involved.
 ## 11. The web version (`TASK-062`)
 
 One copy of the POS per store, in a container on Chachi's server, at
-`<store>.pos.chachisoftware.store`. The store opens the address in a browser; nothing is
-installed. It is the same application as the Windows and Android builds, started in
+**`https://pos.chachisoftware.store/s/<store>/`** (`TASK-065`). Every store shares that host
+and its certificate, so a new store needs no DNS record and no certificate. The store's staff
+open its address in a browser; nothing is installed. The owner can also find it at
+`pos.chachisoftware.store/stores`, signing in with the same Google account that links the
+subscription. It is the same application as the Windows and Android builds, started in
 **hosted mode** (`src/config/hosting.js`).
 
 **What the store must agree to first.** The web version needs the internet to sell: when the
@@ -412,14 +415,23 @@ opened from a browser.
 
 ### Setting up the server (once)
 
-1. `docker` with the compose plugin, `nginx`, `certbot`, and Node on the host (for the script).
-2. DNS: each store needs an A record for `<store>.pos.chachisoftware.store` → the server's
-   address. Namecheap's DNS does not accept a wildcard below the top level (`*.pos`), so at
-   Namecheap it is one record per store — host `<store>.pos`, added under *Advanced DNS*;
-   `store.sh create` prints it. For no per-store step, delegate `pos` to a DNS host that
-   accepts wildcards (DigitalOcean DNS: a zone `pos.chachisoftware.store` with A records `@`
-   and `*`; at Namecheap, NS records for host `pos` to `ns1/2/3.digitalocean.com`).
-3. Build the image: `web/store.sh build` (from the repository, on the release commit).
+1. `docker` with the compose plugin, `nginx`, and Node on the host (for the script). The
+   pos.chachisoftware.store site and its certificate already exist (the licence server).
+2. Build the image: `web/store.sh build` (from the repository, on the release commit).
+3. The first `store.sh create` or `store.sh nginx` adds one line to the pos.chachisoftware.store
+   nginx site — `include /etc/nginx/chachi-pos-stores/*.conf;`, keeping the previous file as
+   `.before-chachi-pos` — plus the rate-limit zone (`conf.d/chachi-pos.conf`) and the proxy lines
+   (`snippets/chachi-pos-proxy.conf`).
+
+**How the stores share the host safely.** Each store's location strips the `/s/<store>` prefix
+and every `Cookie` header before the request reaches the store, so a store never sees the
+licence site's sign-in. The licence site's sign-in cookies are set only for the pages that read
+them (`/link`, `/stores`, `/logout`; `/admin`), and those pages answer only a page load or a
+form, never a script's fetch. A store's pages allow only their own scripts, and a store's
+sign-in is a token in page memory, valid for that store alone.
+
+**Networks.** Store containers use Docker's default bridge network, not one each: a server
+running many compose projects runs out of address ranges for new networks (it did here).
 
 ### A new store
 
@@ -427,13 +439,12 @@ opened from a browser.
 web/store.sh create <store>        # e.g. botika-chachi
 ```
 
-This writes `/srv/chachi-pos/<store>/.env` (its port and setup code, mode 600), makes
-`/var/lib/chachi-pos/<store>/{data,backups}`, starts `chachi-pos-<store>` on the next free
-port from 8801, and — once the name resolves to this machine — writes its nginx vhost,
-checks it with `nginx -t`, reloads nginx and asks certbot for the certificate. If DNS is not
-there yet it says which record is missing; `web/store.sh nginx <store>` finishes the job
-later. It prints the **setup code**: send it to the owner with the address, by a different
-channel from anything public.
+This writes `/srv/chachi-pos/<store>/.env` (its port, setup code and address, mode 600),
+makes `/var/lib/chachi-pos/<store>/{data,backups}`, starts `chachi-pos-<store>` on the next
+free port from 8801, writes `/etc/nginx/chachi-pos-stores/<store>.conf`, checks it with
+`nginx -t` (putting it back if refused) and reloads nginx. It prints the address and the
+**setup code**: send them to the owner, the code by a different channel from anything public.
+The store is on the internet at once.
 
 Then, with the owner: open the address, type the setup code, finish the wizard, **link the
 subscription** (Admin → Subscription), and set the receipt printer up on the counter device
@@ -443,7 +454,8 @@ subscription** (Admin → Subscription), and set the receipt printer up on the c
 
 | | |
 | :--- | :--- |
-| `web/store.sh list` | every store, its port and health |
+| `web/store.sh list` | every store, its port, health and address |
+| `web/store.sh nginx <store>` | rewrite a store's nginx location (and give an older store its address setting) |
 | `web/store.sh code <store>` | the setup code again, before the store is set up |
 | `web/store.sh logs <store>` | its log |
 | `web/store.sh upgrade` | rebuild the image, restart every store on it; each takes a verified backup before it migrates |

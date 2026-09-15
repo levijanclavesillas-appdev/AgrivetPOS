@@ -1,7 +1,11 @@
-# Chachi POS web — the proxy lines every location uses (TASK-062).
+# Chachi POS web — the proxy lines every store location uses (TASK-062, TASK-065).
 proxy_http_version 1.1;
 proxy_set_header Host              $host;
 proxy_set_header X-Real-IP         $remote_addr;
 proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
+# The stores share this host with the licence site. A store has no cookies of its own
+# (its sign-in is a token in the page's memory, SEC-7), so none — least of all the
+# owner's or Chachi's sign-in to the licence site — is passed on to one.
+proxy_set_header Cookie "";
 add_header Strict-Transport-Security "max-age=31536000" always;

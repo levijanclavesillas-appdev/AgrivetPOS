@@ -12,7 +12,8 @@
 
 import { printIfBrowser } from './print.js';
 
-const BASE = '/api/v1';
+// TASK-065: relative, so one copy works at / on a PC and at /s/<store>/ on the web.
+const BASE = 'api/v1';
 const SESSION_HEADER = 'x-session-token';
 
 let token = null;

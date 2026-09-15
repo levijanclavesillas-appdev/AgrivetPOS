@@ -28,6 +28,7 @@ function header() {
       <a href="/#pricing">Pricing</a>
       <a href="/guide" aria-current="page">Guide</a>
       <a href="/#faq">FAQ</a>
+      <a href="/stores">Your stores</a>
       <a href="/link">Link a POS</a>
       <a class="btn btn-primary btn-small" href="/#contact">Try it free</a>
     </nav>
@@ -39,7 +40,8 @@ function header() {
         <a href="/#pricing">Pricing</a>
         <a href="/guide">Guide</a>
         <a href="/#faq">FAQ</a>
-        <a href="/link">Link a POS</a>
+        <a href="/stores">Your stores</a>
+      <a href="/link">Link a POS</a>
         <a class="btn btn-primary" href="/#contact">Try it free for 14 days</a>
       </div>
     </details>
@@ -57,6 +59,7 @@ const footer = `<footer class="site-footer">
       <a href="/">Home</a>
       <a href="/guide">Guide</a>
       <a href="/privacy">Privacy</a>
+      <a href="/stores">Your stores</a>
       <a href="/link">Link a POS</a>
       <a href="mailto:ChachiSoftware@gmail.com">Email us</a>
     </nav>

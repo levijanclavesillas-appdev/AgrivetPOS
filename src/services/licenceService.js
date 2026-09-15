@@ -183,11 +183,15 @@ async function startLink(actor, { storeName = null, appVersion = null } = {}) {
   assertEnforced();
   const at = clock.nowUtc();
   const row = licenceRepository.ensure(crypto.randomUUID(), at);
+  const hosting = require('../config/hosting');
   const started = await call('/device/start', {
     installation_id: row.installation_id,
     store_name: storeName,
-    platform: process.platform === 'android' ? 'Android' : process.platform === 'win32' ? 'Windows' : process.platform,
+    platform: hosting.isHosted() ? 'Web'
+      : process.platform === 'android' ? 'Android' : process.platform === 'win32' ? 'Windows' : process.platform,
     app_version: appVersion,
+    // TASK-065: the web copy's address, for the owner's "Your stores" on the licence site.
+    web_url: hosting.publicUrl(),
   });
   licenceRepository.update({
     pending_device_code: started.device_code,

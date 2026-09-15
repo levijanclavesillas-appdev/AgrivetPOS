@@ -947,7 +947,7 @@ export function createApp({ root }) {
   return {
     async mount() {
       const status = await api.get('/setup').catch(() => null);
-      if (status?.required) { window.location.href = '/'; return; }
+      if (status?.required) { window.location.href = './'; return; }
 
       // Neither call is allowed to stop the counter opening: a sign-in screen without
       // a version on it is a minor inconvenience, and one that never renders is a shop

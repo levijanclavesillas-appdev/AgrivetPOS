@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
-# Chachi POS web — one store per container (TASK-062).
+# Chachi POS web — one store per container, at https://pos.chachisoftware.store/s/<store>/
+# (TASK-062, TASK-065).
 #
 #   web/store.sh build                 build the image chachi-pos:<version> (and :latest)
-#   web/store.sh create <store>        a new store at <store>.pos.chachisoftware.store
+#   web/store.sh create <store>        a new store at /s/<store>/, with its setup code
+#   web/store.sh nginx <store>         (re)write the store's nginx location, and reload
 #   web/store.sh list                  every store, its port and whether it is up
 #   web/store.sh code <store>          the store's one-time setup code, to send its owner
 #   web/store.sh upgrade               rebuild, then restart every store on the new image
 #   web/store.sh logs <store>          the store's log
 #
-# A store is: /srv/chachi-pos/<store>/.env (its port and setup code), its data and backups
-# in /var/lib/chachi-pos/<store>/{data,backups}, a container chachi-pos-<store> on the
-# host's 127.0.0.1:<port>, and an nginx vhost. The vhost and its certificate are made only
-# once <store>.pos.chachisoftware.store resolves to this machine — until then the script
-# says which DNS record is missing and leaves nginx alone.
+# A store is: /srv/chachi-pos/<store>/.env (its port, setup code and address), its data and
+# backups in /var/lib/chachi-pos/<store>/{data,backups}, a container chachi-pos-<store> on
+# the host's 127.0.0.1:<port>, and a location file in /etc/nginx/chachi-pos-stores/ that the
+# pos.chachisoftware.store site includes. Every store shares that host and its certificate,
+# so a new store needs no DNS record and no certificate of its own.
 #
 # Removing a store is deliberately not a command: it deletes a business's records. Stop
-# its container, keep /var/lib/chachi-pos/<store>, and remove the vhost by hand.
+# its container, keep /var/lib/chachi-pos/<store>, and remove its location file by hand.
 
 set -euo pipefail
 
@@ -24,8 +26,8 @@ DOMAIN="${POS_WEB_DOMAIN:-pos.chachisoftware.store}"
 CONF_ROOT="${POS_WEB_CONF:-/srv/chachi-pos}"
 DATA_ROOT="${POS_WEB_DATA:-/var/lib/chachi-pos}"
 FIRST_PORT="${POS_WEB_FIRST_PORT:-8801}"
-NGINX_SITES=/etc/nginx/sites-available
-NGINX_ENABLED=/etc/nginx/sites-enabled
+SITE_CONF="/etc/nginx/sites-available/$DOMAIN.conf"
+STORES_DIR=/etc/nginx/chachi-pos-stores
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'store.sh: %s\n' "$*" >&2; exit 1; }
@@ -39,7 +41,6 @@ compose() {
 
 valid_store() {
   [[ "$1" =~ ^[a-z0-9]([a-z0-9-]{0,28}[a-z0-9])?$ ]] || die "a store name is 1–30 lowercase letters, digits and dashes: $1"
-  case "$1" in www|admin|api|link|mail|static|guide) die "$1 is reserved" ;; esac
 }
 
 next_port() {
@@ -64,25 +65,42 @@ wait_healthy() {
   return 1
 }
 
-install_nginx() {
-  local store="$1" port="$2" host="$store.$DOMAIN" site
-  site="$NGINX_SITES/$host.conf"
-  if [ ! -f /etc/nginx/conf.d/chachi-pos.conf ]; then
-    cp "$REPO/web/nginx-shared.conf" /etc/nginx/conf.d/chachi-pos.conf
-  fi
-  mkdir -p /etc/nginx/snippets
+# Once per server: the rate-limit zone, the proxy lines, the stores folder, and the one
+# include in the pos.chachisoftware.store site that brings every store's location in.
+nginx_base() {
+  [ -f "$SITE_CONF" ] || die "no nginx site for $DOMAIN at $SITE_CONF"
+  cp "$REPO/web/nginx-shared.conf" /etc/nginx/conf.d/chachi-pos.conf
+  mkdir -p /etc/nginx/snippets "$STORES_DIR"
   cp "$REPO/web/nginx-proxy.snippet" /etc/nginx/snippets/chachi-pos-proxy.conf
-  sed -e "s/__HOST__/$host/g" -e "s/__PORT__/$port/g" -e "s/__STORE__/$store/g" \
-    "$REPO/web/nginx-store.conf.template" > "$site"
-  ln -sf "$site" "$NGINX_ENABLED/$host.conf"
+  if ! grep -q "include $STORES_DIR/\*.conf;" "$SITE_CONF"; then
+    cp "$SITE_CONF" "$SITE_CONF.before-chachi-pos"
+    # Into the first server block (the HTTPS one certbot wrote), right after its name.
+    sed -i "0,/server_name $DOMAIN;/s||&\n\n    # Chachi POS web stores (TASK-065): \/s\/<store>\/ → that store's container.\n    include $STORES_DIR/*.conf;|" "$SITE_CONF"
+    say "Added the stores include to $SITE_CONF (the previous file is $SITE_CONF.before-chachi-pos)"
+  fi
+}
+
+write_location() {
+  local store="$1" port="$2" file="$STORES_DIR/$1.conf" previous=""
+  nginx_base
+  [ -f "$file" ] && previous="$(cat "$file")"
+  sed -e "s/__STORE__/$store/g" -e "s/__PORT__/$port/g" "$REPO/web/nginx-store-location.conf.template" > "$file"
   if ! nginx -t 2>/dev/null; then
-    rm -f "$NGINX_ENABLED/$host.conf"
+    if [ -n "$previous" ]; then printf '%s\n' "$previous" > "$file"; else rm -f "$file"; fi
     nginx -t || true
-    die "nginx refused the new vhost; it has been disabled again and nginx was not reloaded"
+    die "nginx refused the store's location; it has been put back and nginx was not reloaded"
   fi
   systemctl reload nginx
-  certbot --nginx -d "$host" --non-interactive --redirect --keep-until-expiring \
-    || say "certbot did not finish; run: certbot --nginx -d $host"
+}
+
+# A store made before its address was part of its settings (TASK-065) gains it.
+ensure_public_url() {
+  local store="$1" env="$CONF_ROOT/$1/.env"
+  if ! grep -q '^PUBLIC_URL=' "$env"; then
+    printf 'PUBLIC_URL=https://%s/s/%s\n' "$DOMAIN" "$store" >> "$env"
+    compose "$store" up -d
+    wait_healthy "$store" || say "  $store is not healthy yet; see: store.sh logs $store"
+  fi
 }
 
 cmd_create() {
@@ -91,7 +109,7 @@ cmd_create() {
   [ -e "$CONF_ROOT/$store/.env" ] && die "$store already exists ($CONF_ROOT/$store/.env)"
   docker image inspect chachi-pos:latest >/dev/null 2>&1 || cmd_build
 
-  local port code host="$store.$DOMAIN"
+  local port code
   port="$(next_port)"
   code="$(node "$REPO/src/config/hosting.js" new-setup-code)"
   mkdir -p "$CONF_ROOT/$store" "$DATA_ROOT/$store/data" "$DATA_ROOT/$store/backups"
@@ -103,31 +121,21 @@ STORE=$store
 PORT=$port
 SETUP_CODE=$code
 STORE_ROOT=$DATA_ROOT/$store
+PUBLIC_URL=https://$DOMAIN/s/$store
 ENV
   compose "$store" up -d
   wait_healthy "$store" || die "chachi-pos-$store did not become healthy; see: store.sh logs $store"
-
-  local here there
-  here="$(curl -s -4 --max-time 5 ifconfig.me || true)"
-  there="$(getent hosts "$host" | awk '{print $1}' | head -1 || true)"
-  if [ -n "$there" ] && [ "$there" = "$here" ]; then
-    install_nginx "$store" "$port"
-    say "Store:       https://$host"
-  else
-    say "Store:       running on 127.0.0.1:$port, not yet on the internet."
-    say "             $host does not resolve to this machine ($here)."
-    say "             At the domain's DNS (Namecheap: Advanced DNS → Add New Record), add:"
-    say "               A Record   host: ${host%.chachisoftware.store}   value: $here   TTL: Automatic"
-    say "             then, once it resolves, run:"
-    say "             POS_WEB_DOMAIN=$DOMAIN $0 nginx $store"
-  fi
-  say "Setup code:  $code   (send it to the store's owner with the address; setup asks for it)"
+  write_location "$store" "$port"
+  say "Store:       https://$DOMAIN/s/$store/"
+  say "Setup code:  $code   (send both to the store's owner; setup asks for the code)"
 }
 
 cmd_nginx() {
   local store="${1:-}"; [ -n "$store" ] || die "usage: store.sh nginx <store>"
   [ -f "$CONF_ROOT/$store/.env" ] || die "no such store: $store"
-  install_nginx "$store" "$(sed -n 's/^PORT=//p' "$CONF_ROOT/$store/.env")"
+  ensure_public_url "$store"
+  write_location "$store" "$(sed -n 's/^PORT=//p' "$CONF_ROOT/$store/.env")"
+  say "Store:       https://$DOMAIN/s/$store/"
 }
 
 cmd_list() {
@@ -137,7 +145,7 @@ cmd_list() {
     [ -f "$env" ] || continue
     store="$(sed -n 's/^STORE=//p' "$env")"; port="$(sed -n 's/^PORT=//p' "$env")"
     state="$(docker inspect -f '{{.State.Health.Status}}' "chachi-pos-$store" 2>/dev/null || echo stopped)"
-    printf '%-24s %-6s %-10s https://%s.%s\n' "$store" "$port" "$state" "$store" "$DOMAIN"
+    printf '%-24s %-6s %-10s https://%s/s/%s/\n' "$store" "$port" "$state" "$DOMAIN" "$store"
   done
 }
 

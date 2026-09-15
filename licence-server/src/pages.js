@@ -93,6 +93,32 @@ ${stores.length ? `<p>Add it to:</p>${options}<label class="choice"><input type=
 <p class="muted">Paid until ${date(store.paid_until)}. You can close this page.</p></div>`);
   },
 
+  // ── TASK-065: the owner's stores ───────────────────────────────────────────
+
+  storesSignIn({ googleReady }) {
+    return layout('Your stores', `<div class="card">
+<h1>Your stores</h1>
+<p>Sign in with the Google account that owns your store to open it on the web.</p>
+<p class="muted">Only the owner signs in with Google. Everyone else opens the store's own address and signs in with their POS username and password.</p>
+${googleReady ? '<a class="button primary" href="/auth/google?next=stores">Continue with Google</a>'
+    : '<p class="note warn">Google sign-in is not set up on this server yet.</p>'}
+</div>`);
+  },
+
+  stores({ owner, stores, now }) {
+    const cards = stores.map((s) => `<div class="card">
+<h2 style="margin-top:0">${esc(s.name)}</h2>
+<p class="muted">Paid until ${date(s.paid_until)} ${paidTag(s.paid_until, now)} · ${s.devices} device${s.devices === 1 ? '' : 's'} linked</p>
+${s.web.length ? s.web.map((w) => `<div class="row"><a class="button primary" href="${esc(w.web_url)}/">Open on the web</a>
+<span class="muted">${esc(w.web_url.replace(/^https?:\/\//, ''))}</span></div>`).join('')
+    : '<p class="muted">Not on the web. It runs on its phones and PCs; ask Chachi\'s to put it on the web too.</p>'}
+</div>`).join('');
+    return layout('Your stores', `<div class="row" style="justify-content:space-between"><h1>Your stores</h1>
+<a class="button" href="/logout?next=stores">Sign out</a></div>
+<p class="muted">Signed in as ${esc(owner.email)}.</p>
+${cards || '<div class="card"><p>No store is linked to this Google account yet. A store appears here once its POS is linked to your subscription.</p></div>'}`);
+  },
+
   denied() {
     return layout('Denied', '<div class="card"><h1>Denied</h1><p>That POS was not linked. You can close this page.</p></div>');
   },

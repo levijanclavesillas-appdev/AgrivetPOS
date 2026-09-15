@@ -85,7 +85,7 @@ export function createMovements({ root, onBack, range = null }) {
       h('a', {
         class: 'report-export',
         icon: 'download',
-        href: `/api/v1/reports/movements/export.csv?from=${params.from}&to=${params.to}`,
+        href: `api/v1/reports/movements/export.csv?from=${params.from}&to=${params.to}`,
         // SEC-7: the token is in memory, so the click fetches and saves a blob.
         onclick: (event) => { event.preventDefault(); exportCsv(); },
         text: 'Export CSV',

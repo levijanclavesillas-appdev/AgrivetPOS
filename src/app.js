@@ -126,7 +126,8 @@ function createApp() {
   // path express.static would otherwise answer directly.
   app.get('/index.html', (req, res, next) => {
     try {
-      return setupService.isComplete() ? next() : res.redirect(302, '/');
+      // Relative (TASK-065): behind /s/<store>/ an absolute '/' is the licence site.
+      return setupService.isComplete() ? next() : res.redirect(302, './');
     } catch (err) {
       return next(err);
     }

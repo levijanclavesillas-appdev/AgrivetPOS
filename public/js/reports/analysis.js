@@ -103,7 +103,7 @@ export function createAnalysis({ root, onBack, tab = 'by-category', range = null
       h('a', {
         class: 'report-export',
         icon: 'download',
-        href: `/api/v1/reports/${active}/export.csv?from=${params.from}&to=${params.to}`,
+        href: `api/v1/reports/${active}/export.csv?from=${params.from}&to=${params.to}`,
         // The token lives in memory only (SEC-7), so a plain link cannot carry it.
         onclick: (event) => { event.preventDefault(); exportCsv(); },
         text: 'Export CSV',

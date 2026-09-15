@@ -36,9 +36,10 @@ let lastContactMs = 0;
 // ── The address ─────────────────────────────────────────────────────────────
 
 /**
- * `https://<store>.pos.chachisoftware.store`, however it was typed. Plain http only to
- * this machine, for tests and a store's own LAN trial: a device's secret and the store's
- * records do not cross the internet unencrypted.
+ * `https://pos.chachisoftware.store/s/<store>`, however it was typed — with its path, since
+ * every web store shares the one host (TASK-065). Plain http only to this machine, for
+ * tests and a store's own LAN trial: a device's secret and the store's records do not
+ * cross the internet unencrypted.
  */
 function normaliseHubUrl(input) {
   let text = String(input || '').trim();
@@ -54,7 +55,7 @@ function normaliseHubUrl(input) {
   if (url.protocol !== 'https:' && !local) {
     throw errors.badRequest('The store\'s web address must start with https://.', { ruleId: 'SYNC-003' });
   }
-  return `${url.protocol}//${url.host}`;
+  return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}`;
 }
 
 // ── HTTP ────────────────────────────────────────────────────────────────────

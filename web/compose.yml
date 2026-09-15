@@ -1,6 +1,7 @@
 # One store's web POS (TASK-062). Started by web/store.sh, which writes the store's .env:
 #
 #   STORE=<slug>  PORT=<host port>  SETUP_CODE=<one-time code>  STORE_ROOT=/var/lib/chachi-pos/<slug>
+#   PUBLIC_URL=https://pos.chachisoftware.store/s/<slug>     (TASK-065)
 #
 #   docker compose -p chachi-pos-<slug> --env-file /srv/chachi-pos/<slug>/.env -f web/compose.yml up -d
 
@@ -9,8 +10,12 @@ services:
     image: chachi-pos:${POS_IMAGE_TAG:-latest}
     container_name: chachi-pos-${STORE}
     restart: unless-stopped
+    # Docker's default bridge, not a network per store: a server running many projects
+    # runs out of address ranges for new networks, and a store never talks to another.
+    network_mode: bridge
     environment:
       AGRIVET_SETUP_CODE: ${SETUP_CODE}
+      AGRIVET_PUBLIC_URL: ${PUBLIC_URL:-}
     # The host's loopback only: nginx is the way in, with TLS.
     ports:
       - "127.0.0.1:${PORT}:8080"

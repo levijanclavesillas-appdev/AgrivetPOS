@@ -1,0 +1,40 @@
+# Chachi POS web — https://pos.chachisoftware.store/s/__STORE__/ (TASK-065).
+# Written by web/store.sh into /etc/nginx/chachi-pos-stores/, which the
+# pos.chachisoftware.store vhost includes. The container is chachi-pos-__STORE__ on
+# 127.0.0.1:__PORT__; the /s/__STORE__ prefix is taken off before the request reaches it,
+# so the store's app is the same one that runs at / on a PC.
+
+location = /s/__STORE__ { return 301 /s/__STORE__/; }
+
+location ^~ /s/__STORE__/ {
+    # A data import or a sync push (with product pictures) is JSON up to 64 MB.
+    client_max_body_size 80m;
+
+    # Sign-in and the setup code, per address: the accounts lock themselves (SEC-3), and
+    # this keeps one address from trying a thousand usernames a minute.
+    location ~ ^/s/__STORE__/api/v1/(auth/(login|pin-unlock|recover)|setup/code)$ {
+        limit_req zone=chachi_pos_auth burst=20 nodelay;
+        limit_req_status 429;
+        rewrite ^/s/__STORE__(/.*)$ $1 break;
+        proxy_read_timeout 60s;
+        proxy_pass http://127.0.0.1:__PORT__;
+        include /etc/nginx/snippets/chachi-pos-proxy.conf;
+    }
+
+    # A backup uploaded to restore (TASK-057), or a store going online from its device
+    # (TASK-063): streamed to the app, not buffered here.
+    location ~ ^/s/__STORE__/api/v1/(setup/restore|backups/files)$ {
+        client_max_body_size 600m;
+        proxy_request_buffering off;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        rewrite ^/s/__STORE__(/.*)$ $1 break;
+        proxy_pass http://127.0.0.1:__PORT__;
+        include /etc/nginx/snippets/chachi-pos-proxy.conf;
+    }
+
+    rewrite ^/s/__STORE__(/.*)$ $1 break;
+    proxy_read_timeout 120s;
+    proxy_pass http://127.0.0.1:__PORT__;
+    include /etc/nginx/snippets/chachi-pos-proxy.conf;
+}

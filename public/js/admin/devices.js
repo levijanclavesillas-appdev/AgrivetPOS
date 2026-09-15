@@ -68,7 +68,8 @@ export function createDevices({ root, session }) {
         h('ol', { class: 'steps' }, [
           h('li', { text: 'Install Chachi POS on it (the Windows app or the Android app).' }),
           h('li', { text: 'In its setup, choose "Connect to a store on the web".' }),
-          h('li', { text: `Type this store's address, ${window.location.origin}, and sign in as the owner.` }),
+          // The page's own address, path and all: every web store shares one host (TASK-065).
+          h('li', { text: `Type this store's address, ${new URL('.', window.location.href).href.replace(/\/$/, '')}, and sign in as the owner.` }),
           h('li', { text: 'It downloads the store and is ready to sell. Link its own subscription seat under Admin → Subscription.' }),
         ]),
       ]),
@@ -133,7 +134,7 @@ export function createDevices({ root, session }) {
   // ── On its own ────────────────────────────────────────────────────────────
 
   function standalone() {
-    const address = h('input', { type: 'text', placeholder: 'yourstore.pos.chachisoftware.store', autocomplete: 'off', spellcheck: 'false' });
+    const address = h('input', { type: 'text', placeholder: 'pos.chachisoftware.store/s/yourstore', autocomplete: 'off', spellcheck: 'false' });
     const code = h('input', { type: 'text', placeholder: 'XXXX-XXXX-XXXX-XXXX', autocomplete: 'off', class: 'recovery-input' });
     const password = h('input', { type: 'password', autocomplete: 'current-password' });
     const name = h('input', { type: 'text', value: 'Counter 1', maxlength: '60' });

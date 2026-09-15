@@ -8,6 +8,7 @@ checks offline. The POS works for 30 days between checks, plus 7 days' grace.
 | :--- | :--- | :--- |
 | `/`, `/privacy` | the public | The site that introduces Chachi POS, and the privacy notice. Static files in `site/`, no script |
 | `/link` | a store owner | Enter the code the POS shows, sign in with Google, approve the device |
+| `/stores` | a store owner | TASK-065: sign in with Google; the owner's stores, each with an **Open on the web** link to its web copy at `/s/<store>/` |
 | `/admin` | Chachi's | Stores, devices, the date each is paid to; record a manual payment (GCash, bank transfer); remove a device |
 | `POST /api/v1/device/start`, `/device/poll` | the POS | The device link |
 | `POST /api/v1/licence/renew` | the POS | The silent check, with the device's renewal secret |

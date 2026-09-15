@@ -83,7 +83,18 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
 
   // ── The device link ──────────────────────────────────────────────────────
 
-  function startLink({ installationId, storeName = null, platform = null, appVersion = null }) {
+  /**
+   * TASK-065: a web copy's address, accepted only if it is one of this site's own store
+   * paths. The owner's "Your stores" page links to it, and a link to anywhere else would
+   * be a link an installation chose to put in front of the owner.
+   */
+  const storePath = new RegExp(`^${String(config.baseUrl).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/s/[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$`);
+  const cleanWebUrl = (url) => {
+    const text = String(url || '').trim().replace(/\/+$/, '');
+    return storePath.test(text) ? text : null;
+  };
+
+  function startLink({ installationId, storeName = null, platform = null, appVersion = null, webUrl = null }) {
     if (!/^[A-Za-z0-9-]{8,64}$/.test(String(installationId || ''))) {
       throw new ServiceError(400, 'bad_installation', 'An installation id is required.');
     }
@@ -92,10 +103,11 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
     while (db.prepare('SELECT 1 FROM device_links WHERE user_code = ?').get(code)) code = userCode();
     const created = at();
     const expires = new Date(now().getTime() + LINK_MINUTES * 60e3).toISOString();
-    db.prepare(`INSERT INTO device_links (device_code_hash, user_code, installation_id, store_name, platform, app_version, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    db.prepare(`INSERT INTO device_links (device_code_hash, user_code, installation_id, store_name, platform, app_version, created_at, expires_at, web_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(sha256(deviceCode), code, installationId, String(storeName || '').slice(0, 120) || null,
-        String(platform || '').slice(0, 40) || null, String(appVersion || '').slice(0, 40) || null, created, expires);
+        String(platform || '').slice(0, 40) || null, String(appVersion || '').slice(0, 40) || null, created, expires,
+        cleanWebUrl(webUrl));
     return {
       device_code: deviceCode,
       user_code: code,
@@ -173,12 +185,12 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
       const store = storeById(link.store_id);
       const secret = token();
       const created = at();
-      db.prepare(`INSERT INTO installations (id, store_id, secret_hash, platform, app_version, created_at, last_check_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)
+      db.prepare(`INSERT INTO installations (id, store_id, secret_hash, platform, app_version, created_at, last_check_at, web_url)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                   ON CONFLICT(id) DO UPDATE SET store_id = excluded.store_id, secret_hash = excluded.secret_hash,
                     platform = excluded.platform, app_version = excluded.app_version,
-                    last_check_at = excluded.last_check_at, revoked_at = NULL`)
-        .run(link.installation_id, store.id, sha256(secret), link.platform, link.app_version, created, created);
+                    last_check_at = excluded.last_check_at, revoked_at = NULL, web_url = excluded.web_url`)
+        .run(link.installation_id, store.id, sha256(secret), link.platform, link.app_version, created, created, link.web_url || null);
       db.prepare("UPDATE device_links SET status = 'PICKED_UP' WHERE device_code_hash = ?").run(link.device_code_hash);
       const installation = { id: link.installation_id };
       return { status: 'approved', licence: issue(installation, store), installation_secret: secret };
@@ -251,6 +263,14 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
   // ── What the pages show ──────────────────────────────────────────────────
 
   const storesForOwner = (sub) => db.prepare('SELECT * FROM stores WHERE owner_sub = ? ORDER BY created_at').all(sub);
+
+  /** TASK-065: an owner's stores, each with its web copies and how many devices it has. */
+  const ownerStores = (sub) => storesForOwner(sub).map((store) => ({
+    ...store,
+    web: db.prepare(`SELECT id, web_url, last_check_at FROM installations
+                      WHERE store_id = ? AND web_url IS NOT NULL AND revoked_at IS NULL ORDER BY created_at`).all(store.id),
+    devices: db.prepare('SELECT COUNT(*) AS n FROM installations WHERE store_id = ? AND revoked_at IS NULL').get(store.id).n,
+  }));
   const listStores = () => db.prepare(`
     SELECT s.*, (SELECT COUNT(*) FROM installations i WHERE i.store_id = s.id AND i.revoked_at IS NULL) AS devices,
            (SELECT MAX(last_check_at) FROM installations i WHERE i.store_id = s.id) AS last_check_at
@@ -286,10 +306,10 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
   };
   const endSession = (id) => db.prepare('DELETE FROM sessions WHERE id = ?').run(sha256(id || ''));
 
-  function saveOAuthState({ verifier, nonce, userCode: code }) {
+  function saveOAuthState({ verifier, nonce, userCode: code, returnTo = null }) {
     const state = token();
-    db.prepare('INSERT INTO oauth_states (state, verifier, nonce, user_code, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(state, verifier, nonce, code || null, at());
+    db.prepare('INSERT INTO oauth_states (state, verifier, nonce, user_code, created_at, return_to) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(state, verifier, nonce, code || null, at(), returnTo === 'stores' ? 'stores' : null);
     return state;
   }
   function takeOAuthState(state) {
@@ -301,7 +321,7 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
 
   return {
     startLink, findLink, approveLink, denyLink, pollLink, renew, recordPayment, applyPlayPurchase,
-    storesForOwner, listStores, storeDetail, revokeInstallation,
+    storesForOwner, ownerStores, listStores, storeDetail, revokeInstallation,
     createSession, getSession, endSession, saveOAuthState, takeOAuthState,
     publicKeyPem: () => licence.publicPem(privateKey),
   };

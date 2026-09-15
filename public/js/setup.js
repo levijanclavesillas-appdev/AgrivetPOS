@@ -208,7 +208,7 @@ function payload() {
 async function complete() {
   nextButton.disabled = true;
   try {
-    const res = await fetch('/api/v1/setup', {
+    const res = await fetch('api/v1/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload()),
@@ -312,7 +312,7 @@ async function restoreBackup() {
   go.textContent = 'Checking and restoring…';
   try {
     const query = `fileName=${encodeURIComponent(file.name)}&backupFolder=${encodeURIComponent(folder)}`;
-    const res = await fetch(`/api/v1/setup/restore?${query}`, {
+    const res = await fetch(`api/v1/setup/restore?${query}`, {
       method: 'POST',
       headers: {
         'content-type': 'application/zip',
@@ -360,7 +360,7 @@ document.querySelector('#restore-back').addEventListener('click', () => {
 document.querySelector('#restore-go').addEventListener('click', restoreBackup);
 document.querySelector('#restore-file').addEventListener('change', () => restoreError(''));
 document.querySelector('#restored-go').addEventListener('click', () => {
-  window.location.href = '/';
+  window.location.href = './';
 });
 
 // ── Or: connect to a store already on the web (TASK-063) ───────────────────
@@ -381,7 +381,7 @@ async function connect() {
   go.disabled = true;
   go.textContent = 'Downloading the store…';
   try {
-    const res = await fetch('/api/v1/setup/connect', {
+    const res = await fetch('api/v1/setup/connect', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         hubUrl: read('#connect-url'), username: read('#connect-username'),
@@ -408,7 +408,7 @@ async function connect() {
 document.querySelector('#to-connect').addEventListener('click', () => { phase = 'connect'; render(); });
 document.querySelector('#connect-back').addEventListener('click', () => { phase = 'steps'; connectError(''); render(); });
 document.querySelector('#connect-go').addEventListener('click', connect);
-document.querySelector('#connected-go').addEventListener('click', () => { window.location.href = '/'; });
+document.querySelector('#connected-go').addEventListener('click', () => { window.location.href = './'; });
 
 // ── Wiring ──────────────────────────────────────────────────────────────────
 
@@ -419,7 +419,7 @@ form.addEventListener('submit', async (event) => {
 
   // TASK-062: the setup code, checked now rather than at the last step.
   if (hosted && STEPS[index] === 'store') {
-    const res = await fetch('/api/v1/setup/code', {
+    const res = await fetch('api/v1/setup/code', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ setupCode: value('setupCode') }),
     }).catch(() => null);
@@ -443,7 +443,7 @@ backButton.addEventListener('click', () => {
 document.querySelector('#to-data').addEventListener('click', openDataStep);
 for (const id of ['#go-to-app', '#skip-data']) {
   document.querySelector(id).addEventListener('click', () => {
-    window.location.href = '/';
+    window.location.href = './';
   });
 }
 
@@ -451,13 +451,13 @@ for (const id of ['#go-to-app', '#skip-data']) {
 document.querySelector('.wizard-mark').innerHTML = iconSvg('store');
 
 try {
-  const res = await fetch('/api/v1/setup');
+  const res = await fetch('api/v1/setup');
   const status = await res.json();
 
   // Already set up — this page was reached by hand, or by a stale tab. The API refuses
   // a second POST regardless (FR_1.1); this just avoids showing a form that cannot work.
   if (!status.required) {
-    window.location.href = '/';
+    window.location.href = './';
   } else {
     renderTaxModes(status.tax_modes);
     renderIndustries(status.industries);

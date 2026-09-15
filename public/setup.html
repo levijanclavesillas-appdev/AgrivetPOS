@@ -10,9 +10,9 @@
         content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <!-- tokens.css first, as in index.html: app.css reads every colour, space and shape
        from it, and without it the wizard renders as unstyled browser defaults. -->
-  <link rel="stylesheet" href="/css/tokens.css">
-  <link rel="stylesheet" href="/css/icons.css">
-  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/icons.css">
+  <link rel="stylesheet" href="css/app.css">
 </head>
 <body class="wizard-page">
   <!--
@@ -216,7 +216,7 @@
           devices. Sign in as the store's owner.
         </p>
         <label><span>Store's web address <span class="req" aria-hidden="true">*</span></span>
-          <input id="connect-url" autocomplete="off" spellcheck="false" placeholder="yourstore.pos.chachisoftware.store">
+          <input id="connect-url" autocomplete="off" spellcheck="false" placeholder="pos.chachisoftware.store/s/yourstore">
         </label>
         <label><span>Owner username <span class="req" aria-hidden="true">*</span></span>
           <input id="connect-username" autocomplete="username" autocapitalize="none">
@@ -266,6 +266,6 @@
       </section>
     </div>
   </main>
-  <script type="module" src="/js/setup.js"></script>
+  <script type="module" src="js/setup.js"></script>
 </body>
 </html>

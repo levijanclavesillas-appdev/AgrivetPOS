@@ -52,8 +52,35 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
   if (config.behindProxy) app.set('trust proxy', 1);
 
   const secure = config.baseUrl.startsWith('https://');
-  const setCookie = (res, name, value, maxAgeSeconds) => res.append('Set-Cookie',
-    `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`);
+  /**
+   * TASK-065: the web stores live on this host too, at /s/<store>/. A sign-in cookie is
+   * therefore set only for the pages that read it, not for the whole site — so a store's
+   * pages never carry the owner's or Chachi's admin session — and a copy once set for the
+   * whole site is cleared as it is replaced.
+   */
+  const COOKIE_PATHS = { [OWNER_COOKIE]: ['/link', '/stores', '/logout'], [ADMIN_COOKIE]: ['/admin'] };
+  const setCookie = (res, name, value, maxAgeSeconds) => {
+    for (const where of COOKIE_PATHS[name] || ['/']) {
+      res.append('Set-Cookie',
+        `${name}=${encodeURIComponent(value)}; Path=${where}; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`);
+    }
+    res.append('Set-Cookie', `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`);
+  };
+
+  /**
+   * TASK-065: the pages a sign-in cookie opens answer only as pages — a navigation or a
+   * form — never to a script's fetch. A store's page on this host is the same origin as
+   * these, and this is what keeps even a misbehaving one from reading them.
+   */
+  const pagesOnly = (req, res, next) => {
+    // A browser marks every request with where it came from (Sec-Fetch-Site) and how
+    // (Sec-Fetch-Mode); a page load or a form post is "navigate", a script's fetch is not.
+    const site = req.get('sec-fetch-site');
+    const mode = req.get('sec-fetch-mode');
+    if (site && mode && mode !== 'navigate') return res.status(403).type('text/plain').send('This page opens only as a page.');
+    return next();
+  };
+  app.use(['/link', '/stores', '/logout', '/admin', '/auth'], pagesOnly);
 
   app.use((req, res, next) => {
     res.set({
@@ -106,6 +133,7 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
   api.get('/public-key', (req, res) => res.type('text/plain').send(service.publicKeyPem()));
   api.post('/device/start', wrap((b) => service.startLink({
     installationId: b.installation_id, storeName: b.store_name, platform: b.platform, appVersion: b.app_version,
+    webUrl: b.web_url,
   })));
   api.post('/device/poll', wrap((b) => service.pollLink({ deviceCode: b.device_code })));
   api.post('/licence/renew', wrap((b) => service.renew({ installationId: b.installation_id, secret: b.installation_secret })));
@@ -146,7 +174,9 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
     if (!google.configured) return page(res, pages.message('Not set up yet', 'Google sign-in is not configured on this server.'), 503);
     const { verifier, challenge } = pkce();
     const nonce = crypto.randomBytes(16).toString('base64url');
-    const state = service.saveOAuthState({ verifier, nonce, userCode: String(req.query.code || '') });
+    const state = service.saveOAuthState({
+      verifier, nonce, userCode: String(req.query.code || ''), returnTo: req.query.next === 'stores' ? 'stores' : null,
+    });
     return res.redirect(google.authorizationUrl({ state, nonce, challenge }));
   });
 
@@ -157,6 +187,7 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
       const who = await google.exchange({ code: String(req.query.code), verifier: saved.verifier, nonce: saved.nonce });
       const session = service.createSession({ kind: 'owner', subject: who.sub, email: who.email, name: who.name, hours: 1 });
       setCookie(res, OWNER_COOKIE, session.id, 3600);
+      if (saved.return_to === 'stores') return res.redirect('/stores');
       return res.redirect(saved.user_code ? `/link?code=${encodeURIComponent(saved.user_code)}` : '/link');
     } catch (err) {
       return page(res, pages.message('Sign-in failed', err.message, 'err'), 400);
@@ -192,7 +223,16 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
   app.get('/logout', (req, res) => {
     service.endSession(cookies(req)[OWNER_COOKIE]);
     setCookie(res, OWNER_COOKIE, '', 0);
+    if (req.query.next === 'stores') return res.redirect('/stores');
     return res.redirect(req.query.code ? `/link?code=${encodeURIComponent(String(req.query.code))}` : '/link');
+  });
+
+  // TASK-065: an owner's front door to their stores on the web, by Google sign-in. Staff
+  // go straight to their store's own address and sign in there with their POS login.
+  app.get('/stores', (req, res) => {
+    const session = owner(req);
+    if (!session) return page(res, pages.storesSignIn({ googleReady: google.configured }));
+    return page(res, pages.stores({ owner: { email: session.email }, stores: service.ownerStores(session.subject), now: now() }));
   });
 
   // ── Admin ─────────────────────────────────────────────────────────────────

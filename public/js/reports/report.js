@@ -71,7 +71,7 @@ export function createReport({ root, session, report, onBack, onReconcile = null
       h('a', {
         class: 'report-export',
         icon: 'download',
-        href: `/api/v1/reports/${report}/export.csv?from=${params.from}&to=${params.to}`,
+        href: `api/v1/reports/${report}/export.csv?from=${params.from}&to=${params.to}`,
         // The token lives in memory only (SEC-7), so a plain link cannot carry it.
         // The click fetches with the header and hands the browser a blob instead.
         onclick: (event) => { event.preventDefault(); exportCsv(); },
