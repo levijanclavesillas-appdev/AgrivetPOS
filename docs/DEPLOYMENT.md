@@ -413,8 +413,12 @@ opened from a browser.
 ### Setting up the server (once)
 
 1. `docker` with the compose plugin, `nginx`, `certbot`, and Node on the host (for the script).
-2. DNS: one wildcard A record, **`*.pos.chachisoftware.store` → the server's address**.
-   Without it each store needs its own record.
+2. DNS: each store needs an A record for `<store>.pos.chachisoftware.store` → the server's
+   address. Namecheap's DNS does not accept a wildcard below the top level (`*.pos`), so at
+   Namecheap it is one record per store — host `<store>.pos`, added under *Advanced DNS*;
+   `store.sh create` prints it. For no per-store step, delegate `pos` to a DNS host that
+   accepts wildcards (DigitalOcean DNS: a zone `pos.chachisoftware.store` with A records `@`
+   and `*`; at Namecheap, NS records for host `pos` to `ns1/2/3.digitalocean.com`).
 3. Build the image: `web/store.sh build` (from the repository, on the release commit).
 
 ### A new store

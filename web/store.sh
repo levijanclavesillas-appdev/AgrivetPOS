@@ -116,7 +116,9 @@ ENV
   else
     say "Store:       running on 127.0.0.1:$port, not yet on the internet."
     say "             $host does not resolve to this machine ($here)."
-    say "             Add a DNS A record for $host (or *.$DOMAIN) to $here, then run:"
+    say "             At the domain's DNS (Namecheap: Advanced DNS → Add New Record), add:"
+    say "               A Record   host: ${host%.chachisoftware.store}   value: $here   TTL: Automatic"
+    say "             then, once it resolves, run:"
     say "             POS_WEB_DOMAIN=$DOMAIN $0 nginx $store"
   fi
   say "Setup code:  $code   (send it to the store's owner with the address; setup asks for it)"

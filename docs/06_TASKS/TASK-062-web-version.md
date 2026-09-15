@@ -109,7 +109,9 @@ record, so the script left nginx alone and said which record to add.
 
 ## Left to do
 
-- **DNS.** Add one wildcard record, `*.pos.chachisoftware.store` A `165.22.246.45`, then run
-  `web/store.sh nginx demo`, which writes the vhost and gets the certificate.
+- **DNS.** Namecheap does not accept `*.pos`, so each store gets its own A record: host
+  `demo.pos`, value `165.22.246.45`. Then run `web/store.sh nginx demo`, which writes the vhost
+  and gets the certificate. For no per-store step, delegate `pos` to DigitalOcean DNS
+  (`DEPLOYMENT.md` §11).
 - **Public site.** It still says "Web browser — coming soon". Change it once a store is live.
 - **Server backups.** Copy `/var/lib/chachi-pos` off the server (a snapshot or off-site sync).
