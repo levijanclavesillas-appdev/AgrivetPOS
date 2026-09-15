@@ -182,8 +182,8 @@ export async function blob(path) {
     headers: token ? { authorization: `Bearer ${token}` } : {},
   }).catch(() => null);
   if (!response) return null;
-  const refreshed = response.headers.get(SESSION_HEADER);
-  if (refreshed) setToken(refreshed);
+  // No token is taken from a picture: it may come from the browser's cache, and a token
+  // stored there belongs to whoever fetched the picture first.
   if (response.status === 404) return null;
   if (!response.ok) return null;
   return response.blob();

@@ -19,7 +19,7 @@ const express = require('express');
 const productService = require('../services/productService');
 const productImageService = require('../services/productImageService');
 const errors = require('../services/errors');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate, requirePermission, SESSION_HEADER } = require('../middleware/auth');
 
 const router = express.Router();
 const readCatalog = [authenticate, requirePermission('TX-422')];
@@ -104,6 +104,9 @@ router.delete('/products/:id', editProduct, (req, res, next) => {
 router.get('/products/:id/image', readCatalog, (req, res, next) => {
   try {
     const found = productImageService.read(req.params.id, req.query.size);
+    // Cached for good, so it must not carry the session token authenticate() set: the
+    // browser would return that token from its cache to the next person signed in.
+    res.removeHeader(SESSION_HEADER);
     res.set({
       'Content-Type': found.mime,
       'Content-Length': String(found.bytes.length),

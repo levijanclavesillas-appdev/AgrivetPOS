@@ -98,6 +98,18 @@ test('IMG-001: the bytes come back as they went, each size, to a cashier too', a
   assert.deepEqual(Buffer.from(await thumb.arrayBuffer()), JPEG_THUMB);
 });
 
+test('SEC-7: a cached picture carries no session token, and no other answer may be cached', async () => {
+  // The picture is kept by the browser for a year. Were the token on it, the browser
+  // would hand the owner's token back from its cache to a cashier signed in later.
+  const picture = await call(`/products/${product.id}/image`, { token: tokens.OWNER });
+  assert.equal(picture.status, 200);
+  assert.equal(picture.headers.get('x-session-token'), null);
+
+  const list = await call('/products', { token: tokens.OWNER });
+  assert.ok(list.headers.get('x-session-token'), 'an ordinary answer still renews the session');
+  assert.equal(list.headers.get('cache-control'), 'no-store');
+});
+
 test('IMG-001: anything that is not a JPEG, PNG or WebP is refused — an SVG above all', async () => {
   const svg = await json(await put(SVG, SVG));
   assert.equal(svg.status, 400);

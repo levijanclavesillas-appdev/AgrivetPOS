@@ -45,6 +45,12 @@ function createApp() {
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
 
+  // Every authenticated answer carries a fresh session token (middleware/auth.js), so no
+  // answer may be kept by the browser: a stored one would hand its token back later, to
+  // whoever is signed in by then. A route that serves something cacheable (a product's
+  // picture) overrides this and sends no token with it.
+  app.use(API_BASE, (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
   // FR_1.1: until the wizard has finished, /setup and /health are the only API this
   // installation has. The gate is mounted before every route rather than checked
   // inside them, so a route added later is refused by default rather than by memory.
