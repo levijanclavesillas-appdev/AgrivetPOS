@@ -185,3 +185,14 @@ sees. All of it is in `src/config/industries.js`:
 The settings are **seeded** from the industry at setup and are ordinary settings afterwards: the
 owner can change any of them. Adding an industry is a block in `industries.js` with
 `available: true`; the column's CHECK already names the two on the roadmap.
+
+## 10. The barcode on a box (`TASK-055`)
+
+A barcode belonged to a product, so the code printed on a box of a hundred tablets added one tablet
+at the counter. `product_barcodes.pack_unit_id` (`905_pack_barcodes.sql`) says which of the
+product's packs a code is printed on; NULL is the base unit, as every code before it was. A scan
+answers with the pack, and the counter adds one of it. The editor's Barcodes tab asks *Printed on*;
+the opening spreadsheet's Packs tab takes a `barcode` column. A pack with a barcode on it cannot be
+removed until the barcode is — read as the base unit, the code would sell a box for the price of a
+tablet again. A pack's code is still unique across the store (`VR-205`).
+

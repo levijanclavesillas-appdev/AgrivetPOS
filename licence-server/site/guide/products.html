@@ -36,7 +36,7 @@
     <thead><tr><th>Tab</th><th>Required columns</th><th>Optional columns</th></tr></thead>
     <tbody>
       <tr><td>Products</td><td>sku, name, category, base_unit, retail_price</td><td>generic_name, brand, wholesale_price, dealer_price, tax_class, min_stock, barcode, batch_tracked, senior_pwd</td></tr>
-      <tr><td>Packs</td><td>sku, unit, contains</td><td>default_sell</td></tr>
+      <tr><td>Packs</td><td>sku, unit, contains</td><td>default_sell, barcode (the code printed on the pack, so scanning it adds a whole pack)</td></tr>
       <tr><td>Opening stock</td><td>sku, quantity, unit_cost</td><td>note, batch_no, expiry_date, supplier (all three required for a batch-tracked product)</td></tr>
     </tbody>
   </table></div>
@@ -153,12 +153,14 @@
   <p class="who"><strong>Who:</strong> Owner, Manager or Inventory</p>
   <ol class="steps">
     <li>Open the product and click <strong>Barcodes</strong>.</li>
-    <li>Click in the box that says “Scan it, or type it” and scan the barcode, or type it and click <strong>Add</strong>.</li>
-    <li>The code appears in the list and the box is ready for the next one. A product can have several codes, for example one on the box and one on the blister.</li>
+    <li>Click in the box that says “Scan it, or type it” and scan the barcode, or type it.</li>
+    <li>If the product has packs, choose in <strong>Printed on</strong> what the code is printed on: the loose item (for example <strong>1 TAB (loose)</strong>) or a pack (for example <strong>1 BOX = 100 TAB</strong>). Then click <strong>Add</strong>.</li>
+    <li>The code appears in the list with what one scan adds, and the box is ready for the next one. A product can have several codes, for example one on the box and one on the blister.
     <li>To take a code off, click <strong>Remove</strong> beside it.</li>
   </ol>
   <p>A barcode is at least 4 characters. One barcode belongs to one product only; if it is already used you see “That barcode is already attached to another product.” The in-store labels printed by a weighing scale (13 digits starting with 02 or 20 to 29) are refused, because part of the number is a weight.</p>
-  <p class="tip"><strong>Tip:</strong> every barcode belongs to the product, not to a pack. Scanning the barcode printed on a box adds one tablet to the sale. Change the line to a box with <kbd>F3</kbd> (see <a href="/guide/units#sell-by-the-pack">Sell by the pack or loose</a>).</p>
+  <p class="tip"><strong>Tip:</strong> scan the code on the box with <strong>Printed on</strong> set to the box, and scanning that box at the counter adds a whole box at the box's size, not one tablet. Add the pack on the Units tab first (see <a href="/guide/units#scan-a-box">Scan the box's barcode</a>).</p>
+  <p class="warn"><strong>Important:</strong> a code added without choosing a pack adds one loose item. If a box's code does that at the counter, remove it here and add it again with <strong>Printed on</strong> set to the box.</p>
   <h3>If the counter scans a barcode that is not in the system</h3>
   <p>The counter shows “[the code] is not in the catalogue.” with <strong>Attach [the code] to a product</strong> and <strong>Dismiss</strong>. The attach button clears the search box so you can find the product by name and sell it; it does not save the code. Afterwards, someone who can edit products opens the product and adds the code on its <strong>Barcodes</strong> tab. A cashier should write the code down and give it to the manager.</p>
 </section>

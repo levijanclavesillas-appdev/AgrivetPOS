@@ -963,3 +963,60 @@ test('negative stock is permitted through a sale when the setting allows it (INV
     db.transaction(() => settingsService.set('allow_negative_stock', false, sessions.OWNER));
   }
 });
+
+// ── TASK-055: the barcode on a box sells a box ──────────────────────────────
+
+test('TASK-055: a barcode printed on a pack scans as that pack, and sells as one', async () => {
+  const product = stocked({ retail: 5000, qtyMilli: 1000000 });
+  productService.addPack(product.id, { unitId: ref.sack.id, factorMilli: 50000 }, sessions.OWNER);
+  const attach = (barcode, packUnitId) => call(`/products/${product.id}/barcodes`, {
+    token: tokens.OWNER, method: 'POST', body: { barcode, packUnitId },
+  });
+
+  // The loose code and the sack's code, on the same product.
+  assert.equal((await attach('4801234000017', null)).status, 201);
+  const added = await attach('4801234000024', ref.sack.id);
+  assert.equal(added.status, 201);
+  const listed = (await added.json()).barcodes;
+  assert.deepEqual(listed.map((b) => [b.barcode, b.pack && b.pack.code, b.pack && b.pack.factor_milli]),
+    [['4801234000017', null, null], ['4801234000024', 'SACK', 50000]]);
+
+  // A pack the product does not have is not a place to print a code.
+  const nowhere = await attach('4801234000031', ref.piece.id);
+  assert.equal(nowhere.status, 400);
+  assert.match((await nowhere.json()).error.message, /not one of this product's/);
+
+  // The scan: the loose code is the base unit; the sack's code says so. Before this, both
+  // added one kilo, and a sack went out for the price of a kilo.
+  const scan = async (code) => (await call(`/products/barcode/${code}`, { token: tokens.CASHIER })).json();
+  assert.equal((await scan('4801234000017')).pack, null);
+  const sack = await scan('4801234000024');
+  assert.equal(sack.found, true);
+  assert.equal(sack.pack.unit.id, ref.sack.id);
+  assert.equal(sack.pack.factor_milli, 50000);
+
+  // What the counter then sends — one of the pack — is one sack of 50 kilos.
+  const sale = saleService.complete({
+    lines: [{ productId: product.id, qtyMilli: 1000, packUnitId: sack.pack.unit.id }],
+    tenders: [{ method: 'CASH', amountCentavos: 9999999 }],
+  }, sessions.CASHIER);
+  assert.equal(sale.items[0].qty_milli, 50000);
+  assert.equal(sale.items[0].qty_display, '1 SACK (50 KG)');
+  assert.equal(sale.sale.total_centavos, 5000 * 50);
+});
+
+test('TASK-055: a pack with a barcode on it cannot be removed out from under the code', async () => {
+  const product = stocked({ retail: 5000 });
+  const [pack] = productService.addPack(product.id, { unitId: ref.sack.id, factorMilli: 50000 }, sessions.OWNER);
+  const [code] = productService.attachBarcode(product.id, '4801234000048', sessions.OWNER, { packUnitId: ref.sack.id });
+
+  // Read as the base unit, the code would sell a sack for the price of a kilo again.
+  assert.throws(() => productService.removePack(product.id, pack.id, sessions.OWNER),
+    (err) => err.ruleId === 'VR-205' && /The SACK pack has barcode 4801234000048 on it/.test(err.message));
+
+  productService.detachBarcode(product.id, code.id, sessions.OWNER);
+  assert.deepEqual(productService.removePack(product.id, pack.id, sessions.OWNER), []);
+
+  const trail = auditService.browse({ action: 'BARCODE_ATTACHED', entityId: product.id }).rows;
+  assert.equal(trail[0].after.pack_unit, 'SACK', 'the trail says which pack the code went on');
+});

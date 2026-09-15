@@ -743,18 +743,45 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
 
   // ── Barcodes (VR-205) ─────────────────────────────────────────────────────
 
+  // TASK-055: which of the product's packs a new code is printed on; '' is the base unit.
+  let barcodePack = '';
+
+  /** "1 BOX = 100 TAB", or "1 TAB (loose)" for the base unit. */
+  const printedOn = (pack) => {
+    const base = product.base_unit.code;
+    if (!pack) return `1 ${base} (loose)`;
+    const size = pack.factor_milli ?? (product.packs.find((p) => p.unit.id === pack.unit_id)?.factor_milli);
+    return size ? `1 ${pack.code} = ${quantity(size)} ${base}` : `1 ${pack.code}`;
+  };
+
   function barcodesTab() {
     const code = h('input', {
       type: 'text', class: 'barcode-input', autocomplete: 'off',
       placeholder: 'Scan it, or type it', 'aria-label': 'Barcode',
     });
+    // TASK-055: the code on a box sells a box. Offered only when there is a pack to name.
+    const packs = product.packs || [];
+    const onWhat = packs.length === 0 ? null : h('select', {
+      'aria-label': 'Printed on',
+      onchange: (event) => { barcodePack = event.target.value; },
+    }, [
+      h('option', { value: '', text: printedOn(null), selected: barcodePack === '' }),
+      ...packs.map((p) => h('option', {
+        value: p.unit.id, selected: barcodePack === p.unit.id,
+        text: printedOn({ unit_id: p.unit.id, code: p.unit.code, factor_milli: p.factor_milli }),
+      })),
+    ]);
 
     return h('div', {}, [
       product.barcodes.length === 0
         ? h('p', { class: 'muted', text: 'No barcodes. Scan the item into the box below.' })
         : h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
+          h('thead', {}, [h('tr', {}, [
+            h('th', { text: 'Barcode' }), h('th', { text: 'Printed on — one scan adds' }), h('th', { text: '' }),
+          ])]),
           h('tbody', {}, product.barcodes.map((barcode) => h('tr', {}, [
             h('td', { class: 'sku', text: barcode.barcode }),
+            h('td', { text: printedOn(barcode.pack) }),
             h('td', {}, [h('button', {
               class: 'row-action', text: 'Remove',
               onclick: async () => {
@@ -777,6 +804,7 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
           try {
             product.barcodes = (await api.post(`/products/${product.id}/barcodes`, {
               barcode: code.value.trim(),
+              packUnitId: barcodePack || null,
             })).barcodes;
             code.value = '';
             render();
@@ -789,11 +817,14 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
         },
       }, [
         h('div', { class: 'field-row' }, [
-          code, h('button', { type: 'submit', class: 'row-action', icon: 'plus', text: 'Add' }),
+          code,
+          onWhat ? h('label', { class: 'inline-label', text: 'Printed on' }, [onWhat]) : null,
+          h('button', { type: 'submit', class: 'row-action', icon: 'plus', text: 'Add' }),
         ]),
       ]),
       h('p', { class: 'muted', text: 'A barcode belongs to one product only (VR-205). '
-        + 'A product may have several — a box and a loose strip often carry different codes.' }),
+        + 'A box and a loose strip often carry different codes: say which each is printed on, '
+        + 'and scanning the box at the counter adds a whole box.' }),
     ]);
   }
 

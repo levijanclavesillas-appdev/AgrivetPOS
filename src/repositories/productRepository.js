@@ -150,9 +150,16 @@ function updateFields(id, fields) {
 // ── Barcodes (VR-205) ───────────────────────────────────────────────────────
 
 function barcodesFor(productId) {
-  return db.get()
-    .prepare('SELECT id, barcode, created_at FROM product_barcodes WHERE product_id = ? ORDER BY created_at')
-    .all(productId);
+  // TASK-055: which pack a code is printed on, with the pack's size — NULL is the base unit.
+  return db.get().prepare(`
+    SELECT b.id, b.barcode, b.created_at, b.pack_unit_id,
+           u.code AS pack_unit_code, pk.factor_milli AS pack_factor_milli
+      FROM product_barcodes b
+      LEFT JOIN units u ON u.id = b.pack_unit_id
+      LEFT JOIN product_packs pk ON pk.product_id = b.product_id AND pk.unit_id = b.pack_unit_id
+     WHERE b.product_id = ?
+     ORDER BY b.created_at
+  `).all(productId);
 }
 
 function findByBarcode(barcode) {
@@ -162,16 +169,23 @@ function findByBarcode(barcode) {
 
 function findBarcode(barcode) {
   return db.get()
-    .prepare('SELECT id, product_id, barcode FROM product_barcodes WHERE barcode = ?')
+    .prepare('SELECT id, product_id, barcode, pack_unit_id FROM product_barcodes WHERE barcode = ?')
     .get(barcode) || null;
 }
 
 function insertBarcode(row) {
   db.get().prepare(`
-    INSERT INTO product_barcodes (id, product_id, barcode, created_at)
-    VALUES (@id, @product_id, @barcode, @created_at)
-  `).run(row);
+    INSERT INTO product_barcodes (id, product_id, barcode, pack_unit_id, created_at)
+    VALUES (@id, @product_id, @barcode, @pack_unit_id, @created_at)
+  `).run({ pack_unit_id: null, ...row });
   return row;
+}
+
+/** TASK-055: the barcodes printed on one of a product's packs. */
+function barcodesOnPack(productId, unitId) {
+  return db.get()
+    .prepare('SELECT id, barcode FROM product_barcodes WHERE product_id = ? AND pack_unit_id = ?')
+    .all(productId, unitId);
 }
 
 function deleteBarcode(id) {
@@ -396,7 +410,7 @@ function countReferences(productId) {
 module.exports = {
   countBatchTracked,
   findById, findBySku, countAll, search, countSearch, insert, updateFields,
-  barcodesFor, findByBarcode, findBarcode, insertBarcode, deleteBarcode,
+  barcodesFor, findByBarcode, findBarcode, insertBarcode, deleteBarcode, barcodesOnPack,
   packsFor, insertPack, clearDefaultPack, deletePack,
   insertPrice, priceAt, currentPrices, priceHistory,
   customerPriceAt, customerPricesFor, insertCustomerPrice,

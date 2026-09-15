@@ -166,11 +166,12 @@ const KINDS = Object.freeze({
     label: 'Packs',
     sheet: 'Packs',
     required: ['sku', 'unit', 'contains'],
-    optional: ['default_sell'],
+    // TASK-055: the code printed on the box, so scanning the box adds a box.
+    optional: ['default_sell', 'barcode'],
     example: [
-      ['sku', 'unit', 'contains', 'default_sell'],
-      ['PARA-500', 'BOX', '100', ''],
-      ['ASC-500', 'BOX', '100', ''],
+      ['sku', 'unit', 'contains', 'default_sell', 'barcode'],
+      ['PARA-500', 'BOX', '100', '', '4800012345685'],
+      ['ASC-500', 'BOX', '100', '', ''],
     ],
   },
   stock: {
@@ -872,6 +873,10 @@ function checkPacks(source, problems, warnings, arriving, declared = NOTHING_DEC
   if (!checkHeaders('packs', table, problems)) return { rows: table.rows, accepted };
   const seen = new Map();
   const defaultFor = new Map();
+  // TASK-055: a pack's barcode may not be on anything else — in the store, on the
+  // Products sheet, or on another pack here — for the reason the Products sheet checks.
+  const productCodes = new Set([...arriving.values()].flatMap((row) => row.input.barcodes || []));
+  const seenBarcode = new Map();
 
   for (const { line, values } of table.rows) {
     const reject = (message, ruleId = 'UOM-002') => problems.push({ line, rule_id: ruleId, message });
@@ -921,7 +926,26 @@ function checkPacks(source, problems, warnings, arriving, declared = NOTHING_DEC
       defaultFor.set(sku.toUpperCase(), line);
     }
 
-    accepted.push({ line, sku, unitCode, factorMilli: factor, isDefaultSell, arriving: Boolean(arrivingRow) });
+    let barcode = null;
+    const rawBarcode = text(values.barcode, { max: 40 });
+    if (rawBarcode) {
+      const classified = productService.classifyBarcode(rawBarcode);
+      if (!classified.ok) { reject(`${sku}: ${classified.reason}`, classified.ruleId); continue; }
+      const clash = productRepository.findByBarcode(classified.barcode);
+      if (clash) { reject(`${sku}: barcode ${classified.barcode} is already on ${clash.sku}.`, 'VR-205'); continue; }
+      if (productCodes.has(classified.barcode)) {
+        reject(`${sku}: barcode ${classified.barcode} is also on the Products sheet. The box's code and the loose one's are different codes.`, 'VR-205');
+        continue;
+      }
+      if (seenBarcode.has(classified.barcode)) {
+        reject(`${sku}: barcode ${classified.barcode} is also on line ${seenBarcode.get(classified.barcode)}.`, 'VR-205');
+        continue;
+      }
+      seenBarcode.set(classified.barcode, line);
+      barcode = classified.barcode;
+    }
+
+    accepted.push({ line, sku, unitCode, factorMilli: factor, isDefaultSell, barcode, arriving: Boolean(arrivingRow) });
   }
   return { rows: table.rows, accepted };
 }
@@ -1138,6 +1162,12 @@ function run({
         productService.addPackWithin(productId, pack, actor);
         counts.packs += 1;
       }
+    }
+    // TASK-055: each pack's own barcode, now that every pack exists.
+    for (const pack of acceptedOf(dependents.parsed.packs)) {
+      if (!pack.barcode) continue;
+      const productId = bySku.get(pack.sku.toUpperCase()) || productRepository.findBySku(pack.sku).id;
+      productService.attachBarcodeWithin(productId, pack.barcode, actor, { packUnitId: unitIdOf(pack.unitCode) });
     }
 
     // ── OPS-106 — one OPENING movement per row, carrying its own cost ──

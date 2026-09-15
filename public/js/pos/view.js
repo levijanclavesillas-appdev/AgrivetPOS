@@ -313,7 +313,8 @@ export function createPos({ root, session, onPay }) {
     try {
       const result = await api.get(`/products/barcode/${encodeURIComponent(code)}`);
       if (result.found) {
-        await addProduct(result.product);
+        // TASK-055: the code on a box adds a box — the pack it is printed on.
+        await addProduct(result.product, { packUnitId: result.pack ? result.pack.unit.id : null });
         return;
       }
       // FR_3.1 / TC-INT-30: never a silent no-op and never a swallowed 404.
@@ -337,10 +338,11 @@ export function createPos({ root, session, onPay }) {
     attachBar.hidden = false;
   }
 
-  async function addProduct(product) {
-    catalogue.set(product.id, await withStock(product));
-    cart.add({ product });
-    selectedKey = `${product.id}:base`;
+  async function addProduct(product, { packUnitId = null } = {}) {
+    const known = await withStock(product);
+    catalogue.set(product.id, known);
+    cart.add({ product: known, packUnitId });
+    selectedKey = `${product.id}:${packUnitId || 'base'}`;
     await reprice();
   }
 

@@ -212,6 +212,8 @@ function readMe() {
     [],
     H('3. Packs — selling one product in more than one size'),
     P(say.pack),
+    P('barcode: the code printed on the pack, if it has its own. Scanning it at the counter then adds a'),
+    P('whole pack. It must differ from the loose item\'s barcode on the Products tab.'),
     P('counted in its base unit; the pack is a way of selling several at once.'),
     [],
     H('4. Opening stock — what is on the shelf at cutover'),

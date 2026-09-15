@@ -266,3 +266,28 @@ test('TC-INT-131: one barcode on two new products is refused on the second row',
   assert.deepEqual(report.problems.map((p) => [p.line, p.rule_id]), [[3, 'VR-205']]);
   assert.match(report.problems[0].message, /also on line 2/);
 });
+
+// ── TASK-055: the box's barcode, on the Packs sheet ─────────────────────────
+
+test('TASK-055: a pack\'s barcode loads onto the pack, and a code on two things is refused at the check', () => {
+  const base = {
+    categories: file(['name'], [['Medicines']]),
+    units: file(['code', 'name', 'fractions'], [['TAB', 'Tablet', ''], ['BOX', 'Box', '']]),
+    products: file(['sku', 'name', 'category', 'base_unit', 'retail_price', 'barcode'],
+      [['PB-CET', 'Cetirizine 10mg', 'Medicines', 'TAB', '8.00', '4809000000011']]),
+  };
+
+  // The box's code is the loose one's: the same scan cannot mean one tablet and a box.
+  const clash = openingDataService.validate({ ...base,
+    packs: file(['sku', 'unit', 'contains', 'barcode'], [['PB-CET', 'BOX', '100', '4809000000011']]) });
+  assert.equal(clash.ok, false);
+  assert.match(clash.problems[0].message, /also on the Products sheet/);
+  assert.equal(clash.problems[0].rule_id, 'VR-205');
+
+  const result = openingDataService.run({ ...base,
+    packs: file(['sku', 'unit', 'contains', 'barcode'], [['PB-CET', 'BOX', '100', '4809000000028']]) }, sessions.OWNER);
+  assert.equal(result.loaded.packs, 1);
+  const product = productRepository.findBySku('PB-CET');
+  const codes = productRepository.barcodesFor(product.id).map((b) => [b.barcode, b.pack_unit_code]);
+  assert.deepEqual(codes, [['4809000000011', null], ['4809000000028', 'BOX']]);
+});

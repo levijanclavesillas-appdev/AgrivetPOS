@@ -195,7 +195,7 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
     product.avg_cost_as_of = row.avg_cost_as_of;
   }
 
-  if (barcodes) product.barcodes = barcodes.map((b) => ({ id: b.id, barcode: b.barcode }));
+  if (barcodes) product.barcodes = barcodes.map(presentBarcode);
   if (packs) product.packs = packs.map(presentPack);
   if (prices) product.prices = prices;
 
@@ -308,7 +308,15 @@ function findByBarcode(rawCode, session) {
   }
 
   const row = productRepository.findByBarcode(classified.barcode);
-  if (row) return { found: true, product: detail(row, session), barcode: classified.barcode };
+  if (row) {
+    // TASK-055: and which pack the code is printed on — the counter adds one of it.
+    const code = productRepository.findBarcode(classified.barcode);
+    const product = detail(row, session);
+    const pack = code && code.pack_unit_id
+      ? (product.packs || []).find((p) => p.unit.id === code.pack_unit_id) || null
+      : null;
+    return { found: true, product, barcode: classified.barcode, pack };
+  }
 
   return {
     found: false,
@@ -533,7 +541,29 @@ function deactivate(id, actor, session = actor) {
 
 // ── Barcodes ────────────────────────────────────────────────────────────────
 
-function attachBarcodeRow(productId, barcode, at) {
+/**
+ * TASK-055: a barcode, and which pack it is printed on — null for the product's base
+ * unit. "4800012345678 on BOX (100 TAB)" is what the editor lists.
+ */
+const presentBarcode = (b) => ({
+  id: b.id,
+  barcode: b.barcode,
+  pack: b.pack_unit_id
+    ? { unit_id: b.pack_unit_id, code: b.pack_unit_code || null, factor_milli: b.pack_factor_milli ?? null }
+    : null,
+});
+
+/** TASK-055: a code for a pack must name one of this product's packs. */
+function packForBarcode(productId, packUnitId) {
+  if (!packUnitId) return null;
+  const pack = productRepository.packsFor(productId).find((p) => p.unit_id === packUnitId);
+  if (!pack) {
+    throw errors.badRequest('That pack is not one of this product\'s. Add the pack on the Units tab first.', { ruleId: 'VR-205' });
+  }
+  return pack;
+}
+
+function attachBarcodeRow(productId, barcode, at, packUnitId = null) {
   const existing = productRepository.findBarcode(barcode);
   if (existing) {
     // Globally unique across products (VR-205): the same physical code cannot mean two
@@ -546,27 +576,35 @@ function attachBarcodeRow(productId, barcode, at) {
     );
   }
   return productRepository.insertBarcode({
-    id: ids.uuidv7(), product_id: productId, barcode, created_at: at,
+    id: ids.uuidv7(), product_id: productId, barcode, pack_unit_id: packUnitId || null, created_at: at,
   });
 }
 
-function attachBarcode(productId, rawCode, actor) {
+/**
+ * VR-205, and TASK-055: the code on the loose unit, or — with `packUnitId` — the code
+ * printed on one of the product's packs, so scanning the box adds a box.
+ */
+function attachBarcode(productId, rawCode, actor, options = {}) {
+  return db.transaction(() => attachBarcodeWithin(productId, rawCode, actor, options));
+}
+
+/** `attachBarcode` without its own transaction, for the opening load's (§8.3). */
+function attachBarcodeWithin(productId, rawCode, actor, { packUnitId = null } = {}) {
   const product = productRepository.findById(productId);
   if (!product) throw errors.notFound('No such product');
   const barcode = validateBarcode(rawCode);
+  const pack = packForBarcode(productId, packUnitId);
   const at = clock.nowUtc();
 
-  return db.transaction(() => {
-    attachBarcodeRow(productId, barcode, at);
-    auditService.write({
-      actor,
-      action: 'BARCODE_ATTACHED',
-      entityType: 'products',
-      entityId: productId,
-      after: { barcode },
-    });
-    return productRepository.barcodesFor(productId).map((b) => ({ id: b.id, barcode: b.barcode }));
+  attachBarcodeRow(productId, barcode, at, pack ? pack.unit_id : null);
+  auditService.write({
+    actor,
+    action: 'BARCODE_ATTACHED',
+    entityType: 'products',
+    entityId: productId,
+    after: { barcode, ...(pack ? { pack_unit: pack.unit_code, factor_milli: pack.factor_milli } : {}) },
   });
+  return productRepository.barcodesFor(productId).map(presentBarcode);
 }
 
 function detachBarcode(productId, barcodeId, actor) {
@@ -581,9 +619,9 @@ function detachBarcode(productId, barcodeId, actor) {
       action: 'BARCODE_DETACHED',
       entityType: 'products',
       entityId: productId,
-      before: { barcode: row.barcode },
+      before: { barcode: row.barcode, ...(row.pack_unit_code ? { pack_unit: row.pack_unit_code } : {}) },
     });
-    return productRepository.barcodesFor(productId).map((b) => ({ id: b.id, barcode: b.barcode }));
+    return productRepository.barcodesFor(productId).map(presentBarcode);
   });
 }
 
@@ -659,6 +697,17 @@ function removePack(productId, packId, actor) {
   const packs = productRepository.packsFor(productId);
   const pack = packs.find((p) => p.id === packId);
   if (!pack) throw errors.notFound('No such pack on this product');
+
+  // TASK-055: a barcode printed on this pack would otherwise mean nothing — or, read as
+  // the base unit, sell a box for the price of a tablet, which is the fault it fixed.
+  const onIt = productRepository.barcodesOnPack(productId, pack.unit_id);
+  if (onIt.length > 0) {
+    throw errors.conflict(
+      `The ${pack.unit_code} pack has barcode ${onIt.map((b) => b.barcode).join(', ')} on it. `
+      + 'Remove the barcode on the Barcodes tab first, then the pack.',
+      { ruleId: 'VR-205' }
+    );
+  }
 
   return db.transaction(() => {
     productRepository.deletePack(packId);
@@ -955,6 +1004,6 @@ module.exports = {
   toPublic, detail, resolvePrice, isSellable,
   get, search, findByBarcode,
   create, createWithin, update, deactivate, assertBaseUnitChangeable,
-  attachBarcode, detachBarcode, addPack, addPackWithin, removePack, normalisePack,
+  attachBarcode, attachBarcodeWithin, detachBarcode, addPack, addPackWithin, removePack, normalisePack,
   setPrices, setQuantityBreaks, quantityBreaks, validateBandSet, setCost, assertMayChangeCost,
 };

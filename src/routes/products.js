@@ -140,7 +140,9 @@ router.delete('/products/:id/image', editProduct, (req, res, next) => {
 
 router.post('/products/:id/barcodes', editProduct, (req, res, next) => {
   try {
-    res.status(201).json({ barcodes: productService.attachBarcode(req.params.id, (req.body || {}).barcode, req.session) });
+    const body = req.body || {};
+    // TASK-055: `packUnitId` for the code printed on a box; absent for the loose unit.
+    res.status(201).json({ barcodes: productService.attachBarcode(req.params.id, body.barcode, req.session, { packUnitId: body.packUnitId || null }) });
   } catch (err) {
     next(err);
   }

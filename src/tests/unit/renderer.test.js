@@ -2321,3 +2321,17 @@ test('TASK-054: the receipt screen says printed, not set up, or failed — and o
   // A store with no printer is not told "failed" after every sale.
   assert.match(view, /printState\.transport !== 'NONE'/);
 });
+
+// ── TASK-055: the barcode on a box sells a box ──────────────────────────────
+
+test('TASK-055: a scan that names a pack adds one of the pack, and the editor says what each code is on', () => {
+  const pos = codeOf('js/pos/view.js');
+  assert.match(pos, /await addProduct\(result\.product, \{ packUnitId: result\.pack \? result\.pack\.unit\.id : null \}\)/);
+  assert.match(pos, /cart\.add\(\{ product: known, packUnitId \}\)/);
+  assert.match(pos, /selectedKey = `\$\{product\.id\}:\$\{packUnitId \|\| 'base'\}`/);
+
+  const editor = codeOf('js/catalogue/editor.js');
+  assert.match(editor, /'aria-label': 'Printed on'/);
+  assert.match(editor, /packUnitId: barcodePack \|\| null/);
+  assert.match(editor, /Printed on — one scan adds/);
+});

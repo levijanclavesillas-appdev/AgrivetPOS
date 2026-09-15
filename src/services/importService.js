@@ -275,6 +275,7 @@ const REFERENCES = Object.freeze([
   ['customer_prices', 'product_id', 'products'],
   ['product_quantity_breaks', 'product_id', 'products'],
   ['product_images', 'product_id', 'products'],
+  ['product_barcodes', 'pack_unit_id', 'units'],
 ]);
 
 function danglingReferences(parsed) {

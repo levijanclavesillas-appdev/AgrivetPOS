@@ -7,6 +7,7 @@
   <li><a href="#add-a-pack">Add a pack</a></li>
   <li><a href="#pack-prices">Prices for packs</a></li>
   <li><a href="#sell-by-the-pack">Sell by the pack or loose</a></li>
+  <li><a href="#scan-a-box">Scan the box's barcode</a></li>
   <li><a href="#buy-by-the-pack">Receive a delivery of packs</a></li>
   <li><a href="#open-a-box">Open a box to sell loose</a></li>
   <li><a href="#count-in-base-units">Counts, adjustments and stock on hand</a></li>
@@ -80,7 +81,7 @@
 <section id="sell-by-the-pack">
   <h2>Sell by the pack or loose</h2>
   <p class="who"><strong>Who:</strong> Cashier, Manager or Owner</p>
-  <p>Every product goes into the sale as 1 base unit, whether you scan it or pick it from the search. This is true even when you scan the barcode printed on a box, because a barcode belongs to the product, not to a pack.</p>
+  <p>A product picked from the search, or scanned by the code on the loose item, goes into the sale as 1 base unit. A code printed on a box, and set up as the box's, adds a whole box (see <a href="#scan-a-box">Scan the box's barcode</a>). To change what a line is:</p>
   <ol class="steps">
     <li>Scan the product, or search for it and pick it. The line shows <strong>1 TAB</strong>.</li>
     <li>With that line selected, press <kbd>F3</kbd> (see <a href="/guide/selling#change-quantity">Change the quantity</a>). The quantity box opens with the product's name.</li>
@@ -93,6 +94,18 @@
   <p>Under each line the counter shows <strong>stock after</strong> in base units, for example “stock after: 385 TAB”. When the sale is paid, the stock falls by the base units: 100 TAB for the box and 15 TAB for the loose tablets. For a product tracked by batch, the tablets come from the batch that expires first (see <a href="/guide/stock#batches-and-expiry">Batches and expiry</a>). The receipt prints each line's price per base unit and the line total.</p>
   <h3>Fractions</h3>
   <p>If the unit you choose cannot be split, a note under the field says so, for example “BOX cannot be sold in parts — a whole number of them.”, and a fraction is refused. A unit that can be split, such as KG or ML, takes decimals: 2.5 KG of feed loose is fine, but half a SACK is not.</p>
+</section>
+
+<section id="scan-a-box">
+  <h2>Scan the box's barcode</h2>
+  <p class="who"><strong>Who:</strong> setting up: Owner, Manager or Inventory · scanning: anyone at the counter</p>
+  <p>A box usually carries its own barcode, different from the one on each strip or bottle. Tell Chachi POS which pack that code is on, and scanning the box adds one box, priced and counted as the box.</p>
+  <ol class="steps">
+    <li>Add the pack first, on the product's <strong>Units</strong> tab (see <a href="#add-a-pack">Add a pack</a>).</li>
+    <li>On the <strong>Barcodes</strong> tab, scan the code on the box and choose <strong>Printed on: 1 BOX = 100 TAB</strong>. Click <strong>Add</strong>.</li>
+    <li>At the counter, scan the box. The line reads <strong>1 BOX (100 TAB)</strong>, and scanning a second box makes it 2 BOX.</li>
+  </ol>
+  <p>A pack with a barcode on it cannot be removed; remove the barcode first. When the opening spreadsheet is filled in, the box's code goes in the <strong>barcode</strong> column of the Packs tab.</p>
 </section>
 
 <section id="buy-by-the-pack">
@@ -141,7 +154,7 @@
     <tbody>
       <tr><td>Wrong base unit, and no stock has moved yet</td><td>Choose the right unit on the Identity tab and click <strong>Save</strong>.</td></tr>
       <tr><td>Wrong base unit, and stock has moved</td><td>The unit is locked. Create a new product with the right unit, move the stock across with an adjustment on each product (see below), then deactivate the old product.</td></tr>
-      <tr><td>Wrong pack size</td><td>On the Units tab, <strong>Remove</strong> the pack and add it again with the right size. Sales already made took the old size; if that made the stock wrong, correct it with a count.</td></tr>
+      <tr><td>Wrong pack size</td><td>On the Units tab, <strong>Remove</strong> the pack and add it again with the right size. If a barcode is on the pack, remove it on the Barcodes tab first and add it back to the new pack afterwards. Sales already made took the old size; if that made the stock wrong, correct it with a count.</td></tr>
       <tr><td>Price typed for the box instead of the tablet</td><td>On the Pricing tab, type the price of one base unit and click <strong>Save prices</strong>. Sales already made keep their price.</td></tr>
       <tr><td>A unit made without fractions that needs them</td><td>A unit cannot be edited. Make a new unit with another code and use it for new products or packs.</td></tr>
       <tr><td>Sold 1 TAB when the customer took a box</td><td>Before payment, press <kbd>F3</kbd> and change the unit. After payment, see <a href="/guide/corrections#void-or-return">Returns, voids and reprints</a>.</td></tr>

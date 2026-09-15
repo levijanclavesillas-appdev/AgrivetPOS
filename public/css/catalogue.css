@@ -208,3 +208,7 @@
 .picture-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
 .picture-actions { display: grid; gap: var(--space-2); flex: 1 1 12rem; }
 .picture-buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* TASK-055: "Printed on" beside the barcode box. */
+.inline-label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
+.inline-label select { min-height: var(--touch); }
