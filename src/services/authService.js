@@ -494,7 +494,19 @@ const APPROVAL_REFUSAL = 'The approval has expired or was not given. Ask the app
 const spentApprovals = new Map();
 
 /** POST /auth/approve: the approver's own password, for the session that asks. */
-function approve({ username, password }, requester) {
+/**
+ * TASK-060: which rules an approval is for, as the approver saw them on the panel. An
+ * approval used to prove only *who* agreed; a manager approving a discount therefore also
+ * approved, unseen, a credit sale over the customer's limit on the same request. A rule
+ * that needs to know it was the thing approved (CR-104) checks this list.
+ */
+const APPROVAL_RULE = /^[A-Z]{2,4}-\d{3}$/;
+const approvalRules = (rules) => (Array.isArray(rules) ? rules : [])
+  .map((rule) => String(rule).trim().toUpperCase())
+  .filter((rule) => APPROVAL_RULE.test(rule))
+  .slice(0, 12);
+
+function approve({ username, password, rules = [] }, requester) {
   let approver;
   try {
     approver = checkPassword({ username, password });
@@ -506,7 +518,7 @@ function approve({ username, password }, requester) {
     throw err;
   }
   const token = jwt.sign(
-    { sub: approver.id, scope: APPROVAL_SCOPE, for: requester.id, jti: crypto.randomUUID() },
+    { sub: approver.id, scope: APPROVAL_SCOPE, for: requester.id, jti: crypto.randomUUID(), rules: approvalRules(rules) },
     secrets.sessionSecret(),
     { expiresIn: `${APPROVAL_MINUTES}m` }
   );
@@ -530,7 +542,10 @@ function verifyApproval(token, requester) {
   }
   const row = userRepository.findById(claims.sub);
   if (!row || !row.is_active) throw errors.forbidden(APPROVAL_REFUSAL, { ruleId: 'AUD-603' });
-  return { id: row.id, username: row.username, role: row.role, jti: claims.jti, expiresAtMs: claims.exp * 1000 };
+  return {
+    id: row.id, username: row.username, role: row.role, jti: claims.jti, expiresAtMs: claims.exp * 1000,
+    rules: approvalRules(claims.rules),
+  };
 }
 
 /** One action per approval. `undo` puts it back, for an action that was refused. */

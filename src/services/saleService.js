@@ -550,13 +550,33 @@ function settleTenders({
           { ruleId: 'AUD-603' }
         );
       }
+      // TASK-060: the approval has to have been *for* this. One given for a discount on
+      // the same sale proves a manager was present, not that they saw the customer go
+      // over their limit. An approval from the counter always states its rules; an
+      // approver built by a service caller states none, and is taken as given.
+      if (Array.isArray(approver.rules) && !approver.rules.includes('CR-104')) {
+        throw errors.forbidden(
+          `The approval given was not for credit. ${customer.name} has ${money.toDisplay(available)} `
+          + `of credit available and this sale needs ${money.toDisplay(creditCentavos)}: a manager or `
+          + 'owner must approve going over the limit.',
+          { ruleId: 'CR-104', requiresRole: 'MANAGER or OWNER' }
+        );
+      }
+      // CR-104's own words: recorded with actor **and reason**. A sentence the system
+      // made up is not the reason anybody gave.
+      const reason = textOrNull(approver.reason);
+      if (!reason) {
+        throw errors.badRequest(
+          `Say why ${customer.name} may go over their credit limit. The reason is kept with the approval.`,
+          { ruleId: 'CR-104' }
+        );
+      }
 
       overLimit = {
         balanceCentavos: account.balance_centavos,
         limitCentavos: account.credit_limit_centavos,
         availableCentavos: available,
-        reason: textOrNull(approver.reason)
-          || `Over-limit credit authorised by ${approver.username}`,
+        reason,
       };
     }
   }

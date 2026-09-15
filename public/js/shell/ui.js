@@ -127,9 +127,11 @@ export function toast(message, { kind = 'success' } = {}) {
  * cannot read. It names the rule, states the role, and takes the approver's own
  * credentials so AUD-603's two actors are two people.
  */
-export function authorisationPanel({ message, ruleId, requiresRole, onApprove, onCancel }) {
+export function authorisationPanel({ message, ruleId, requiresRole, onApprove, onCancel, askReason = false }) {
   const username = h('input', { type: 'text', name: 'approver', autocomplete: 'off', required: true });
   const password = h('input', { type: 'password', name: 'approverPassword', autocomplete: 'off', required: true });
+  // TASK-060: CR-104 records the approver's reason with the override, so the panel asks.
+  const reason = askReason ? h('input', { type: 'text', name: 'approverReason', autocomplete: 'off', required: true, maxlength: '300' }) : null;
   const problem = h('p', { class: 'error', hidden: true });
 
   const panel = h('form', {
@@ -138,7 +140,7 @@ export function authorisationPanel({ message, ruleId, requiresRole, onApprove, o
       event.preventDefault();
       problem.hidden = true;
       try {
-        await onApprove({ username: username.value.trim(), password: password.value });
+        await onApprove({ username: username.value.trim(), password: password.value, reason: reason ? reason.value.trim() : null });
       } catch (err) {
         problem.textContent = err.message;
         problem.hidden = false;
@@ -152,6 +154,7 @@ export function authorisationPanel({ message, ruleId, requiresRole, onApprove, o
     h('p', { class: 'authorisation-role', text: `A ${String(requiresRole || '').toLowerCase()} must approve.` }),
     h('label', { text: 'Approver' }, [username]),
     h('label', { text: 'Password' }, [password]),
+    reason ? h('label', { text: 'Reason' }, [reason]) : null,
     problem,
     h('div', { class: 'authorisation-actions' }, [
       h('button', { type: 'submit', class: 'primary', icon: 'shield-check', text: 'Approve' }),

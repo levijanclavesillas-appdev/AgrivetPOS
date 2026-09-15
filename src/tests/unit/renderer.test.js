@@ -1620,12 +1620,18 @@ test('AUD-603: every screen with the authorisation panel sends the approval, not
   // The server believes only what an approval proves (middleware/auth.js). A screen that
   // sent { username } alone would be refused — this says which screen, before a store does.
   const screens = ['js/catalogue/adjustment.js', 'js/catalogue/count.js', 'js/purchasing/receive.js',
-    'js/receipt/view.js', 'js/returns/view.js', 'js/shift/view.js', 'js/payment/view.js'];
+    'js/receipt/view.js', 'js/returns/view.js', 'js/shift/view.js'];
   for (const file of screens) {
     const source = codeOf(file);
     assert.match(source, /approver: approver \? \{ username: approver\.username, token: approver\.token \} : null/, file);
   }
-  assert.match(codeOf('js/pos/view.js'), /await api\.approve\(username, password\)/);
+  // The payment screen holds the approval it will send, because its own CR-104 panel can
+  // replace the counter's (TASK-060); it still sends the token, never a bare name.
+  const payment = codeOf('js/payment/view.js');
+  assert.match(payment, /let approval = approver \? \{ username: approver\.username, token: approver\.token \} : null;/);
+  assert.match(payment, /approval = \{ username: given\.username, token: given\.token, reason \};/);
+  assert.match(payment, /approver: approval,/);
+  assert.match(codeOf('js/pos/view.js'), /await api\.approve\(username, password,/);
   assert.match(codeOf('js/shell/api.js'), /post\('\/auth\/approve'/);
 });
 
@@ -2422,4 +2428,18 @@ test('TASK-059: Admin shows to a manager, with the tabs their grants reach', () 
   assert.match(settings, /onclick: \(\) => save\(open\)/, 'a section saves only what the role may change');
   const data = codeOf('js/admin/data.js');
   assert.match(data, /const mayImport = !session \|\| session\.role === 'OWNER';/);
+});
+
+// ── TASK-060: over the credit limit, approved at the payment screen ─────────
+
+test('TASK-060: Complete over the limit opens the approval panel, which asks a reason and names CR-104', () => {
+  const payment = codeOf('js/payment/view.js');
+  assert.match(payment, /if \(credit && creditTendered\(\) > credit\.available_centavos && !approvedFor\.has\('CR-104'\)\) \{\s*askCreditApproval\(\);/);
+  assert.match(payment, /askReason: true,/);
+  assert.match(payment, /const rules = \[\.\.\.new Set\(\[\.\.\.counterRules, 'CR-104'\]\)\];/);
+  assert.match(payment, /await api\.approve\(username, password, rules\)/);
+  assert.match(payment, /if \(err\.ruleId === 'CR-104'\) \{/, 'a refusal from the server opens it too');
+  assert.match(codeOf('js/shell/api.js'), /post\('\/auth\/approve', \{ username, password, rules \}\)/);
+  assert.match(codeOf('js/shell/ui.js'), /h\('label', \{ text: 'Reason' \}, \[reason\]\)/);
+  assert.match(codeOf('js/pos/view.js'), /api\.approve\(username, password, \(priced\.authorisations \|\| \[\]\)\.map\(\(a\) => a\.rule_id\)\)/);
 });

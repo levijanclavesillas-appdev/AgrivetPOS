@@ -1183,7 +1183,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | :--- | :--- | :--- | :--- |
 | `POST` | `/auth/login` | — | `SEC-3` lockout |
 | `POST` | `/auth/pin-unlock` | — | `FR_1.3`, shift must be open |
-| `POST` | `/auth/approve` | signed in | `AUD-603`: the approver's own password, `SEC-3` lockout; answers with an approval for this session's next action (5 minutes, once), sent as `approver: { token }`. The body's approver is replaced by who the approval proves (`middleware/auth.js`) |
+| `POST` | `/auth/approve` | signed in | `AUD-603`: the approver's own password, `SEC-3` lockout; answers with an approval for this session's next action (5 minutes, once), sent as `approver: { token }`. The body's approver is replaced by who the approval proves (`middleware/auth.js`). TASK-060: `rules` names what the approver was shown; `CR-104` accepts only an approval naming it, with `approver.reason` |
 | `POST` | `/auth/recover` | — | `SEC-5`, `AUD-604` |
 | `POST` | `/auth/password` | signed in | TASK-058 — your own password: `{ currentPassword, newPassword }`. Proved with the current one (counts towards `SEC-3`); refused to a PIN session (`SEC-2`). A wrong current password is 403, not 401 |
 | `POST` | `/auth/pin` | signed in | TASK-058 — your own PIN: `{ currentPassword, pin }`, `pin: null` removes it |

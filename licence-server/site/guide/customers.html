@@ -99,12 +99,14 @@
 <section id="over-the-limit">
   <h2>When a customer is over their limit</h2>
   <p class="who"><strong>Who:</strong> Cashier; a Manager or Owner decides</p>
-  <p>When you choose a customer who has no credit left, the POS says "(name) is at their credit limit." On the payment screen, a sale bigger than their available credit shows "This sale is over their available credit. A manager or owner must authorise it." If you complete it anyway, the sale is refused: "(name) has ₱… of credit available and this sale needs ₱…".</p>
-  <p>In this version the payment screen has no button to call a manager for this. Do one of these:</p>
-  <ul>
-    <li><strong>Split the payment:</strong> put only the available amount on <strong>CREDIT</strong> and take the rest in cash, GCash or QR Ph.</li>
-    <li><strong>Raise the limit:</strong> a manager or owner changes the limit on the customer's profile (<a href="#credit-limit-and-terms">Change a credit limit</a>), with a reason. Then complete the sale.</li>
-  </ul>
+  <p>When you choose a customer who has no credit left, the POS says "(name) is at their credit limit." On the payment screen, a sale bigger than their available credit shows "This sale is more than their available credit. Put up to ₱… on CREDIT, or a manager or owner approves the rest when you press Complete."</p>
+  <ol class="steps">
+    <li>Put the amount on <strong>CREDIT</strong> and press <strong>Complete</strong>. A box headed <strong>CR-104 — authorisation required</strong> opens under the payments. It says how much credit the customer has left and how far over their limit this sale takes them.</li>
+    <li>The manager or owner types their own username in <strong>Approver</strong>, their own password in <strong>Password</strong>, and in <strong>Reason</strong> why the customer may go over (for example <em>Pays every Friday; owner agreed</em>).</li>
+    <li>They click <strong>Approve</strong>. The sale completes and the receipt prints. The audit trail records the cashier, the approver and the reason.</li>
+  </ol>
+  <p>The approver must be a manager or owner, and not the person selling. A cashier's name is refused in the box: <em>… is a cashier and cannot approve this. A manager or owner must.</em> A manager's approval for a discount on the same sale does not cover going over the limit, so the box asks again. <strong>Cancel</strong> closes the box and keeps the sale on the screen.</p>
+  <p>Instead of an approval you can put only the available amount on <strong>CREDIT</strong> and take the rest in cash, GCash or QR Ph, or a manager or owner can raise the limit (<a href="/guide/customers#credit-limit-and-terms">Change a credit limit</a>).</p>
   <p>The dashboard lists how many accounts have reached their limit.</p>
 </section>
 

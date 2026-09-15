@@ -38,7 +38,11 @@ function provenApprover(req, res) {
 
   const approval = authService.verifyApproval(body.approver && body.approver.token, req.session);
   const reason = body.approver && typeof body.approver.reason === 'string' ? body.approver.reason : undefined;
-  body.approver = { id: approval.id, username: approval.username, role: approval.role, ...(reason ? { reason } : {}) };
+  // `rules`: what the approver was shown and agreed to (TASK-060), for the rules that ask.
+  body.approver = {
+    id: approval.id, username: approval.username, role: approval.role, rules: approval.rules,
+    ...(reason ? { reason } : {}),
+  };
 
   const giveBack = authService.spendApproval(approval);
   res.on('finish', () => { if (res.statusCode >= 400) giveBack(); });

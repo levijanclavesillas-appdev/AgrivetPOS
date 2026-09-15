@@ -4,6 +4,13 @@
 // Complete stays disabled until SUM(tenders) ≥ due (POS-204) and says *why* it is
 // disabled, because 04_UX_SPEC.md §6 puts rule validation at the point of action and a
 // greyed-out button with no explanation is what cashiers ring the owner about.
+//
+// TASK-060: CR-104's approval happens here. The screen said "a manager or owner must
+// authorise it" and offered nobody a way to: the only way through was to split the bill
+// or raise the limit. Now Complete, with more on credit than the customer has available,
+// opens the authorisation panel under the tenders; the manager signs, gives the reason
+// CR-104 records, and the sale completes with an approval that names CR-104. It replaces
+// any approval the counter already got for a discount, and covers those rules too.
 
 import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
@@ -12,6 +19,12 @@ import { money } from '../shell/format.js';
 import { createTenders, METHODS, NEEDS_REFERENCE, NEEDS_CUSTOMER } from './tenders.js';
 
 export function createPayment({ root, cart, priced, approver = null, onComplete, onCancel }) {
+  // The approval the sale will carry, and the rules it was given for (TASK-060).
+  const counterRules = (priced.authorisations || []).map((a) => a.rule_id);
+  let approval = approver ? { username: approver.username, token: approver.token } : null;
+  let approvedFor = new Set(approver ? counterRules : []);
+  let credit = null;                         // GET /customers/:id/credit, when there is one
+  const authHost = h('div', { class: 'payment-authorisation' });
   // CR-108: what the store is holding for this customer, fetched with their credit
   // below. Nothing is offered against it until the server has said what it is — a
   // screen that guessed would offer a tender the sale then refuses.
@@ -161,7 +174,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
   async function renderCredit() {
     if (!cart.customer) return;
     try {
-      const { credit } = await api.get(`/customers/${cart.customer.id}/credit`);
+      ({ credit } = await api.get(`/customers/${cart.customer.id}/credit`));
       if (!credit) return;
 
       // CR-108: the balance the customer holds, and the tender that spends it. Set
@@ -185,7 +198,9 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
             + 'It can pay for this sale, in whole or in part (CR-108).' })
           : null,
         over
-          ? h('p', { class: 'credit-warning', text: 'This sale is over their available credit. A manager or owner must authorise it.' })
+          ? h('p', { class: 'credit-warning', text: `This sale is more than their available credit. Put up to `
+            + `${money(Math.max(0, credit.available_centavos))} on CREDIT, or a manager or owner approves the rest `
+            + 'when you press Complete.' })
           : null,
       ].filter(Boolean));
       creditHost.hidden = false;
@@ -194,9 +209,55 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
     } catch { /* not credit-eligible; the server refuses a credit tender anyway */ }
   }
 
+  const creditTendered = () => tenders.rows
+    .filter((row) => row.method === 'CREDIT')
+    .reduce((sum, row) => sum + (row.amountCentavos || 0), 0);
+
+  /**
+   * CR-104's panel, under the tenders rather than over them: the approver reads the
+   * figures they are approving on the screen behind it (04_UX_SPEC.md §4).
+   */
+  function askCreditApproval(message = null) {
+    const onCredit = creditTendered();
+    // Over by what the balance will exceed the limit, not by what exceeds "available"
+    // shown as zero: a customer already past their limit goes further past it.
+    const availableNow = credit ? credit.available_centavos : 0;
+    const text = message || `${cart.customer.name} has ${money(Math.max(0, availableNow))} of credit available. `
+      + `This sale puts ${money(onCredit)} on credit, taking them ${money(onCredit - availableNow)} over their `
+      + `limit of ${money(credit ? credit.credit_limit_centavos : 0)}.`;
+    clear(authHost).append(ui.authorisationPanel({
+      message: text,
+      ruleId: 'CR-104',
+      requiresRole: 'MANAGER or OWNER',
+      askReason: true,
+      onCancel: () => { clear(authHost); completeButton.focus(); },
+      onApprove: async ({ username, password, reason }) => {
+        if (!reason) throw new Error(`Say why ${cart.customer.name} may go over their limit.`);
+        // One approval for the sale: whatever the counter already needed, and the credit.
+        const rules = [...new Set([...counterRules, 'CR-104'])];
+        const given = await api.approve(username, password, rules);
+        // Said in the panel, not after a round trip: the server refuses it again anyway.
+        if (!['MANAGER', 'OWNER'].includes(given.role)) {
+          throw new Error(`${given.username} is a ${String(given.role).toLowerCase()} and cannot approve this. `
+            + 'A manager or owner must.');
+        }
+        approval = { username: given.username, token: given.token, reason };
+        approvedFor = new Set(rules);
+        clear(authHost);
+        await complete();
+      },
+    }));
+  }
+
   async function complete() {
     const blocked = tenders.blockedReason();
     if (blocked) return ui.toast(blocked, { kind: 'error' });
+
+    // CR-104, asked before the sale is sent rather than discovered in its refusal.
+    if (credit && creditTendered() > credit.available_centavos && !approvedFor.has('CR-104')) {
+      askCreditApproval();
+      return undefined;
+    }
 
     completeButton.disabled = true;
     const request = {
@@ -205,7 +266,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
       // §4.1: sent so the server can compare and reject a stale screen. Never banked.
       clientTotalCentavos: priced.total_centavos,
       acceptDuplicateReference: tenders.anyDuplicateAccepted(),
-      approver: approver ? { username: approver.username, token: approver.token } : null,
+      approver: approval,
     };
 
     try {
@@ -214,6 +275,13 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
       onComplete(sale);
     } catch (err) {
       completeButton.disabled = false;
+      // The limit moved under the screen (another till, a payment), or the approval did
+      // not cover it: the panel again, with the server's own sentence.
+      if (err.ruleId === 'CR-104') {
+        approvedFor.delete('CR-104');
+        askCreditApproval(err.message);
+        return;
+      }
       if (err.isRefusal) {
         // 04_UX_SPEC.md §5's refused state, with the rule and the role.
         const host = h('div', { class: 'payment-refusal' });
@@ -227,6 +295,11 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
   }
 
   function onKeyDown(event) {
+    // Keys typed into the approval panel are the panel's: Enter approves, Escape closes it.
+    if (authHost.contains(event.target)) {
+      if (event.key === 'Escape') { event.preventDefault(); clear(authHost); completeButton.focus(); }
+      return undefined;
+    }
     if (event.key === 'Escape') { event.preventDefault(); onCancel(); }
     if (event.key === 'Enter' && !completeButton.disabled) { event.preventDefault(); complete(); }
     if (event.key === 'F10') {
@@ -246,6 +319,7 @@ export function createPayment({ root, cart, priced, approver = null, onComplete,
       creditHost,
       rowsHost,
       addBar,
+      authHost,
       blockedNote,
       h('div', { class: 'payment-actions' }, [
         completeButton,

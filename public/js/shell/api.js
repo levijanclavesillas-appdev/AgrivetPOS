@@ -105,8 +105,9 @@ export const post = (path, body, opts) => request('POST', path, body ?? {}, opts
  * is an approval for this session's next action — sent back as `approver: { token }` —
  * and never the approver's own session, so this screen does not hold their sign-in.
  */
-export async function approve(username, password) {
-  const { approver, approval_token: token } = await post('/auth/approve', { username, password });
+export async function approve(username, password, rules = []) {
+  // TASK-060: `rules` — what the approver is being shown, so the approval is for those.
+  const { approver, approval_token: token } = await post('/auth/approve', { username, password, rules });
   return { ...approver, token };
 }
 export const put = (path, body, opts) => request('PUT', path, body ?? {}, opts);

@@ -760,7 +760,7 @@ export function createPos({ root, session, onPay }) {
       onApprove: async ({ username, password }) => {
         // AUD-603: the approver authenticates as themselves, so the two actors the
         // server records are two people rather than one person typing a name.
-        const approver = await api.approve(username, password);
+        const approver = await api.approve(username, password, (priced.authorisations || []).map((a) => a.rule_id));
         modalOpen = false;
         clear(panelHost);
         onPay({ cart, priced, approver });

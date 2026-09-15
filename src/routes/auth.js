@@ -45,8 +45,8 @@ router.post('/auth/recover', (req, res, next) => {
 // the cashier's screen never holds the manager's sign-in.
 router.post('/auth/approve', authenticate, (req, res, next) => {
   try {
-    const { username, password } = req.body || {};
-    res.json(authService.approve({ username, password }, req.session));
+    const { username, password, rules } = req.body || {};
+    res.json(authService.approve({ username, password, rules }, req.session));
   } catch (err) {
     next(err);
   }

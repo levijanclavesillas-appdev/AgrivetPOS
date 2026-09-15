@@ -1020,3 +1020,55 @@ test('TASK-055: a pack with a barcode on it cannot be removed out from under the
   const trail = auditService.browse({ action: 'BARCODE_ATTACHED', entityId: product.id }).rows;
   assert.equal(trail[0].after.pack_unit, 'SACK', 'the trail says which pack the code went on');
 });
+
+test('TASK-060: over the credit limit at the counter needs an approval given for CR-104, with a reason', async () => {
+  const product = stocked({ retail: 100000 });
+  const { customer, account } = creditCustomer({ limit: 50000 });   // ₱500 limit, a ₱1,000 sale
+  const approve = async (rules, username = 'manager') => (await (await call('/auth/approve', {
+    token: tokens.CASHIER, method: 'POST', body: { username, password: PASSWORD, rules },
+  })).json()).approval_token;
+  const sell = (approver) => call('/sales', {
+    token: tokens.CASHIER, method: 'POST',
+    body: {
+      lines: [{ productId: product.id, qtyMilli: 1000 }],
+      customerId: customer.id,
+      tenders: [{ method: 'CREDIT', amountCentavos: 100000 }],
+      clientTotalCentavos: 100000,
+      approver,
+    },
+  });
+
+  // With no approval: the refusal the payment screen turns into its panel.
+  const none = await (await sell(null)).json();
+  assert.equal(none.error.rule_id, 'CR-104');
+
+  // A manager's approval for a discount on the same sale is not an approval of the credit.
+  const forDiscount = await sell({ username: 'manager', token: await approve(['PR-203']), reason: 'regular' });
+  assert.equal(forDiscount.status, 403);
+  const discountBody = await forDiscount.json();
+  assert.equal(discountBody.error.rule_id, 'CR-104');
+  assert.match(discountBody.error.message, /not for credit/);
+
+  // For CR-104, but with no reason: CR-104 records one.
+  const token = await approve(['PR-203', 'CR-104']);
+  const noReason = await sell({ username: 'manager', token });
+  assert.equal(noReason.status, 400);
+  assert.equal(creditRepository.findAccount(account.id).balance_centavos, 0, 'nothing debited yet');
+
+  // The same approval was given back by the refusal, and now carries the reason.
+  const res = await sell({ username: 'manager', token, reason: 'Pays every harvest; owner agreed by phone' });
+  const body = await res.json();
+  assert.equal(res.status, 201, JSON.stringify(body));
+  assert.equal(body.sale.approved_by, sessions.MANAGER.id);
+  assert.equal(creditRepository.findAccount(account.id).balance_centavos, 100000);
+
+  const [row] = auditService.browse({ action: 'OVERRIDE_CREDIT_OVER_LIMIT' }).rows
+    .filter((r) => r.reason === 'Pays every harvest; owner agreed by phone');
+  assert.equal(row.actor.username, 'cashier');
+  assert.equal(row.approver.username, 'manager');
+
+  // And an approval is one sale: the same token again is refused.
+  const again = await sell({ username: 'manager', token, reason: 'again' });
+  assert.equal(again.status, 403);
+  assert.equal((await again.json()).error.rule_id, 'AUD-603');
+});
