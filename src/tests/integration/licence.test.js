@@ -33,6 +33,7 @@ let pos;
 let BASE;
 let licenceHttp;
 let licensing;           // the licence server's service
+let signingKey;          // …and its private key, to write a licence as an older server did
 const tokens = {};
 
 const call = (p, { token, method = 'GET', body = null } = {}) => fetch(`${BASE}${p}`, {
@@ -47,6 +48,7 @@ const inDays = (days) => new Date(Date.now() + days * DAY).toISOString();
 test.before(async () => {
   // The licence server, as it will run at pos.chachisoftware.store.
   const { privateKey } = crypto.generateKeyPairSync('ed25519');
+  signingKey = privateKey;
   licensing = createService({
     db: licenceDb.open(':memory:'),
     config: { baseUrl: 'http://licence.test', validityDays: 30, graceDays: 7, warningDays: 7, trialDays: 14 },
@@ -199,4 +201,55 @@ test('NFR_3.1: with the licence server unreachable, the check fails politely and
   const status = licenceService.state();
   assert.equal(status.state, 'ACTIVE');
   assert.match(status.last_error, /could not be reached/);
+});
+
+// ── TASK-067: a one-time licence ────────────────────────────────────────────
+
+test('LIC-005: a one-time licence set on the licence server arrives with the next check, and is audited', async () => {
+  const storeId = licenceService.state().store_id;
+  licensing.setOneTime({ storeId, amountCentavos: 1500000, reference: 'BDO-1', recordedBy: 'admin' });
+
+  const renewed = await json(await call('/licence/renew', { token: tokens.OWNER, method: 'POST' }));
+  assert.equal(renewed.status, 200);
+  assert.equal(renewed.body.state, 'ACTIVE');
+  assert.equal(renewed.body.plan, 'ONE_TIME');
+  assert.equal(renewed.body.paid_until, null, 'nothing to show as a paid-until');
+  assert.equal(renewed.body.ends_because, 'OFFLINE', 'only the monthly check can end it');
+  assert.match(renewed.body.message, /^One-time licence: no subscription to renew\. This POS checks in online by \d{4}-\d{2}-\d{2}\.$/);
+  assert.doesNotThrow(() => licenceService.assertMayOpenShift());
+
+  const audit = db.get().prepare("SELECT * FROM audit_logs WHERE action = 'LICENCE_RENEWED' ORDER BY rowid DESC").get();
+  assert.deepEqual(JSON.parse(audit.before_value).plan, 'MONTHLY');
+  assert.deepEqual(JSON.parse(audit.after_value), { plan: 'ONE_TIME', paid_until: '9999-12-31T00:00:00.000Z' });
+
+  // Only a change of plan or date is recorded.
+  const count = () => db.get().prepare("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'LICENCE_RENEWED'").get().n;
+  const before = count();
+  await call('/licence/renew', { token: tokens.OWNER, method: 'POST' });
+  assert.equal(count(), before);
+});
+
+test('LIC-005: a licence from before TASK-067, plan "monthly", is read as the monthly plan', () => {
+  const good = licenceRepository.get().licence;
+  const payload = JSON.parse(Buffer.from(good.split('.')[1], 'base64url').toString('utf8'));
+  const older = licenceSigning.sign({ ...payload, plan: 'monthly', paid_until: inDays(60) }, signingKey);
+  licenceRepository.update({ licence: older }, new Date().toISOString());
+  try {
+    const state = licenceService.state();
+    assert.equal(state.plan, 'MONTHLY');
+    assert.match(state.message, /^Subscribed until /);
+    assert.ok(state.paid_until);
+  } finally {
+    licenceRepository.update({ licence: good }, new Date().toISOString());
+  }
+  assert.equal(licenceService.state().plan, 'ONE_TIME');
+});
+
+test('LIC-007: a one-time POS that stays offline past its check and grace opens no new shift', () => {
+  // Checked today: valid 30 days, then 7 of grace. This moves the POS's clock on for good (LIC-003).
+  assert.equal(licenceService.state({ at: inDays(25) }).state, 'WARNING');
+  assert.match(licenceService.state({ at: inDays(25) }).message, /^The licence ends on .*has not reached the licence server/);
+  assert.equal(licenceService.state({ at: inDays(33) }).state, 'GRACE');
+  assert.throws(() => licenceService.assertMayOpenShift({ at: inDays(38) }), (err) => err.ruleId === 'LIC-001'
+    && /^The licence ended on .* no new shift can be opened until it is renewed/.test(err.message));
 });

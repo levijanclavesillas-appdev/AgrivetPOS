@@ -113,7 +113,9 @@ export function createLicence({ root, session }) {
         : status.message }),
       linked ? h('dl', { class: 'licence-facts' }, [
         fact('Owner', status.owner_email),
-        fact('Paid until', date(status.paid_until)),
+        // TASK-067: a one-time licence has no paid-until to show.
+        fact('Plan', status.plan === 'ONE_TIME' ? 'One-time licence' : 'Monthly subscription'),
+        status.plan === 'ONE_TIME' ? null : fact('Paid until', date(status.paid_until)),
         fact('Last checked', date(status.checked_at)),
         fact('Check again by', date(status.valid_until)),
       ]) : null,

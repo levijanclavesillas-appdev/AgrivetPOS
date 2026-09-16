@@ -791,6 +791,14 @@ test('SEC-9: SCR-704 says who can read a backup, and promises no encryption', ()
   );
 });
 
+test('TASK-067: SCR-707 names the plan, and a one-time licence shows no paid-until', () => {
+  const code = codeOf('js/admin/licence.js');
+  assert.match(code, /fact\('Plan', status\.plan === 'ONE_TIME' \? 'One-time licence' : 'Monthly subscription'\)/);
+  assert.match(code, /status\.plan === 'ONE_TIME' \? null : fact\('Paid until'/);
+  // The sentence itself is the server's (licenceService), so the two cannot disagree.
+  assert.match(code, /text: status\.state === 'UNLINKED'[\s\S]*?: status\.message \}/);
+});
+
 test('OPS-004: the restore needs the filename typed, checked in the view too', () => {
   const source = codeOf('js/admin/backup.js');
 

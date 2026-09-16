@@ -377,3 +377,218 @@ test('TASK-065: pages behind a sign-in answer a page load, never a script', asyn
   }
 });
 
+
+// ── TASK-067: one-time licences, and plans set by hand ───────────────────────
+
+async function adminCookie(s) {
+  return cookieOf(await form(s.base, '/admin/login', { password: PASSWORD }, ''));
+}
+const adminCsrf = async (s, cookie, where = '/admin') => csrfIn(await (await fetch(s.base + where, { headers: { cookie } })).text());
+
+test('TASK-067: a trial store set as one-time paid is paid for good; a payment or a Play purchase leaves it so', async () => {
+  const s = await boot({ playVerify: async (q) => ({ productId: q.productId, expiry: '2026-11-15T00:00:00.000Z', state: 'SUBSCRIPTION_STATE_ACTIVE' }) });
+  try {
+    const device = await linkedDevice(s);
+    const storeId = licence.verify(device.licence, s.publicKey).store_id;
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie, `/admin/stores/${storeId}`);
+
+    // Unconfirmed, nothing happens; without the token, nothing either.
+    assert.equal((await form(s.base, `/admin/stores/${storeId}/one-time`, { csrf, amount: '15,000' }, cookie)).status, 400);
+    assert.equal((await form(s.base, `/admin/stores/${storeId}/one-time`, { amount: '15,000', confirm: 'yes' }, cookie)).status, 403);
+    assert.equal(s.service.storeDetail(storeId).store.plan, 'MONTHLY');
+
+    const set = await form(s.base, `/admin/stores/${storeId}/one-time`, { csrf, amount: '15,000', reference: 'BDO-9', confirm: 'yes' }, cookie);
+    assert.equal(set.status, 302);
+    const detail = s.service.storeDetail(storeId);
+    assert.equal(detail.store.plan, 'ONE_TIME');
+    assert.equal(detail.store.paid_until, '9999-12-31T00:00:00.000Z');
+    assert.deepEqual(
+      { method: detail.payments[0].method, amount: detail.payments[0].amount_centavos, before: detail.payments[0].paid_until_before },
+      { method: 'ONE_TIME', amount: 1500000, before: '2026-09-29T00:00:00.000Z' },
+    );
+
+    const renewed = licence.verify((await (await post(s.base, '/api/v1/licence/renew', { installation_id: 'inst-0000-0010', installation_secret: device.installation_secret })).json()).licence, s.publicKey);
+    assert.equal(renewed.plan, 'ONE_TIME');
+    assert.equal(renewed.paid_until, '9999-12-31T00:00:00.000Z');
+    assert.equal(renewed.valid_until, '2026-10-15T00:00:00.000Z', 'LIC-007: still checked in every 30 days');
+
+    const page = await (await fetch(`${s.base}/admin/stores/${storeId}`, { headers: { cookie } })).text();
+    assert.match(page, /One-time licence<\/strong>, paid for good/);
+    assert.match(page, /no subscription to extend/);
+    assert.doesNotMatch(page, /Record payment<\/button>/);
+    assert.match(await (await fetch(`${s.base}/admin`, { headers: { cookie } })).text(), /<td>One-time<\/td>/);
+
+    assert.throws(() => s.service.recordPayment({ storeId, months: 1, recordedBy: 'admin' }), /one-time licence/);
+    assert.throws(() => s.service.setOneTime({ storeId, recordedBy: 'admin' }), /already has a one-time/);
+    const play = licence.verify((await (await post(s.base, '/api/v1/play/purchase', {
+      installation_id: 'inst-0000-0010', installation_secret: device.installation_secret, product_id: 'pos_monthly', purchase_token: 'p-1',
+    })).json()).licence, s.publicKey);
+    assert.equal(play.plan, 'ONE_TIME');
+    assert.equal(play.paid_until, '9999-12-31T00:00:00.000Z');
+  } finally { await s.close(); }
+});
+
+test('TASK-067: paid until a date, later or earlier, with a reason; earlier is confirmed first', async () => {
+  const s = await boot();
+  try {
+    const device = await linkedDevice(s);
+    const storeId = licence.verify(device.licence, s.publicKey).store_id;
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie, `/admin/stores/${storeId}`);
+    const to = (fields) => form(s.base, `/admin/stores/${storeId}/paid-until`, { csrf, ...fields }, cookie);
+
+    assert.equal((await to({ date: '2026-12-31' })).status, 400, 'a reason is required');
+    assert.equal((await to({ date: '2026-02-30', note: 'free month' })).status, 400, 'a date that does not exist');
+    assert.equal((await to({ date: '2026-12-31', note: 'Free months for the pilot' })).status, 302);
+    let store = s.service.storeDetail(storeId).store;
+    assert.equal(store.paid_until, '2026-12-31T15:59:59.999Z', 'through the 31st in Manila');
+    assert.equal(s.service.storeDetail(storeId).payments[0].method, 'OVERRIDE');
+
+    const shorter = await to({ date: '2026-09-14', note: 'Did not pay' });
+    assert.equal(shorter.status, 400);
+    assert.match(await shorter.text(), /earlier than what the store has now \(paid until 2026-12-31\)/);
+    assert.equal((await to({ date: '2026-09-14', note: 'Did not pay', confirm: 'yes' })).status, 302);
+    store = s.service.storeDetail(storeId).store;
+    assert.equal(store.paid_until, '2026-09-14T15:59:59.999Z');
+
+    // From one-time, any date takes the licence away, so it is confirmed too.
+    s.service.setOneTime({ storeId, recordedBy: 'admin' });
+    assert.equal((await to({ date: '2030-01-01', note: 'Moved to monthly' })).status, 400);
+    assert.equal((await to({ date: '2030-01-01', note: 'Moved to monthly', confirm: 'yes' })).status, 302);
+    assert.equal(s.service.storeDetail(storeId).store.plan, 'MONTHLY');
+  } finally { await s.close(); }
+});
+
+test('TASK-067: revoking a one-time licence leaves the store unpaid from today, with the reason kept', async () => {
+  const s = await boot();
+  try {
+    const device = await linkedDevice(s);
+    const storeId = licence.verify(device.licence, s.publicKey).store_id;
+    s.service.setOneTime({ storeId, recordedBy: 'admin' });
+    s.advance(40);
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie, `/admin/stores/${storeId}`);
+
+    assert.equal((await form(s.base, `/admin/stores/${storeId}/revoke-one-time`, { csrf, note: 'Refunded' }, cookie)).status, 400);
+    assert.equal((await form(s.base, `/admin/stores/${storeId}/revoke-one-time`, { csrf, confirm: 'yes' }, cookie)).status, 400, 'a reason is required');
+    assert.equal((await form(s.base, `/admin/stores/${storeId}/revoke-one-time`, { csrf, note: 'Refunded', confirm: 'yes' }, cookie)).status, 302);
+
+    const { store, payments } = s.service.storeDetail(storeId);
+    assert.deepEqual({ plan: store.plan, paid_until: store.paid_until }, { plan: 'MONTHLY', paid_until: '2026-10-25T00:00:00.000Z' });
+    assert.equal(payments[0].note, 'One-time licence revoked: Refunded');
+    assert.equal(payments[0].paid_until_before, '9999-12-31T00:00:00.000Z');
+    assert.equal(payments.length, 3, 'trial, one-time, revoked: nothing edited in place');
+
+    const renewed = licence.verify((await (await post(s.base, '/api/v1/licence/renew', { installation_id: 'inst-0000-0010', installation_secret: device.installation_secret })).json()).licence, s.publicKey);
+    assert.deepEqual({ plan: renewed.plan, paid_until: renewed.paid_until }, { plan: 'MONTHLY', paid_until: '2026-10-25T00:00:00.000Z' });
+    assert.throws(() => s.service.revokeOneTime({ storeId, note: 'again', recordedBy: 'admin' }), /does not have a one-time/);
+  } finally { await s.close(); }
+});
+
+test('TASK-067: a store registered for an e-mail is linked by that Google account as it was set up, with no trial', async () => {
+  const s = await boot({ googleClaims: { sub: 'g-rosa', email: 'rosa@example.com', name: 'Rosa' } });
+  try {
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie);
+    const added = await form(s.base, '/admin/stores', {
+      csrf, store_name: 'Botika ni Aling Rosa', owner_email: ' Rosa@Example.com ', plan: 'ONE_TIME', amount: '15000', reference: 'CASH',
+    }, cookie);
+    assert.equal(added.status, 302);
+    const [registered] = s.service.listStores();
+    assert.deepEqual(
+      { owner_sub: registered.owner_sub, owner_email: registered.owner_email, plan: registered.plan },
+      { owner_sub: null, owner_email: 'rosa@example.com', plan: 'ONE_TIME' },
+    );
+    assert.match(await (await fetch(`${s.base}/admin`, { headers: { cookie } })).text(), /not linked yet/);
+
+    // Another Google account is not offered it, and cannot take it.
+    assert.equal(s.service.storesForApproval({ sub: 'g-other', email: 'other@example.com' }).length, 0);
+
+    const { started, cookie: owner, approvePage } = await linkAndSignIn(s, { installationId: 'inst-0000-0067' });
+    assert.match(approvePage, /Botika ni Aling Rosa<\/strong><br><span class="muted">One-time licence · set up for you by Chachi's/);
+    const elsewhere = s.service.registerStore({ name: 'Not Rosa\'s', ownerEmail: 'other@example.com', plan: 'ONE_TIME', recordedBy: 'admin' });
+    const taken = await form(s.base, '/link/approve', { csrf: csrfIn(approvePage), code: started.user_code, store_id: elsewhere.id }, owner);
+    assert.equal(taken.status, 403, 'a store registered for another e-mail');
+    const approved = await form(s.base, '/link/approve', { csrf: csrfIn(approvePage), code: started.user_code, store_id: registered.id }, owner);
+    assert.equal(approved.status, 200);
+    assert.match(await approved.text(), /One-time licence\. You can close this page/);
+
+    const picked = await (await post(s.base, '/api/v1/device/poll', { device_code: started.device_code })).json();
+    const payload = licence.verify(picked.licence, s.publicKey);
+    assert.deepEqual({ store: payload.store_id, plan: payload.plan }, { store: registered.id, plan: 'ONE_TIME' });
+    const detail = s.service.storeDetail(registered.id);
+    assert.equal(detail.store.owner_sub, 'g-rosa');
+    assert.deepEqual(detail.payments.map((p) => p.method), ['ONE_TIME'], 'no trial row');
+
+    // Linked now: it cannot be deleted, and it is the owner's own on the next approval.
+    assert.throws(() => s.service.deleteUnlinkedStore(registered.id), /has been linked/);
+    assert.equal(s.service.storesForApproval({ sub: 'g-rosa', email: 'rosa@example.com' })[0].registered, undefined);
+  } finally { await s.close(); }
+});
+
+test('TASK-067: registering checks its fields; a store nobody linked can be deleted, after a confirmation', async () => {
+  const s = await boot();
+  try {
+    assert.throws(() => s.service.registerStore({ name: 'X', ownerEmail: 'a@b.co', plan: 'TRIAL', recordedBy: 'admin' }), /name/);
+    assert.throws(() => s.service.registerStore({ name: 'Store', ownerEmail: 'not an email', plan: 'TRIAL', recordedBy: 'admin' }), /e-mail/);
+    assert.throws(() => s.service.registerStore({ name: 'Store', ownerEmail: 'a@b.co', plan: 'FREE', recordedBy: 'admin' }), /how the store is paid/);
+    assert.throws(() => s.service.registerStore({ name: 'Store', ownerEmail: 'a@b.co', plan: 'PAID_UNTIL', recordedBy: 'admin' }), /YYYY-MM-DD/);
+
+    const trial = s.service.registerStore({ name: 'Trial store', ownerEmail: 'a@b.co', plan: 'TRIAL', recordedBy: 'admin' });
+    assert.equal(trial.paid_until, '2026-09-29T00:00:00.000Z');
+    const paid = s.service.registerStore({ name: 'Paid store', ownerEmail: 'a@b.co', plan: 'PAID_UNTIL', date: '2027-03-31', amountCentavos: 299400, recordedBy: 'admin' });
+    assert.deepEqual({ plan: paid.plan, paid_until: paid.paid_until }, { plan: 'MONTHLY', paid_until: '2027-03-31T15:59:59.999Z' });
+
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie, `/admin/stores/${paid.id}`);
+    assert.match(await (await fetch(`${s.base}/admin/stores/${paid.id}`, { headers: { cookie } })).text(), /Delete store/);
+    assert.equal((await form(s.base, `/admin/stores/${paid.id}/delete`, { csrf }, cookie)).status, 400);
+    const deleted = await form(s.base, `/admin/stores/${paid.id}/delete`, { csrf, confirm: 'yes' }, cookie);
+    assert.equal(deleted.status, 302);
+    assert.equal(s.service.storeDetail(paid.id), null);
+    assert.deepEqual(s.service.listStores().map((x) => x.name), ['Trial store']);
+  } finally { await s.close(); }
+});
+
+test('TASK-067: a database from before one-time licences opens with its stores and payments as they were', () => {
+  const Database = require('better-sqlite3');
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'licence-db-')), 'licences.db');
+  const old = new Database(file);
+  old.exec(`CREATE TABLE stores (id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_sub TEXT NOT NULL, owner_email TEXT NOT NULL,
+              plan TEXT NOT NULL DEFAULT 'monthly', paid_until TEXT NOT NULL, created_at TEXT NOT NULL);
+            CREATE INDEX stores_owner ON stores(owner_sub);
+            CREATE TABLE installations (id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES stores(id), secret_hash TEXT NOT NULL,
+              platform TEXT, app_version TEXT, created_at TEXT NOT NULL, last_check_at TEXT, revoked_at TEXT);
+            CREATE TABLE payments (id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES stores(id),
+              method TEXT NOT NULL CHECK (method IN ('MANUAL','PLAY','TRIAL')), amount_centavos INTEGER, reference TEXT, note TEXT,
+              paid_until_before TEXT, paid_until_after TEXT NOT NULL, recorded_by TEXT NOT NULL, created_at TEXT NOT NULL);
+            INSERT INTO stores VALUES ('s1', 'Botika', 'g-1', 'rosa@example.com', 'monthly', '2026-10-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z');
+            INSERT INTO installations VALUES ('inst-1', 's1', 'hash', 'Windows', '1.0.0', '2026-09-01T00:00:00.000Z', NULL, NULL);
+            INSERT INTO payments VALUES ('p1', 's1', 'TRIAL', NULL, NULL, '14-day trial', NULL, '2026-09-15T00:00:00.000Z', 'rosa@example.com', '2026-09-01T00:00:00.000Z'),
+                                        ('p2', 's1', 'MANUAL', 49900, 'GC-1', NULL, '2026-09-15T00:00:00.000Z', '2026-10-01T00:00:00.000Z', 'admin', '2026-09-10T00:00:00.000Z');`);
+  old.close();
+
+  const upgraded = db.open(file);
+  try {
+    assert.deepEqual(upgraded.prepare('SELECT id, plan, owner_sub, paid_until FROM stores').all(),
+      [{ id: 's1', plan: 'MONTHLY', owner_sub: 'g-1', paid_until: '2026-10-01T00:00:00.000Z' }]);
+    assert.deepEqual(upgraded.prepare('SELECT id, method, amount_centavos FROM payments ORDER BY id').all(),
+      [{ id: 'p1', method: 'TRIAL', amount_centavos: null }, { id: 'p2', method: 'MANUAL', amount_centavos: 49900 }]);
+    assert.equal(upgraded.prepare('SELECT store_id FROM installations').get().store_id, 's1');
+    assert.deepEqual(upgraded.pragma('foreign_key_check'), []);
+    assert.equal(upgraded.pragma('foreign_keys', { simple: true }), 1);
+
+    // The new values are accepted, and a store may wait for its owner.
+    upgraded.prepare("INSERT INTO stores (id, name, owner_sub, owner_email, plan, paid_until, created_at) VALUES ('s2', 'New', NULL, 'x@y.z', 'ONE_TIME', 'x', 'x')").run();
+    upgraded.prepare("INSERT INTO payments (id, store_id, method, paid_until_after, recorded_by, created_at) VALUES ('p3', 's2', 'OVERRIDE', 'x', 'admin', 'x')").run();
+    assert.throws(() => upgraded.prepare("INSERT INTO stores (id, name, owner_email, plan, paid_until, created_at) VALUES ('s3', 'Bad', 'x', 'monthly', 'x', 'x')").run(), /CHECK/);
+  } finally { upgraded.close(); }
+
+  const again = db.open(file);   // a second start rebuilds nothing
+  assert.equal(again.prepare('SELECT COUNT(*) AS n FROM payments').get().n, 3);
+  again.close();
+});

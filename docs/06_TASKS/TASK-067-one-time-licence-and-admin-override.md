@@ -22,7 +22,63 @@ So there are two ways to pay, and Chachi's admin can set either one by hand:
 - **Admin override.** On the admin page, the admin sets a store's plan and marks it paid. The
   store then has access at its next check, with no Google Play and no payment in the app.
 
-## Before starting — 3 answers are needed
+> **Built 2026-09-16.** The owner answered **yes** to all three questions below ("yes proceed").
+>
+> - **Answer 1.** A one-time store still checks in every 30 days.
+> - **Answer 2.** One-time covers the store's software for good, on every device it links, with
+>   updates. There is no device limit and no update window.
+> - **Answer 3.** The admin can add a store before its owner links it.
+>
+> **As built.**
+>
+> - **The licence server.** `db.js` rebuilds `stores` and `payments` once:
+>   - **Plans.** `plan` is `MONTHLY`/`ONE_TIME`, and old `monthly` rows are converted.
+>   - **Owners.** `owner_sub` may be null.
+>   - **Payment methods.** `payments.method` gains `ONE_TIME` and `OVERRIDE`.
+>   - **How.** Rows are copied with foreign keys off, then checked, and a second start rebuilds
+>     nothing.
+> - **The service.** `service.js` gains `setOneTime`, `setPaidUntil`, `revokeOneTime`,
+>   `registerStore`, `deleteUnlinkedStore` and `storesForApproval`.
+>   - **One-time stores.** `recordPayment` refuses them, and `applyPlayPurchase` leaves them alone.
+>   - **Registered stores.** `approveLink` lets a registered store be claimed only by the Google
+>     account whose verified e-mail it was registered for.
+>   - **Dates.** A date typed on the admin page means through that day in Manila:
+>     `T15:59:59.999Z`.
+> - **The admin page.** New forms, all under the existing admin session and CSRF token:
+>   - Set as one-time paid, and Revoke;
+>   - Set paid until;
+>   - Add a store, and Delete store.
+>
+>   Anything that removes or shortens access needs a ticked confirmation, and an override or a
+>   revoke needs a note. The stores list shows the plan and *not linked yet*. Every change is a row
+>   under *Payments and changes*, with its before and after.
+> - **The owner's pages.** The approve page offers a registered store first (*set up for you by
+>   Chachi's*). The approve, linked and "Your stores" pages say *One-time licence* instead of a
+>   9999 date.
+> - **The POS.** `licenceService.state()` returns `plan`, and `paid_until` is null for one-time.
+>   - **When it ends.** A one-time licence ends only at its check date, so `ends_because` is
+>     `OFFLINE`.
+>   - **Wording.** It reads *One-time licence: no subscription to renew. This POS checks in online
+>     by …*, and later warnings say *licence*.
+>   - **Audit.** A change of plan is audited as `LICENCE_RENEWED`, with the plan before and after.
+>   - **`SCR-707`.** It shows *Plan* and hides *Paid until* for one-time.
+> - **Older POS builds.** They were not run against a one-time licence. By reading their code: a
+>   paid-until of 9999-12-31 is never the earlier end, so they treat the licence as paid and end it
+>   at the 30-day check. They show *Subscribed until* with the check date.
+> - **Tests.**
+>   - **Licence server: 20** (was 14). One-time, with a payment and a Play purchase refused;
+>     paid-until later and earlier; revoke; register and link with no trial; field checks and
+>     delete; an old-format database upgraded.
+>   - **POS licence suite: 12** (was 9). One-time arrives at the check and is audited; an old
+>     `monthly` licence is read as monthly; 38 days offline lapses.
+>   - **`renderer.test.js`.** `SCR-707`'s plan line.
+>   - **Suites.** Unit 334, integration 722, e2e 26 files: all pass.
+> - **Still open.** The live licence server at `pos.chachisoftware.store` still runs the old code.
+>   Rebuilding it (`docker compose up -d --build` in `licence-server/`, after copying
+>   `/var/lib/chachi-licence/licences.db`) waits on the owner's go-ahead. Until then, the new
+>   admin forms are not on the live admin page.
+
+## The three questions (answered: yes to all)
 
 **1. Does a one-time store still check in online once a month?** Recommended: **yes.**
 

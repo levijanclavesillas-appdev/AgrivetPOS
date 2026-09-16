@@ -8,7 +8,7 @@
 //   POST /api/v1/play/purchase     a Google Play purchase, verified with Google
 //   GET  /api/v1/public-key        the key the POS verifies licences with
 //   GET  /link, /auth/google…      the owner links a device, signed in with Google
-//   GET  /admin…                   Chachi's page: stores, devices, manual payments
+//   GET  /admin…                   Chachi's page: stores, devices, manual payments; plans set by hand (TASK-067)
 //   GET  /, /privacy, /static/…     the public site that introduces Chachi POS (site/)
 //   GET  /guide, /guide/:chapter    the user guide (site/guide/, wrapped by guide.js)
 
@@ -19,7 +19,7 @@ const bcrypt = require('bcryptjs');
 const { pages } = require('./pages');
 const guide = require('./guide');
 const { pkce } = require('./google');
-const { ServiceError } = require('./service');
+const { ServiceError, endOfManilaDay } = require('./service');
 
 const OWNER_COOKIE = 'cps_owner';
 const SITE = path.join(__dirname, '..', 'site');
@@ -165,7 +165,7 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
     const session = owner(req);
     if (!session) return page(res, pages.signIn({ code: link.user_code, link }));
     return page(res, pages.approve({
-      code: link.user_code, link, stores: service.storesForOwner(session.subject),
+      code: link.user_code, link, stores: service.storesForApproval({ sub: session.subject, email: session.email }),
       owner: { email: session.email }, csrf: session.csrf,
     }));
   });
@@ -260,29 +260,96 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
     setCookie(res, ADMIN_COOKIE, '', 0);
     return res.redirect('/admin/login');
   });
-  app.get('/admin', requireAdmin, (req, res) => page(res, pages.adminStores({ stores: service.listStores(), now: now(), csrf: req.admin.csrf })));
+  app.get('/admin', requireAdmin, (req, res) => page(res, pages.adminStores({
+    stores: service.listStores(), now: now(), csrf: req.admin.csrf, notice: req.query.notice || null,
+  })));
   app.get('/admin/stores/:id', requireAdmin, (req, res) => {
     const detail = service.storeDetail(req.params.id);
     if (!detail) return page(res, pages.message('Not found', 'No such store.'), 404);
     return page(res, pages.adminStore({ detail, now: now(), csrf: req.admin.csrf, notice: req.query.notice || null }));
   });
-  app.post('/admin/stores/:id/payments', requireAdmin, (req, res) => {
-    const amount = String(req.body.amount || '').replace(/[₱,\s]/g, '');
-    if (amount && !/^\d+(\.\d{1,2})?$/.test(amount)) return page(res, pages.message('Not recorded', 'The amount is not a peso amount.', 'err'), 400);
+  /** An amount typed on a form, in centavos: null when blank, undefined when it is not one. */
+  const pesos = (typed) => {
+    const amount = String(typed || '').replace(/[₱,\s]/g, '');
+    if (!amount) return null;
+    return /^\d+(\.\d{1,2})?$/.test(amount) ? Math.round(Number(amount) * 100) : undefined;
+  };
+  const text = (value, max) => String(value || '').trim().slice(0, max) || null;
+  const confirmed = (req) => req.body.confirm === 'yes';
+
+  /**
+   * One admin form: `act` does the work and answers the store it changed; the page goes back
+   * to that store with `notice`, or says why nothing was done.
+   */
+  const adminForm = (act) => (req, res) => {
     try {
-      const store = service.recordPayment({
-        storeId: req.params.id, months: Number(req.body.months),
-        amountCentavos: amount ? Math.round(Number(amount) * 100) : null,
-        reference: String(req.body.reference || '').slice(0, 80) || null,
-        note: String(req.body.note || '').slice(0, 200) || null,
-        recordedBy: 'admin',
-      });
-      return res.redirect(`/admin/stores/${store.id}?notice=${encodeURIComponent(`Recorded. Paid until ${store.paid_until.slice(0, 10)}.`)}`);
+      const { store, notice, to } = act(req);
+      return res.redirect(to || `/admin/stores/${store.id}?notice=${encodeURIComponent(notice)}`);
     } catch (err) {
-      if (err instanceof ServiceError) return page(res, pages.message('Not recorded', err.message, 'err'), err.status);
+      if (err instanceof ServiceError) return page(res, pages.message('Not done', err.message, 'err', '/admin'), err.status);
       throw err;
     }
-  });
+  };
+  const refuse = (status, code, message) => { throw new ServiceError(status, code, message); };
+  const paidDate = (store) => (store.plan === 'ONE_TIME' ? 'one-time, for good' : `paid until ${store.paid_until.slice(0, 10)}`);
+
+  app.post('/admin/stores/:id/payments', requireAdmin, adminForm((req) => {
+    const amountCentavos = pesos(req.body.amount);
+    if (amountCentavos === undefined) refuse(400, 'amount', 'The amount is not a peso amount.');
+    const store = service.recordPayment({
+      storeId: req.params.id, months: Number(req.body.months), amountCentavos,
+      reference: text(req.body.reference, 80), note: text(req.body.note, 200), recordedBy: 'admin',
+    });
+    return { store, notice: `Recorded. Paid until ${store.paid_until.slice(0, 10)}.` };
+  }));
+
+  // TASK-067, LIC-005 – LIC-007: the plan, set by hand.
+  app.post('/admin/stores/:id/one-time', requireAdmin, adminForm((req) => {
+    const amountCentavos = pesos(req.body.amount);
+    if (amountCentavos === undefined) refuse(400, 'amount', 'The amount is not a peso amount.');
+    if (!confirmed(req)) refuse(400, 'confirm', 'Tick the box to confirm the store has paid once, for good.');
+    const store = service.setOneTime({
+      storeId: req.params.id, amountCentavos,
+      reference: text(req.body.reference, 80), note: text(req.body.note, 200), recordedBy: 'admin',
+    });
+    return { store, notice: 'Set as one-time paid. Its devices have it at their next check.' };
+  }));
+
+  app.post('/admin/stores/:id/paid-until', requireAdmin, adminForm((req) => {
+    const current = service.storeDetail(req.params.id);
+    if (!current) refuse(404, 'no_store', 'No such store.');
+    // Access taken away, or shortened, is confirmed first.
+    const shortens = current.store.plan === 'ONE_TIME' || endOfManilaDay(req.body.date) < current.store.paid_until;
+    if (shortens && !confirmed(req)) {
+      refuse(400, 'confirm', `That is earlier than what the store has now (${paidDate(current.store)}). Tick the box to confirm.`);
+    }
+    const store = service.setPaidUntil({ storeId: req.params.id, date: req.body.date, note: req.body.note, recordedBy: 'admin' });
+    return { store, notice: `Set. Paid until ${store.paid_until.slice(0, 10)}; its devices have it at their next check.` };
+  }));
+
+  app.post('/admin/stores/:id/revoke-one-time', requireAdmin, adminForm((req) => {
+    if (!confirmed(req)) refuse(400, 'confirm', 'Tick the box to confirm. Every device of this store stops opening shifts after its grace.');
+    const store = service.revokeOneTime({ storeId: req.params.id, note: req.body.note, recordedBy: 'admin' });
+    return { store, notice: 'One-time licence revoked. Its devices lapse after their next check and grace.' };
+  }));
+
+  app.post('/admin/stores', requireAdmin, adminForm((req) => {
+    const amountCentavos = pesos(req.body.amount);
+    if (amountCentavos === undefined) refuse(400, 'amount', 'The amount is not a peso amount.');
+    const store = service.registerStore({
+      name: req.body.store_name, ownerEmail: req.body.owner_email, plan: String(req.body.plan || ''),
+      date: req.body.date, amountCentavos, reference: text(req.body.reference, 80), note: text(req.body.note, 200),
+      recordedBy: 'admin',
+    });
+    return { store, notice: `Registered, ${paidDate(store)}. It is linked when ${store.owner_email} approves a POS on /link.` };
+  }));
+
+  app.post('/admin/stores/:id/delete', requireAdmin, adminForm((req) => {
+    if (!confirmed(req)) refuse(400, 'confirm', 'Tick the box to confirm.');
+    const store = service.deleteUnlinkedStore(req.params.id);
+    return { store, to: `/admin?notice=${encodeURIComponent(`${store.name} deleted.`)}` };
+  }));
+
   app.post('/admin/installations/:id/revoke', requireAdmin, (req, res) => {
     const storeId = service.revokeInstallation(req.params.id);
     return res.redirect(storeId ? `/admin/stores/${storeId}?notice=Device%20removed.` : '/admin');

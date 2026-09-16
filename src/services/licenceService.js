@@ -20,6 +20,9 @@
 // The licence ends at the earlier of `paid_until` (the store stopped paying) and
 // `valid_until` (30 days since the last check: the store has been offline a month).
 //
+// TASK-067: the plan is MONTHLY or ONE_TIME (LIC-005). A one-time licence is paid for good,
+// so only `valid_until` ends it: it is still renewed online every 30 days (LIC-007).
+//
 // ## Why the shift, and only the shift (LIC-001, L-2)
 //
 // Every sale, return and collection already needs an open shift (POS-501). So refusing a
@@ -59,6 +62,9 @@ function verify(token) {
 
 const enforced = () => Boolean(licenceConfig.server());
 
+/** LIC-005. Licences issued before TASK-067 say `monthly`. */
+const planOf = (payload) => (String(payload.plan || '').toUpperCase() === 'ONE_TIME' ? 'ONE_TIME' : 'MONTHLY');
+
 function state({ at = clock.nowUtc() } = {}) {
   if (!enforced()) return { enforced: false, state: 'OFF' };
 
@@ -93,7 +99,9 @@ function state({ at = clock.nowUtc() } = {}) {
     };
   }
 
-  const endsBecause = payload.paid_until <= payload.valid_until ? 'UNPAID' : 'OFFLINE';
+  const plan = planOf(payload);
+  const oneTime = plan === 'ONE_TIME';
+  const endsBecause = !oneTime && payload.paid_until <= payload.valid_until ? 'UNPAID' : 'OFFLINE';
   const ends = endsBecause === 'UNPAID' ? payload.paid_until : payload.valid_until;
   const graceEnds = plusDays(ends, payload.grace_days);
   // The warning window and the grace are the licence's own terms, set by the licence
@@ -107,12 +115,15 @@ function state({ at = clock.nowUtc() } = {}) {
     ? 'the subscription is paid until then'
     : 'this POS has not reached the licence server since '
       + `${payload.checked_at.slice(0, 10)}; connect it to the internet to renew`;
+  const noun = oneTime ? 'licence' : 'subscription';
   const messages = {
-    ACTIVE: `Subscribed until ${ends.slice(0, 10)}.`,
-    WARNING: `The subscription ends on ${ends.slice(0, 10)}: ${why}.`,
-    GRACE: `The subscription ended on ${ends.slice(0, 10)} (${endsBecause === 'UNPAID' ? 'not paid' : 'not renewed online'}). `
+    ACTIVE: oneTime
+      ? `One-time licence: no subscription to renew. This POS checks in online by ${ends.slice(0, 10)}.`
+      : `Subscribed until ${ends.slice(0, 10)}.`,
+    WARNING: `The ${noun} ends on ${ends.slice(0, 10)}: ${why}.`,
+    GRACE: `The ${noun} ended on ${ends.slice(0, 10)} (${endsBecause === 'UNPAID' ? 'not paid' : 'not renewed online'}). `
       + `Everything works until ${graceEnds.slice(0, 10)}; after that no new shift can be opened.`,
-    LAPSED: `The subscription ended on ${ends.slice(0, 10)} and its grace period on ${graceEnds.slice(0, 10)}. `
+    LAPSED: `The ${noun} ended on ${ends.slice(0, 10)} and its grace period on ${graceEnds.slice(0, 10)}. `
       + 'Reports, export and backups still work; no new shift can be opened until it is renewed.',
   };
 
@@ -123,8 +134,8 @@ function state({ at = clock.nowUtc() } = {}) {
     store_id: payload.store_id,
     store_name: payload.store_name,
     owner_email: payload.owner_email,
-    plan: payload.plan,
-    paid_until: payload.paid_until,
+    plan,
+    paid_until: oneTime ? null : payload.paid_until,
     valid_until: payload.valid_until,
     checked_at: payload.checked_at,
     ends_at: ends,
@@ -244,7 +255,7 @@ async function pollLink(actor) {
     action: 'LICENCE_LINKED',
     entityType: 'licence_state',
     entityId: row.installation_id,
-    after: { store_id: payload.store_id, store_name: payload.store_name, paid_until: payload.paid_until },
+    after: { store_id: payload.store_id, store_name: payload.store_name, plan: planOf(payload), paid_until: payload.paid_until },
   });
   return { poll: 'approved', ...state({ at }) };
 }
@@ -252,7 +263,8 @@ async function pollLink(actor) {
 /**
  * The monthly check (LIC-002). Silent: the renewal secret authenticates, not Google.
  * Recorded in the audit trail only when it changes something — a payment extended the
- * subscription — because a row per day would drown the trail people read.
+ * subscription, or the plan changed (TASK-067) — because a row per day would drown the
+ * trail people read.
  */
 async function renew(actor = auditService.SYSTEM_ACTOR) {
   assertEnforced();
@@ -270,14 +282,14 @@ async function renew(actor = auditService.SYSTEM_ACTOR) {
     throw err;
   }
   const { payload, previous } = saveLicence(result.licence, null, at);
-  if (!previous || previous.paid_until !== payload.paid_until) {
+  if (!previous || previous.paid_until !== payload.paid_until || planOf(previous) !== planOf(payload)) {
     auditService.write({
       actor,
       action: 'LICENCE_RENEWED',
       entityType: 'licence_state',
       entityId: row.installation_id,
-      before: previous ? { paid_until: previous.paid_until } : null,
-      after: { paid_until: payload.paid_until },
+      before: previous ? { plan: planOf(previous), paid_until: previous.paid_until } : null,
+      after: { plan: planOf(payload), paid_until: payload.paid_until },
     });
   }
   return state({ at });

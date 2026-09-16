@@ -30,7 +30,7 @@ two editions became one application and what an industry decides. Every rule in
 | Customers created by the opening balance load | `FARM` | `REGULAR` | `openingDataService` |
 | Product pictures (`TASK-052`) | None | One per product: on the editor, beside each name in the list and in the counter's search. In the database, so backups and exports carry them (`IMG-001`–`IMG-002`, §7) | `902_product_images.sql`, `productImageService`, `shell/pictures.js` |
 | A recalled batch (`INV-208`) | A list of who bought it (`INV-206`); the counter goes on selling it | **Held**: put on recall with a reason, never sold until lifted, what is left returned to the supplier; a dashboard alert while it is on the shelf (§8) | `903_batch_recall.sql`, `batchService.recall`, `SCR-207` |
-| Subscription (`TASK-048`) | None | A signed licence, renewed online at least every 30 days; no new shift opens once it lapses (`LIC-001`–`LIC-004`, §6). **On**: the build names `pos.chachisoftware.store` | `licenceService`, `901_licence.sql`, `licence-server/` |
+| Subscription (`TASK-048`) | None | A signed licence, renewed online at least every 30 days; no new shift opens once it lapses (`LIC-001`–`LIC-007`, §6); a one-time licence beside it (`TASK-067`). **On**: the build names `pos.chachisoftware.store` | `licenceService`, `901_licence.sql`, `licence-server/` |
 
 ## 2. Recorded decisions
 
@@ -104,7 +104,7 @@ legal advice. Confirm them with the store's accountant and the FDA licensing req
 
 ## 6. The subscription (`TASK-048`)
 
-**Rules `LIC-001`–`LIC-004`** exist only on this branch. The full record is in
+**Rules `LIC-001`–`LIC-007`** exist only on this branch (`LIC-005`–`LIC-007` since `TASK-067`). The full record is in
 `06_TASKS/TASK-048-google-sign-in-and-subscription.md`; the licence server is `licence-server/`.
 
 | # | Rule |
@@ -113,6 +113,9 @@ legal advice. Confirm them with the store's accountant and the FDA licensing req
 | `LIC-002` | The licence ends at the earlier of its paid-until and 30 days after its last check; 7 days' warning before, 7 days' grace after |
 | `LIC-003` | Only a licence signed by the build's key counts, and setting the clock back does not undo a lapse |
 | `LIC-004` | Only the owner links the POS or asks for a check; linking is audited |
+| `LIC-005` | A store is on one plan, `MONTHLY` or `ONE_TIME`. A one-time store is paid for good, and no monthly payment or Play purchase changes it |
+| `LIC-006` | Only Chachi's admin sets a plan, or grants or takes access by hand, on the licence server's admin page. Each change is kept in the store's payment history, and access taken away needs a note and a confirmation |
+| `LIC-007` | A one-time licence is still renewed online at least every 30 days (`LIC-002`'s check and grace). Revoking it lapses every device after its next check and grace |
 
 **`NFR_3.1` is amended on this branch:** every core operation works with no internet for the
 licence's validity plus grace, 37 days after the last check. **`TC-E2E-08` runs with licensing

@@ -36,10 +36,20 @@ function layout(title, body, { wide = false } = {}) {
 }
 
 const hidden = (name, value) => `<input type="hidden" name="${esc(name)}" value="${esc(value)}">`;
-const date = (iso) => (iso ? esc(String(iso).slice(0, 10)) : '—');
+const date = (iso) => {
+  if (!iso) return '—';
+  // TASK-067: a one-time store's paid-until is the end of time, and says so.
+  return String(iso).startsWith('9999-') ? 'for good' : esc(String(iso).slice(0, 10));
+};
+const pesos = (centavos) => (centavos == null ? '—' : `₱${(centavos / 100).toFixed(2)}`);
+const checkbox = (label) => `<label class="choice"><input type="checkbox" name="confirm" value="yes"><span>${esc(label)}</span></label>`;
 
-/** The status of a store's subscription, as a tag. */
-function paidTag(paidUntil, now) {
+/** What a store has paid for, in words (LIC-005). */
+const paidWords = (store) => (store.plan === 'ONE_TIME' ? 'One-time licence' : `Paid until ${date(store.paid_until)}`);
+
+/** The status of a store's licence, as a tag. */
+function paidTag(paidUntil, now, plan = 'MONTHLY') {
+  if (plan === 'ONE_TIME') return '<span class="tag ok">one-time</span>';
   const days = Math.ceil((new Date(paidUntil) - now) / 86400e3);
   if (days < 0) return `<span class="tag err">lapsed ${-days} d</span>`;
   if (days <= 7) return `<span class="tag warn">${days} d left</span>`;
@@ -72,7 +82,7 @@ ${googleReady ? '' : '<p class="note warn">Google sign-in is not set up on this 
 
   approve({ code, link, stores, owner, csrf }) {
     const options = stores.map((s, i) => `<label class="choice"><input type="radio" name="store_id" value="${esc(s.id)}"${i === 0 ? ' checked' : ''}>
-<span><strong>${esc(s.name)}</strong><br><span class="muted">Paid until ${date(s.paid_until)}</span></span></label>`).join('');
+<span><strong>${esc(s.name)}</strong><br><span class="muted">${paidWords(s)}${s.registered ? ' · set up for you by Chachi\'s' : ''}</span></span></label>`).join('');
     return layout('Approve this device', `<div class="card">
 <h1>Approve this device?</h1>
 <p><strong>${esc(link.store_name || 'A POS')}</strong> ${link.platform ? `on ${esc(link.platform)}` : ''}, code <strong>${esc(code)}</strong>.</p>
@@ -90,7 +100,7 @@ ${stores.length ? `<p>Add it to:</p>${options}<label class="choice"><input type=
   linked({ store }) {
     return layout('Linked', `<div class="card"><h1>Linked</h1>
 <p class="note ok">The POS is now part of <strong>${esc(store.name)}</strong>. Go back to it — it finishes on its own within a few seconds.</p>
-<p class="muted">Paid until ${date(store.paid_until)}. You can close this page.</p></div>`);
+<p class="muted">${paidWords(store)}. You can close this page.</p></div>`);
   },
 
   // ── TASK-065: the owner's stores ───────────────────────────────────────────
@@ -108,7 +118,7 @@ ${googleReady ? '<a class="button primary" href="/auth/google?next=stores">Conti
   stores({ owner, stores, now }) {
     const cards = stores.map((s) => `<div class="card">
 <h2 style="margin-top:0">${esc(s.name)}</h2>
-<p class="muted">Paid until ${date(s.paid_until)} ${paidTag(s.paid_until, now)} · ${s.devices} device${s.devices === 1 ? '' : 's'} linked</p>
+<p class="muted">${paidWords(s)} ${paidTag(s.paid_until, now, s.plan)} · ${s.devices} device${s.devices === 1 ? '' : 's'} linked</p>
 ${s.web.length ? s.web.map((w) => `<div class="row"><a class="button primary" href="${esc(w.web_url)}/">Open on the web</a>
 <span class="muted">${esc(w.web_url.replace(/^https?:\/\//, ''))}</span></div>`).join('')
     : '<p class="muted">Not on the web. It runs on its phones and PCs; ask Chachi\'s to put it on the web too.</p>'}
@@ -123,8 +133,8 @@ ${cards || '<div class="card"><p>No store is linked to this Google account yet. 
     return layout('Denied', '<div class="card"><h1>Denied</h1><p>That POS was not linked. You can close this page.</p></div>');
   },
 
-  message(title, text, kind = 'warn') {
-    return layout(title, `<div class="card"><h1>${esc(title)}</h1><p class="note ${kind}">${esc(text)}</p><a class="button" href="/link">Back</a></div>`);
+  message(title, text, kind = 'warn', back = '/link') {
+    return layout(title, `<div class="card"><h1>${esc(title)}</h1><p class="note ${kind}">${esc(text)}</p><a class="button" href="${esc(back)}">Back</a></div>`);
   },
 
   // ── Admin ──────────────────────────────────────────────────────────────────
@@ -138,36 +148,94 @@ ${error ? `<p class="note err">${esc(error)}</p>` : ''}
 <button class="primary" type="submit">Sign in</button></form></div>`);
   },
 
-  adminStores({ stores, now, csrf }) {
-    const rows = stores.map((s) => `<tr><td><a href="/admin/stores/${esc(s.id)}">${esc(s.name)}</a></td><td>${esc(s.owner_email)}</td>
-<td>${date(s.paid_until)} ${paidTag(s.paid_until, now)}</td><td>${s.devices}</td><td>${date(s.last_check_at)}</td></tr>`).join('');
+  adminStores({ stores, now, csrf, notice = null }) {
+    const rows = stores.map((s) => `<tr><td><a href="/admin/stores/${esc(s.id)}">${esc(s.name)}</a></td>
+<td>${esc(s.owner_email)}${s.owner_sub ? '' : ' <span class="tag warn">not linked yet</span>'}</td>
+<td>${s.plan === 'ONE_TIME' ? 'One-time' : 'Monthly'}</td>
+<td>${s.plan === 'ONE_TIME' ? '—' : date(s.paid_until)} ${paidTag(s.paid_until, now, s.plan)}</td><td>${s.devices}</td><td>${date(s.last_check_at)}</td></tr>`).join('');
     return layout('Stores', `<div class="row" style="justify-content:space-between"><h1>Stores</h1>
 <form method="post" action="/admin/logout">${hidden('csrf', csrf)}<button type="submit">Sign out</button></form></div>
-<div class="card scroll"><table><thead><tr><th>Store</th><th>Owner</th><th>Paid until</th><th>Devices</th><th>Last check</th></tr></thead>
-<tbody>${rows || '<tr><td colspan="5" class="muted">No stores yet. A store appears when its owner links its first POS.</td></tr>'}</tbody></table></div>`, { wide: true });
+${notice ? `<p class="note ok">${esc(notice)}</p>` : ''}
+<div class="card scroll"><table><thead><tr><th>Store</th><th>Owner</th><th>Plan</th><th>Paid until</th><th>Devices</th><th>Last check</th></tr></thead>
+<tbody>${rows || '<tr><td colspan="6" class="muted">No stores yet. A store appears when its owner links its first POS, or when you add one below.</td></tr>'}</tbody></table></div>
+<div class="card"><h2>Add a store</h2>
+<p class="muted">For a client who has paid before installing. The first POS its owner approves on /link, signed in with this Google e-mail, joins it with no trial.</p>
+<form method="post" action="/admin/stores">${hidden('csrf', csrf)}
+<div class="grid"><div><label for="store_name">Store name</label><input id="store_name" name="store_name" maxlength="120" required></div>
+<div><label for="owner_email">Owner's Google e-mail</label><input id="owner_email" name="owner_email" type="email" maxlength="200" required></div></div>
+<p>Paid how</p>
+<label class="choice"><input type="radio" name="plan" value="ONE_TIME" checked><span><strong>One-time</strong>, paid for good</span></label>
+<label class="choice"><input type="radio" name="plan" value="PAID_UNTIL"><span><strong>Monthly</strong>, paid until the date below</span></label>
+<label class="choice"><input type="radio" name="plan" value="TRIAL"><span><strong>Trial</strong>, as if the owner had signed up</span></label>
+<div class="grid"><div><label for="date">Paid until (monthly)</label><input id="date" name="date" type="date"></div>
+<div><label for="amount">Amount (₱)</label><input id="amount" name="amount" inputmode="decimal"></div>
+<div><label for="reference">Reference</label><input id="reference" name="reference" maxlength="80"></div></div>
+<label for="note">Note</label><input id="note" name="note" maxlength="200">
+<button class="primary" type="submit">Add store</button></form></div>`, { wide: true });
   },
 
   adminStore({ detail, now, csrf, notice = null }) {
     const { store, installations, payments } = detail;
+    const oneTime = store.plan === 'ONE_TIME';
+    const action = (what) => `/admin/stores/${esc(store.id)}/${what}`;
     const devices = installations.map((i) => `<tr><td>${esc(i.platform || '—')} ${esc(i.app_version || '')}<br><span class="muted">${esc(i.id)}</span></td>
 <td>${date(i.created_at)}</td><td>${date(i.last_check_at)}</td>
 <td>${i.revoked_at ? `removed ${date(i.revoked_at)}` : `<form method="post" action="/admin/installations/${esc(i.id)}/revoke">${hidden('csrf', csrf)}<button class="danger" type="submit">Remove</button></form>`}</td></tr>`).join('');
     const history = payments.map((p) => `<tr><td>${date(p.created_at)}</td><td>${esc(p.method)}</td>
-<td>${p.amount_centavos == null ? '—' : `₱${(p.amount_centavos / 100).toFixed(2)}`}</td><td>${esc(p.reference || '')} ${esc(p.note || '')}</td>
-<td>${date(p.paid_until_after)}</td><td>${esc(p.recorded_by)}</td></tr>`).join('');
-    return layout(store.name, `<p><a href="/admin">← Stores</a></p>
-<div class="card"><h1>${esc(store.name)}</h1><p class="muted">${esc(store.owner_email)} · since ${date(store.created_at)}</p>
-<p>Paid until <strong>${date(store.paid_until)}</strong> ${paidTag(store.paid_until, now)}</p>
-${notice ? `<p class="note ok">${esc(notice)}</p>` : ''}</div>
-<div class="card"><h2>Record a payment</h2><p class="muted">GCash or bank transfer. The subscription is extended from today or from the date already paid to, whichever is later.</p>
-<form method="post" action="/admin/stores/${esc(store.id)}/payments">${hidden('csrf', csrf)}
+<td>${pesos(p.amount_centavos)}</td><td>${esc(p.reference || '')} ${esc(p.note || '')}</td>
+<td>${date(p.paid_until_before)}</td><td>${date(p.paid_until_after)}</td><td>${esc(p.recorded_by)}</td></tr>`).join('');
+    const unlinked = !store.owner_sub && !installations.length;
+
+    const payment = oneTime
+      ? '<div class="card"><h2>Record a payment</h2><p class="muted">This store has a one-time licence, so there is no subscription to extend.</p></div>'
+      : `<div class="card"><h2>Record a payment</h2><p class="muted">GCash or bank transfer. The subscription is extended from today or from the date already paid to, whichever is later.</p>
+<form method="post" action="${action('payments')}">${hidden('csrf', csrf)}
 <div class="grid"><div><label for="months">Months</label><input id="months" name="months" type="number" min="1" max="36" value="1" required></div>
 <div><label for="amount">Amount (₱)</label><input id="amount" name="amount" inputmode="decimal" placeholder="e.g. 499.00"></div>
 <div><label for="reference">Reference</label><input id="reference" name="reference" maxlength="80" placeholder="GCash ref no."></div></div>
 <label for="note">Note</label><input id="note" name="note" maxlength="200">
-<button class="primary" type="submit">Record payment</button></form></div>
+<button class="primary" type="submit">Record payment</button></form></div>`;
+
+    const plan = oneTime
+      ? `<div class="card"><h2>Revoke the one-time licence</h2>
+<p class="muted">After a refund, a chargeback or a copied installation. The store goes back to monthly, unpaid from today. Each device lapses after its next check and its grace.</p>
+<form method="post" action="${action('revoke-one-time')}">${hidden('csrf', csrf)}
+<label for="revoke_note">Why</label><input id="revoke_note" name="note" maxlength="200" required>
+${checkbox('I understand this store stops opening shifts after its grace.')}
+<button class="danger" type="submit">Revoke</button></form></div>`
+      : `<div class="card"><h2>Set as one-time paid</h2>
+<p class="muted">The store has paid once, for good. No monthly payment is needed again, and every device has it at its next check.</p>
+<form method="post" action="${action('one-time')}">${hidden('csrf', csrf)}
+<div class="grid"><div><label for="ot_amount">Amount (₱)</label><input id="ot_amount" name="amount" inputmode="decimal"></div>
+<div><label for="ot_reference">Reference</label><input id="ot_reference" name="reference" maxlength="80"></div></div>
+<label for="ot_note">Note</label><input id="ot_note" name="note" maxlength="200">
+${checkbox('This store has paid the one-time price.')}
+<button class="primary" type="submit">Set as one-time paid</button></form></div>`;
+
+    const override = `<div class="card"><h2>Set paid until</h2>
+<p class="muted">The override: a free month, a correction, or access ended. The store is on the monthly plan, paid through the day given${oneTime ? ', and loses its one-time licence' : ''}.</p>
+<form method="post" action="${action('paid-until')}">${hidden('csrf', csrf)}
+<div class="grid"><div><label for="pu_date">Paid until</label><input id="pu_date" name="date" type="date" required></div>
+<div><label for="pu_note">Why</label><input id="pu_note" name="note" maxlength="200" required></div></div>
+${checkbox('If this is earlier than what the store has now, I mean to shorten it.')}
+<button type="submit">Set paid until</button></form></div>`;
+
+    const remove = unlinked ? `<div class="card"><h2>Delete this store</h2>
+<p class="muted">Nobody has linked it yet, so nothing depends on it.</p>
+<form method="post" action="${action('delete')}">${hidden('csrf', csrf)}
+${checkbox('Delete it and its payment history.')}
+<button class="danger" type="submit">Delete store</button></form></div>` : '';
+
+    return layout(store.name, `<p><a href="/admin">← Stores</a></p>
+<div class="card"><h1>${esc(store.name)}</h1><p class="muted">${esc(store.owner_email)} · since ${date(store.created_at)}${store.owner_sub ? '' : ' · <span class="tag warn">not linked yet</span>'}</p>
+<p>${oneTime ? '<strong>One-time licence</strong>, paid for good' : `Monthly, paid until <strong>${date(store.paid_until)}</strong>`} ${paidTag(store.paid_until, now, store.plan)}</p>
+${notice ? `<p class="note ok">${esc(notice)}</p>` : ''}</div>
+${payment}
+${plan}
+${override}
 <div class="card scroll"><h2>Devices</h2><table><thead><tr><th>Device</th><th>Linked</th><th>Last check</th><th></th></tr></thead><tbody>${devices || '<tr><td colspan="4" class="muted">None.</td></tr>'}</tbody></table></div>
-<div class="card scroll"><h2>Payments</h2><table><thead><tr><th>Date</th><th>How</th><th>Amount</th><th>Reference</th><th>Paid until</th><th>By</th></tr></thead><tbody>${history}</tbody></table></div>`, { wide: true });
+<div class="card scroll"><h2>Payments and changes</h2><table><thead><tr><th>Date</th><th>How</th><th>Amount</th><th>Reference / note</th><th>Before</th><th>After</th><th>By</th></tr></thead><tbody>${history}</tbody></table></div>
+${remove}`, { wide: true });
   },
 };
 

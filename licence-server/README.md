@@ -9,7 +9,7 @@ checks offline. The POS works for 30 days between checks, plus 7 days' grace.
 | `/`, `/privacy` | the public | The site that introduces Chachi POS, and the privacy notice. Static files in `site/`, no script |
 | `/link` | a store owner | Enter the code the POS shows, sign in with Google, approve the device |
 | `/stores` | a store owner | TASK-065: sign in with Google; the owner's stores, each with an **Open on the web** link to its web copy at `/s/<store>/` |
-| `/admin` | Chachi's | Stores, devices, the date each is paid to; record a manual payment (GCash, bank transfer); remove a device |
+| `/admin` | Chachi's | Stores, devices, each store's plan and the date it is paid to; record a manual payment (GCash, bank transfer); remove a device. TASK-067: set a store as one-time paid, set it paid until a date, revoke a one-time licence, add a store before its owner links it, delete one nobody linked |
 | `POST /api/v1/device/start`, `/device/poll` | the POS | The device link |
 | `POST /api/v1/licence/renew` | the POS | The silent check, with the device's renewal secret |
 | `POST /api/v1/play/purchase` | the Android app | A Google Play subscription, verified with Google before it counts |
@@ -41,6 +41,14 @@ not there.
    12 hours, whenever it has the internet. Nobody signs in with Google again.
 4. Payment extends `paid_until`: a Google Play subscription on Android, verified with Google, or a
    manual payment recorded on `/admin`.
+5. **TASK-067.** A store is on the `MONTHLY` or the `ONE_TIME` plan. On `/admin`:
+   - **Set as one-time paid.** The store is paid for good (`paid_until` 9999-12-31). No payment
+     or Play purchase changes it, and its devices still renew every 30 days.
+   - **Set paid until.** Moves any store to monthly, paid through a date. An earlier date is
+     confirmed first.
+   - **Add a store.** Registers one for its owner's Google e-mail before anything is linked. The
+     first device that e-mail approves joins it as set up, with no trial.
+   - **The history.** Every change is a row in the store's history, with a note.
 
 ## Configuration (environment)
 
