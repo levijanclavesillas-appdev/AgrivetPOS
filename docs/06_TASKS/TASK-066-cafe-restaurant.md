@@ -200,11 +200,7 @@ NAM-NAM's move (TASK-064 §5). The owner's answers (2026-09-16):
 - **Still to do.**
   - **Passwords.** `owner` and `staff` have none (`SEC-1`). The owner sets them in Admin → Users.
   - **Settings.** GCash details are re-entered by hand.
-- **Why the switch is a rebuild.** back-end.store still takes orders, so this copy falls behind.
-  The tool converts into a newly set-up store only, and its sale ids are new on every run: a
-  second import into this store is refused (`sale_no` is unique). On the day of the switch:
-  1. Stop the store's container and empty `/var/lib/chachi-pos/nam-nam/data`.
-  2. Start it, set it up, convert and import again, then compare the figures.
-  3. Stop orders on back-end.store.
-
-  Nothing done in the staged store before then is kept, so NAM-NAM does not trade in it yet.
+- **No switch (the owner, 2026-09-16).** NAM-NAM runs both systems in parallel, and this store is
+  live for trading. Nothing is rebuilt or imported again. Each system holds only the orders taken on
+  it from 2026-09-16, so their figures part from that day. The tool cannot top this store up: it
+  converts into a newly set-up store only, and a second import is refused (`sale_no` is unique).
