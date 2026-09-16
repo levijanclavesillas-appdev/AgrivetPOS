@@ -173,6 +173,38 @@ the new columns.
 
 ## Next
 
-NAM-NAM's move (TASK-064 §5): `web/store.sh create nam-nam`, set it up as Café / Restaurant,
-export, run `tools/orderingapp/to-archive.js` against `mmcafe-db-1`, import, set passwords, and
-stop taking orders on back-end.store. It waits on the owner's three answers in TASK-064.
+NAM-NAM's move (TASK-064 §5). The owner's answers (2026-09-16):
+
+- **Unpaid orders.** Count them all as paid.
+- **Customers.** Bring the 140 names across.
+- **Timing.** Move now, but keep back-end.store taking orders.
+
+**Staged 2026-09-16.**
+
+- **The store.** `web/store.sh create nam-nam` made
+  `https://pos.chachisoftware.store/s/nam-nam/`, set up over the API as a Café / Restaurant with
+  tax mode `NONE`. The owner login `namnam` and its recovery code are in
+  `/root/nam-nam-cutover/credentials.txt` (root only).
+- **The history.** `to-archive.js` converted OrderingApp's data and the import took 6,616 rows,
+  after a verified pre-import backup.
+- **The check.** It matches OrderingApp to the centavo:
+
+  | | OrderingApp | Chachi POS |
+  | :--- | ---: | ---: |
+  | Completed | 1,297 orders, ₱390,838.40 | 1,297 sales, net ₱390,838.40 |
+  | Service charge | ₱102.40 | ₱102.40 |
+  | Cancelled | 37, ₱9,927.00 | 37 voided, ₱9,927.00 |
+  | Cash | ₱389,528.40 | ₱389,528.40 |
+
+  One order, never paid, was left out. GCash and QR Ph also match.
+- **Still to do.**
+  - **Passwords.** `owner` and `staff` have none (`SEC-1`). The owner sets them in Admin → Users.
+  - **Settings.** GCash details are re-entered by hand.
+- **Why the switch is a rebuild.** back-end.store still takes orders, so this copy falls behind.
+  The tool converts into a newly set-up store only, and its sale ids are new on every run: a
+  second import into this store is refused (`sale_no` is unique). On the day of the switch:
+  1. Stop the store's container and empty `/var/lib/chachi-pos/nam-nam/data`.
+  2. Start it, set it up, convert and import again, then compare the figures.
+  3. Stop orders on back-end.store.
+
+  Nothing done in the staged store before then is kept, so NAM-NAM does not trade in it yet.
