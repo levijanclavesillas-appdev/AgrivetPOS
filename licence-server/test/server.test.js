@@ -592,3 +592,89 @@ test('TASK-067: a database from before one-time licences opens with its stores a
   assert.equal(again.prepare('SELECT COUNT(*) AS n FROM payments').get().n, 3);
   again.close();
 });
+
+// ── TASK-068: activation keys ────────────────────────────────────────────────
+
+test('TASK-068: an activation key made on the admin page links devices without Google, up to its limit', async () => {
+  const s = await boot();
+  try {
+    const store = s.service.registerStore({ name: 'Play review', ownerEmail: 'review@example.com', plan: 'ONE_TIME', recordedBy: 'admin' });
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie, `/admin/stores/${store.id}`);
+    assert.equal((await form(s.base, `/admin/stores/${store.id}/keys`, { max_uses: '2', days: '30' }, cookie)).status, 403, 'no token');
+    assert.equal((await form(s.base, `/admin/stores/${store.id}/keys`, { csrf, max_uses: '0', days: '30' }, cookie)).status, 400);
+
+    const made = await form(s.base, `/admin/stores/${store.id}/keys`, { csrf, max_uses: '2', days: '30', label: 'Google Play review' }, cookie);
+    assert.equal(made.status, 200);
+    const html = await made.text();
+    const key = /<strong class="code">([B-DF-HJ-NP-TV-XZ2-9]{4}(?:-[B-DF-HJ-NP-TV-XZ2-9]{4}){3})<\/strong>/.exec(html)[1];
+    assert.match(html, /for 2 devices until 2026-10-15/);
+    assert.equal(made.headers.get('cache-control'), 'no-store');
+    // Shown once: the store's page does not have it again, and the database has only its hash.
+    const later = await (await fetch(`${s.base}/admin/stores/${store.id}`, { headers: { cookie } })).text();
+    assert.equal(later.includes(key), false);
+    assert.match(later, /Google Play review<\/td><td>0 of 2/);
+    assert.equal(JSON.stringify(s.service.storeDetail(store.id).keys).includes(key.replace(/-/g, '')), false);
+
+    const activate = (installationId, typed = key) => post(s.base, '/api/v1/device/activate', {
+      installation_id: installationId, activation_key: typed, platform: 'Android', app_version: '1.0.0',
+    });
+    const first = await activate('inst-key-0001', key.toLowerCase().replace(/-/g, ' '));
+    assert.equal(first.status, 200, 'typed however');
+    const body = await first.json();
+    assert.equal(body.store_name, 'Play review');
+    const payload = licence.verify(body.licence, s.publicKey);
+    assert.deepEqual({ store: payload.store_id, plan: payload.plan, inst: payload.installation_id }, { store: store.id, plan: 'ONE_TIME', inst: 'inst-key-0001' });
+
+    // The secret it gave renews like any other.
+    assert.equal((await post(s.base, '/api/v1/licence/renew', { installation_id: 'inst-key-0001', installation_secret: body.installation_secret })).status, 200);
+
+    // The same device again uses nothing; a second device uses the second seat; a third is refused.
+    assert.equal((await activate('inst-key-0001')).status, 200);
+    assert.equal((await activate('inst-key-0002')).status, 200);
+    const third = await activate('inst-key-0003');
+    assert.equal(third.status, 403);
+    assert.match((await third.json()).message, /as many devices as it allows/);
+    assert.equal(s.service.storeDetail(store.id).keys[0].uses, 2);
+
+    const devices = await (await fetch(`${s.base}/admin/stores/${store.id}`, { headers: { cookie } })).text();
+    assert.match(devices, /by key/);
+    assert.match(devices, /used up/);
+
+    // A wrong key, and the store never got a trial row from any of it.
+    assert.match((await (await activate('inst-key-0004', 'BBBB-BBBB-BBBB-BBBB')).json()).message, /not right/);
+    assert.deepEqual(s.service.storeDetail(store.id).payments.map((p) => p.method), ['ONE_TIME']);
+  } finally { await s.close(); }
+});
+
+test('TASK-068: a key stops at its expiry or when withdrawn; devices it linked stay until removed', async () => {
+  const s = await boot();
+  try {
+    const store = s.service.registerStore({ name: 'Keyed', ownerEmail: 'k@example.com', plan: 'TRIAL', recordedBy: 'admin' });
+    const { key: shortKey } = s.service.createActivationKey({ storeId: store.id, maxUses: 5, days: 1, createdBy: 'admin' });
+    const { key, activationKey } = s.service.createActivationKey({ storeId: store.id, maxUses: 5, days: 30, createdBy: 'admin' });
+    assert.throws(() => s.service.createActivationKey({ storeId: store.id, maxUses: 5, days: 400, createdBy: 'admin' }), /365/);
+
+    const linked = s.service.activate({ installationId: 'inst-key-0100', key });
+    s.advance(2);
+    assert.throws(() => s.service.activate({ installationId: 'inst-key-0101', key: shortKey }), /expired/);
+
+    const cookie = await adminCookie(s);
+    const csrf = await adminCsrf(s, cookie, `/admin/stores/${store.id}`);
+    assert.equal((await form(s.base, `/admin/keys/${activationKey.id}/revoke`, { csrf }, cookie)).status, 302);
+    assert.throws(() => s.service.activate({ installationId: 'inst-key-0102', key }), /withdrawn/);
+    assert.match(await (await fetch(`${s.base}/admin/stores/${store.id}`, { headers: { cookie } })).text(), /withdrawn 2026-09-17/);
+
+    // Withdrawing a key does not unlink what it linked; removing the device does.
+    const renew = () => s.service.renew({ installationId: 'inst-key-0100', secret: linked.installation_secret });
+    assert.ok(renew().licence);
+    s.service.revokeInstallation('inst-key-0100');
+    assert.throws(renew, /removed from its store/);
+
+    // A store with keys and no linked device can still be deleted, keys and all.
+    const spare = s.service.registerStore({ name: 'Spare', ownerEmail: 'k@example.com', plan: 'TRIAL', recordedBy: 'admin' });
+    s.service.createActivationKey({ storeId: spare.id, maxUses: 1, days: 1, createdBy: 'admin' });
+    s.service.deleteUnlinkedStore(spare.id);
+    assert.equal(s.service.storeDetail(spare.id), null);
+  } finally { await s.close(); }
+});

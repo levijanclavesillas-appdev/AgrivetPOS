@@ -396,6 +396,8 @@
 .licence-facts dt { flex: none; font-size: var(--type-label-md-size); }
 .licence-facts dd { overflow-wrap: anywhere; color: var(--md-on-surface); }
 .licence-link { padding: var(--space-4); border: 1px dashed var(--md-primary); border-radius: var(--shape-md); background: var(--md-surface); }
+.licence-link + .licence-link { margin-top: var(--space-4); }
+.licence-key { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .08em; }
 .licence-link ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); line-height: 1.6; }
 .licence-code { font-family: var(--font-mono); font-size: 2rem; letter-spacing: .15em; text-align: center;
   margin: var(--space-3) 0; color: var(--md-on-surface); user-select: all; }

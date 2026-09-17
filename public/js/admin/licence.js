@@ -60,6 +60,15 @@ export function createLicence({ root, session }) {
   };
 
   const link = act(() => api.post('/licence/link'));
+  // TASK-068: a key from Chachi's links this POS with no Google sign-in.
+  // Kept here, not read off the input: the screen redraws when the request starts.
+  let keyTyped = '';
+  const activate = act(async () => {
+    const result = await api.post('/licence/activate', { key: keyTyped });
+    keyTyped = '';
+    note = { kind: 'success', text: `Linked to ${result.store_name} with the activation key.` };
+    return result;
+  });
   const renew = act(async () => {
     const result = await api.post('/licence/renew');
     note = { kind: 'success', text: 'Checked with the licence server.' };
@@ -91,6 +100,7 @@ export function createLicence({ root, session }) {
         'This build does not check a subscription. Licensing starts when the build names a licence server.' }),
       note ? h('p', { class: `opening-status ${note.kind === 'error' ? 'error' : 'success'}`, role: note.kind === 'error' ? 'alert' : 'status', text: note.text }) : null,
       status.enforced && status.pending ? pendingBlock() : null,
+      status.enforced && isOwner && !status.pending ? keyBlock() : null,
     ]));
   }
 
@@ -120,6 +130,26 @@ export function createLicence({ root, session }) {
           : (status.pending ? null : h('button', { class: 'primary', icon: 'link', text: busy ? 'Asking…' : 'Link this POS', disabled: busy, onclick: link })),
         linked && !status.pending ? h('button', { icon: 'link', text: 'Link again', disabled: busy, onclick: link }) : null,
       ]) : h('p', { class: 'muted', text: 'Only the owner manages the subscription (LIC-004).' }),
+    ]);
+  }
+
+  function keyBlock() {
+    const linked = !['UNLINKED', 'MISCONFIGURED'].includes(status.state);
+    const keyInput = h('input', {
+      type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false',
+      maxlength: 24, placeholder: 'XXXX-XXXX-XXXX-XXXX', class: 'licence-key', value: keyTyped,
+      oninput: (event) => { keyTyped = event.target.value; },
+    });
+    return h('form', {
+      class: 'licence-link',
+      onsubmit: (event) => { event.preventDefault(); if (!busy) activate(); },
+    }, [
+      h('h3', { text: linked ? 'Link with an activation key instead' : 'Or enter an activation key' }),
+      h('p', { class: 'muted', text: 'If Chachi\'s gave you an activation key for your store, enter it here. No Google sign-in is needed.' }),
+      h('label', { text: 'Activation key' }, [keyInput]),
+      h('div', { class: 'opening-actions' }, [
+        h('button', { type: 'submit', icon: 'lock-open', text: busy ? 'Activating…' : 'Activate', disabled: busy }),
+      ]),
     ]);
   }
 

@@ -49,6 +49,12 @@ not there.
    - **Add a store.** Registers one for its owner's Google e-mail before anything is linked. The
      first device that e-mail approves joins it as set up, with no trial.
    - **The history.** Every change is a row in the store's history, with a note.
+6. **TASK-068: an activation key.** It links a POS without Google.
+   - **Making one.** On a store's page, *Activation keys* makes a key for a number of devices and
+     days. The key is shown once; only its hash is kept.
+   - **Using one.** The owner enters it under Admin → Subscription, and the POS calls
+     `POST /api/v1/device/activate`.
+   - **The Play review store** (`play-review`) is linked this way.
 
 ## Configuration (environment)
 

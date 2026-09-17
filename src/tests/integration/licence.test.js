@@ -245,6 +245,35 @@ test('LIC-005: a licence from before TASK-067, plan "monthly", is read as the mo
   assert.equal(licenceService.state().plan, 'ONE_TIME');
 });
 
+test('TASK-068: the owner links the POS with an activation key; a cashier cannot, and a wrong key changes nothing', async () => {
+  const store = licensing.registerStore({ name: 'Play review', ownerEmail: 'review@example.com', plan: 'ONE_TIME', recordedBy: 'admin' });
+  const { key } = licensing.createActivationKey({ storeId: store.id, maxUses: 2, days: 30, createdBy: 'admin' });
+  const before = licenceService.state().store_name;
+
+  assert.equal((await call('/licence/activate', { token: tokens.CASHIER, method: 'POST', body: { key } })).status, 403);
+  const short = await json(await call('/licence/activate', { token: tokens.OWNER, method: 'POST', body: { key: 'ABC' } }));
+  assert.equal(short.status, 400);
+  assert.match(short.body.error.message, /16 letters and numbers/);
+  const wrong = await json(await call('/licence/activate', { token: tokens.OWNER, method: 'POST', body: { key: 'BBBB-BBBB-BBBB-BBBB' } }));
+  assert.equal(wrong.status, 409);
+  assert.match(wrong.body.error.message, /not right/);
+  assert.equal(licenceService.state().store_name, before, 'the licence it had stands');
+
+  const linked = await json(await call('/licence/activate', { token: tokens.OWNER, method: 'POST', body: { key: key.toLowerCase() } }));
+  assert.equal(linked.status, 200);
+  assert.deepEqual(
+    { state: linked.body.state, store: linked.body.store_name, plan: linked.body.plan, error: linked.body.last_error },
+    { state: 'ACTIVE', store: 'Play review', plan: 'ONE_TIME', error: null },
+  );
+  const audit = db.get().prepare("SELECT * FROM audit_logs WHERE action = 'LICENCE_LINKED' ORDER BY rowid DESC").get();
+  assert.equal(JSON.parse(audit.after_value).by, 'ACTIVATION_KEY');
+  assert.equal(JSON.stringify(linked.body).includes(licenceRepository.get().installation_secret), false);
+
+  // It renews with the secret the key gave it, like any linked POS.
+  assert.equal((await json(await call('/licence/renew', { token: tokens.OWNER, method: 'POST' }))).body.store_name, 'Play review');
+  assert.equal(licensing.storeDetail(store.id).keys[0].uses, 1);
+});
+
 test('LIC-007: a one-time POS that stays offline past its check and grace opens no new shift', () => {
   // Checked today: valid 30 days, then 7 of grace. This moves the POS's clock on for good (LIC-003).
   assert.equal(licenceService.state({ at: inDays(25) }).state, 'WARNING');

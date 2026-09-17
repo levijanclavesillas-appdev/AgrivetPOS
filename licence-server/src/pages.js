@@ -24,6 +24,7 @@ table{width:100%;border-collapse:collapse;font-size:.95rem}th,td{text-align:left
 .scroll{overflow-x:auto}.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.row form{margin:0}
 .tag{display:inline-block;padding:0 .5rem;border-radius:999px;font-size:.8rem;font-weight:600}.tag.ok{background:var(--ok);color:var(--ok-ink)}.tag.warn{background:var(--warn);color:var(--warn-ink)}.tag.err{background:var(--err);color:var(--err-ink)}
 .foot{margin:1.5rem 0 0;text-align:center;font-size:.9rem;color:var(--muted)}.foot a{color:inherit}
+.note .code{display:block;margin-top:.5rem;font-size:1.25rem;word-break:break-all}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:0 1rem}
 `;
 
@@ -174,17 +175,37 @@ ${notice ? `<p class="note ok">${esc(notice)}</p>` : ''}
 <button class="primary" type="submit">Add store</button></form></div>`, { wide: true });
   },
 
-  adminStore({ detail, now, csrf, notice = null }) {
-    const { store, installations, payments } = detail;
+  adminStore({ detail, now, csrf, notice = null, newKey = null }) {
+    const { store, installations, payments, keys = [] } = detail;
     const oneTime = store.plan === 'ONE_TIME';
     const action = (what) => `/admin/stores/${esc(store.id)}/${what}`;
-    const devices = installations.map((i) => `<tr><td>${esc(i.platform || '—')} ${esc(i.app_version || '')}<br><span class="muted">${esc(i.id)}</span></td>
+    const devices = installations.map((i) => `<tr><td>${esc(i.platform || '—')} ${esc(i.app_version || '')}${i.activation_key_id ? ' <span class="tag warn">by key</span>' : ''}<br><span class="muted">${esc(i.id)}</span></td>
 <td>${date(i.created_at)}</td><td>${date(i.last_check_at)}</td>
 <td>${i.revoked_at ? `removed ${date(i.revoked_at)}` : `<form method="post" action="/admin/installations/${esc(i.id)}/revoke">${hidden('csrf', csrf)}<button class="danger" type="submit">Remove</button></form>`}</td></tr>`).join('');
     const history = payments.map((p) => `<tr><td>${date(p.created_at)}</td><td>${esc(p.method)}</td>
 <td>${pesos(p.amount_centavos)}</td><td>${esc(p.reference || '')} ${esc(p.note || '')}</td>
 <td>${date(p.paid_until_before)}</td><td>${date(p.paid_until_after)}</td><td>${esc(p.recorded_by)}</td></tr>`).join('');
     const unlinked = !store.owner_sub && !installations.length;
+
+    // TASK-068: activation keys.
+    const keyState = (k) => {
+      if (k.revoked_at) return `<span class="tag err">withdrawn ${date(k.revoked_at)}</span>`;
+      if (new Date(k.expires_at) <= now) return '<span class="tag err">expired</span>';
+      if (k.uses >= k.max_uses) return '<span class="tag warn">used up</span>';
+      return '<span class="tag ok">active</span>';
+    };
+    const keyRows = keys.map((k) => `<tr><td>${esc(k.label || '—')}</td><td>${k.uses} of ${k.max_uses}</td><td>${date(k.created_at)}</td>
+<td>${date(k.expires_at)}</td><td>${keyState(k)}</td>
+<td>${k.revoked_at ? '' : `<form method="post" action="/admin/keys/${esc(k.id)}/revoke">${hidden('csrf', csrf)}<button class="danger" type="submit">Withdraw</button></form>`}</td></tr>`).join('');
+    const keysCard = `<div class="card scroll"><h2>Activation keys</h2>
+<p class="muted">A key links a POS to this store without Google: the owner enters it under Admin → Subscription. Each device it links uses one. Only a hash is kept, so a key is shown once, when it is made.</p>
+${newKey ? `<p class="note ok">New key${newKey.activationKey.label ? ` (${esc(newKey.activationKey.label)})` : ''}, for ${newKey.activationKey.max_uses} device${newKey.activationKey.max_uses === 1 ? '' : 's'} until ${date(newKey.activationKey.expires_at)}. Copy it now; it is not shown again:<br><strong class="code">${esc(newKey.key)}</strong></p>` : ''}
+<form method="post" action="${action('keys')}">${hidden('csrf', csrf)}
+<div class="grid"><div><label for="key_label">Label</label><input id="key_label" name="label" maxlength="80" placeholder="e.g. Google Play review"></div>
+<div><label for="key_uses">Devices</label><input id="key_uses" name="max_uses" type="number" min="1" max="100" value="1" required></div>
+<div><label for="key_days">Valid for (days)</label><input id="key_days" name="days" type="number" min="1" max="365" value="30" required></div></div>
+<button type="submit">Make a key</button></form>
+${keys.length ? `<table><thead><tr><th>Label</th><th>Used</th><th>Made</th><th>Expires</th><th></th><th></th></tr></thead><tbody>${keyRows}</tbody></table>` : ''}</div>`;
 
     const payment = oneTime
       ? '<div class="card"><h2>Record a payment</h2><p class="muted">This store has a one-time licence, so there is no subscription to extend.</p></div>'
@@ -233,6 +254,7 @@ ${notice ? `<p class="note ok">${esc(notice)}</p>` : ''}</div>
 ${payment}
 ${plan}
 ${override}
+${keysCard}
 <div class="card scroll"><h2>Devices</h2><table><thead><tr><th>Device</th><th>Linked</th><th>Last check</th><th></th></tr></thead><tbody>${devices || '<tr><td colspan="4" class="muted">None.</td></tr>'}</tbody></table></div>
 <div class="card scroll"><h2>Payments and changes</h2><table><thead><tr><th>Date</th><th>How</th><th>Amount</th><th>Reference / note</th><th>Before</th><th>After</th><th>By</th></tr></thead><tbody>${history}</tbody></table></div>
 ${remove}`, { wide: true });

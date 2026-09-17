@@ -45,6 +45,19 @@ const SCHEMA = [
      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED','DENIED','PICKED_UP')),
      store_id TEXT, approved_by TEXT)`,
   PAYMENTS,
+  // TASK-068: a key Chachi's gives a store, typed on a POS to link it without Google.
+  // Only its hash is kept; the key is shown once, when it is made.
+  `CREATE TABLE IF NOT EXISTS activation_keys (
+     id TEXT PRIMARY KEY,
+     store_id TEXT NOT NULL REFERENCES stores(id),
+     key_hash TEXT NOT NULL UNIQUE,
+     label TEXT,
+     max_uses INTEGER NOT NULL CHECK (max_uses BETWEEN 1 AND 100),
+     uses INTEGER NOT NULL DEFAULT 0,
+     expires_at TEXT NOT NULL,
+     created_by TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     revoked_at TEXT)`,
   `CREATE TABLE IF NOT EXISTS play_purchases (
      purchase_token TEXT PRIMARY KEY,
      store_id TEXT NOT NULL REFERENCES stores(id),
@@ -74,6 +87,8 @@ const COLUMNS = [
   ['installations', 'web_url', 'TEXT'],
   // TASK-065: where Google sign-in returns to: a link being approved, or "Your stores".
   ['oauth_states', 'return_to', 'TEXT'],
+  // TASK-068: the activation key a device was linked with, when it was not linked by Google.
+  ['installations', 'activation_key_id', 'TEXT'],
 ];
 
 /**

@@ -116,6 +116,7 @@ legal advice. Confirm them with the store's accountant and the FDA licensing req
 | `LIC-005` | A store is on one plan, `MONTHLY` or `ONE_TIME`. A one-time store is paid for good, and no monthly payment or Play purchase changes it |
 | `LIC-006` | Only Chachi's admin sets a plan, or grants or takes access by hand, on the licence server's admin page. Each change is kept in the store's payment history, and access taken away needs a note and a confirmation |
 | `LIC-007` | A one-time licence is still renewed online at least every 30 days (`LIC-002`'s check and grace). Revoking it lapses every device after its next check and grace |
+| `LIC-008` | An activation key, made by Chachi's admin for one store, links a POS to that store with no Google sign-in (`TASK-068`). Only the owner enters it. It covers a set number of devices for a set number of days, and a withdrawn or expired key links nothing new |
 
 **`NFR_3.1` is amended on this branch:** every core operation works with no internet for the
 licence's validity plus grace, 37 days after the last check. **`TC-E2E-08` runs with licensing

@@ -15,6 +15,10 @@
 //   for good (its paid_until is FOR_GOOD). Chachi's admin sets either by hand, and can
 //   register a store before its owner links it (LIC-006). Every change is a payments row.
 //
+//   TASK-068: an activation key links a device without Google. Chachi's makes one for a
+//   store on the admin page, for a number of devices and a number of days; the owner types
+//   it on the POS. Each device it links counts as one use.
+//
 //   A licence is signed (licence.js), valid for `validityDays` from its check, and
 //   carries `grace_days`; the POS decides warning, grace and lapse from it offline (L-2,
 //   L-3).
@@ -48,6 +52,15 @@ const normaliseCode = (typed) => {
   const clean = String(typed || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   return clean.length === 8 ? `${clean.slice(0, 4)}-${clean.slice(4)}` : null;
 };
+
+/** An activation key: 16 characters from the code alphabet, in fours (about 77 bits). */
+function activationKey() {
+  let out = '';
+  for (const byte of crypto.randomBytes(16)) out += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+  return out.match(/.{4}/g).join('-');
+}
+/** What somebody typed, as a key: case, spaces and dashes do not matter. */
+const normaliseKey = (typed) => String(typed || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 const addDays = (iso, days) => new Date(new Date(iso).getTime() + days * 86400e3).toISOString();
 function addMonths(iso, months) {
@@ -213,6 +226,23 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
   }
 
   /**
+   * A device's seat in a store, new or taken again, with a fresh renewal secret. The secret
+   * is returned once and kept only as a hash.
+   */
+  function seat({ installationId, store, platform = null, appVersion = null, webUrl = null, keyId = null }) {
+    const secret = token();
+    const created = at();
+    db.prepare(`INSERT INTO installations (id, store_id, secret_hash, platform, app_version, created_at, last_check_at, web_url, activation_key_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET store_id = excluded.store_id, secret_hash = excluded.secret_hash,
+                  platform = excluded.platform, app_version = excluded.app_version,
+                  last_check_at = excluded.last_check_at, revoked_at = NULL, web_url = excluded.web_url,
+                  activation_key_id = excluded.activation_key_id`)
+      .run(installationId, store.id, sha256(secret), platform, appVersion, created, created, webUrl || null, keyId);
+    return secret;
+  }
+
+  /**
    * The device's poll. Once approved, the first poll collects the licence and the
    * renewal secret — once: a second poll with the same code gets nothing, so a code
    * seen over a shoulder is worth nothing after the device has used it.
@@ -227,14 +257,9 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
 
     return db.transaction(() => {
       const store = storeById(link.store_id);
-      const secret = token();
-      const created = at();
-      db.prepare(`INSERT INTO installations (id, store_id, secret_hash, platform, app_version, created_at, last_check_at, web_url)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                  ON CONFLICT(id) DO UPDATE SET store_id = excluded.store_id, secret_hash = excluded.secret_hash,
-                    platform = excluded.platform, app_version = excluded.app_version,
-                    last_check_at = excluded.last_check_at, revoked_at = NULL, web_url = excluded.web_url`)
-        .run(link.installation_id, store.id, sha256(secret), link.platform, link.app_version, created, created, link.web_url || null);
+      const secret = seat({
+        installationId: link.installation_id, store, platform: link.platform, appVersion: link.app_version, webUrl: link.web_url,
+      });
       db.prepare("UPDATE device_links SET status = 'PICKED_UP' WHERE device_code_hash = ?").run(link.device_code_hash);
       const installation = { id: link.installation_id };
       return { status: 'approved', licence: issue(installation, store), installation_secret: secret };
@@ -257,6 +282,64 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
     const installation = installationFor({ installationId, secret });
     db.prepare('UPDATE installations SET last_check_at = ? WHERE id = ?').run(at(), installation.id);
     return { licence: issue(installation, storeById(installation.store_id)) };
+  }
+
+  // ── Activation keys (TASK-068) ───────────────────────────────────────────
+
+  /** A new key for a store. The key itself is in the answer and nowhere else. */
+  function createActivationKey({ storeId, maxUses, days, label = null, createdBy }) {
+    const store = storeById(storeId);
+    if (!store) throw new ServiceError(404, 'no_store', 'No such store.');
+    const uses = Number(maxUses);
+    if (!Number.isInteger(uses) || uses < 1 || uses > 100) throw new ServiceError(400, 'max_uses', 'Devices is a whole number from 1 to 100.');
+    const valid = Number(days);
+    if (!Number.isInteger(valid) || valid < 1 || valid > 365) throw new ServiceError(400, 'days', 'Days is a whole number from 1 to 365.');
+    const key = activationKey();
+    const row = {
+      id: newId(), store_id: store.id, key_hash: sha256(normaliseKey(key)),
+      label: String(label || '').trim().slice(0, 80) || null, max_uses: uses,
+      expires_at: addDays(at(), valid), created_by: createdBy, created_at: at(),
+    };
+    db.prepare(`INSERT INTO activation_keys (id, store_id, key_hash, label, max_uses, expires_at, created_by, created_at)
+                VALUES (@id, @store_id, @key_hash, @label, @max_uses, @expires_at, @created_by, @created_at)`).run(row);
+    return { key, activationKey: db.prepare('SELECT * FROM activation_keys WHERE id = ?').get(row.id) };
+  }
+
+  function revokeActivationKey(id) {
+    db.prepare('UPDATE activation_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL').run(at(), id);
+    const row = db.prepare('SELECT store_id FROM activation_keys WHERE id = ?').get(id);
+    return row ? row.store_id : null;
+  }
+
+  /**
+   * A POS links itself with a key. One use per device: the same device activating again
+   * with the same key, while it is still linked, uses nothing more.
+   */
+  function activate({ installationId, key, platform = null, appVersion = null, webUrl = null }) {
+    if (!/^[A-Za-z0-9-]{8,64}$/.test(String(installationId || ''))) {
+      throw new ServiceError(400, 'bad_installation', 'An installation id is required.');
+    }
+    const found = db.prepare('SELECT * FROM activation_keys WHERE key_hash = ?').get(sha256(normaliseKey(key)));
+    const refuse = (why) => { throw new ServiceError(403, 'bad_key', why); };
+    if (!found) refuse('That activation key is not right. Check it, or ask Chachi\'s for a new one.');
+    if (found.revoked_at) refuse('That activation key has been withdrawn. Ask Chachi\'s for a new one.');
+    if (found.expires_at <= at()) refuse('That activation key has expired. Ask Chachi\'s for a new one.');
+    return db.transaction(() => {
+      const existing = db.prepare('SELECT * FROM installations WHERE id = ?').get(installationId);
+      const again = existing && !existing.revoked_at && existing.store_id === found.store_id && existing.activation_key_id === found.id;
+      if (!again) {
+        const used = db.prepare('UPDATE activation_keys SET uses = uses + 1 WHERE id = ? AND uses < max_uses').run(found.id).changes;
+        if (!used) refuse('That activation key has already linked as many devices as it allows. Ask Chachi\'s for another.');
+      }
+      const store = storeById(found.store_id);
+      const secret = seat({
+        installationId, store, keyId: found.id,
+        platform: String(platform || '').slice(0, 40) || null,
+        appVersion: String(appVersion || '').slice(0, 40) || null,
+        webUrl: cleanWebUrl(webUrl),
+      });
+      return { licence: issue({ id: installationId }, store), installation_secret: secret, store_name: store.name };
+    })();
   }
 
   // ── Payments ─────────────────────────────────────────────────────────────
@@ -344,6 +427,7 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
       throw new ServiceError(409, 'linked', 'This store has been linked, so it is kept. Remove its devices or revoke its licence instead.');
     }
     db.transaction(() => {
+      db.prepare('DELETE FROM activation_keys WHERE store_id = ?').run(store.id);
       db.prepare('DELETE FROM payments WHERE store_id = ?').run(store.id);
       db.prepare('DELETE FROM stores WHERE id = ?').run(store.id);
     })();
@@ -427,6 +511,7 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
     return {
       store,
       installations: db.prepare('SELECT * FROM installations WHERE store_id = ? ORDER BY created_at').all(id),
+      keys: db.prepare('SELECT * FROM activation_keys WHERE store_id = ? ORDER BY created_at DESC').all(id),
       payments: db.prepare('SELECT * FROM payments WHERE store_id = ? ORDER BY created_at DESC, rowid DESC').all(id),
     };
   };
@@ -467,6 +552,7 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
 
   return {
     startLink, findLink, approveLink, denyLink, pollLink, renew, recordPayment, applyPlayPurchase,
+    createActivationKey, revokeActivationKey, activate,
     setOneTime, setPaidUntil, revokeOneTime, registerStore, deleteUnlinkedStore,
     storesForOwner, storesForApproval, ownerStores, listStores, storeDetail, revokeInstallation,
     createSession, getSession, endSession, saveOAuthState, takeOAuthState,
@@ -474,4 +560,4 @@ function createService({ db, config, privateKey, now = () => new Date() }) {
   };
 }
 
-module.exports = { createService, ServiceError, normaliseCode, addMonths, addDays, FOR_GOOD, endOfManilaDay };
+module.exports = { createService, ServiceError, normaliseCode, addMonths, addDays, FOR_GOOD, endOfManilaDay, normaliseKey };

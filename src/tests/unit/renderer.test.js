@@ -809,6 +809,13 @@ test('Google Play User Data: sign-in links to the privacy policy, opened outside
   assert.match(codeOf('js/admin/licence.js'), /import \{ h, clear, openExternally \} from '\.\.\/shell\/ui\.js'/);
 });
 
+test('TASK-068: SCR-707 takes an activation key from the owner, and keeps what was typed across a redraw', () => {
+  const code = codeOf('js/admin/licence.js');
+  assert.match(code, /api\.post\('\/licence\/activate', \{ key: keyTyped \}\)/);
+  assert.match(code, /oninput: \(event\) => \{ keyTyped = event\.target\.value; \}/);
+  assert.match(code, /status\.enforced && isOwner && !status\.pending \? keyBlock\(\) : null/, 'the owner only, and not while a code is waiting');
+});
+
 test('TASK-067: SCR-707 names the plan, and a one-time licence shows no paid-until', () => {
   const code = codeOf('js/admin/licence.js');
   assert.match(code, /fact\('Plan', status\.plan === 'ONE_TIME' \? 'One-time licence' : 'Monthly subscription'\)/);

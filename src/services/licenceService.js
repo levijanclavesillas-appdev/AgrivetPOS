@@ -188,21 +188,28 @@ function assertEnforced() {
   if (!enforced()) throw errors.conflict('This build has no licence server; there is nothing to link.', { ruleId: 'LIC-002' });
 }
 
+/** What the licence server is told about this installation when it links. */
+function describeInstallation() {
+  const hosting = require('../config/hosting');
+  return {
+    platform: hosting.isHosted() ? 'Web'
+      : process.platform === 'android' ? 'Android' : process.platform === 'win32' ? 'Windows' : process.platform,
+    // TASK-065: the web copy's address, for the owner's "Your stores" on the licence site.
+    web_url: hosting.publicUrl(),
+  };
+}
+
 /** Ask the licence server for a code the owner approves on /link. */
 async function startLink(actor, { storeName = null, appVersion = null } = {}) {
   assertOwner(actor);
   assertEnforced();
   const at = clock.nowUtc();
   const row = licenceRepository.ensure(crypto.randomUUID(), at);
-  const hosting = require('../config/hosting');
   const started = await call('/device/start', {
     installation_id: row.installation_id,
     store_name: storeName,
-    platform: hosting.isHosted() ? 'Web'
-      : process.platform === 'android' ? 'Android' : process.platform === 'win32' ? 'Windows' : process.platform,
     app_version: appVersion,
-    // TASK-065: the web copy's address, for the owner's "Your stores" on the licence site.
-    web_url: hosting.publicUrl(),
+    ...describeInstallation(),
   });
   licenceRepository.update({
     pending_device_code: started.device_code,
@@ -261,6 +268,41 @@ async function pollLink(actor) {
 }
 
 /**
+ * TASK-068: linked with an activation key Chachi's gave the store, instead of Google. The
+ * licence server answers with the licence and the renewal secret at once. Audited as a
+ * link, saying it was by key.
+ */
+async function activate(actor, { key, appVersion = null } = {}) {
+  assertOwner(actor);
+  assertEnforced();
+  const typed = String(key || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (typed.length !== 16) {
+    throw errors.badRequest('An activation key is 16 letters and numbers, like XXXX-XXXX-XXXX-XXXX.', { ruleId: 'LIC-004' });
+  }
+  const at = clock.nowUtc();
+  const row = licenceRepository.ensure(crypto.randomUUID(), at);
+  let result;
+  try {
+    result = await call('/device/activate', {
+      installation_id: row.installation_id, activation_key: typed, app_version: appVersion, ...describeInstallation(),
+    });
+  } catch (err) {
+    licenceRepository.update({ last_attempt_at: at, last_error: err.message }, at);
+    throw err;
+  }
+  const { payload } = saveLicence(result.licence, result.installation_secret, at);
+  licenceRepository.update({ pending_device_code: null, pending_user_code: null, pending_uri: null, pending_expires_at: null }, at);
+  auditService.write({
+    actor,
+    action: 'LICENCE_LINKED',
+    entityType: 'licence_state',
+    entityId: row.installation_id,
+    after: { store_id: payload.store_id, store_name: payload.store_name, plan: planOf(payload), paid_until: payload.paid_until, by: 'ACTIVATION_KEY' },
+  });
+  return state({ at });
+}
+
+/**
  * The monthly check (LIC-002). Silent: the renewal secret authenticates, not Google.
  * Recorded in the audit trail only when it changes something — a payment extended the
  * subscription, or the plan changed (TASK-067) — because a row per day would drown the
@@ -309,4 +351,4 @@ function renewIfDue({ at = clock.nowUtc() } = {}) {
   }
 }
 
-module.exports = { verify, state, assertMayOpenShift, startLink, pollLink, renew, renewIfDue };
+module.exports = { verify, state, assertMayOpenShift, startLink, pollLink, activate, renew, renewIfDue };

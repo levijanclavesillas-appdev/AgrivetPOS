@@ -5,6 +5,7 @@
 //   GET  /licence              any signed-in user: the state, so every screen can warn
 //   POST /licence/link         the owner: ask the licence server for a code (LIC-004)
 //   POST /licence/link/poll    the owner: has it been approved yet?
+//   POST /licence/activate     the owner: link with an activation key instead (TASK-068)
 //   POST /licence/renew        the owner: "Check now"
 
 const express = require('express');
@@ -38,6 +39,17 @@ router.post('/licence/link', owner, async (req, res, next) => {
 router.post('/licence/link/poll', owner, async (req, res, next) => {
   try {
     res.json(await licenceService.pollLink(req.session));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/licence/activate', owner, async (req, res, next) => {
+  try {
+    res.json(await licenceService.activate(req.session, {
+      key: (req.body || {}).key,
+      appVersion: require('../../package.json').version,
+    }));
   } catch (err) {
     next(err);
   }

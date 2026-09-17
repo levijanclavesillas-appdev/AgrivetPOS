@@ -387,6 +387,7 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-065](TASK-065-stores-on-one-address.md) | Web stores at `pos.chachisoftware.store/s/<store>/`; the owner's "Your stores" by Google; no DNS per store | Built, `01f4899`; `demo` live | — |
 | [TASK-066](TASK-066-cafe-restaurant.md) | Café / Restaurant at setup: made-to-order items, open orders, kitchen ticket, line notes, service charge; then NAM-NAM moves off back-end.store | Built, *this commit*; NAM-NAM's move waits on the owner | NAM-NAM's first day on Chachi POS |
 | [TASK-067](TASK-067-one-time-licence-and-admin-override.md) | A one-time licence beside the subscription; Chachi's admin sets a store's plan and marks it paid by hand | Built, `76638f8`; live on the licence server since 2026-09-17 | The first client sold a one-time licence |
+| [TASK-068](TASK-068-activation-keys-and-play-review.md) | Activation keys link a POS without Google; the `play-review` store for Google Play's reviewers | Built, *this commit*; live on the licence server and `play-review` | An Android build from this commit, submitted to Play |
 
 **`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
 100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription

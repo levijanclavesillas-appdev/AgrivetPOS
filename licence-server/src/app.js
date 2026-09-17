@@ -4,6 +4,7 @@
 //
 //   POST /api/v1/device/start      the POS asks for a link code
 //   POST /api/v1/device/poll       …and polls until the owner approves it
+//   POST /api/v1/device/activate   …or links itself with an activation key (TASK-068)
 //   POST /api/v1/licence/renew     the monthly check: installation id + secret → licence
 //   POST /api/v1/play/purchase     a Google Play purchase, verified with Google
 //   GET  /api/v1/public-key        the key the POS verifies licences with
@@ -134,6 +135,9 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
   api.post('/device/start', wrap((b) => service.startLink({
     installationId: b.installation_id, storeName: b.store_name, platform: b.platform, appVersion: b.app_version,
     webUrl: b.web_url,
+  })));
+  api.post('/device/activate', limiter({ perMinute: 10 }), wrap((b) => service.activate({
+    installationId: b.installation_id, key: b.activation_key, platform: b.platform, appVersion: b.app_version, webUrl: b.web_url,
   })));
   api.post('/device/poll', wrap((b) => service.pollLink({ deviceCode: b.device_code })));
   api.post('/licence/renew', wrap((b) => service.renew({ installationId: b.installation_id, secret: b.installation_secret })));
@@ -349,6 +353,28 @@ function createApp({ service, config, google, play, now = () => new Date() }) {
     const store = service.deleteUnlinkedStore(req.params.id);
     return { store, to: `/admin?notice=${encodeURIComponent(`${store.name} deleted.`)}` };
   }));
+
+  // TASK-068: activation keys. A new key is shown on the page that answers the form, once,
+  // and never again: only its hash is kept.
+  app.post('/admin/stores/:id/keys', requireAdmin, (req, res) => {
+    try {
+      const { key, activationKey } = service.createActivationKey({
+        storeId: req.params.id, maxUses: Number(req.body.max_uses), days: Number(req.body.days),
+        label: req.body.label, createdBy: 'admin',
+      });
+      return page(res, pages.adminStore({
+        detail: service.storeDetail(req.params.id), now: now(), csrf: req.admin.csrf,
+        newKey: { key, activationKey },
+      }));
+    } catch (err) {
+      if (err instanceof ServiceError) return page(res, pages.message('Not done', err.message, 'err', '/admin'), err.status);
+      throw err;
+    }
+  });
+  app.post('/admin/keys/:id/revoke', requireAdmin, (req, res) => {
+    const storeId = service.revokeActivationKey(req.params.id);
+    return res.redirect(storeId ? `/admin/stores/${storeId}?notice=${encodeURIComponent('Key withdrawn. Devices it already linked stay linked; remove them below if they should not.')}` : '/admin');
+  });
 
   app.post('/admin/installations/:id/revoke', requireAdmin, (req, res) => {
     const storeId = service.revokeInstallation(req.params.id);
