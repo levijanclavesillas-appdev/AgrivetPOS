@@ -637,3 +637,58 @@ test('TAX-004 eligibility is editable on a product at any time', () => {
   const off = productService.update(product.id, { statutoryDiscountEligible: false }, sessions.OWNER);
   assert.equal(off.statutory_discount_eligible, false);
 });
+
+// ── TX-411 — many prices at once (SCR-209) ──────────────────────────────────
+
+test('TX-411: a bulk price change writes every product in one go, with one reason on each', () => {
+  const made = [
+    productService.create(productInput({ sku: 'BULK-1', name: 'Bulk one', retailPriceCentavos: 10000 }), sessions.OWNER),
+    productService.create(productInput({ sku: 'BULK-2', name: 'Bulk two', retailPriceCentavos: 25050, wholesalePriceCentavos: 24000 }), sessions.OWNER),
+    productService.create(productInput({ sku: 'BULK-3', name: 'Bulk three', retailPriceCentavos: 5000 }), sessions.OWNER),
+  ];
+
+  const result = productService.setPricesBulk([
+    { productId: made[0].id, RETAIL: 10500 },
+    { productId: made[1].id, RETAIL: 26300, WHOLESALE: 25000 },
+    // Already at this price: skipped rather than written again.
+    { productId: made[2].id, RETAIL: 5000 },
+  ], sessions.OWNER, sessions.OWNER, { reason: 'Supplier raised prices, September' });
+
+  assert.deepEqual({ ok: result.ok, changed: result.changed, skipped: result.skipped }, { ok: true, changed: 2, skipped: 1 });
+  assert.equal(productService.resolvePrice(made[0].id, 'RETAIL').price_centavos, 10500);
+  assert.equal(productService.resolvePrice(made[1].id, 'WHOLESALE').price_centavos, 25000);
+  assert.equal(productService.resolvePrice(made[2].id, 'RETAIL').price_centavos, 5000);
+
+  // AUD-601: one row per product, with the store's reason and both figures.
+  const trail = require('../../repositories/auditRepository').list({ action: 'PRICE_CHANGED', limit: 10 });
+  const forBulk = trail.filter((row) => row.reason === 'Supplier raised prices, September');
+  assert.equal(forBulk.length, 2);
+  assert.match(forBulk.map((row) => row.before_value).join(' '), /25050|10000/);
+
+  // The old price is still the price of the day before (MON-005's reasoning for prices).
+  const history = require('../../repositories/productRepository').priceHistory(made[0].id, 'RETAIL');
+  assert.ok(history.length >= 2);
+});
+
+test('TX-411: a bulk change is refused whole — no reason, a bad price, or the wrong role', () => {
+  const product = productService.create(productInput({ sku: 'BULK-4', name: 'Bulk four', retailPriceCentavos: 8000 }), sessions.OWNER);
+  const priceNow = () => productService.resolvePrice(product.id, 'RETAIL').price_centavos;
+
+  assert.throws(() => productService.setPricesBulk([{ productId: product.id, RETAIL: 9000 }], sessions.OWNER, sessions.OWNER, { reason: '' }),
+    (err) => err.ruleId === 'AUD-601' && /Say why/.test(err.message));
+  assert.equal(priceNow(), 8000, 'and nothing was written');
+
+  assert.throws(() => productService.setPricesBulk([
+    { productId: product.id, RETAIL: 9000 },
+    { productId: product.id === 'x' ? 'y' : 'no-such-product', RETAIL: 100 },
+  ], sessions.OWNER, sessions.OWNER, { reason: 'A try' }), /No such product on row 2/);
+  assert.equal(priceNow(), 8000, 'the whole change is refused, not the rows before the bad one');
+
+  assert.throws(() => productService.setPricesBulk([{ productId: product.id, RETAIL: -1 }], sessions.OWNER, sessions.OWNER, { reason: 'A try' }),
+    (err) => err.ruleId === 'VR-203');
+  assert.throws(() => productService.setPricesBulk([], sessions.OWNER, sessions.OWNER, { reason: 'A try' }), /Nothing to change/);
+  assert.throws(() => productService.setPricesBulk(
+    Array.from({ length: productService.BULK_PRICE_MAX + 1 }, () => ({ productId: product.id, RETAIL: 9000 })),
+    sessions.OWNER, sessions.OWNER, { reason: 'A try' },
+  ), /at most 500 products/);
+});

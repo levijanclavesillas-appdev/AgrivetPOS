@@ -260,6 +260,50 @@ test('the cart request is the shape POST /sales takes', async () => {
 
 // ── TASK-069: the camera as a scanner ───────────────────────────────────────
 
+test('SCR-209: the bulk price rules, worked out to the centavo', async () => {
+  const { newPrice, marginBp, RULES, ROUNDINGS } = await load('js/catalogue/price-rules.js');
+  // 5% on ₱52.00, and the same rounded the way a store likes its prices to land.
+  assert.equal(newPrice({ rule: 'PERCENT_UP', value: 5, current: 5200 }), 5460);
+  assert.equal(newPrice({ rule: 'PERCENT_UP', value: 5, current: 5200, rounding: 'C25' }), 5450);
+  assert.equal(newPrice({ rule: 'PERCENT_UP', value: 5, current: 5200, rounding: 'P1' }), 5500);
+  assert.equal(newPrice({ rule: 'PERCENT_DOWN', value: 10, current: 5200 }), 4680);
+  assert.equal(newPrice({ rule: 'AMOUNT_UP', value: 250, current: 5200 }), 5450);
+  assert.equal(newPrice({ rule: 'AMOUNT_DOWN', value: 250, current: 200 }), 0, 'never below zero');
+  assert.equal(newPrice({ rule: 'SET', value: 9900, current: 5200 }), 9900);
+  // A margin is made on the selling price: ₱80 of cost at 20% is ₱100, not ₱96.
+  assert.equal(newPrice({ rule: 'MARGIN', value: 20, current: null, costCentavos: 8000 }), 10000);
+  assert.equal(newPrice({ rule: 'MARGIN', value: 20, costCentavos: null }), null, 'no cost, no answer');
+  assert.equal(newPrice({ rule: 'PERCENT_UP', value: 5, current: null }), null, 'no price to raise');
+  assert.equal(newPrice({ rule: 'NONSENSE', value: 5, current: 100 }), null);
+
+  assert.equal(marginBp(10000, 8000), 2000);
+  assert.equal(marginBp(10000, 0), null);
+  assert.deepEqual(RULES.map((r) => r.id), ['PERCENT_UP', 'PERCENT_DOWN', 'AMOUNT_UP', 'AMOUNT_DOWN', 'SET', 'MARGIN']);
+  assert.deepEqual(ROUNDINGS.map((r) => r.centavos), [0, 25, 100, 500]);
+});
+
+test('SCR-209: the screen proposes and the server disposes', () => {
+  const code = codeOf('js/catalogue/prices.js');
+  assert.match(code, /api\.put\('\/products\/prices', \{/);
+  assert.match(code, /reason: reason\.trim\(\)/, 'AUD-601: a reason travels with the change');
+  assert.match(code, /withPrices: 'true'/);
+  // Only what actually changed is sent.
+  assert.match(code, /changes: list\.map\(\(row\) => \(\{ productId: row\.product\.id, \[level\]: row\.next \}\)\)/);
+  assert.match(codeOf('js/shell/app.js'), /onPrices: may\(session\.role, 'TX-411'\)/);
+});
+
+test('SCR-209: the products are what a search finds, or a list the store builds by hand', () => {
+  const code = codeOf('js/catalogue/prices.js');
+  // The same picker every other screen uses, so a code can be scanned into it.
+  assert.match(code, /import \{ createProductPicker \} from '\.\.\/shell\/picker\.js'/);
+  assert.match(code, /onPick: \(product\) => \{ picker\.input\.value = ''; add\(product\); \}/);
+  // A picked product is read again with its other levels — the picker's own search has none.
+  assert.match(code, /withPrices: 'true'[\s\S]*?picked = \[\.\.\.picked, \{ product: full, next: null \}\]/);
+  assert.match(code, /const lines = \(\) => \(mode === 'PICKED' \? picked : found\)/);
+  assert.match(code, /Take \$\{row\.product\.name\} off the list/);
+  assert.match(proseOf('js/catalogue/prices.js'), /two different things/i);
+});
+
 test('the counter puts the customer and the kind of sale above the search, and the totals on the right', () => {
   const code = codeOf('js/pos/view.js');
   assert.match(code, /const topHost = h\('div', \{ class: 'pos-top' \}\)/);

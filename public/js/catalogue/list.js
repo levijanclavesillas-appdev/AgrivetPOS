@@ -21,7 +21,7 @@ import { productPicture } from '../shell/pictures.js';
 const PAGE = 50;
 
 export function createProductList({
-  root, mode = 'all', onOpen, onAdjust, onBatches, onValuation, onCount, onMode = null, onQuickKeys = null,
+  root, mode = 'all', onOpen, onAdjust, onBatches, onValuation, onCount, onMode = null, onQuickKeys = null, onPrices = null,
 }) {
   let query = '';
   let categoryId = '';
@@ -115,6 +115,8 @@ export function createProductList({
       onCount ? h('button', { class: 'row-action', icon: 'clipboard-list', text: 'Stock count', onclick: () => onCount() }) : null,
       // POS-113 (TASK-070): the counter's buttons, arranged by whoever edits the catalogue.
       onQuickKeys ? h('button', { class: 'row-action', icon: 'list-checks', text: 'Quick keys', onclick: () => onQuickKeys() }) : null,
+      // TX-411: many prices at once, rather than a hundred products one at a time.
+      onPrices ? h('button', { class: 'row-action', icon: 'coins', text: 'Change prices', onclick: () => onPrices() }) : null,
       // SCR-204, from the list it is a filter of.
       //
       // It used to hang off the dashboard's low-stock tile and nowhere else, and the

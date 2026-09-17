@@ -45,6 +45,19 @@ router.get('/products/barcode/:code', scanAtCounter, (req, res, next) => {
   }
 });
 
+/**
+ * TX-411 — many products' prices at once (`PR-101`, `AUD-601`'s reason on every one).
+ * Before `/products/:id`, or "prices" is read as a product id.
+ */
+router.put('/products/prices', changePrice, (req, res, next) => {
+  try {
+    const { changes = [], reason = null, effectiveFrom = null } = req.body || {};
+    res.json(productService.setPricesBulk(changes, req.session, req.session, { reason, effectiveFrom }));
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/products', lookUpAtCounter, (req, res, next) => {
   try {
     res.json(productService.search({
@@ -53,6 +66,8 @@ router.get('/products', lookUpAtCounter, (req, res, next) => {
       includeInactive: req.query.includeInactive === 'true',
       limit: req.query.limit,
       offset: req.query.offset,
+      // TX-411's bulk change: every level, not only retail.
+      withPrices: req.query.withPrices === 'true',
     }, req.session));
   } catch (err) {
     next(err);

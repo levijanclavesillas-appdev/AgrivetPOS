@@ -390,6 +390,7 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-068](TASK-068-activation-keys-and-play-review.md) | Activation keys link a POS without Google; the `play-review` store for Google Play's reviewers | Built, *this commit*; live on the licence server and `play-review` | An Android build from this commit, submitted to Play |
 | [TASK-069](TASK-069-camera-barcode-scanning.md) | Scan barcodes with the phone's, tablet's or laptop's camera, at the counter and wherever a barcode is typed | Built, *this commit* | A walk on a real phone, with and without Play services |
 | [TASK-070](TASK-070-wholesale-and-retail-sari-sari.md) | *Sari-sari & wholesale* at setup: a wholesale switch, pack prices, quick keys, sell by amount, utang customers added at the counter; the first store deployed | Built, *this commit* | Which store is first (answer 6) |
+| [TASK-071](TASK-071-bulk-price-change.md) | **Change prices** (`SCR-209`): one price level for many products at once — a rule, a rounding, a preview, one reason (`PR-109`) | Built, *this commit* | A supplier's letter worked through in one sitting |
 
 **`TASK-048` changes a founding requirement, and says so.** `NFR_3.1` puts offline operation at
 100% and `TC-E2E-08` asserts the application reaches for no network. A monthly subscription

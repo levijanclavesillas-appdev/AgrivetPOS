@@ -303,10 +303,15 @@ What follows is in every store and switched on by these defaults.
 | :--- | :--- |
 | `PR-107` | A cart has a price level: retail unless the counter switches a walk-in to wholesale (`wholesale_switch_enabled`), or a chosen customer sets it. Every line resolves at it, falling back to retail where a product has no price at that level, and marked so. The level is recorded on the sale and each line. Dealer is an account customer's only. A chosen customer's own level wins over the switch |
 | `PR-108` | A pack may carry its own price per price level (`product_pack_prices`, dated like a unit price). A line sold in that pack is charged per pack at it (`sale_items.priced_per_pack`), and otherwise costs its contents × the unit price. At wholesale, a pack with no wholesale price sells per unit at wholesale where the product has one, and only then at the pack's retail price. A customer-specific price (`PR-103`) still overrides it, per unit. Quantity breaks (`PR-104`) apply to per-unit lines only. The below-cost check (`PR-105`) weighs a pack price against what the pack's contents cost. Stock and cost stay in base units |
+| `PR-109` | Many prices are changed in one go (`SCR-209`, `TX-411`): one price level for a list of products — what a search or a category finds, or a list built product by product at the picker (typed or scanned) — worked out in the browser as a preview and re-checked by the server, which refuses the whole list if any figure in it is wrong. At most 500 products at a time. One reason (`AUD-601`) is asked for once and kept on every product, each written as an ordinary dated price change (`PR-101`) with its own audit row, so the old price stays in the history. A product whose price would not change is skipped rather than rewritten |
 | `POS-113` | Quick keys are the store's own buttons at the counter, up to 24, each a product or a pack of it; pressing one is scanning it. They are arranged under Products by whoever may edit the catalogue (`TX-410`), saved as a whole set, audited (`QUICK_KEYS_CHANGED`) and synced. A new store may take a suggested first set: its products with no barcode |
 
 **Also built:**
 
+- **Changing many prices at once** (`PR-109`). Under Products, **Change prices**: the products a
+  search or a category finds — or a list added to product by product, scanned or typed — a rule (raise or lower by % or ₱, set one figure, or work back from
+  cost at a margin), where the prices should land (`₱0.25`, `₱1`, `₱5`), and the new column beside
+  the old one with the margin each would make. Typed over by hand where the store disagrees.
 - **Selling by amount.** On a loose line of a unit sold in parts, **By amount** turns pesos into
   a quantity at the line's price. It rounds down to the unit's selling step (`units.step_milli`,
   for example 250 for quarter-kilos), so the customer is never charged more than they asked for.

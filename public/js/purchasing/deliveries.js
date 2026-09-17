@@ -1,4 +1,4 @@
-// SCR-804 — the deliveries this store has recorded (FT-503, FT-504).
+// SCR-805 — the deliveries this store has recorded (FT-503, FT-504).
 //
 // `POST /goods-receipts` has been the one way stock arrives since TASK-019, and until now
 // nothing showed what had arrived: a delivery was posted and vanished, and "what came in last

@@ -26,6 +26,9 @@ const referenceRepository = require('../repositories/referenceRepository');
 const TAX_CLASSES = Object.freeze(['VATABLE', 'VAT_EXEMPT', 'ZERO_RATED']);
 const PRICE_LEVELS = Object.freeze(['RETAIL', 'WHOLESALE', 'DEALER']);
 
+/** How many products one bulk price change may cover. */
+const BULK_PRICE_MAX = 500;
+
 const text = (value, { max = 200 } = {}) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
 // ── Validation (VR-201..VR-209) ─────────────────────────────────────────────
@@ -284,7 +287,7 @@ function get(id, session) {
   return detail(row, session);
 }
 
-function search({ q = null, categoryId = null, includeInactive = false, limit = 50, offset = 0 } = {}, session) {
+function search({ q = null, categoryId = null, includeInactive = false, limit = 50, offset = 0, withPrices = false } = {}, session) {
   const term = q === null || q === undefined ? null : text(q, { max: 60 });
   const filters = { q: term || null, categoryId: categoryId || null, includeInactive };
   const size = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
@@ -302,6 +305,14 @@ function search({ q = null, categoryId = null, includeInactive = false, limit = 
       const retail = productRepository.priceAt(row.id, 'RETAIL', at);
       product.retail_price_centavos = retail ? retail.price_centavos : null;
       product.is_sellable = Boolean(retail);
+      // TX-411's bulk change needs every level, and nothing else does: a catalogue list of
+      // 200 rows would otherwise be 600 price lookups nobody reads.
+      if (withPrices) {
+        const current = productRepository.currentPrices(row.id, at);
+        product.prices = Object.fromEntries(PRICE_LEVELS.map((level) => [
+          level, current[level] ? current[level].price_centavos : null,
+        ]));
+      }
       return product;
     }),
   };
@@ -1094,6 +1105,87 @@ function setPrices(productId, levels, actor, session = actor, { effectiveFrom = 
   });
 }
 
+/**
+ * TX-411 — many products' prices, in one transaction (the bulk change).
+ *
+ * A store that raises every price by 5% did it one product at a time, on a screen a hundred
+ * products deep; the day's work made the change untraceable and half-finished if anybody
+ * stopped. So: one call, one transaction, and the same `PRICE_CHANGED` row per product that a
+ * single change writes — a bulk change is a hundred ordinary changes with one reason on them,
+ * not a new kind of event nothing else can read.
+ *
+ * `changes` is `[{ productId, RETAIL, WHOLESALE, DEALER }]`, each level optional. A price that
+ * is already what it would be set to is skipped rather than written again.
+ */
+function setPricesBulk(changes, actor, session = actor, { reason = null, effectiveFrom = null } = {}) {
+  if (!Array.isArray(changes) || changes.length === 0) {
+    throw errors.badRequest('Nothing to change.', { ruleId: 'PR-101' });
+  }
+  if (changes.length > BULK_PRICE_MAX) {
+    throw errors.badRequest(`A price change covers at most ${BULK_PRICE_MAX} products at a time.`, { ruleId: 'PR-101' });
+  }
+  const why = text(reason, { max: 200 });
+  if (why.length < 3) {
+    // AUD-601: a hundred prices moved at once, and nothing saying why, is the change nobody
+    // can explain next month.
+    throw errors.badRequest('Say why the prices are changing. It is kept with every one of them.', { ruleId: 'AUD-601' });
+  }
+
+  const at = clock.nowUtc();
+  const stamp = effectiveFrom || at;
+
+  // Everything is checked before anything is written: a bulk change that stopped half way
+  // would leave the shelf at two price lists.
+  const planned = changes.map((change, index) => {
+    const product = productRepository.findById(change.productId);
+    if (!product) throw errors.notFound(`No such product on row ${index + 1}`);
+    const levels = [];
+    for (const level of PRICE_LEVELS) {
+      const raw = change[level] ?? change[level.toLowerCase()];
+      if (raw === undefined || raw === null || raw === '') continue;
+      const price = validateCentavos(raw, `The ${level.toLowerCase()} price of ${product.sku}`, 'VR-203');
+      const current = productRepository.priceAt(product.id, level, at);
+      if (current && current.price_centavos === price) continue;
+      levels.push({ level, price, before: current ? current.price_centavos : null });
+    }
+    return { product, levels };
+  }).filter((row) => row.levels.length > 0);
+
+  if (planned.length === 0) {
+    return { ok: true, changed: 0, skipped: changes.length, reason: why, at };
+  }
+
+  return db.transaction(() => {
+    for (const { product, levels } of planned) {
+      for (const change of levels) {
+        writePrice(product.id, change.level, change.price, { at, actor, effectiveFrom: stamp });
+      }
+      auditService.write({
+        actor,
+        action: 'PRICE_CHANGED',
+        entityType: 'products',
+        entityId: product.id,
+        before: Object.fromEntries(levels.map((c) => [c.level, c.before])),
+        after: Object.fromEntries(levels.map((c) => [c.level, c.price])),
+        reason: why,
+      });
+    }
+    return {
+      ok: true,
+      changed: planned.length,
+      skipped: changes.length - planned.length,
+      reason: why,
+      at,
+      products: planned.map(({ product, levels }) => ({
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        levels: Object.fromEntries(levels.map((c) => [c.level, c.price])),
+      })),
+    };
+  });
+}
+
 function assertMayChangeCost(session) {
   if (session && permissions.can(session, 'TX-412')) return;
   throw errors.forbidden(
@@ -1138,6 +1230,7 @@ function setCost(productId, avgCostCentavos, actor, session = actor, { reason = 
 }
 
 module.exports = {
+  setPricesBulk, BULK_PRICE_MAX,
   setPackPrices, packsOf, writePackPrice,
   TAX_CLASSES, PRICE_LEVELS,
   validateSku, validateName, validateTaxClass, validateBarcode, classifyBarcode,

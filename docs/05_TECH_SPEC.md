@@ -1191,6 +1191,7 @@ server-side (`SEC-6`). Errors: `{ error: { code, message, rule_id, requires_role
 | `GET` | `/products?q=&category=&low=` | `TX-422` | `NFR_1.3` |
 | `GET` | `/products/barcode/:code` | `TX-401` | `NFR_1.2` |
 | `POST` `PUT` | `/products` `/products/:id` | `TX-410` | cost only under `TX-412` |
+| `PUT` | `/products/prices` | `TX-411` | `PR-109` (`TASK-071`) — many prices at once: `{ reason, changes: [{ productId, RETAIL?, WHOLESALE?, DEALER? }] }`, at most 500. Validated whole, written in one transaction, one audit row per product. Declared before `/products/:id` so the word *prices* is never read as an id |
 | `GET` | `/inventory/:productId/movements` | `TX-422` | the ledger view |
 | `POST` | `/inventory/adjustments` | `TX-407` | `INV-108` |
 | `GET` | `/inventory/reconciliation` | `TX-427` | `INV-101` and, since `TASK-029`, `INV-201` — one answer per product and per batch, because two pages that can disagree are two pages nobody believes |

@@ -212,3 +212,26 @@
 /* TASK-055: "Printed on" beside the barcode box. */
 .inline-label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--type-label-md-size); color: var(--md-on-surface-muted); }
 .inline-label select { min-height: var(--touch); }
+
+/* SCR-209 — many prices at once (TX-411). The rule above the table, the new price in it. */
+.price-rule {
+  display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end;
+  margin: var(--space-3) 0; padding: var(--space-3);
+  background: var(--md-surface-container-lowest); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md);
+}
+.price-rule label { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--type-body-sm-size); }
+.price-rule select, .price-rule input { min-height: var(--touch); min-width: 8rem; }
+.price-rule button { min-height: var(--touch); }
+.price-source { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-top: var(--space-3); }
+.price-tabs { display: flex; gap: var(--space-2); }
+.price-tabs .is-on { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+/* The picker takes the rest of the row, and keeps a width a name can be read in. */
+.price-source .picker { flex: 1 1 22rem; min-width: 16rem; }
+.price-change tbody .row-actions { text-align: right; }
+.price-change .new-price { width: 7rem; min-height: var(--touch); text-align: right; }
+.price-change tr.is-changed { background: var(--md-secondary-container); }
+.price-save { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin-top: var(--space-3); }
+.price-save label { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 18rem; font-size: var(--type-body-sm-size); }
+.price-save input { min-height: var(--touch); width: 100%; }
+.price-save button { min-height: var(--touch); }

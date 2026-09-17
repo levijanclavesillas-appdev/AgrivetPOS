@@ -32,6 +32,7 @@ import { createBatchList } from '../catalogue/batches.js';
 import { createRecall } from '../catalogue/recall.js';
 import { createStockCount } from '../catalogue/count.js';
 import { createQuickKeys } from '../catalogue/quick-keys.js';
+import { createPriceChange } from '../catalogue/prices.js';
 import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
 import { createStatement } from '../customers/statement.js';
@@ -92,6 +93,8 @@ const GRANTS = {
   'TX-409': ['OWNER', 'MANAGER', 'INVENTORY'],
   // TASK-070: arranging the counter's quick keys is editing the catalogue.
   'TX-410': ['OWNER', 'MANAGER', 'INVENTORY'],
+  // TX-411: changing what things sell for is not the inventory clerk's (§10).
+  'TX-411': ['OWNER', 'MANAGER'],
   'TX-413': ['OWNER', 'MANAGER', 'CASHIER', 'INVENTORY'],
   'TX-418': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-421': ['OWNER', 'MANAGER', 'CASHIER'],
@@ -411,6 +414,8 @@ export function createApp({ root }) {
       onCount: () => showStockCount(),
       // POS-113: arranging them is editing the catalogue (TX-410).
       onQuickKeys: may(session.role, 'TX-410') ? () => showQuickKeys() : null,
+      // TX-411: a manager or the owner, not the inventory clerk who may edit a product.
+      onPrices: may(session.role, 'TX-411') ? () => showPriceChange() : null,
       // SCR-204 is a filter of this list, so it is reachable from it — and not only
       // from a dashboard the inventory clerk cannot open (04_UX_SPEC.md §2.1).
       onMode: (next) => show(next === 'low-stock' ? 'low-stock' : 'products'),
@@ -507,7 +512,7 @@ export function createApp({ root }) {
     return current;
   }
 
-  // ── SCR-801 – SCR-804 ─────────────────────────────────────────────────────
+  // ── SCR-801 – SCR-805 ─────────────────────────────────────────────────────
 
   /** SCR-801. The rail lands here; everything else in Buying is reached from it. */
   function showPurchaseOrders() {
@@ -519,14 +524,14 @@ export function createApp({ root }) {
       onNew: () => showPurchaseOrder(null),
       onReceive: (id) => showGoodsReceipt(id),
       onSuppliers: () => showSuppliers(),
-      // SCR-804: what has already arrived.
+      // SCR-805: what has already arrived.
       onDeliveries: () => showDeliveries(),
     });
     current.mount();
     return current;
   }
 
-  /** SCR-804 — the deliveries recorded, and one of them read back (PO-206: never edited). */
+  /** SCR-805 — the deliveries recorded, and one of them read back (PO-206: never edited). */
   function showDeliveries() {
     if (current?.unmount) current.unmount();
     renderRail('buying');
@@ -617,6 +622,15 @@ export function createApp({ root }) {
       countId: id,
       onBack: () => showProducts(),
     });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-209 — many prices at once (TX-411), reached from the products list. */
+  function showPriceChange() {
+    if (current?.unmount) current.unmount();
+    renderRail('products');
+    current = createPriceChange({ root: host(), onBack: () => showProducts() });
     current.mount();
     return current;
   }

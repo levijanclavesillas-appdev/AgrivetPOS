@@ -1,4 +1,4 @@
-// POS-113 — arranging the counter's quick keys (TASK-070).
+// SCR-208 — arranging the counter's quick keys (POS-113, TASK-070).
 //
 // The store's own buttons for goods with no barcode: loose rice, ice, eggs, a cigarette by
 // the stick. Reached from Products, because arranging them is editing the catalogue

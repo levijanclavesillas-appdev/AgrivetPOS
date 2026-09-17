@@ -76,11 +76,13 @@ hours in a room with a window.
 │  STOCK        SCR-201 Products       SCR-202 Product     │
 │               SCR-203 Adjustment     SCR-204 Low stock   │
 │               SCR-205 Stock count    SCR-206 Batches     │
-│               SCR-207 Recall                             │
+│               SCR-207 Recall         SCR-208 Quick keys  │
+│               SCR-209 Change prices                      │
 │  SHIFT        SCR-501 Open           SCR-502 Till cash   │
 │               SCR-503 Close                              │
 │  BUYING       SCR-801 Orders         SCR-802 Order       │
 │               SCR-803 Receive        SCR-804 Suppliers   │
+│               SCR-805 Deliveries                         │
 │  REPORTS      SCR-601 Dashboard      SCR-602 Daily sales │
 │               SCR-603 Payments       SCR-604 Inventory   │
 │               SCR-605 Ageing         SCR-606 Reconcile   │
@@ -143,6 +145,8 @@ of them to three.
 | `SCR-205` Stock count | `SCR-201` | 2 |
 | `SCR-206` Batches | `SCR-201`, `SCR-601` | 1 |
 | `SCR-207` Recall | `SCR-206` | 2 |
+| `SCR-208` Quick keys | `SCR-201` | 2 |
+| `SCR-209` Change prices | `SCR-201` | 2 |
 | `SCR-501` Shift | rail | 1 |
 | `SCR-502` Till cash | `SCR-501` | 2 |
 | `SCR-503` Close | `SCR-501` | 2 |
@@ -150,6 +154,7 @@ of them to three.
 | `SCR-802` Order | `SCR-801` | 2 |
 | `SCR-803` Receive | `SCR-801`, `SCR-802` | 2 |
 | `SCR-804` Suppliers | `SCR-801` | 2 |
+| `SCR-805` Deliveries | `SCR-801` | 2 |
 | `SCR-601` Dashboard | rail | 0 |
 | `SCR-602` Daily sales | `SCR-601` | 1 |
 | `SCR-603` Payments | `SCR-601` | 1 |
@@ -691,6 +696,35 @@ immutable (`PO-206`) and the screen offers no edit.
 `SCR-804` **Suppliers** — name, code, contact, terms, and the purchase history that answers
 "what did this supplier charge us last time". Deactivated, never deleted (`VR-401`), and refused
 while an order is still outstanding.
+
+`SCR-805` **Deliveries** — everything that has arrived, newest first, searched by delivery number,
+the supplier's own DR, the invoice or the supplier, with a filter for the ones that came over the
+order or over its cost (`PO-204`, `PO-205`). One of them opens read-only, down to the line: a
+posted delivery is never edited (`PO-206`), and the screen offers no button that pretends
+otherwise. It exists because until `TASK-071` a delivery was posted and then visible nowhere.
+
+### `SCR-208` — Quick keys · `SCR-209` — Change prices · `POS-113`, `PR-107`–`PR-109`
+
+Both hang off `SCR-201`, because both are the catalogue seen from a different question.
+
+`SCR-208` **Quick keys** — the counter's own buttons for goods with no barcode (`POS-113`),
+behind `TX-410`: up to 24, each a product or a pack of it, arranged and saved as a whole set.
+
+`SCR-209` **Change prices** — one price level for many products at once, behind `TX-411`.
+Putting every price up by 5% used to mean opening `SCR-202` a hundred times. Here the store
+chooses the products **two ways, because it means two different things**: *what the search finds*
+— a term, a category — is "every drink goes up 5%"; *the list I build* is the eleven items the
+supplier wrote about, added one at a time through the ordinary product picker, typed or scanned,
+each removable and the list kept until it is saved or emptied. Then it says what to do — raise or lower by a percentage or an
+amount, set one figure, or work back from cost at a margin — picks where the prices should land
+(`₱0.25`, `₱1`, `₱5`, or wherever the arithmetic says), and reads the **New price** column beside
+the old one and the margin each would make. Any figure can still be typed over by hand.
+
+**The screen proposes and the server disposes.** The preview is arithmetic in the browser; `PUT
+/products/prices` re-checks every figure, refuses the whole list if any one of them is wrong,
+writes them in a single transaction and audits each product as an ordinary price change
+(`PR-109`) — so one reason, asked for once (`AUD-601`), lands on every row and the old price
+stays in the history.
 
 ### `SCR-701`–`SCR-705` — Admin
 
