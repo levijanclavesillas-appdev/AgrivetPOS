@@ -161,7 +161,7 @@ stock to a supplier is a purchasing question for another screen.
 ## 9. One application, the industry chosen at setup (`TASK-053`)
 
 A Play Store listing is one app, so Chachi Agrivet POS and Chachi Pharmacy POS became **Chachi
-POS**: one Android package (`store.chachisoftware.pos`), one Windows installer
+POS**: one Android package (`store.chachisoftware.pharmacypos` on Play; its Java package is `store.chachisoftware.pos`), one Windows installer
 (`ChachiPOS-Setup-<version>.exe`), one data folder (`%LOCALAPPDATA%\ChachiPOS`), and backups named
 `chachipos_backup_….zip`. No store was live on either edition when this was done, so nothing is
 migrated from the old names.

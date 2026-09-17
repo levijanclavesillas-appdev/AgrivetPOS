@@ -372,7 +372,7 @@ warning that has to be acted on before the first pharmacy install.**
 | [TASK-050](TASK-050-lucide-icons.md) | Lucide icons, vendored, beside the words they illustrate | Closed, `c6cd9b4` | — |
 | [TASK-051](TASK-051-responsive-layout.md) | Every screen fits a phone, a tablet and a desktop | Built | Use on the client's phone |
 | [TASK-052](TASK-052-product-pictures.md) | A picture of each product: editor, list, counter search; the camera on Android | Built, *this commit* | Photos taken on the store's own phone |
-| [TASK-053](TASK-053-one-app-industries.md) | One application, Chachi POS; the industry (pharmacy, agrivet) chosen at setup | Built, *this commit* | The Play Store listing under `store.chachisoftware.pos` |
+| [TASK-053](TASK-053-one-app-industries.md) | One application, Chachi POS; the industry (pharmacy, agrivet) chosen at setup | Built, *this commit* | The Play Store listing, under `store.chachisoftware.pharmacypos` (the applicationId since 2026-09-17) |
 | [TASK-054](TASK-054-receipt-printing.md) | The receipt prints when the sale completes, unmarked, and adds up | Built, *this commit* | A sale on the store's own printer |
 | [TASK-055](TASK-055-pack-barcodes.md) | The barcode on a box sells a box | Built, *this commit* | Boxes scanned at the store's counter |
 | [TASK-056](TASK-056-pin-and-touch.md) | A PIN reaches the counter; every counter action is a button for touch | Built, `dce4add` | The store's Android tablet at the counter |

@@ -68,7 +68,7 @@ not there.
 | `VALIDITY_DAYS`, `GRACE_DAYS`, `WARNING_DAYS` | `30`, `7`, `7` | TASK-048's L-3 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | A **Web** OAuth client; redirect URI `https://pos.chachisoftware.store/auth/google/callback` |
 | `PLAY_SERVICE_ACCOUNT_FILE` | — | Service-account JSON with access to the Play Developer API |
-| `PLAY_PACKAGE_NAME`, `PLAY_PRODUCTS` | `store.chachisoftware.pos`, `pos_monthly` | The app and its subscription product id(s) |
+| `PLAY_PACKAGE_NAME`, `PLAY_PRODUCTS` | `store.chachisoftware.pharmacypos`, `pos_monthly` | The app and its subscription product id(s) |
 | `ADMIN_PASSWORD_HASH` | — | `node src/tools/hash-password.js`, then paste the hash |
 
 Until Google is configured, `/link` says sign-in is not set up. Until Play is configured,

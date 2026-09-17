@@ -97,7 +97,10 @@ android {
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "store.chachisoftware.pos"
+        // Play Console registered the app as store.chachisoftware.pharmacypos, and a Play
+        // package name never changes. The Java package and namespace stay .pos: the native
+        // entry points are named after them, and Play never sees them.
+        applicationId = "store.chachisoftware.pharmacypos"
         // Android 8.0. Every tablet sold as a POS in the last several years is newer.
         minSdk = 26
         targetSdk = 35

@@ -21,7 +21,7 @@ The owner, preparing the Play Store listing:
 
 | # | Decision |
 | :-: | :--- |
-| D-1 | Android package **`store.chachisoftware.pos`** — permanent once on Play |
+| D-1 | Android package **`store.chachisoftware.pos`** — permanent once on Play. **Superseded 2026-09-17:** Play Console holds the app as `store.chachisoftware.pharmacypos`, so that is the `applicationId`; the Java package and namespace stay `store.chachisoftware.pos` |
 | D-2 | **No live stores** on either edition: nothing is migrated from the old names or folders |
 | D-3 | The industry is **fixed at setup**; a store set up as the wrong kind is set up again |
 

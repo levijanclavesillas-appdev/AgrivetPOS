@@ -52,6 +52,15 @@ keyPassword=…
 and build with `./gradlew assembleRelease`. The APK is
 `app/build/outputs/apk/release/app-release.apk`.
 
+**For Google Play**, build the App Bundle instead: `./gradlew bundleRelease`. It is
+`app/build/outputs/bundle/release/app-release.aab`, signed with the same key (Play's upload
+key). Its package name is `store.chachisoftware.pharmacypos`, the one Play Console holds for
+the app, and it cannot change. Raise `versionCode` in `app/build.gradle.kts` for every upload.
+
+An APK built before 2026-09-17 is `store.chachisoftware.pos`. To Android that is a different
+app, so it does not update to this one. Move a tablet across with a backup and restore
+(Admin → Backups), then uninstall the old app.
+
 ## On the tablet
 
 - **First launch** asks where backups may go. Allow *all files access*: backups then go to
