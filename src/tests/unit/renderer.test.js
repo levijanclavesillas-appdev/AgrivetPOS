@@ -260,6 +260,28 @@ test('the cart request is the shape POST /sales takes', async () => {
 
 // ── TASK-069: the camera as a scanner ───────────────────────────────────────
 
+test('a buying line\'s buttons stay on screen, and a product can be made from the line that needs it', () => {
+  const buying = fs.readFileSync(path.join(root, 'public', 'css', 'purchasing.css'), 'utf8');
+  // The rows are wider than a phone. The action column is pinned to the right edge, which
+  // needs all three of these: the table not squeezed to the box, not a scroll box itself,
+  // and its borders not collapsed (Chromium ignores a sticky cell in a collapsed table).
+  assert.match(buying, /td\.row-actions \{[\s\S]*?position: sticky; right: 0;/);
+  assert.match(buying, /:has\(\.row-actions\) \{[\s\S]*?width: max-content; min-width: 100%;/);
+  assert.match(buying, /:has\(\.row-actions\) \{[\s\S]*?overflow: visible;/);
+  assert.match(buying, /:has\(\.row-actions\) \{[\s\S]*?border-collapse: separate;/);
+  for (const screen of ['js/purchasing/receive.js', 'js/purchasing/order.js']) {
+    const code = codeOf(screen);
+    assert.match(code, /h\('td', \{ class: 'row-actions' \}/, `${screen}: the buttons have a column of their own`);
+    assert.match(code, /mayCreate: true/, `${screen}: TX-410 — the product can be made here`);
+  }
+  // The dialog writes through the ordinary endpoints, so the catalogue's rules govern it.
+  const made = codeOf('js/catalogue/new-product.js');
+  for (const call of [/api\.post\('\/products',/, /api\.post\('\/categories',/, /api\.post\('\/units',/]) {
+    assert.match(made, call);
+  }
+  assert.match(codeOf('js/shell/picker.js'), /Add “\$\{typed\}” as a new product/);
+});
+
 test('TASK-069: a code held in front of the camera is read once, and again only after a pause', async () => {
   const { createRepeatGuard, REPEAT_PAUSE_MS, cleanCode, FORMATS } = await load('js/shell/camera-scan.js');
   const guard = createRepeatGuard();

@@ -148,7 +148,10 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
               h('th', { class: 'qty', text: 'Into stock' }),
               h('th', { class: 'money', text: 'Unit cost' }),
               h('th', { class: 'money', text: 'Value' }),
-              h('th', { text: '' }),
+              h('th', { text: 'Damage note' }),
+              // Its own column, pinned to the right edge: in the width this table needs, a
+              // button in the last cell of a row sat a thousand pixels off a phone's screen.
+              h('th', { class: 'row-actions', text: '' }),
             ])]),
             h('tbody', { id: 'gr-lines' }, lines.map((line, index) => lineRow(line, index))),
           ]),
@@ -283,14 +286,17 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
           placeholder: 'What was wrong with them', 'aria-label': `Damage note on line ${index + 1}`,
           oninput: (event) => { line.damageNote = event.target.value; },
         }),
-        // A delivery without an order had "Add a line" and no way to take one away.
+      ]),
+
+      // A delivery without an order had "Add a line" and no way to take one away.
+      h('td', { class: 'row-actions' }, [
         direct() && lines.length > 1
           ? h('button', {
             type: 'button', class: 'tender-remove', icon: 'x', 'aria-label': `Remove line ${index + 1}`,
             onclick: () => { lines.splice(index, 1); render(); },
           })
           : null,
-      ]),
+      ].filter(Boolean)),
     ]);
   }
 
@@ -349,6 +355,8 @@ export function createGoodsReceipt({ root, poId = null, onBack, onPosted }) {
       ariaLabel: `Product on line ${index + 1}`,
       // INV-105: a withdrawn product still arrives on the last delivery of it.
       includeInactive: true,
+      // TX-410: a delivery or an order may bring something the catalogue has never had.
+      mayCreate: true,
       onPick: (product) => {
         line.productId = product.id;
         line.unitCode = product.base_unit.code;

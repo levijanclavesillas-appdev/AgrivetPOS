@@ -168,7 +168,7 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
             h('th', { class: 'qty', text: 'Quantity' }),
             h('th', { class: 'money', text: 'Unit cost' }),
             h('th', { class: 'money', text: 'Line total' }),
-            h('th', { text: '' }),
+            h('th', { class: 'row-actions', text: '' }),
           ])]),
           h('tbody', { id: 'po-lines' }, lines.map((line, index) => lineRow(line, index))),
         ]),
@@ -233,7 +233,7 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
         }),
       ]),
       h('td', { class: 'money line-total', text: money(lineTotal(line)) }),
-      h('td', {}, [
+      h('td', { class: 'row-actions' }, [
         h('button', {
           type: 'button', class: 'row-action', text: 'Remove', 'aria-label': `Remove line ${index + 1}`,
           onclick: () => { lines.splice(index, 1); if (lines.length === 0) lines.push(blankLine()); render(); },
@@ -251,6 +251,8 @@ export function createPurchaseOrder({ root, poId, onBack, onReceive }) {
       // store that stopped selling something may still be receiving the last delivery
       // of it. The POS asks for active products only; this screen does not.
       includeInactive: true,
+      // TX-410: a delivery or an order may bring something the catalogue has never had.
+      mayCreate: true,
       onPick: (product) => {
         line.productId = product.id;
         line.unitCode = product.base_unit.code;

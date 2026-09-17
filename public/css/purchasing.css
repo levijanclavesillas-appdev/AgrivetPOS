@@ -125,3 +125,30 @@
 /* TASK-061: a line left at 0 on a delivery against an order — not part of this delivery. */
 .receive-table tr.not-in-delivery td { color: var(--md-on-surface-muted); }
 .receive-table tr.not-in-delivery td .qty { background: var(--md-surface-container-low); }
+
+/* TX-410: making the product the catalogue does not have, from the line that needs it. */
+.picker-new { display: flex; gap: var(--space-2); align-items: center; color: var(--md-primary); font-weight: 600; }
+.new-product select, .new-product input[type="text"] { width: 100%; min-height: var(--touch); }
+
+/* The line's own buttons, pinned to the right edge of the scrolling table: these rows are
+   wider than a phone, and a button in the last cell sat a thousand pixels off the screen. */
+/* Chromium ignores a sticky cell in a table whose borders collapse, so these tables keep
+   their own borders and draw the row line themselves. */
+.table-scroll .catalogue-list:has(.row-actions) {
+  border-collapse: separate; border-spacing: 0;
+  /* Its natural width, never 100%: a table squeezed to the box's width leaves its cells
+     overflowing it, and a sticky cell then has nothing to stick to. */
+  width: max-content; min-width: 100%;
+  /* And it may not be a scroll box of its own: the table's own `overflow: hidden` (for its
+     rounded corners) was the scrollport a sticky cell stuck to, which never scrolls. */
+  overflow: visible;
+}
+.table-scroll .catalogue-list:has(.row-actions) td { border-bottom: 1px solid var(--md-outline-variant); }
+.table-scroll .catalogue-list th.row-actions,
+.table-scroll .catalogue-list td.row-actions {
+  position: sticky; right: 0; z-index: 1;
+  width: 1%; white-space: nowrap; text-align: right;
+  background: var(--md-surface-container-lowest);
+  box-shadow: -6px 0 6px -6px rgba(15, 23, 42, .25);
+}
+.table-scroll .catalogue-list thead th.row-actions { background: var(--md-surface-container); }

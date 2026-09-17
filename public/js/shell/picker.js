@@ -36,6 +36,9 @@ import { cameraButton } from './camera-scan.js';
 export function createProductPicker({
   value = '', onPick, onClear = null, placeholder = 'Name, SKU or barcode',
   ariaLabel = 'Find a product', includeInactive = false,
+  // TX-410: where the screen allows it, a product the catalogue does not have yet is made
+  // here rather than on another screen — a delivery arrives with things nobody has sold.
+  mayCreate = false,
 }) {
   let timer = null;
   let latest = 0;
@@ -117,6 +120,7 @@ export function createProductPicker({
     clear(results);
     if (matches.length === 0) {
       results.append(h('p', { class: 'no-results', text: `Nothing matches “${input.value.trim()}”.` }));
+      if (mayCreate) results.append(newProductButton());
     }
 
     matches.forEach((product, index) => {
@@ -140,6 +144,23 @@ export function createProductPicker({
     });
 
     open();
+  }
+
+  /** The last row of an empty list: make the product that is not there. */
+  function newProductButton() {
+    const typed = input.value.trim();
+    return h('button', {
+      type: 'button', class: 'picker-result picker-new', icon: 'plus',
+      // mousedown, as the rows above: the field's blur would take the button away first.
+      onmousedown: async (event) => {
+        event.preventDefault();
+        close();
+        const { askNewProduct } = await import('../catalogue/new-product.js');
+        const made = await askNewProduct({ name: typed });
+        if (made) pick(made);
+        else input.focus();
+      },
+    }, [h('span', { class: 'picker-name', text: `Add “${typed}” as a new product` })]);
   }
 
   function pick(product) {
