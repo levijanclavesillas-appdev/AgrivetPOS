@@ -791,6 +791,24 @@ test('SEC-9: SCR-704 says who can read a backup, and promises no encryption', ()
   );
 });
 
+test('Google Play User Data: sign-in links to the privacy policy, opened outside the app', () => {
+  const code = codeOf('js/shell/app.js');
+  assert.match(code, /privacy_policy_url: status\?\.privacy_policy_url \|\| null/, 'the address comes from GET /setup');
+  assert.match(code, /text: 'Privacy policy',\s*onclick: \(\) => openExternally\(installation\.privacy_policy_url\)/);
+  const licence = require('../../config/licence');
+  const saved = { server: process.env.AGRIVET_LICENCE_SERVER, off: process.env.AGRIVET_LICENSING };
+  try {
+    delete process.env.AGRIVET_LICENCE_SERVER;
+    process.env.AGRIVET_LICENSING = 'off';
+    assert.equal(licence.privacyPolicyUrl(), 'https://pos.chachisoftware.store/privacy', 'even with licensing off');
+  } finally {
+    for (const [key, name] of [['server', 'AGRIVET_LICENCE_SERVER'], ['off', 'AGRIVET_LICENSING']]) {
+      if (saved[key] === undefined) delete process.env[name]; else process.env[name] = saved[key];
+    }
+  }
+  assert.match(codeOf('js/admin/licence.js'), /import \{ h, clear, openExternally \} from '\.\.\/shell\/ui\.js'/);
+});
+
 test('TASK-067: SCR-707 names the plan, and a one-time licence shows no paid-until', () => {
   const code = codeOf('js/admin/licence.js');
   assert.match(code, /fact\('Plan', status\.plan === 'ONE_TIME' \? 'One-time licence' : 'Monthly subscription'\)/);

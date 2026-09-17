@@ -11,7 +11,7 @@
 
 import * as api from '../shell/api.js';
 import * as ui from '../shell/ui.js';
-import { h, clear } from '../shell/ui.js';
+import { h, clear, openExternally } from '../shell/ui.js';
 import { manila } from '../shell/format.js';
 
 const STATE_WORDS = {
@@ -24,12 +24,6 @@ const STATE_WORDS = {
 };
 
 const date = (iso) => (iso ? iso.slice(0, 10) : '—');
-
-/** The link page, in the device's own browser: Electron hands window.open to the OS. */
-function openExternally(uri) {
-  if (window.ChachiAndroid && window.ChachiAndroid.openExternal) window.ChachiAndroid.openExternal(uri);
-  else window.open(uri, '_blank', 'noopener');
-}
 
 export function createLicence({ root, session }) {
   let status = null;

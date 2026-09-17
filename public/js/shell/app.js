@@ -7,7 +7,7 @@
 
 import * as api from './api.js';
 import * as ui from './ui.js';
-import { h, clear } from './ui.js';
+import { h, clear, openExternally } from './ui.js';
 import { openAccount, renderRecover } from './account.js';
 import { manila } from './format.js';
 import { setEmptyIcon } from './pictures.js';
@@ -117,7 +117,7 @@ export function createApp({ root }) {
   // the first thing a support call needs and the last thing anyone can find.
   // TASK-053: one application, and the store's industry beside its name — "Chachi POS
   // (Pharmacy)" — read from GET /setup before anybody signs in.
-  let installation = { store_name: null, app_version: null, industry: null };
+  let installation = { store_name: null, app_version: null, industry: null, privacy_policy_url: null };
   const PRODUCT_NAME = 'Chachi POS';
   const main = h('main', { class: 'screen' });
   const railHost = h('nav', { class: 'rail', id: 'rail', 'aria-label': 'Sections' });
@@ -207,6 +207,11 @@ export function createApp({ root }) {
           onBack: () => signIn(),
         }),
       }),
+      // Google Play's User Data policy: the privacy policy is reachable from inside the app.
+      installation.privacy_policy_url ? h('button', {
+        type: 'button', class: 'signin-link', text: 'Privacy policy',
+        onclick: () => openExternally(installation.privacy_policy_url),
+      }) : null,
       h('p', {
         class: 'signin-version',
         text: installation.app_version ? `Version ${installation.app_version}` : '',
@@ -959,6 +964,7 @@ export function createApp({ root }) {
         store_name: status?.store_name || null,
         app_version: health?.app_version || null,
         industry: status?.industry || null,
+        privacy_policy_url: status?.privacy_policy_url || null,
       };
       // TASK-066: a product with no picture shows the store's mark. @icons pill coffee
       setEmptyIcon(installation.industry?.code === 'CAFE' ? 'coffee' : 'pill');

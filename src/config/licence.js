@@ -26,4 +26,8 @@ const server = () => (process.env.AGRIVET_LICENCE_SERVER
   || (process.env.AGRIVET_LICENSING === 'off' ? '' : PRODUCTION_SERVER)).replace(/\/$/, '') || null;
 const publicKey = () => process.env.AGRIVET_LICENCE_PUBLIC_KEY || PRODUCTION_PUBLIC_KEY || null;
 
-module.exports = { server, publicKey };
+// Google Play's User Data policy: the privacy policy is reachable from inside the app. It is
+// on the product's site whether or not this build checks licences.
+const privacyPolicyUrl = () => `${server() || PRODUCTION_SERVER}/privacy`;
+
+module.exports = { server, publicKey, privacyPolicyUrl };

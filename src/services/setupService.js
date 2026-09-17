@@ -19,6 +19,7 @@ const clock = require('../config/clock');
 const paths = require('../config/paths');
 const industries = require('../config/industries');
 const hosting = require('../config/hosting');
+const licenceConfig = require('../config/licence');
 const errors = require('./errors');
 const authService = require('./authService');
 const auditService = require('./auditService');
@@ -80,6 +81,8 @@ function status() {
     product_name: industries.PRODUCT_NAME,
     industry: profile ? industries.describe(profile.industry) : null,
     industries: complete ? null : industries.catalogue(),
+    // The sign-in screen's link. From here, so no address is written into the renderer.
+    privacy_policy_url: licenceConfig.privacyPolicyUrl(),
   };
 }
 

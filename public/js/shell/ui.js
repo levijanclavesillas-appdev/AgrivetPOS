@@ -47,6 +47,15 @@ export const h = (tag, attrs = {}, children = []) => {
   return el;
 };
 
+/**
+ * A page in the device's own browser: Electron hands window.open to the OS, and Android
+ * has a bridge that accepts https:// only (TASK-048).
+ */
+export function openExternally(uri) {
+  if (window.ChachiAndroid && window.ChachiAndroid.openExternal) window.ChachiAndroid.openExternal(uri);
+  else window.open(uri, '_blank', 'noopener');
+}
+
 export const clear = (el) => { while (el.firstChild) el.firstChild.remove(); return el; };
 
 /** Loading: a skeleton, never a spinner over stale data (§5). */
