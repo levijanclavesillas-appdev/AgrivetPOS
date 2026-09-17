@@ -85,10 +85,25 @@ function folder() {
 
 // ── Taking one ──────────────────────────────────────────────────────────────
 
+/**
+ * Where a backup goes when the configured folder refuses it: the folder this installation
+ * always owns. On Android that is the app's own folder on shared storage; on a PC the
+ * application data directory is not one (OPS-001 forbids it), so there is none and the
+ * failure stands.
+ */
+let lastFallback = null;
+
+function fallbackFolder(target) {
+  const spare = process.env.AGRIVET_BACKUP_FALLBACK_DIR || null;
+  if (!spare) return null;
+  return path.resolve(spare) === path.resolve(target) ? null : spare;
+}
+
 function run({ trigger = 'MANUAL', actor = null, now = clock.nowUtc() } = {}) {
   assertTrigger(trigger);
   const at = now;
   const target = folder();
+  let fellBackFrom = null;
 
   if (!target) {
     return logFailure({
@@ -99,23 +114,55 @@ function run({ trigger = 'MANUAL', actor = null, now = clock.nowUtc() } = {}) {
   }
 
   const filename = fileNameFor(trigger, at);
-  const filePath = path.join(target, filename);
+  let filePath = path.join(target, filename);
   let written = null;
 
   try {
     fs.mkdirSync(target, { recursive: true });
     written = backupRepository.archive(filePath);
   } catch (err) {
-    return logFailure({
-      trigger, at, actor, filePath, filename,
-      error: `The backup could not be written (${err.code || err.message}).`,
-      ruleId: 'OPS-001',
-    });
+    // A folder the store can no longer write — Android tightening what a folder allows, a
+    // USB stick pulled out, a permission withdrawn. Rather than skip the backup, take it
+    // where this installation can always write and say so, loudly, on the Backups screen.
+    const spare = fallbackFolder(target);
+    if (!spare) {
+      return logFailure({
+        trigger, at, actor, filePath, filename,
+        error: `The backup could not be written (${err.code || err.message}).`,
+        ruleId: 'OPS-001',
+      });
+    }
+    try {
+      fs.mkdirSync(spare, { recursive: true });
+      filePath = path.join(spare, filename);
+      written = backupRepository.archive(filePath);
+      fellBackFrom = { from: target, to: spare, code: err.code || err.message };
+      lastFallback = { ...fellBackFrom, at };
+    } catch (second) {
+      return logFailure({
+        trigger, at, actor, filePath, filename,
+        error: `The backup could not be written to ${target} (${err.code || err.message}) `
+          + `or to ${spare} (${second.code || second.message}).`,
+        ruleId: 'OPS-001',
+      });
+    }
   }
 
   // The row exists before the verification does, and says PENDING. A crash between
   // writing and checking then reads as unverified rather than as success — which is
   // the honest reading, and the one OPS-002 requires.
+  if (fellBackFrom) {
+    auditService.write({
+      actor: actor || auditService.SYSTEM_ACTOR,
+      action: 'BACKUP_FAILED',
+      entityType: 'backup',
+      entityId: filename,
+      before: { folder: fellBackFrom.from, error: fellBackFrom.code },
+      after: { folder: fellBackFrom.to },
+      reason: `The backup folder refused the file (${fellBackFrom.code}); this one was written to ${fellBackFrom.to}.`,
+    });
+  }
+
   const row = logged({
     id: ids.uuidv7(), filename, path: filePath, size_bytes: written.size_bytes,
     taken_at: at, trigger, verification_result: 'PENDING', created_by: actorId(actor),
@@ -373,6 +420,8 @@ function list({ limit = 30 } = {}) {
     hosted: hosting.isHosted(),
     // On Android: where the app copies each backup, so it survives the app being removed.
     copied_to: process.env.AGRIVET_APP_BACKUP_COPY || null,
+    // OPS-001: a folder that refused a backup, and where the last one went instead.
+    fell_back: lastFallback,
     backups: logged_,
     // Files nobody here wrote — a copy from another machine, or the backup a restore
     // came from. Each can be restored once it has been checked (TASK-057); they are

@@ -297,6 +297,11 @@ test('TASK-069: no camera, no button; and every camera read goes where a wedge s
   assert.match(buying, /\.picker\.has-camera > \.picker-input \{ flex: 1 1 auto; min-width: 16rem; \}/);
   assert.equal(/\.picker\.has-camera > \.picker-input \{[^}]*min-width: 0/.test(buying), false);
   assert.match(codeOf('js/shell/picker.js'), /cameraButton\(\{ onCode: fromCamera, title: 'Scan the product', label: '' \}\)/);
+  // The list hangs off the field from `body`: inside the buying table it was clipped away by
+  // the sideways scroll, so it was built and never seen.
+  assert.match(codeOf('js/shell/picker.js'), /document\.body\.append\(results\)/);
+  assert.match(codeOf('js/shell/picker.js'), /results\.style\.position = 'fixed'/);
+  assert.match(buying, /\.picker-results \{ position: fixed;/);
   // Electron grants the camera to the POS's own page, and nothing else to anything.
   const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
   assert.match(main, /permission === 'media'/);

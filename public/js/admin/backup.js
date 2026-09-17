@@ -126,6 +126,14 @@ export function createBackup({ root, session }) {
     return h('div', { class: 'backup-warning' }, [
       h('h2', { text: 'Two things worth knowing' }),
       h('p', { text: data.shared_drive_warning }),
+      // OPS-001: the folder refused the file and the backup went elsewhere. Said first, and
+      // plainly: a store reading "backed up" while its folder is unwritable is the one thing
+      // this screen must not let happen.
+      data.fell_back
+        ? h('p', { class: 'opening-status error', role: 'alert', text:
+          `${data.fell_back.from} refused the backup (${data.fell_back.code}), so it was written to `
+          + `${data.fell_back.to} instead. Tell Chachi's: the folder needs fixing.` })
+        : null,
       // On Android the app copies each backup out to shared storage, where it survives the app.
       data.copied_to
         ? h('p', { text: `Each backup is also copied to ${data.copied_to} on this device, where it stays if the app `

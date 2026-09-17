@@ -104,7 +104,9 @@
 }
 .picker-input { width: 100%; min-height: var(--touch); }
 /* M3 menu, at elevation 2, hanging off the field it belongs to. */
-.picker-results { position: absolute; z-index: 5; left: 0; right: 0; top: 100%;
+/* Placed by picker.js: fixed, over the field, because a table that scrolls sideways clips
+   anything drawn inside it — the list was built and never seen (TASK-069's field change). */
+.picker-results { position: fixed; z-index: 60;
   max-height: 16rem; overflow-y: auto; background: var(--md-surface-container-lowest);
   border: 1px solid var(--md-outline-variant);
   border-radius: 0 0 var(--shape-sm) var(--shape-sm); box-shadow: var(--elev-2); }

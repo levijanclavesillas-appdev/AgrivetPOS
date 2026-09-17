@@ -78,6 +78,10 @@ final class NodeRuntime {
             // including a Documents path saved by a build that had "all files access".
             if (fixed) Os.setenv("AGRIVET_APP_BACKUP_DIR", backupFolder, true);
             if (copiedTo != null) Os.setenv("AGRIVET_APP_BACKUP_COPY", copiedTo.replaceAll("/+$", ""), true);
+            // OPS-001: where a backup goes if the folder above ever refuses it. The app's own
+            // folder on shared storage is one it can always write, on every Android version.
+            File spare = context.getExternalFilesDir("ChachiPOS Backups");
+            if (spare != null) Os.setenv("AGRIVET_BACKUP_FALLBACK_DIR", spare.getAbsolutePath(), true);
             Os.setenv("HOME", context.getFilesDir().getAbsolutePath(), true);
             Os.setenv("TMPDIR", context.getCacheDir().getAbsolutePath(), true);
             // Android has no /etc/localtime for Node to read. The ledger is UTC and the

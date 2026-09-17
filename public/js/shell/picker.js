@@ -49,10 +49,41 @@ export function createProductPicker({
     role: 'combobox', 'aria-expanded': 'false', 'aria-autocomplete': 'list',
   });
 
+  /**
+   * The list floats above the page, not inside the row.
+   *
+   * On the buying screens the picker sits in a cell of a table that scrolls sideways, and a
+   * scrolling box clips whatever is drawn outside it: the list was built, and never seen. So
+   * while it is open it is a child of `body`, positioned over the field, and it goes back to
+   * being nothing at all when it closes.
+   */
+  function place() {
+    const box = input.getBoundingClientRect();
+    results.style.position = 'fixed';
+    results.style.left = `${Math.round(box.left)}px`;
+    results.style.top = `${Math.round(box.bottom + 2)}px`;
+    // Wide enough to read a name and a SKU, whatever the cell it hangs off.
+    const width = Math.min(Math.max(box.width, 360), Math.max(320, window.innerWidth - box.left - 16));
+    results.style.width = `${Math.round(width)}px`;
+    results.style.right = 'auto';
+  }
+
+  function open() {
+    if (results.parentElement !== document.body) document.body.append(results);
+    place();
+    results.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+  }
+
   function close() {
     results.hidden = true;
     input.setAttribute('aria-expanded', 'false');
     cursor = -1;
+    window.removeEventListener('scroll', place, true);
+    window.removeEventListener('resize', place);
+    results.remove();
   }
 
   /**
@@ -108,8 +139,7 @@ export function createProductPicker({
       ]));
     });
 
-    results.hidden = false;
-    input.setAttribute('aria-expanded', 'true');
+    open();
   }
 
   function pick(product) {
@@ -166,7 +196,8 @@ export function createProductPicker({
 
   return {
     input,
-    el: h('div', { class: `picker${camera ? ' has-camera' : ''}` }, [input, camera, results]),
+    // `results` is not among the children: it lives on `body` while it is open (see `place`).
+    el: h('div', { class: `picker${camera ? ' has-camera' : ''}` }, [input, camera]),
     focus: () => input.focus(),
     get value() { return input.value; },
   };

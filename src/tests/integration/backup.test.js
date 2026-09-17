@@ -727,7 +727,7 @@ test('Android: the app\'s own backup folder wins over a saved one it can no long
   process.env.AGRIVET_APP_BACKUP_COPY = 'Documents/ChachiPOS Backups';
   try {
     // The store's saved folder is whatever an older build chose; the app's fixed one is used.
-    db.get().prepare("UPDATE system_settings SET value = ? WHERE key = 'backup_folder'").run(JSON.stringify(stale));
+    db.get().prepare("UPDATE system_settings SET value = ? WHERE key = 'backup_folder'").run(stale);
     const result = backupService.run({ trigger: 'MANUAL', actor: owner });
     assert.equal(result.ok, true, result.error);
     assert.equal(path.dirname(result.file_path), fixed);
@@ -742,6 +742,40 @@ test('Android: the app\'s own backup folder wins over a saved one it can no long
   } finally {
     delete process.env.AGRIVET_APP_BACKUP_DIR;
     delete process.env.AGRIVET_APP_BACKUP_COPY;
+    db.transaction(() => settingsService.set('backup_folder', backupFolder, owner));
+  }
+});
+
+test('OPS-001: a folder that refuses the file does not lose the backup — it is written to the spare and said so', () => {
+  // A folder the kernel refuses to anybody, root included — the test runner is root, so a
+  // read-only directory would not refuse it and would prove nothing.
+  const refuses = '/sys/chachi-backups-test';
+  const spare = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-spare-'));
+  // Written straight in: Settings refuses such a folder, and this is a folder that worked
+  // when it was chosen and stopped working afterwards.
+  db.get().prepare("UPDATE system_settings SET value = ? WHERE key = 'backup_folder'").run(refuses);
+  process.env.AGRIVET_BACKUP_FALLBACK_DIR = spare;
+  try {
+    const result = backupService.run({ trigger: 'MANUAL', actor: owner });
+    assert.equal(result.ok, true, result.error);
+    assert.equal(path.dirname(result.file_path), spare, 'the backup exists, in the spare folder');
+    assert.equal(result.verified, true);
+
+    const listed = backupService.list();
+    assert.equal(listed.fell_back.from, refuses);
+    assert.equal(listed.fell_back.to, spare);
+    assert.equal(listed.fell_back.code, 'EPERM');
+
+    const trail = require('../../repositories/auditRepository').list({ action: 'BACKUP_FAILED', limit: 5 });
+    assert.match(trail[0].reason, /refused the file \(EPERM\); this one was written to/);
+
+    // No spare, and the failure stands, as it did before.
+    delete process.env.AGRIVET_BACKUP_FALLBACK_DIR;
+    const refused = backupService.run({ trigger: 'MANUAL', actor: owner });
+    assert.equal(refused.ok, false);
+    assert.match(refused.error, /could not be written \(EPERM\)/);
+  } finally {
+    delete process.env.AGRIVET_BACKUP_FALLBACK_DIR;
     db.transaction(() => settingsService.set('backup_folder', backupFolder, owner));
   }
 });
