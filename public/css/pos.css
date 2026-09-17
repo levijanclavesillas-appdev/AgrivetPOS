@@ -216,10 +216,36 @@
 .pos {
   display: grid;
   grid-template-columns: 1fr var(--totals-width);
-  gap: var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
   /* The whole screen, minus the shell padding: the page itself never scrolls. */
   height: calc(100vh - 2rem);
 }
+
+/* Who is buying and how the sale is rung up, across the top: a counter is used in landscape,
+   and these two belong above the search field rather than beside the totals, where they
+   pushed the cart down and were read last. */
+.pos-top {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: flex-end;
+  padding-bottom: var(--space-2); border-bottom: 1px solid var(--md-outline-variant);
+}
+.pos-top .top-block { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.pos-top .top-block h2 {
+  margin: 0; font-size: var(--type-label-md-size); letter-spacing: var(--tracking-overline);
+  text-transform: uppercase; color: var(--md-on-surface-muted);
+}
+.pos-top .top-row { display: flex; gap: var(--space-2); align-items: center; }
+.pos-top .rail-customer { font-size: var(--type-title-md-size); }
+.pos-top .rail-level { margin: 0; }
+.pos-top .top-action { min-height: var(--touch); white-space: nowrap; }
+.pos-top .price-switch { margin: 0; }
+.pos-top .order-types { margin: 0; }
+.pos-top .rail-order { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.pos-top .rail-order h2 { width: 100%; }
+.pos-top .order-table { width: 12rem; }
+.pos-top .order-state { margin: 0; }
+.pos-top .order-state-host { display: flex; gap: var(--space-2); align-items: center; }
 .pos-main { display: flex; flex-direction: column; min-height: 0; }
 .pos-searchbar { position: relative; display: flex; gap: var(--space-2); align-items: stretch; }
 .pos-searchbar > .pos-search, .pos-searchbar > input[type="search"] { flex: 1; min-width: 0; }
@@ -359,6 +385,7 @@
 @media (max-width: 899px) {
   .pos { display: flex; flex-direction: column; gap: var(--space-3); }
   .pos-main { flex: 1 1 auto; min-height: 10rem; }
+  .pos-top { padding-bottom: var(--space-1); gap: var(--space-2) var(--space-3); }
   .pos-rail {
     flex: 0 1 auto; max-height: 50%; gap: var(--space-3);
     padding: var(--space-3) 0 0; border-left: 0; border-top: 1px solid var(--md-outline-variant);
@@ -370,6 +397,23 @@
   .pos-rail .rail-customer-block { order: 3; }
   .rail-row.total { font-size: var(--type-title-lg-size); }
 }
+/* A counter held in landscape — a phone on its side, a small tablet — keeps the two columns:
+   stacking them there leaves the cart a few lines tall and the totals off the bottom. */
+@media (max-width: 899px) and (orientation: landscape) and (min-width: 600px) {
+  .pos {
+    display: grid; grid-template-columns: 1fr 15rem; grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+  }
+  .pos-rail {
+    max-height: none; padding: 0 0 0 var(--space-3);
+    border-top: 0; border-left: 1px solid var(--md-outline-variant);
+  }
+  .pos-rail .rail-pay { display: block; }
+  .pos-top { gap: var(--space-2); align-items: center; }
+  .pos-top .top-block h2 { display: none; }
+  .quick-keys { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+}
+
 @media (max-width: 599px) {
   /* The pane under the top app bar, less its own padding. */
   .pos { height: calc(100vh - 5.5rem); height: calc(100dvh - 5.5rem); }

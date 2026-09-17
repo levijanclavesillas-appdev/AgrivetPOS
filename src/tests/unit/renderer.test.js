@@ -260,6 +260,27 @@ test('the cart request is the shape POST /sales takes', async () => {
 
 // ── TASK-069: the camera as a scanner ───────────────────────────────────────
 
+test('the counter puts the customer and the kind of sale above the search, and the totals on the right', () => {
+  const code = codeOf('js/pos/view.js');
+  assert.match(code, /const topHost = h\('div', \{ class: 'pos-top' \}\)/);
+  assert.match(code, /function renderTop\(\)[\s\S]*?class: 'top-block top-customer'[\s\S]*?class: 'top-block top-level'/);
+  // The rail is the totals and the one button the screen exists for, and nothing else.
+  assert.equal(/rail-customer-block/.test(code), false, 'the customer moved out of the rail');
+  const css = fs.readFileSync(path.join(root, 'public', 'css', 'pos.css'), 'utf8');
+  assert.match(css, /\.pos-top \{[\s\S]*?grid-column: 1 \/ -1;/);
+  // A counter is used in landscape: the two columns stay side by side there.
+  assert.match(css, /@media \(max-width: 899px\) and \(orientation: landscape\) and \(min-width: 600px\)/);
+});
+
+test('SCR-804: the deliveries recorded have a screen, read-only (PO-206)', () => {
+  const code = codeOf('js/purchasing/deliveries.js');
+  assert.match(code, /api\.get\(`\/goods-receipts\?\$\{params\}`\)/);
+  assert.match(code, /api\.get\(`\/goods-receipts\/\$\{id\}`\)/);
+  assert.equal(/api\.(post|put|del)\(/.test(code), false, 'nothing here writes');
+  assert.match(codeOf('js/purchasing/orders.js'), /text: 'Deliveries', onclick: \(\) => onDeliveries\(\)/);
+  assert.match(codeOf('js/shell/app.js'), /onPosted: \(gr\) => \(gr\.po_id \? showPurchaseOrder\(gr\.po_id\) : showDeliveries\(\)\)/);
+});
+
 test('a buying line\'s buttons stay on screen, and a product can be made from the line that needs it', () => {
   const buying = fs.readFileSync(path.join(root, 'public', 'css', 'purchasing.css'), 'utf8');
   // The rows are wider than a phone. The action column is pinned to the right edge, which

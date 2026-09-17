@@ -45,6 +45,7 @@ import { createShiftSummary } from '../shift/summary.js';
 import { createPurchaseOrders } from '../purchasing/orders.js';
 import { createPurchaseOrder } from '../purchasing/order.js';
 import { createGoodsReceipt } from '../purchasing/receive.js';
+import { createDeliveries } from '../purchasing/deliveries.js';
 import { createReturn } from '../returns/view.js';
 import { createSuppliers } from '../purchasing/suppliers.js';
 
@@ -518,6 +519,21 @@ export function createApp({ root }) {
       onNew: () => showPurchaseOrder(null),
       onReceive: (id) => showGoodsReceipt(id),
       onSuppliers: () => showSuppliers(),
+      // SCR-804: what has already arrived.
+      onDeliveries: () => showDeliveries(),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-804 — the deliveries recorded, and one of them read back (PO-206: never edited). */
+  function showDeliveries() {
+    if (current?.unmount) current.unmount();
+    renderRail('buying');
+    current = createDeliveries({
+      root: host(),
+      onBack: () => showPurchaseOrders(),
+      onOpenOrder: (id) => showPurchaseOrder(id),
     });
     current.mount();
     return current;
@@ -547,7 +563,9 @@ export function createApp({ root }) {
       onBack: () => (poId ? showPurchaseOrder(poId) : showPurchaseOrders()),
       // PO-206: a posted delivery is immutable, so there is nothing to go back to.
       // Landing on the order shows the new status and what is still outstanding.
-      onPosted: (gr) => (gr.po_id ? showPurchaseOrder(gr.po_id) : showPurchaseOrders()),
+      // A delivery against an order lands on the order, which shows what is still
+      // outstanding; one without an order lands on the list it has just joined.
+      onPosted: (gr) => (gr.po_id ? showPurchaseOrder(gr.po_id) : showDeliveries()),
     });
     current.mount();
     return current;

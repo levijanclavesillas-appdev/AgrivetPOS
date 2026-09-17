@@ -40,6 +40,9 @@ export function createPos({ root, session, onPay }) {
   const attachBar = h('div', { class: 'attach-bar', hidden: true });
   const linesHost = h('div', { class: 'cart-lines', role: 'list', tabindex: '0', 'aria-label': 'Cart' });
   const railHost = h('aside', { class: 'pos-rail' });
+  // The customer and how the sale is being made: above the search field, across the screen,
+  // where a landscape counter has room for them and the cart does not have to give any up.
+  const topHost = h('div', { class: 'pos-top' });
   const panelHost = h('div', { class: 'pos-panel' });
   const results = h('div', { class: 'search-results', hidden: true });
   // Its own host, because the bar's contents depend on the policy the server has not
@@ -271,6 +274,31 @@ export function createPos({ root, session, onPay }) {
     );
   }
 
+  /** The bar over the counter: who is buying, and how this sale is being rung up. */
+  function renderTop() {
+    const customer = cart.customer;
+    clear(topHost).append(...[
+      h('div', { class: 'top-block top-customer' }, [
+        h('h2', { text: 'Customer' }),
+        h('div', { class: 'top-row' }, [
+          h('p', { class: 'rail-customer', text: customer ? customer.name : 'Walk-in' }),
+          h('button', { class: 'top-action', icon: 'users', text: 'Change  F2', onclick: () => chooseCustomer() }),
+        ]),
+      ]),
+      // PR-107: retail or wholesale, for a walk-in; an account customer's own level is shown.
+      wholesaleOn() || !ordersOn()
+        ? h('div', { class: 'top-block top-level' }, [
+          h('h2', { text: 'Price' }),
+          wholesaleOn() && !customer
+            ? priceSwitch()
+            : h('p', { class: 'rail-level', text: customer?.price_level || 'RETAIL' }),
+        ])
+        : null,
+      // POS-109: dine-in, take-out or delivery, and the table — a café's kind of sale.
+      ordersOn() ? h('div', { class: 'top-block top-order' }, [orderBlock()]) : null,
+    ].filter(Boolean));
+  }
+
   function renderRail() {
     const customer = cart.customer;
     // `.filter(Boolean)`, and it is not decoration: `Element.append()` is the DOM's own
@@ -280,15 +308,6 @@ export function createPos({ root, session, onPay }) {
     // the Pay button, on the one screen this product is for. The payment screen already
     // filters for the same reason; this call site did not.
     clear(railHost).append(...[
-      ordersOn() ? orderBlock() : null,
-      h('div', { class: 'rail-block rail-customer-block' }, [
-        h('h2', { text: 'Customer' }),
-        h('p', { class: 'rail-customer', text: customer ? customer.name : 'Walk-in' }),
-        h('button', { class: 'rail-action', text: 'Change  F2', onclick: () => chooseCustomer() }),
-        wholesaleOn() && !customer
-          ? priceSwitch()
-          : h('p', { class: 'rail-level', text: `Price: ${customer?.price_level || 'RETAIL'}` }),
-      ]),
       h('div', { class: 'rail-block rail-totals' }, [
         row('Subtotal', priced ? money(priced.subtotal_centavos) : money(0)),
         row('Discount', priced ? money(-(priced.line_discount_centavos + priced.transaction_discount_centavos)) : money(0)),
@@ -457,6 +476,7 @@ export function createPos({ root, session, onPay }) {
 
   function render() {
     renderLines();
+    renderTop();
     renderRail();
     clear(helpHost).append(helpBar());
   }
@@ -1229,6 +1249,7 @@ export function createPos({ root, session, onPay }) {
   async function mount() {
     clear(root).append(
       h('div', { class: 'pos' }, [
+        topHost,
         h('div', { class: 'pos-main' }, [
           h('div', { class: 'pos-searchbar' }, [
             search,

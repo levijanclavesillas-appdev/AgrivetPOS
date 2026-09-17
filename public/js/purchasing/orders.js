@@ -16,7 +16,7 @@ import { money, manila } from '../shell/format.js';
 
 const PAGE = 50;
 
-export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSuppliers }) {
+export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSuppliers, onDeliveries }) {
   let query = '';
   let status = '';
   let openOnly = true;
@@ -64,6 +64,8 @@ export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSupplie
       // here because that is where somebody who has just been handed a delivery note
       // starts looking, and PO-207 makes it a normal case rather than an exception.
       h('button', { class: 'row-action', icon: 'package-plus', text: 'Receive without an order', onclick: () => onReceive(null) }),
+      // SCR-804: what has already arrived. A delivery used to be posted and never seen again.
+      onDeliveries ? h('button', { class: 'row-action', icon: 'package-check', text: 'Deliveries', onclick: () => onDeliveries() }) : null,
       h('button', { class: 'primary', icon: 'plus', text: 'New order', onclick: () => onNew() }),
     ]);
   }
