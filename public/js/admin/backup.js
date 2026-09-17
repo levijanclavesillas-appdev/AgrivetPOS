@@ -126,6 +126,12 @@ export function createBackup({ root, session }) {
     return h('div', { class: 'backup-warning' }, [
       h('h2', { text: 'Two things worth knowing' }),
       h('p', { text: data.shared_drive_warning }),
+      // On Android the app copies each backup out to shared storage, where it survives the app.
+      data.copied_to
+        ? h('p', { text: `Each backup is also copied to ${data.copied_to} on this device, where it stays if the app `
+          + 'is removed. Copy that folder to a computer every week: backups on this phone do not survive this phone. '
+          + 'After the app is installed again, open an old backup with Restore from a file.' })
+        : null,
       data.hosted
         // TASK-062: the web version's backups are on Chachi's server.
         ? h('p', { text: 'These backups are kept on Chachi\'s server, apart from the store\'s data. '

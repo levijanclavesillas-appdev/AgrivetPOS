@@ -66,13 +66,18 @@ app, so it does not update to this one. Move a tablet across with a backup and r
 - **Backups** go to `Documents/ChachiPOS Backups`, which survives the app being removed and
   can be copied off over USB. There is no "all files access": Google Play does not permit it
   for a point of sale, and it is not needed.
-  - **Android 11 and later.** The app writes its own files there with no permission. It cannot
-    see backups another installation made, so after a reinstall an old backup is opened with
-    *Restore from a file*.
-  - **Android 8–10.** The first launch asks for the ordinary storage permission. If it is
-    refused, backups go to the app's own folder and are **deleted if the app is uninstalled**.
-  - **If Documents cannot be written** (a probe at launch fails), backups also go to the app's
-    own folder. `05_TECH_SPEC.md` §7 still applies: a copy off the
+  - **Android 11 and later.** Android refuses a direct write to Documents (`EACCES`), so:
+    - the server writes and checks each backup in the app's own folder
+      (`Android/data/<package>/files/ChachiPOS Backups`);
+    - `BackupMirror` copies each one into Documents through MediaStore, falling back to
+      `Download/ChachiPOS Backups`, and removes a copy when the server removes the backup;
+    - the app fixes that folder (`AGRIVET_APP_BACKUP_DIR`), so it wins over a Documents path a
+      store saved under an older build.
+
+    After a reinstall, an old backup is opened with *Restore from a file*.
+  - **Android 8–10.** The first launch asks for the ordinary storage permission, and the server
+    writes to Documents itself. If it is refused, backups go to the app's own folder and are
+    **deleted if the app is uninstalled**. `05_TECH_SPEC.md` §7 still applies: a copy off the
   tablet is the owner's job, and matters more when the tablet is the only machine.
 - **The setup wizard** is the same as on Windows, including step 6, the Excel workbook. The
   workbook is chosen with Android's file picker. A downloaded template or export goes to

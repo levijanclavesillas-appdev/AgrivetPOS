@@ -189,46 +189,29 @@ public class MainActivity extends Activity {
 
     /**
      * OPS-001: backups go outside the application's own storage, so they survive the app
-     * being cleared or uninstalled — to Documents/ChachiPOS Backups.
+     * being cleared or uninstalled.
      *
-     * No "all files access" (removed for Google Play): on Android 11 and later an app may
-     * create and write its own files in Documents with no permission at all, and the backups
-     * are its own files. What it cannot do is see files another installation made, so after a
-     * reinstall an old backup is opened with Restore from a file (Android's picker), not from
-     * the Backups list. On Android 8–10 the ordinary storage permission covers the same folder.
+     * No "all files access" (removed for Google Play). On Android 11 and later a direct write to
+     * Documents is refused (EACCES), so the server writes to the app's own folder on shared
+     * storage and BackupMirror copies each backup into Documents/ChachiPOS Backups through
+     * MediaStore. After a reinstall an old backup is opened with Restore from a file. On
+     * Android 8–10 the ordinary storage permission lets the server write to Documents itself.
      */
     private boolean hasSharedStorage() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return canWrite(sharedFolder());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return false;
         return checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private File sharedFolder() {
-        return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), BACKUP_FOLDER_NAME);
-    }
-
-    /** Whether this app can create a file in `folder` now: a probe written and removed. */
-    private static boolean canWrite(File folder) {
-        try {
-            //noinspection ResultOfMethodCallIgnored
-            folder.mkdirs();
-            File probe = new File(folder, ".chachi-write-test");
-            try (OutputStream out = new FileOutputStream(probe)) {
-                out.write(1);
-            }
-            return probe.delete();
-        } catch (Exception e) {
-            Log.w(TAG, "Documents is not writable here: " + e.getMessage());
-            return false;
-        }
-    }
-
     private String backupFolder() {
-        File shared = sharedFolder();
+        File shared = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), BACKUP_FOLDER_NAME);
         if (hasSharedStorage()) return shared.getAbsolutePath();
-        // Refused (Android 8–10 said no, or a device that keeps apps out of Documents): the
-        // app's own folder on shared storage, visible over USB but removed on uninstall.
         File own = getExternalFilesDir(BACKUP_FOLDER_NAME);
-        return own != null ? own.getAbsolutePath() : shared.getAbsolutePath();
+        return own != null ? own.getAbsolutePath() : new File(getFilesDir().getParentFile(), "backups").getAbsolutePath();
+    }
+
+    /** Whether the server's backup folder is fixed by the app rather than chosen by the owner. */
+    private boolean backupFolderFixed() {
+        return !hasSharedStorage();
     }
 
     private boolean serverRequested = false;
@@ -238,7 +221,11 @@ public class MainActivity extends Activity {
         serverRequested = true;
         new Thread(() -> {
             try {
-                NodeRuntime.start(getApplicationContext(), backupFolder());
+                String folder = backupFolder();
+                boolean fixed = backupFolderFixed();
+                if (fixed) BackupMirror.start(getApplicationContext(), new File(folder));
+                NodeRuntime.start(getApplicationContext(), folder, fixed,
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ? BackupMirror.RELATIVE : null);
             } catch (RuntimeException e) {
                 Log.e(TAG, "The server could not start", e);
                 main.post(() -> web.loadData(failed(e.getMessage()), "text/html", "utf-8"));

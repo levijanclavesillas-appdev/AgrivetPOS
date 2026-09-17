@@ -78,7 +78,9 @@ function fileNameFor(trigger, at) {
  */
 function folder() {
   // TASK-062: a web copy's folder is the server's volume, known before any setting is.
-  return settingsService.get('backup_folder') || hosting.backupDir() || null;
+  // The fixed folder wins over the setting: on Android a store set up before the folder was
+  // fixed still has Documents in its setting, which the app can no longer write (EACCES).
+  return hosting.backupDir() || settingsService.get('backup_folder') || null;
 }
 
 // ── Taking one ──────────────────────────────────────────────────────────────
@@ -369,6 +371,8 @@ function list({ limit = 30 } = {}) {
     // TASK-062: on the web version the folder is on Chachi's server, and the owner's own
     // copy is a download rather than a USB stick.
     hosted: hosting.isHosted(),
+    // On Android: where the app copies each backup, so it survives the app being removed.
+    copied_to: process.env.AGRIVET_APP_BACKUP_COPY || null,
     backups: logged_,
     // Files nobody here wrote — a copy from another machine, or the backup a restore
     // came from. Each can be restored once it has been checked (TASK-057); they are

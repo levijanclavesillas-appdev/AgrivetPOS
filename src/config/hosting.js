@@ -37,9 +37,17 @@ function listenHost() {
   return process.env.AGRIVET_HOST || '0.0.0.0';
 }
 
-/** The fixed backup folder of a hosted copy, or null on a PC (the owner chooses). */
+/**
+ * The fixed backup folder, or null where the owner chooses one (a PC).
+ *
+ * A hosted copy's is its server volume. The Android app fixes one too
+ * (`AGRIVET_APP_BACKUP_DIR`): its own folder on shared storage, which it can always write,
+ * and which it copies each backup out of into Documents through MediaStore — Android 11
+ * and later refuse a direct write there to an app without "all files access".
+ */
 function backupDir() {
-  return isHosted() ? (process.env.AGRIVET_BACKUP_DIR || '/backups') : null;
+  if (isHosted()) return process.env.AGRIVET_BACKUP_DIR || '/backups';
+  return process.env.AGRIVET_APP_BACKUP_DIR || null;
 }
 
 /** The store's own address on the web, without a trailing slash, or null. */

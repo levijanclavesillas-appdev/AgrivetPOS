@@ -45,7 +45,12 @@ final class NodeRuntime {
 
     private NodeRuntime() { }
 
-    static synchronized void start(Context context, String backupFolder) {
+    /**
+     * @param backupFolder where the server writes its backups
+     * @param fixed        true where the app decides that folder (the owner cannot change it)
+     * @param copiedTo     where each backup is copied for keeping (Documents/…), or null
+     */
+    static synchronized void start(Context context, String backupFolder, boolean fixed, String copiedTo) {
         if (started) return;
         started = true;
 
@@ -69,6 +74,10 @@ final class NodeRuntime {
             Os.setenv("AGRIVET_SQLITE_ADDON",
                     context.getApplicationInfo().nativeLibraryDir + "/libbetter_sqlite3.so", true);
             Os.setenv("AGRIVET_BACKUP_SUGGESTION", backupFolder, true);
+            // src/config/hosting.js: a folder the app fixes wins over any the store saved,
+            // including a Documents path saved by a build that had "all files access".
+            if (fixed) Os.setenv("AGRIVET_APP_BACKUP_DIR", backupFolder, true);
+            if (copiedTo != null) Os.setenv("AGRIVET_APP_BACKUP_COPY", copiedTo.replaceAll("/+$", ""), true);
             Os.setenv("HOME", context.getFilesDir().getAbsolutePath(), true);
             Os.setenv("TMPDIR", context.getCacheDir().getAbsolutePath(), true);
             // Android has no /etc/localtime for Node to read. The ledger is UTC and the

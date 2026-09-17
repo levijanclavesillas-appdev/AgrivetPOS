@@ -716,3 +716,32 @@ test('OPS-001: a backup folder inside the application data folder is reported as
   // the failures that do not matter.
   assert.equal(backupService.list().inside_app_data, false);
 });
+
+// ── Android: a folder the app fixes (Play build, no "all files access") ─────
+
+test('Android: the app\'s own backup folder wins over a saved one it can no longer write, and cannot be changed', () => {
+  const fixed = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-app-backups-'));
+  const stale = path.join(os.tmpdir(), 'agrivet-no-such-parent', 'Documents', 'ChachiPOS Backups');
+  db.transaction(() => settingsService.set('backup_folder', backupFolder, owner));
+  process.env.AGRIVET_APP_BACKUP_DIR = fixed;
+  process.env.AGRIVET_APP_BACKUP_COPY = 'Documents/ChachiPOS Backups';
+  try {
+    // The store's saved folder is whatever an older build chose; the app's fixed one is used.
+    db.get().prepare("UPDATE system_settings SET value = ? WHERE key = 'backup_folder'").run(JSON.stringify(stale));
+    const result = backupService.run({ trigger: 'MANUAL', actor: owner });
+    assert.equal(result.ok, true, result.error);
+    assert.equal(path.dirname(result.file_path), fixed);
+    assert.ok(fs.existsSync(result.file_path));
+
+    const listed = backupService.list();
+    assert.equal(listed.folder, fixed);
+    assert.equal(listed.copied_to, 'Documents/ChachiPOS Backups', 'the screen says where the copies go');
+
+    assert.throws(() => settingsService.set('backup_folder', backupFolder, owner),
+      /the app keeps its backups in its own folder/);
+  } finally {
+    delete process.env.AGRIVET_APP_BACKUP_DIR;
+    delete process.env.AGRIVET_APP_BACKUP_COPY;
+    db.transaction(() => settingsService.set('backup_folder', backupFolder, owner));
+  }
+});

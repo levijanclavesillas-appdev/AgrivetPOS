@@ -159,8 +159,9 @@ function resetSetupCodeFailures() { codeFailures = []; }
  * the same failed disk and the same uninstaller as the thing it was backing up.
  */
 function suggestBackupFolder() {
-  // TASK-062: a hosted copy's backups go to its own volume, and are not a choice.
-  if (hosting.isHosted()) return hosting.backupDir();
+  // TASK-062: a hosted copy's backups go to its own volume, and are not a choice; nor are an
+  // Android app's, which fixes its own folder.
+  if (hosting.backupDir()) return hosting.backupDir();
   // On Android the app knows where shared storage is and the server does not, so the
   // app says (TASK-049). The rule the wizard enforces is the same: outside the data folder.
   if (process.env.AGRIVET_BACKUP_SUGGESTION) return process.env.AGRIVET_BACKUP_SUGGESTION;
@@ -242,7 +243,7 @@ function complete({ store = {}, taxMode, owner = {}, backupFolder, acknowledgedR
     );
   }
 
-  const folder = validateBackupFolder(hosting.isHosted() ? hosting.backupDir() : backupFolder);
+  const folder = validateBackupFolder(hosting.backupDir() || backupFolder);
   const recoveryCode = authService.generateRecoveryCode();
   const at = clock.nowUtc();
 

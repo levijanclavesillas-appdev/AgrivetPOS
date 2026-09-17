@@ -153,3 +153,23 @@ was removed.
 - **Still to do.** Confirm on a real phone (Android 11+) that a backup lands in Documents, and
   that *Restore from a file* opens one after a reinstall.
 
+**The same day, on a phone: "The backup could not be written (EACCES)".** Android 11+ refused
+the direct write to Documents. The store also kept a Documents path saved by the older build,
+and the launch probe only changed the suggestion for a new setup, never that saved folder.
+
+- **The folder is now fixed by the app.** `NodeRuntime` sets `AGRIVET_APP_BACKUP_DIR` to the
+  app's own folder on shared storage, which it can always write. `hosting.backupDir()` returns
+  it, and `backupService.folder()` now prefers a fixed folder to the saved setting. The setting
+  cannot be changed to anything else, and the wizard uses the fixed folder.
+- **Each backup is copied to Documents.** `BackupMirror` watches that folder and copies each
+  finished backup into `Documents/ChachiPOS Backups` through MediaStore (or
+  `Download/ChachiPOS Backups` if Documents is refused). It removes the copy when the server
+  deletes a backup, and copies older backups at launch.
+- **The Backups screen** says where the copies go (`copied_to`).
+- **Checked here.**
+  - `backup.test.js`: a stale saved folder is ignored, the backup lands in the fixed folder, and
+    the setting refuses a change.
+  - A debug build succeeds.
+- **Still to do.** Confirm on the phone: a backup succeeds and appears in Documents (or
+  Download).
+

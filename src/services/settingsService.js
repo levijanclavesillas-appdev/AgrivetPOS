@@ -524,8 +524,11 @@ function validateBackupFolder(text) {
   const hostedDir = require('../config/hosting').backupDir();
   if (hostedDir && require('path').resolve(text) !== require('path').resolve(hostedDir)) {
     throw errors.badRequest(
-      'On the hosted POS, backups are kept on Chachi\'s server and the folder cannot be changed. '
-      + 'Download a copy from Admin → Backups to keep one yourself.',
+      require('../config/hosting').isHosted()
+        ? 'On the hosted POS, backups are kept on Chachi\'s server and the folder cannot be changed. '
+          + 'Download a copy from Admin → Backups to keep one yourself.'
+        : 'On this device the app keeps its backups in its own folder and copies each one to '
+          + 'Documents/ChachiPOS Backups. The folder cannot be changed here.',
       { ruleId: 'OPS-001' }
     );
   }
