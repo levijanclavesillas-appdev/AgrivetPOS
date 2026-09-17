@@ -73,10 +73,12 @@ So there are two ways to pay, and Chachi's admin can set either one by hand:
 >     `monthly` licence is read as monthly; 38 days offline lapses.
 >   - **`renderer.test.js`.** `SCR-707`'s plan line.
 >   - **Suites.** Unit 334, integration 722, e2e 26 files: all pass.
-> - **Still open.** The live licence server at `pos.chachisoftware.store` still runs the old code.
->   Rebuilding it (`docker compose up -d --build` in `licence-server/`, after copying
->   `/var/lib/chachi-licence/licences.db`) waits on the owner's go-ahead. Until then, the new
->   admin forms are not on the live admin page.
+> - **Live 2026-09-17.** The licence server at `pos.chachisoftware.store` was rebuilt after a copy
+>   of its database, `/var/lib/chachi-licence/licences.db.before-task-067-20260916-150912`.
+>   - **The upgrade.** Its one store became `MONTHLY`, with its trial payment and its device kept
+>     and no broken references.
+>   - **The site.** It is healthy. The admin page shows *Plan*, *Add a store*, *Set as one-time
+>     paid* and *Set paid until*. Nothing was set on the live store.
 
 ## The three questions (answered: yes to all)
 
