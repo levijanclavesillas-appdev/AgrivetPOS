@@ -4,7 +4,7 @@
 // server, the services and the repositories run identically under `npm start`,
 // which is what keeps the v1.3 LAN client additive (05_TECH_SPEC.md §1).
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const server = require('./src/server');
@@ -19,6 +19,23 @@ let window = null;
 function iconOption() {
   const icon = path.join(__dirname, 'build', 'icon.png');
   return fs.existsSync(icon) ? { icon } : {};
+}
+
+/**
+ * TASK-069: the camera, for scanning a barcode, and nothing else — and only for the POS's own
+ * page. Electron grants every permission a page asks for unless told otherwise, and this is
+ * where it is told.
+ */
+function limitPermissions() {
+  const ours = (url) => typeof url === 'string' && (url === BASE || url.startsWith(`${BASE}/`));
+  const allowed = (permission, details = {}) => permission === 'media'
+    && (!details.mediaTypes || details.mediaTypes.every((type) => type === 'video'));
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(ours(details.requestingUrl || contents.getURL()) && allowed(permission, details));
+  });
+  session.defaultSession.setPermissionCheckHandler((contents, permission, origin, details) => (
+    ours(origin || details.requestingUrl || '') && permission === 'media'
+  ));
 }
 
 function createWindow() {
@@ -66,6 +83,7 @@ async function boot() {
   if (!(await server.waitForHealth({ listenPort: PORT }))) {
     throw new Error(`the API did not answer on ${BASE}; the window was not opened`);
   }
+  limitPermissions();
   createWindow();
 }
 

@@ -1,0 +1,3 @@
+@zxing/library 0.23.0 (Apache-2.0), umd/index.min.js, unmodified.
+sha256 3ede94153fb0c5b67a12d7adff6decd827c2b22714fdc6faecf27a8f20937ea6
+Loaded only by public/js/shell/camera-scan.js, where the browser has no BarcodeDetector (TASK-069).

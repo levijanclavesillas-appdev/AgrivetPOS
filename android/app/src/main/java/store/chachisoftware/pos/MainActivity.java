@@ -20,6 +20,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -27,6 +28,13 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
+import com.google.mlkit.vision.barcode.common.Barcode;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanner;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
+
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -49,11 +57,14 @@ public class MainActivity extends Activity {
     private static final String ORIGIN = "http://127.0.0.1:" + NodeRuntime.PORT;
     private static final int PICK_FILE = 1;
     private static final int PICK_PICTURE = 3;
+    private static final int CAMERA_FOR_WEB = 4;
     private static final String BACKUP_FOLDER_NAME = "ChachiPOS Backups";
 
     private WebView web;
     private ValueCallback<Uri[]> pendingPick;
     private File pendingPhoto;
+    // TASK-069: the web reader's camera request, waiting for the runtime permission.
+    private PermissionRequest pendingCamera;
     private boolean askedForStorage = false;
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -83,6 +94,30 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
+            /**
+             * TASK-069: the web reader's camera, on a phone without Play services. Only the
+             * POS's own page, only video, and only after Android's own permission prompt.
+             */
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                boolean ours = request.getOrigin() != null && request.getOrigin().toString().startsWith(ORIGIN);
+                boolean videoOnly = true;
+                for (String resource : request.getResources()) {
+                    if (!PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) videoOnly = false;
+                }
+                if (!ours || !videoOnly) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[] {PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    return;
+                }
+                if (pendingCamera != null) pendingCamera.deny();
+                pendingCamera = request;
+                requestPermissions(new String[] {android.Manifest.permission.CAMERA}, CAMERA_FOR_WEB);
+            }
+
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (pendingPick != null) pendingPick.onReceiveValue(null);
@@ -255,6 +290,39 @@ public class MainActivity extends Activity {
         pendingPick = null;
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != CAMERA_FOR_WEB || pendingCamera == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            pendingCamera.grant(new String[] {PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+        } else {
+            pendingCamera.deny();
+        }
+        pendingCamera = null;
+    }
+
+    /** TASK-069: a scan's answer, handed to the page's waiting promise. */
+    private void scanResult(String id, String code, String error) {
+        String js = "window.__chachiScanResult && window.__chachiScanResult("
+                + JSONObject.quote(id) + ","
+                + (code == null ? "null" : JSONObject.quote(code)) + ","
+                + (error == null ? "null" : JSONObject.quote(error)) + ")";
+        main.post(() -> { if (web != null) web.evaluateJavascript(js, null); });
+    }
+
+    private static int formatOf(String name) {
+        switch (name) {
+            case "ean_13": return Barcode.FORMAT_EAN_13;
+            case "ean_8": return Barcode.FORMAT_EAN_8;
+            case "upc_a": return Barcode.FORMAT_UPC_A;
+            case "upc_e": return Barcode.FORMAT_UPC_E;
+            case "code_128": return Barcode.FORMAT_CODE_128;
+            case "code_39": return Barcode.FORMAT_CODE_39;
+            default: return 0;
+        }
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed() {
@@ -269,6 +337,47 @@ public class MainActivity extends Activity {
          * (TASK-048), where the owner signs in with Google. https only: whatever the page
          * asks, this never hands the system a scheme it could turn into something else.
          */
+        /**
+         * TASK-069: one barcode, read by Google's code scanner. The answer comes back through
+         * window.__chachiScanResult(id, code, error): a code, or null when the cashier backed
+         * out, or the error "unavailable" where the phone has no Play services — the page
+         * then uses its own reader.
+         */
+        @JavascriptInterface
+        public void scanBarcode(String id, String formats) {
+            main.post(() -> {
+                try {
+                    int first = 0;
+                    int[] more = new int[0];
+                    java.util.List<Integer> wanted = new java.util.ArrayList<>();
+                    for (String name : (formats == null ? "" : formats).split(",")) {
+                        int format = formatOf(name.trim());
+                        if (format != 0) wanted.add(format);
+                    }
+                    if (!wanted.isEmpty()) {
+                        first = wanted.get(0);
+                        more = new int[wanted.size() - 1];
+                        for (int i = 1; i < wanted.size(); i++) more[i - 1] = wanted.get(i);
+                    }
+                    GmsBarcodeScannerOptions options = new GmsBarcodeScannerOptions.Builder()
+                            .setBarcodeFormats(first == 0 ? Barcode.FORMAT_EAN_13 : first, more)
+                            .enableAutoZoom()
+                            .build();
+                    GmsBarcodeScanner scanner = GmsBarcodeScanning.getClient(MainActivity.this, options);
+                    scanner.startScan()
+                            .addOnSuccessListener(barcode -> scanResult(id, barcode.getRawValue(), null))
+                            .addOnCanceledListener(() -> scanResult(id, null, null))
+                            .addOnFailureListener(e -> {
+                                Log.w(TAG, "code scanner unavailable", e);
+                                scanResult(id, null, "unavailable");
+                            });
+                } catch (Throwable e) {
+                    Log.w(TAG, "code scanner unavailable", e);
+                    scanResult(id, null, "unavailable");
+                }
+            });
+        }
+
         @JavascriptInterface
         public void openExternal(String url) {
             if (url == null || !url.startsWith("https://")) return;

@@ -111,3 +111,13 @@ build, `chrome://inspect` on the PC opens the tablet's WebView in DevTools.
 - Built and packaged on a Linux build machine, and **not yet run on a tablet or an
   emulator**. The first install on the store's tablet is the first real run; check the
   wizard, a sale, a printed receipt and a backup before trading on it.
+
+## Scanning with the camera (TASK-069)
+
+- **With Google Play services.** The counter's **Camera** button uses Google's code scanner
+  (`play-services-code-scanner`). Play services shows its own camera screen and gives the app only
+  the code, so the app never asks for the camera. Its module is fetched when the app is installed.
+- **Without Play services.** The app falls back to reading the camera itself in the WebView. It
+  asks for the camera the first time. This is why the manifest declares `CAMERA`, as not required
+  hardware.
+

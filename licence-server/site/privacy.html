@@ -29,7 +29,7 @@
 <main id="main" class="wrap">
   <article class="doc">
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 17 September 2026</p>
+    <p class="updated">Last updated 17 September 2026 (camera scanning)</p>
 
     <p class="note"><strong>In short:</strong> Chachi POS keeps a store's sales, stock, prices, customers and staff
       on the store's own computer, phone or tablet. If a store also uses Chachi POS on the web, or keeps its devices
@@ -90,10 +90,19 @@
               The app reads and writes only its own backup files there.</td></tr>
           <tr><td>The camera app</td>
             <td>Only when someone taps the button to take a product's photo. The photo is taken by the phone's camera
-              app and saved with the product. The app has no camera permission of its own.</td></tr>
+              app and saved with the product.</td></tr>
+          <tr><td>Scanning barcodes with the camera</td>
+            <td>Only while someone is scanning. Where the phone has Google Play services, Google's code scanner shows
+              the camera and hands the app only the barcode's number; the app sees no picture. On a phone without
+              Play services, the app asks for camera permission the first time and reads the barcode itself. Either
+              way, camera images are read on the phone, never stored and never sent anywhere.</td></tr>
+          <tr><td>Network state</td>
+            <td>Added by Google's code scanner, to fetch its scanning module when the phone is online.</td></tr>
         </tbody>
       </table>
     </div>
+    <p>The web version and the Windows app use the same camera scanning in the browser, with the browser's or
+      Windows' own permission prompt, and keep no images either.</p>
     <p>The app does not collect location, contacts, call logs, SMS, microphone audio, the advertising ID or a list of
       other apps. It contains no advertising and no analytics or tracking code.</p>
 

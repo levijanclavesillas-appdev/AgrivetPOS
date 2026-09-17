@@ -258,6 +258,82 @@ test('the cart request is the shape POST /sales takes', async () => {
   assert.equal(cart.toRequest().statutory, null);
 });
 
+// ── TASK-069: the camera as a scanner ───────────────────────────────────────
+
+test('TASK-069: a code held in front of the camera is read once, and again only after a pause', async () => {
+  const { createRepeatGuard, REPEAT_PAUSE_MS, cleanCode, FORMATS } = await load('js/shell/camera-scan.js');
+  const guard = createRepeatGuard();
+  assert.equal(REPEAT_PAUSE_MS, 1500);
+  let t = 0;
+  assert.equal(guard.accept('4800000100016', t), true, 'the first sighting');
+  // Held still for five seconds, seen four times a second: nothing more.
+  let extra = 0;
+  for (t = 250; t <= 5000; t += 250) if (guard.accept('4800000100016', t)) extra += 1;
+  assert.equal(extra, 0);
+  assert.equal(guard.accept('4800000200015', t + 250), true, 'another product at once');
+  assert.equal(guard.accept('4800000100016', t + 500), true, 'and the first again, since another came between');
+  assert.equal(guard.accept('4800000100016', t + 500 + REPEAT_PAUSE_MS - 1), false);
+  assert.equal(guard.accept('4800000100016', t + 500 + REPEAT_PAUSE_MS - 1 + REPEAT_PAUSE_MS), true, 'shown again after the pause');
+
+  assert.equal(cleanCode(' 4800000100016 '), '4800000100016');
+  assert.equal(cleanCode('12'), null, 'too short to be a code');
+  assert.equal(cleanCode('https://example.test/pay?x=1'), null, 'a link is not a product');
+  assert.deepEqual([...FORMATS], ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']);
+  assert.equal(FORMATS.includes('qr_code'), false, 'a QR Ph code is a payment, not a product');
+});
+
+test('TASK-069: no camera, no button; and every camera read goes where a wedge scan goes', async () => {
+  const { cameraButton, cameraAvailable } = await load('js/shell/camera-scan.js');
+  assert.equal(cameraAvailable(), false, 'this test has neither a bridge nor mediaDevices');
+  assert.equal(cameraButton({ onCode: () => {} }), null);
+
+  const pos = codeOf('js/pos/view.js');
+  assert.match(pos, /cameraButton\(\{\s*continuous: true,[\s\S]*?await scan\(code\);/, 'the counter hands a read to scan()');
+  assert.match(pos, /onOpen: \(\) => \{ modalOpen = true; \}/, 'INT-3: a wedge does not type into the counter under the camera');
+  assert.match(codeOf('js/catalogue/editor.js'), /cameraButton\(\{ onCode: \(read\) => \{ code\.value = read;/, 'the editor fills the field and adds nothing');
+  assert.match(codeOf('js/shell/picker.js'), /if \(matches\.length === 1\) pick\(matches\[0\]\);/);
+  // Electron grants the camera to the POS's own page, and nothing else to anything.
+  const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
+  assert.match(main, /permission === 'media'/);
+  assert.match(main, /setPermissionRequestHandler/);
+});
+
+test('TASK-069: the vendored reader is pure JavaScript, and reads an EAN-13', () => {
+  const file = path.join(root, 'public', 'vendor', 'zxing', 'zxing-library.min.js');
+  const source = fs.readFileSync(file, 'utf8');
+  assert.equal(/\beval\(|new Function\(|WebAssembly/.test(source), false, 'the CSP needs no exception');
+  const version = fs.readFileSync(path.join(root, 'public', 'vendor', 'zxing', 'VERSION'), 'utf8');
+  const sha = require('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  assert.ok(version.includes(sha), 'the file is the one VERSION names');
+  assert.ok(fs.existsSync(path.join(root, 'public', 'vendor', 'zxing', 'LICENSE')));
+
+  const ZX = require(file);
+  const L = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011'];
+  const R = L.map((p) => p.replace(/./g, (b) => (b === '1' ? '0' : '1')));
+  const G = R.map((p) => p.split('').reverse().join(''));
+  const PARITY = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+  const code = '4800000100016';
+  const d = code.split('').map(Number);
+  let bits = '0000000000101';
+  for (let i = 1; i <= 6; i += 1) bits += (PARITY[d[0]][i - 1] === 'L' ? L : G)[d[i]];
+  bits += '01010';
+  for (let i = 7; i <= 12; i += 1) bits += R[d[i]];
+  bits += '1010000000000';
+  const scale = 3;
+  const width = bits.length * scale;
+  const height = 60;
+  const pixels = new Uint8ClampedArray(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) pixels[y * width + x] = bits[Math.floor(x / scale)] === '1' ? 0 : 255;
+  }
+  const reader = new ZX.MultiFormatReader();
+  const hints = new Map();
+  hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS, ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128', 'CODE_39'].map((f) => ZX.BarcodeFormat[f]));
+  reader.setHints(hints);
+  const read = reader.decode(new ZX.BinaryBitmap(new ZX.HybridBinarizer(new ZX.RGBLuminanceSource(pixels, width, height))));
+  assert.equal(read.getText(), code);
+});
+
 test('PR-107: a walk-in cart carries its wholesale switch, and a chosen customer\'s level wins', async () => {
   const { createCart } = await load('js/pos/cart.js');
   const cart = createCart();

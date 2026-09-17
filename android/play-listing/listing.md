@@ -27,7 +27,7 @@ Chachi POS is a point-of-sale and inventory app for small stores in the Philippi
 It keeps working without internet. Your records stay on your phone or tablet, and you can also run the same store on the web and on several devices, kept in step.
 
 SELL FAST AT THE COUNTER
-• Scan barcodes with a scanner, or search by name or generic name
+• Scan barcodes with the phone's camera or a scanner, or search by name or generic name
 • Sell by the piece, the box, the bottle or the sack; a box barcode sells a box
 • Discounts, including senior citizen and PWD, with the ID recorded
 • Cash, GCash, QR Ph and split payments, with change worked out for you

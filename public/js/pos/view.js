@@ -16,6 +16,7 @@ import { productPicture } from '../shell/pictures.js';
 import { createCart } from './cart.js';
 import { quantityForAmount } from './by-amount.js';
 import { createScanner } from '../shell/scanner.js';
+import { cameraButton } from '../shell/camera-scan.js';
 import { KEYMAP, HELP_ORDER, actionFor, isMapped } from '../shell/keymap.js';
 
 // TASK-056: the actions with no button of their own, in the order a sale uses them.
@@ -1229,7 +1230,24 @@ export function createPos({ root, session, onPay }) {
     clear(root).append(
       h('div', { class: 'pos' }, [
         h('div', { class: 'pos-main' }, [
-          h('div', { class: 'pos-searchbar' }, [search, results]),
+          h('div', { class: 'pos-searchbar' }, [
+            search,
+            // TASK-069: the phone's camera as a scanner. It stays open for the next item,
+            // and each code goes where a wedge scan goes.
+            cameraButton({
+              continuous: true,
+              title: 'Scan items',
+              onCode: async (code) => {
+                const before = cart.count;
+                await scan(code);
+                const line = selected();
+                return cart.count >= before && line ? `${line.name} added. Scan the next one, or press Done.` : null;
+              },
+              onOpen: () => { modalOpen = true; },
+              onClose: () => { modalOpen = false; search.focus(); },
+            }),
+            results,
+          ]),
           quickHost,
           attachBar,
           linesHost,

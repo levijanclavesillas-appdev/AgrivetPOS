@@ -23,6 +23,7 @@ import * as ui from '../shell/ui.js';
 import { h, clear } from '../shell/ui.js';
 import { money, quantity, manila } from '../shell/format.js';
 import * as pictures from '../shell/pictures.js';
+import { cameraButton } from '../shell/camera-scan.js';
 
 const TABS = ['Identity', 'Units', 'Pricing', 'Stock', 'Barcodes'];
 const TAX_CLASSES = ['VATABLE', 'VAT_EXEMPT', 'ZERO_RATED'];
@@ -897,6 +898,8 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
       }, [
         h('div', { class: 'field-row' }, [
           code,
+          // TASK-069: read off the box with the camera. It fills the field and adds nothing.
+          cameraButton({ onCode: (read) => { code.value = read; code.focus(); }, title: 'Scan the barcode on the item' }),
           onWhat ? h('label', { class: 'inline-label', text: 'Printed on' }, [onWhat]) : null,
           h('button', { type: 'submit', class: 'row-action', icon: 'plus', text: 'Add' }),
         ]),

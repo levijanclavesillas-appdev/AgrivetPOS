@@ -3,7 +3,7 @@
 **Priority:** **P1**, most small stores have a phone and no scanner · **Blocks release:** no ·
 **Rules:** `INT-3`, `POS-101`, `SEC-10`, `NFR_3.1` · **Follows:** `TASK-015` (the counter),
 `TASK-049` (Android), `TASK-052` (the camera for product pictures), `TASK-062` (the web version) ·
-**Status:** open, 2026-09-17
+**Status:** built 2026-09-17; the walk on a real phone is still to do
 
 ---
 
@@ -21,7 +21,76 @@ The owner (2026-09-17): "make a task to allow scanning of barcode using device c
 - **The camera today.** The Android app uses the camera for one thing: a product's picture,
   through the phone's camera app (`TASK-052`).
 
-## Before starting — 3 answers are needed
+> **Built 2026-09-17.** The owner took the recommendations for all three questions.
+>
+> **As built.**
+>
+> - **`public/js/shell/camera-scan.js`.** One scanner for every screen:
+>   - **The readers.** The Android bridge first; then the browser's `BarcodeDetector`; then
+>     ZXing.
+>   - **Repeats.** `createRepeatGuard`: a code held in view is read once, and again only after
+>     1.5 s out of sight.
+>   - **What it reads.** `cleanCode`, and `FORMATS`: EAN-13/8, UPC-A/E, Code 128 and Code 39,
+>     with no QR.
+>   - **The overlay.** A guide box, a status line, **Light** where there is a torch, and
+>     **Done** or Esc.
+>   - **Feedback.** A beep and a short vibration on each read.
+> - **The vendored decoder.** `public/vendor/zxing/zxing-library.min.js` is `@zxing/library`
+>   0.23.0's UMD build, unmodified (Apache-2.0, `LICENSE`, `VERSION` with its SHA-256). It is
+>   loaded only when the browser has no `BarcodeDetector`. It has no `eval` and no WebAssembly,
+>   and the CSP test passes unchanged.
+> - **Where the camera is.**
+>   - **The counter** (continuous): reads go to `scan()`, the wedge's path, and the counter
+>     holds its modal flag while the camera is open.
+>   - **The product editor's Barcodes tab**: it fills the field and adds nothing.
+>   - **The shared product picker**: it searches the code, and one match is chosen. The picker
+>     is used by ordering and receiving.
+> - **Android.**
+>   - **The library.** `play-services-code-scanner` 16.1.0, with the module fetched on install
+>     (`barcode_ui`).
+>   - **The bridge.** `ChachiAndroid.scanBarcode(id, formats)` answers through
+>     `window.__chachiScanResult`: a code, `null` when the cashier backs out, or `unavailable`
+>     where Play services is missing.
+>   - **The fallback.** `onPermissionRequest` grants video only, only to the POS's own page, and
+>     only after Android's `CAMERA` prompt.
+>   - **The manifest** declares `CAMERA` (for that fallback) and `camera` features as not
+>     required. Play services adds `ACCESS_NETWORK_STATE`.
+>   - **The build.** A debug build succeeds.
+> - **Electron** (`main.js`). A permission handler allows `media` (video) for the POS's own page
+>   and refuses everything else. Electron granted every request before.
+> - **The privacy policy.** Its Android table has *Scanning barcodes with the camera* and
+>   *Network state*, and it says the web and Windows scanning keep no images.
+> - **The guide's *Selling* chapter** has *Scan with the phone's or laptop's camera*.
+> - **Differences from the requirements.**
+>   - **Stock count and returns: no camera.** The stock count's filter searches name and SKU,
+>     and the returns lookup searches receipt numbers; neither takes a barcode, so neither has
+>     the button.
+>   - **No keyboard shortcut.** Every function key is taken, so the counter's camera is a button.
+>   - **No `Permissions-Policy` header** for web stores: a page's own origin may use the
+>     camera by default.
+>   - **One manifest permission.** `CAMERA` is declared so the fallback can work, but it is
+>     asked for only when the fallback is used. A phone with Play services is never asked.
+> - **Tests.**
+>   - **`renderer.test.js`.**
+>     - The repeat pause, held still for five seconds.
+>     - `cleanCode`, and no QR.
+>     - No camera, no button.
+>     - The counter, editor and picker hand-offs, and Electron's handler.
+>     - The vendored file is pure JavaScript and matches its `VERSION` checksum.
+>     - It decodes an EAN-13 drawn in the test.
+>   - **Suites.** Unit, integration, e2e and licence server: all pass.
+> - **The walk, in Electron with a fake camera.** A Y4M video of EAN-13 4800000100016:
+>   - The counter's **Camera** opened the overlay.
+>   - With no `BarcodeDetector`, ZXing loaded and read the code, and *Cola 290 mL* was added.
+>   - Held in view for 2.5 s more, it stayed at 1 PC.
+>   - **Done** closed it.
+> - **Still to do.** The walk on a real Android phone, with and without Play services, and on a
+>   phone browser at a web store. This machine cannot run an emulator.
+> - **Found on the way.** The demo barcodes in the Play screenshots and the `play-review` store
+>   (4800000100017, 4800000000017…) have wrong check digits. The POS does not check them and
+>   nobody scans those, but a camera reader never returns such a code.
+
+## The three questions (answered: the recommendations)
 
 **1. On Android, which scanner?** Recommended: **Google's code scanner (ML Kit, through Play
 services).**

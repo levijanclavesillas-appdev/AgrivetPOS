@@ -21,6 +21,7 @@
 
 import * as api from './api.js';
 import { h, clear } from './ui.js';
+import { cameraButton } from './camera-scan.js';
 
 /**
  * @param {object} options
@@ -145,9 +146,27 @@ export function createProductPicker({
 
   input.addEventListener('blur', () => { setTimeout(close, 120); });
 
+  /**
+   * TASK-069: a code read by the camera is searched like one typed. One match is chosen;
+   * more, or none, are shown, as they would be for typing.
+   */
+  async function fromCamera(code) {
+    input.value = code;
+    if (onClear) onClear();
+    const mine = ++latest;
+    try {
+      const data = await api.get(`/products?q=${encodeURIComponent(code)}&limit=8&includeInactive=${includeInactive}`);
+      if (mine !== latest) return;
+      matches = data.products || [];
+      if (matches.length === 1) pick(matches[0]);
+      else render();
+    } catch { close(); }
+  }
+  const camera = cameraButton({ onCode: fromCamera, title: 'Scan the product' });
+
   return {
     input,
-    el: h('div', { class: 'picker' }, [input, results]),
+    el: h('div', { class: `picker${camera ? ' has-camera' : ''}` }, [input, camera, results]),
     focus: () => input.focus(),
     get value() { return input.value; },
   };

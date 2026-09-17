@@ -16,6 +16,14 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
 
+    <!-- TASK-069: barcodes read with the camera. Google's code scanner needs no permission; this
+         is for the web reader, used only on a phone without Play services, and asked for at
+         runtime the first time it is used. Not required, so a device without a camera still
+         installs the app. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
     <!-- TASK-052: the camera app, asked for a product's photo. Declared so Android 11+
          lets this app see that one exists; the CAMERA permission is not needed, because
          the photo is taken by the camera app, not by this one. -->
@@ -48,6 +56,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- TASK-069: Play services fetches the code scanner when the app is installed, so it
+             works offline from the first scan. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
 
         <!-- Where the camera writes a product's photo (TASK-052). Not exported: reached
              only through the one-time grant on the camera intent. -->

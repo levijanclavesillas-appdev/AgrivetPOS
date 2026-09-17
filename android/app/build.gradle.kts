@@ -174,6 +174,12 @@ android {
     }
 }
 
+// TASK-069: Google's code scanner. Play services shows its own camera screen and returns only
+// the code read, so the app needs no camera of its own on a phone that has Play services.
+dependencies {
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+}
+
 tasks.named("preBuild") {
     dependsOn(stageNodeProject)
 }
