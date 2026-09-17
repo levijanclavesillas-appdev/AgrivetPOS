@@ -292,6 +292,11 @@ test('TASK-069: no camera, no button; and every camera read goes where a wedge s
   assert.match(pos, /onOpen: \(\) => \{ modalOpen = true; \}/, 'INT-3: a wedge does not type into the counter under the camera');
   assert.match(codeOf('js/catalogue/editor.js'), /cameraButton\(\{ onCode: \(read\) => \{ code\.value = read;/, 'the editor fills the field and adds nothing');
   assert.match(codeOf('js/shell/picker.js'), /if \(matches\.length === 1\) pick\(matches\[0\]\);/);
+  // In a buying line's cell the field keeps its width, and the camera is an icon beside it.
+  const buying = fs.readFileSync(path.join(root, 'public', 'css', 'purchasing.css'), 'utf8');
+  assert.match(buying, /\.picker\.has-camera > \.picker-input \{ flex: 1 1 auto; min-width: 16rem; \}/);
+  assert.equal(/\.picker\.has-camera > \.picker-input \{[^}]*min-width: 0/.test(buying), false);
+  assert.match(codeOf('js/shell/picker.js'), /cameraButton\(\{ onCode: fromCamera, title: 'Scan the product', label: '' \}\)/);
   // Electron grants the camera to the POS's own page, and nothing else to anything.
   const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
   assert.match(main, /permission === 'media'/);

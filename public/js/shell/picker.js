@@ -162,7 +162,7 @@ export function createProductPicker({
       else render();
     } catch { close(); }
   }
-  const camera = cameraButton({ onCode: fromCamera, title: 'Scan the product' });
+  const camera = cameraButton({ onCode: fromCamera, title: 'Scan the product', label: '' });
 
   return {
     input,

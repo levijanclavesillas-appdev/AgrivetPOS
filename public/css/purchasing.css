@@ -94,8 +94,14 @@
 */
 .picker { position: relative; }
 /* TASK-069: the camera beside the field, where the device has one. */
-.picker.has-camera { display: flex; gap: var(--space-2); }
-.picker.has-camera > .picker-input { flex: 1; min-width: 0; }
+/* The field keeps its width: in a line table's cell a min-width of 0 let it collapse until
+   nothing typed could be seen. The camera is an icon only, beside it. */
+.picker.has-camera { display: flex; gap: var(--space-1); align-items: stretch; }
+.picker.has-camera > .picker-input { flex: 1 1 auto; min-width: 16rem; }
+.picker.has-camera > .camera-scan-button { flex: 0 0 auto; padding: 0 var(--space-2); }
+@media (max-width: 599px) {
+  .picker.has-camera > .picker-input { min-width: 10rem; }
+}
 .picker-input { width: 100%; min-height: var(--touch); }
 /* M3 menu, at elevation 2, hanging off the field it belongs to. */
 .picker-results { position: absolute; z-index: 5; left: 0; right: 0; top: 100%;

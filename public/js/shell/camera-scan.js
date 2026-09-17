@@ -64,7 +64,8 @@ export function cameraAvailable() {
 export function cameraButton({ onCode, continuous = false, title = 'Scan a barcode', label = 'Camera', onOpen, onClose }) {
   if (!cameraAvailable()) return null;
   return h('button', {
-    type: 'button', class: 'camera-scan-button', icon: 'camera', text: label,
+    // An empty label is an icon-only button, for a field inside a table row.
+    type: 'button', class: `camera-scan-button${label ? '' : ' icon-only'}`, icon: 'camera', text: label || null,
     title: 'Scan with the camera', 'aria-label': 'Scan with the camera',
     onclick: () => openCameraScanner({ onCode, continuous, title, onOpen, onClose }),
   });
