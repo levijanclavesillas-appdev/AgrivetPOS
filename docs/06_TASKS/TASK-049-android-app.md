@@ -173,3 +173,15 @@ and the launch probe only changed the suggestion for a new setup, never that sav
 - **Still to do.** Confirm on the phone: a backup succeeds and appears in Documents (or
   Download).
 
+**Then: "the camera does not open when adding a product's picture".** TASK-069 declared `CAMERA`
+for the barcode fallback. Android refuses `ACTION_IMAGE_CAPTURE` to an app that declares that
+permission without holding it, so TASK-052's photo, which had needed no permission, silently
+failed.
+
+- **The fix.** `choosePicture()` now asks for `CAMERA` first, where there is a camera app.
+- **Allowed:** the chooser offers the camera and the gallery, as before.
+- **Refused:** it offers the gallery alone.
+- **Also updated:** the privacy policy's Android table.
+- **Checked here:** a debug build succeeds. **To confirm on the phone:** add a picture, allow the
+  camera, and take the photo.
+

@@ -56,6 +56,7 @@ public class MainActivity extends Activity {
     private static final int PICK_FILE = 1;
     private static final int PICK_PICTURE = 3;
     private static final int CAMERA_FOR_WEB = 4;
+    private static final int CAMERA_FOR_PICTURE = 5;
     private static final String BACKUP_FOLDER_NAME = "ChachiPOS Backups";
 
     private WebView web;
@@ -151,6 +152,18 @@ public class MainActivity extends Activity {
      * answers with its own content URI. Either reaches the page as the chosen file.
      */
     private boolean choosePicture() {
+        // TASK-069 declared CAMERA (for the barcode fallback), and Android then refuses to open
+        // the camera app for a photo until the app itself holds that permission — the photo
+        // silently never started. So it is asked for first; refused, the gallery still works.
+        boolean hasCameraApp = new Intent(MediaStore.ACTION_IMAGE_CAPTURE).resolveActivity(getPackageManager()) != null;
+        if (hasCameraApp && checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {android.Manifest.permission.CAMERA}, CAMERA_FOR_PICTURE);
+            return true;
+        }
+        return openPictureChooser(hasCameraApp);
+    }
+
+    private boolean openPictureChooser(boolean withCamera) {
         pendingPhoto = PhotoProvider.newPhoto(this);
         Uri out = PhotoProvider.uriFor(this, pendingPhoto);
         Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE)
@@ -161,7 +174,7 @@ public class MainActivity extends Activity {
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("image/*");
         Intent chooser = Intent.createChooser(gallery, getString(R.string.picture_chooser));
-        if (camera.resolveActivity(getPackageManager()) != null) {
+        if (withCamera && camera.resolveActivity(getPackageManager()) != null) {
             chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] {camera});
         }
         try {
@@ -283,6 +296,15 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
+        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        if (requestCode == CAMERA_FOR_PICTURE) {
+            // The picture the page asked for: with the camera if allowed, else the gallery alone.
+            if (pendingPick != null && !openPictureChooser(granted)) {
+                pendingPick.onReceiveValue(null);
+                pendingPick = null;
+            }
+            return;
+        }
         if (requestCode != CAMERA_FOR_WEB || pendingCamera == null) return;
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
             pendingCamera.grant(new String[] {PermissionRequest.RESOURCE_VIDEO_CAPTURE});
