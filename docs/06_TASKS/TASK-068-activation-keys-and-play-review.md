@@ -134,5 +134,8 @@ in `/root/play-review/credentials.txt`):
   no key field.
 - **Other web stores.** `demo` and `nam-nam` get the key field at the next `web/store.sh
   upgrade`, which restarts them.
+- **Keep `play-review` on the app's version.** A device syncs only with a web copy on the same
+  schema (`SYNC-002`). It was moved to the TASK-069/070 image on 2026-09-17 (schema 909) by
+  recreating its container alone. Do the same before each Play submission that adds a migration.
 - **Upkeep.** Each review adds a device to `play-review` and uses a seat. Remove old devices
   from the licence admin page, or make a new key, when the 25 run out or the key expires.
