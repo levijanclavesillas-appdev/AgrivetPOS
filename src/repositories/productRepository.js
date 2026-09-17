@@ -26,6 +26,7 @@ const JOINED = `
   u.code AS base_unit_code,
   u.name AS base_unit_name,
   u.allows_fraction AS base_unit_allows_fraction,
+  u.step_milli AS base_unit_step_milli,
   -- SCR-201 shows on-hand in its list. Joined here rather than fetched per row,
   -- because fifty products on a page is fifty round trips otherwise, and the figure is
   -- one the list is read for. COALESCE because a product that has never moved has no
@@ -222,6 +223,50 @@ function packsFor(productId) {
   `).all(productId);
 }
 
+// ── PR-108 — a pack's own price (TASK-070) ──────────────────────────────────
+
+/** The pack's price at one level in force at `at`; null where it has none (or it was cleared). */
+function packPriceAt(productId, unitId, level, at) {
+  const row = db.get().prepare(`
+    SELECT price_centavos, effective_from
+      FROM product_pack_prices
+     WHERE product_id = ? AND unit_id = ? AND price_level = ? AND effective_from <= ?
+     ORDER BY effective_from DESC, created_at DESC
+     LIMIT 1
+  `).get(productId, unitId, level, at);
+  return row && row.price_centavos !== null ? row : null;
+}
+
+/** Every pack's current price at every level, as { unitId: { RETAIL: centavos, … } }. */
+function currentPackPrices(productId, at) {
+  const rows = db.get().prepare(`
+    SELECT unit_id, price_level, price_centavos
+      FROM product_pack_prices p
+     WHERE product_id = @productId AND effective_from <= @at
+       AND NOT EXISTS (
+         SELECT 1 FROM product_pack_prices q
+          WHERE q.product_id = p.product_id AND q.unit_id = p.unit_id AND q.price_level = p.price_level
+            AND q.effective_from <= @at
+            AND (q.effective_from > p.effective_from
+                 OR (q.effective_from = p.effective_from AND q.created_at > p.created_at))
+       )
+  `).all({ productId, at });
+  const out = {};
+  for (const row of rows) {
+    if (row.price_centavos === null) continue;
+    (out[row.unit_id] = out[row.unit_id] || {})[row.price_level] = row.price_centavos;
+  }
+  return out;
+}
+
+function insertPackPrice(row) {
+  db.get().prepare(`
+    INSERT INTO product_pack_prices (id, product_id, unit_id, price_level, price_centavos, effective_from, created_at, created_by)
+    VALUES (@id, @product_id, @unit_id, @price_level, @price_centavos, @effective_from, @created_at, @created_by)
+  `).run(row);
+  return row;
+}
+
 function insertPack(row) {
   db.get().prepare(`
     INSERT INTO product_packs (id, product_id, unit_id, factor_milli, is_default_sell, created_at)
@@ -408,6 +453,7 @@ function countReferences(productId) {
 }
 
 module.exports = {
+  packPriceAt, currentPackPrices, insertPackPrice,
   countBatchTracked,
   findById, findBySku, countAll, search, countSearch, insert, updateFields,
   barcodesFor, findByBarcode, findBarcode, insertBarcode, deleteBarcode, barcodesOnPack,

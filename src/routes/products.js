@@ -193,6 +193,19 @@ router.put('/products/:id/prices', changePrice, (req, res, next) => {
 });
 
 /**
+ * PR-108 (TASK-070) — a pack's own price per level: `{ RETAIL: 18000, WHOLESALE: null }`.
+ * A number sets it, null clears it, and a level left out is unchanged.
+ */
+router.put('/products/:id/packs/:packId/prices', changePrice, (req, res, next) => {
+  try {
+    const { reason = null, ...levels } = req.body || {};
+    res.json({ product: productService.setPackPrices(req.params.id, req.params.packId, levels, req.session, req.session, { reason }) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * PR-104 — the quantity-break set for one price level.
  *
  * `PUT` and a whole set, not `POST` and a band. PR-104's guarantees — ascending,

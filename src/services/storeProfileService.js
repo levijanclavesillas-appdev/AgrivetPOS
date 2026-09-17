@@ -83,7 +83,7 @@ function industry() {
   return row ? row.industry : null;
 }
 
-/** "Pharmacy, Agrivet or Café / Restaurant" — a list the way it is said. */
+/** "Pharmacy, Agrivet, Café / Restaurant or Sari-sari & wholesale" — a list the way it is said. */
 const spoken = (words) => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} or ${words.at(-1)}`);
 
 /** TASK-053: only an industry that is offered may be chosen. */

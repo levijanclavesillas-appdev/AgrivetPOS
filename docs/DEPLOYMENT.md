@@ -487,3 +487,30 @@ phone can go on the web; `PHARMACY_EDITION.md` §12 has the rules. For Chachi's:
 - **Upgrade the web copy first.** A device syncs only on the same version (`SYNC-002`); a device
   updated before its web copy waits, still selling, until the web copy catches up.
 
+
+## 12. A sari-sari store (`TASK-070`)
+
+A sari-sari store usually has a phone and no PC. The steps:
+
+1. **The device.** Install the Android app from Play (or the APK), or create a web store
+   (`web/store.sh create <store>`, §11) if the owner wants it on the web too.
+2. **Setup.** Choose **Sari-sari & wholesale**. Tax mode is usually *Not registered*. The store
+   starts with:
+   - the wholesale switch and quick keys on;
+   - the senior/PWD discount off;
+   - a counter credit limit of ₱500.
+3. **The goods.** Fill in the opening spreadsheet (§6) on a computer or the phone:
+   - **Sachets and pieces.** Sell by the piece, with the strip, box or case on the *Packs* sheet.
+   - **A pack's own price.** Where a case is cheaper than its pieces, give it one in
+     `retail_price` (and `wholesale_price`).
+   - **Loose goods.** Rice and sugar by the kilo, in a unit that allows fractions.
+   - **The utang notebook.** Its balances go on *Credit balances*.
+4. **The licence.** Link it under Admin → Subscription, with the owner's Google account or an
+   activation key made on the licence admin page (TASK-068).
+5. **The counter.** Under Products → **Quick keys**, press *Suggest* or add the goods with no
+   barcode: ice, eggs, pandesal, a cigarette by the stick. For rice sold in quarters, give the
+   kilo unit a selling step of 0.25 when it is made.
+6. **Staff.** Add the helper as a cashier (§5). A cashier can add an utang customer from the
+   counter; only the owner or a manager raises a limit.
+7. **Printing.** A receipt printer is optional (§4). Without one, the receipt shows on screen.
+8. **Scanning.** Use the phone's camera, once TASK-069 is in, or a Bluetooth scanner.

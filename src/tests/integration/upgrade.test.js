@@ -88,6 +88,21 @@ function priorStore({ withOwner }) {
  * `binaryVersion() - 1` — this edition's own migrations are numbered from 900
  * (config/migrate.js), so the number below the newest is usually not a file at all.
  */
+/**
+ * The catalogue's reference rows, written with the columns 002 declared, for the same
+ * reason as the store and the product: the reference service speaks the current schema,
+ * and the day the newest migration adds a column to units (909, the selling step, did),
+ * it cannot read a row back out of the previous release's table.
+ */
+function priorCatalog() {
+  const at = clock.nowUtc();
+  const category = { id: ids.uuidv7() };
+  const kg = { id: ids.uuidv7() };
+  db.get().prepare('INSERT INTO categories (id, name, is_active, created_at) VALUES (?, ?, 1, ?)').run(category.id, 'Feeds', at);
+  db.get().prepare('INSERT INTO units (id, code, name, allows_fraction, is_active, created_at) VALUES (?, ?, ?, 1, 1, ?)').run(kg.id, 'KG', 'Kilogram', at);
+  return { category, kg };
+}
+
 const previousVersion = () => migrate.available().slice(-2)[0].version;
 
 test.after(() => temp.cleanup());
@@ -102,7 +117,7 @@ test('TC-INST-01: an upgrade preserves the data, backs up first, and migrates on
   const prior = priorInstall(previousVersion());
 
   priorStore({ withOwner: false });
-  const ref = temp.seedCatalog();
+  const ref = priorCatalog();
   temp.seedUser({ username: 'owner', role: 'OWNER', password: PASSWORD });
   const owner = authService.verifyToken(authService.login({ username: 'owner', password: PASSWORD }).token);
   // Written with the columns 002 declared rather than through productService, which

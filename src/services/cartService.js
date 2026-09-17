@@ -97,7 +97,7 @@ function orderOf(input = {}) {
  * power cut equivalent: neither loses anything the cashier had keyed. It replaces
  * rather than appends — the cart is one row, not a log of edits.
  */
-function save({ lines = [], customerId = null, transactionDiscountCentavos = 0, ...order }, actor) {
+function save({ lines = [], customerId = null, transactionDiscountCentavos = 0, priceLevel = null, ...order }, actor) {
   const shift = shiftService.requireOpenShift(actor, { action: 'build a cart' });
   const normalised = normaliseLines(lines);
   const at = clock.nowUtc();
@@ -111,6 +111,8 @@ function save({ lines = [], customerId = null, transactionDiscountCentavos = 0, 
     const payload = JSON.stringify({
       lines: normalised,
       transactionDiscountCentavos: Number.isInteger(transactionDiscountCentavos) ? transactionDiscountCentavos : 0,
+      // PR-107: kept only when the counter switched it; retail is the default.
+      ...(String(priceLevel || '').toUpperCase() === 'WHOLESALE' ? { priceLevel: 'WHOLESALE' } : {}),
       ...orderOf(order),
     });
 
@@ -285,8 +287,10 @@ function present(row) {
   let priced = null;
   try {
     priced = pricingService.priceCart({
-      lines: payload.lines,
+      // PR-108 and POS-102: in base units, with the pack, as the sale prices them.
+      lines: require('./saleService').pricingLinesOf(payload.lines),
       customer,
+      priceLevel: payload.priceLevel || null,
       taxMode: storeProfileService.taxMode(),
       actorRole: null,
       transactionDiscountCentavos: payload.transactionDiscountCentavos || 0,
@@ -306,6 +310,8 @@ function present(row) {
     customer: customer ? { id: customer.id, name: customer.name, price_level: customer.price_level } : null,
     lines: payload.lines,
     transaction_discount_centavos: payload.transactionDiscountCentavos || 0,
+    // PR-107: the cart's price level, where the counter switched a walk-in to wholesale.
+    price_level: payload.priceLevel || 'RETAIL',
     // TASK-066: the café's order this cart is, where it is one.
     order_type: payload.orderType || null,
     table_label: payload.tableLabel || null,

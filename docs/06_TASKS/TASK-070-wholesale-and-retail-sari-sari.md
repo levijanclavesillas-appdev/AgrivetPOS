@@ -2,8 +2,8 @@
 
 **Priority:** **P1** · **Blocks release:** no · **Rules:** `PR-101`–`PR-104`, `UOM-002`,
 `CR-101`–`CR-108`, `TAX-004`, `INV-101`, `POS-101`; new rules `PR-107`, `PR-108`, `POS-113`
-(to be added to `PHARMACY_EDITION.md` §14) · **Follows:** `TASK-053` (industries),
-`TASK-066` (how a store type is added), `TASK-069` (camera scanning) · **Status:** open, 2026-09-17
+(`PHARMACY_EDITION.md` §14) · **Follows:** `TASK-053` (industries),
+`TASK-066` (how a store type is added), `TASK-069` (camera scanning) · **Status:** built 2026-09-17; the first store waits on answer 6
 
 ---
 
@@ -28,6 +28,78 @@ store deployment."
   four things a sari-sari store or a small distributor does every day and cannot yet do.
   Then it deploys the first store.
 
+> **Built 2026-09-17.** The owner took the recommendations (answers 1–5). Answer 6, which store
+> goes first, is still open, so requirement 11 waits on it.
+>
+> **As built.**
+>
+> - **The store type.** `RETAIL` is available as *Sari-sari & wholesale*, with the defaults in
+>   requirement 2. The public site's card and the guide name it.
+> - **The schema.** `909_wholesale_retail.sql` adds:
+>   - `product_pack_prices` (a NULL price clears one);
+>   - `sale_items.priced_per_pack`;
+>   - `units.step_milli`;
+>   - `quick_keys`.
+>
+>   `store_profile` already admitted `RETAIL`, so no rebuild was needed.
+> - **Pricing.**
+>   - **The switch.** `pricingService.priceCart({ priceLevel })` with `pricingCustomer()`
+>     (PR-107). A walk-in is priced as a wholesale customer of no one. The switch is refused
+>     where `wholesale_switch_enabled` is off, and dealer is refused outright.
+>   - **Pack prices.** `resolvePackPrice()` (PR-108) charges a pack line per pack. A pack line's
+>     `priced_qty_milli` is the number of packs, `priced_per_pack` says so, and the below-cost
+>     check uses the pack's cost.
+>   - **One helper.** `saleService.pricingLinesOf()` now builds every caller's lines: the price
+>     check, a parked cart, an open order and the sale.
+>   - **A fix on the way.** A parked cart's preview had priced a pack line's quantity as base
+>     units. It no longer does.
+>   - **Reading a line back.** `saleService.grossOf()` gives the gross of a line priced per pack.
+> - **Server.**
+>   - **Routes.** `PUT /products/:id/packs/:packId/prices`, `GET/PUT /quick-keys` and
+>     `POST /quick-keys/suggest` (`quickKeyService`), and `POST /customers/quick`
+>     (`customerService.quickAdd`).
+>   - **Settings.** `wholesale_switch_enabled`, `quick_keys_enabled`,
+>     `counter_customer_credit_limit_centavos` and `counter_customer_terms_days`.
+>   - **The counter's policy.** `/sales/pricing-policy` gains `retail`.
+>   - **The Packs sheet** takes `retail_price` and `wholesale_price`.
+>   - **Export and sync.** The new tables are exported and synced.
+> - **The counter** (`pos/view.js`):
+>   - **Retail | Wholesale** in the customer block, for a walk-in.
+>   - **Quick keys**, a grid under the search bar that can be hidden.
+>   - **By amount**, on a loose line of a fractional unit (`pos/by-amount.js`, kept out of the
+>     cart, which holds no price).
+>   - **New customer**, in the customer picker.
+>   - **Pack prices**, shown as `₱180.00/BOX`.
+> - **Other screens.**
+>   - **The product editor's Units tab** shows and sets each pack's price.
+>   - **The new-unit dialog** asks for a selling step.
+>   - **Products → Quick keys** (`catalogue/quick-keys.js`) arranges the keys, behind `TX-410`.
+> - **Differences from the requirements.**
+>   - **No keyboard shortcut for the switch.** Every function key is taken (`F11` is the
+>     screen's), so the switch is a button, like the café's Note.
+>   - **Quick keys are a collapsible grid,** not a tab.
+>   - **No "coffee" suggestion.** The suggested keys are the products *without* a barcode, so a
+>     sachet with a barcode is not suggested.
+>   - **No quantity breaks on a pack priced per pack.** Breaks apply to per-unit lines only; a
+>     pack's own price is already its bulk price (requirement 6 said breaks still apply).
+> - **Tests.**
+>   - **`retail.test.js` (8).** The defaults and the step; a box at its own price and a strip at
+>     its contents, with stock in sachets; the wholesale switch, its fall-back, a parked cart,
+>     dealer refused and the setting off; below cost; quick keys; a counter customer over the
+>     limit; the void and the daily report; the Packs sheet.
+>   - **`sync.test.js`.** Pack prices and a rearranged set of quick keys reach a device.
+>   - **`renderer.test.js`.** The switch in the cart, by amount, and the counter's new pieces.
+>   - **Lists.** The migration, table and setup lists are updated. `upgrade.test.js` writes its
+>     reference rows by hand, as it does its store and product.
+>   - **Suites.** Unit, integration (45 files), e2e and licence server: all pass.
+> - **The walk.** In Electron, on a sari-sari store set up over the API:
+>   - Quick keys *Egg medium · Ice tube · Well-milled rice* added items.
+>   - *By amount* ₱20 of rice gave 0.25 KG (a quarter-kilo step) at ₱13.00.
+>   - **Wholesale** kept the rice at retail and marked it.
+>   - **New customer** added *Mang Kanor*.
+>   - The Units tab read *₱180.00 retail · ₱170.00 wholesale*.
+>   - A stray "null" on the Quick keys screen was found and fixed.
+
 ## What a sari-sari store or distributor does that the POS cannot yet
 
 | # | Need | Today | This task |
@@ -41,7 +113,7 @@ store deployment."
 Each is useful to every store type, and none is switched off elsewhere. The *Wholesale & retail*
 type turns them on or up by default.
 
-## Before starting — 6 answers are needed
+## The six questions (1–5 answered: the recommendations; 6 open)
 
 1. **The name in the wizard.** Recommended: **"Sari-sari & wholesale"**, with the blurb
    *Sari-sari stores, groceries, general merchandise and distributors*. The code stays

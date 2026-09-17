@@ -94,7 +94,7 @@ const textOrNull = (value) => {
  */
 function complete(input, actor) {
   const {
-    lines = [], customerId = null, tenders = [], transactionDiscountCentavos = 0,
+    lines = [], customerId = null, tenders = [], transactionDiscountCentavos = 0, priceLevel = null,
     clientTotalCentavos = null, approver = null, acceptDuplicateReference = false,
     reason = null, statutory = null,
     // TASK-066: how a café's order is served, where, and the open order it pays for.
@@ -142,12 +142,16 @@ function complete(input, actor) {
     const resolvedLines = lines.map((line) => ({ line, ...resolveLineQuantity(line) }));
 
     const priced = pricingService.priceCart({
-      lines: resolvedLines.map(({ line, qtyMilli }) => ({
+      lines: resolvedLines.map(({ line, qtyMilli, packUnitId, packQtyMilli }) => ({
         productId: line.productId,
         qtyMilli,
+        packUnitId,
+        packQtyMilli,
         discountCentavos: line.discountCentavos || 0,
       })),
       customer,
+      // PR-107: a walk-in's cart switched to wholesale.
+      priceLevel,
       taxMode,
       actorRole: actor.role,
       approverRole: approver ? approver.role : null,
@@ -716,6 +720,8 @@ function writeSale({
       sold_unit_id: resolvedLines[index].soldUnitId,
       sold_pack_factor_milli: resolvedLines[index].packFactorMilli,
       unit_price_centavos: line.unit_price_centavos,
+      // PR-108: the price above is per pack.
+      priced_per_pack: line.priced_per_pack ? 1 : 0,
       price_level_applied: line.price_level,
       // The cost snapshot RPT-104 reads. Changing a product's cost afterwards does not
       // change this sale's gross profit — TC-INT-35.
@@ -875,7 +881,7 @@ function resolveLineQuantity(line) {
   // No pack named, or the base unit named: the quantity is already in base units.
   if (!packUnitId || packUnitId === product.base_unit_id) {
     assertFractionAllowed(raw, product.base_unit_allows_fraction, product.base_unit_code);
-    return { qtyMilli: raw, soldUnitId: product.base_unit_id, packFactorMilli: 1000 };
+    return { qtyMilli: raw, soldUnitId: product.base_unit_id, packFactorMilli: 1000, packUnitId: null, packQtyMilli: null };
   }
 
   const pack = productRepository.packsFor(line.productId).find((p) => p.unit_id === packUnitId);
@@ -894,7 +900,29 @@ function resolveLineQuantity(line) {
     qtyMilli: quantity.toBaseUnits(raw, pack.factor_milli),
     soldUnitId: pack.unit_id,
     packFactorMilli: pack.factor_milli,
+    // PR-108: how many packs, for a pack with a price of its own.
+    packUnitId: pack.unit_id,
+    packQtyMilli: raw,
   };
+}
+
+/**
+ * The counter's lines, as the pricing engine takes them: in base units, with the pack and
+ * how many of it (PR-108). One function, so the price check, a parked cart, an open order
+ * and the sale price a pack line the same way.
+ */
+function pricingLinesOf(lines) {
+  return lines.map((line) => {
+    const q = resolveLineQuantity(line);
+    return {
+      productId: line.productId,
+      qtyMilli: q.qtyMilli,
+      packUnitId: q.packUnitId,
+      packQtyMilli: q.packQtyMilli,
+      discountCentavos: line.discountCentavos || 0,
+      discountReason: line.discountReason || null,
+    };
+  });
 }
 
 function assertFractionAllowed(qtyMilli, allowsFraction, unitCode) {
@@ -1013,6 +1041,18 @@ function getByNo(saleNo) {
   return present(sale);
 }
 
+/**
+ * What a sale line came to before anything came off it: price × quantity, where the
+ * quantity is packs on a line priced per pack (PR-108) and base units otherwise.
+ */
+function grossOf(item) {
+  if (item.priced_per_pack) {
+    const factor = item.sold_pack_factor_milli || 1000;
+    return money.mulQty(item.unit_price_centavos, Math.round((item.qty_milli * 1000) / factor));
+  }
+  return money.mulQty(item.unit_price_centavos, item.qty_milli);
+}
+
 /** "1 BOX (100 TAB)" for a pack line, "12 TAB" for a loose one (UOM-002, UOM-005). */
 function qtyDisplay(item) {
   const factor = item.sold_pack_factor_milli || 1000;
@@ -1100,7 +1140,7 @@ function present(sale) {
       unit_price_centavos: item.unit_price_centavos,
       // What the line came to before anything came off it, which is what the receipt's
       // item line shows so that "qty x price" is arithmetic the customer can check.
-      gross_centavos: money.mulQty(item.unit_price_centavos, item.qty_milli),
+      gross_centavos: grossOf(item),
       line_discount_centavos: ownDiscountByItem.get(item.id) || 0,
       price_level_applied: item.price_level_applied,
       unit_cost_centavos: item.unit_cost_centavos,
@@ -1111,7 +1151,7 @@ function present(sale) {
         ? statutoryByItem.get(item.id).discount_centavos
         : 0,
       vat_exemption_centavos: statutoryByItem.has(item.id)
-        ? money.mulQty(item.unit_price_centavos, item.qty_milli) - statutoryByItem.get(item.id).original_centavos
+        ? grossOf(item) - statutoryByItem.get(item.id).original_centavos
         : 0,
       tax_class: item.tax_class_snapshot,
       tax_centavos: item.tax_centavos,
@@ -1169,6 +1209,7 @@ function search(opts = {}) {
 const countSearch = (opts = {}) => saleRepository.countSearch(opts);
 
 module.exports = {
+  pricingLinesOf, grossOf,
   TENDERS, TENDER_METHODS, STATUS_LABELS,
   complete, get, getByNo, present, forShift, search, countSearch,
   reprint, printReceipt, printQueuedReceipt, duplicateReferences,

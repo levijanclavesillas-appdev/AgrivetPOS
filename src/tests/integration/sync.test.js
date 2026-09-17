@@ -250,6 +250,28 @@ test('TASK-063: a second device joins with its own letter and everything so far'
   assert.equal(await onHand(state.a, state.aToken, state.product.id), 93000);
 });
 
+test('TASK-070: a pack\'s own price and the quick keys, arranged on the web, reach the devices', async () => {
+  const { hub, hubToken, a, aToken } = state;
+  const box = await api(hub, 'POST', '/units', { token: hubToken, body: { code: 'BOXSYNC', name: 'Box' } });
+  assert.equal(box.status, 201, JSON.stringify(box.body));
+  const unitId = (box.body.unit || box.body.row || box.body).id;
+  const packs = await api(hub, 'POST', `/products/${state.product.id}/packs`, { token: hubToken, body: { unitId, factorMilli: 10000 } });
+  assert.equal(packs.status, 201, JSON.stringify(packs.body));
+  const packId = packs.body.packs.find((p) => p.unit.id === unitId).id;
+  const priced = await api(hub, 'PUT', `/products/${state.product.id}/packs/${packId}/prices`, { token: hubToken, body: { RETAIL: 4500 } });
+  assert.equal(priced.status, 200, JSON.stringify(priced.body));
+  for (const keys of [[{ productId: state.product.id }], [{ productId: state.product.id, packUnitId: unitId, label: 'Box' }, { productId: state.product.id }]]) {
+    const arranged = await api(hub, 'PUT', '/quick-keys', { token: hubToken, body: { keys } });
+    assert.equal(arranged.status, 200, JSON.stringify(arranged.body));
+  }
+
+  await syncNow(a, aToken);
+  const onA = (await api(a, 'GET', '/quick-keys', { token: aToken })).body.keys;
+  assert.deepEqual(onA.map((k) => [k.position, k.label]), [[1, 'Box'], [2, 'Paracetamol 500 mg tablet']], 'the rearranged set, not the first');
+  const preview = await api(a, 'POST', '/sales/price-check', { token: aToken, body: { lines: [{ productId: state.product.id, qtyMilli: 1000, packUnitId: unitId }] } });
+  assert.equal(preview.body.lines[0].unit_price_centavos, 4500, 'the box\'s own price, on the device');
+});
+
 test('TASK-063: two devices give one code to two customers offline; the web copy keeps both', async () => {
   await state.hub.stop();
   const onA = await api(state.a, 'POST', '/customers', { token: state.aToken, body: { name: 'Juan (A)', code: 'DUP', customerType: 'REGULAR', priceLevel: 'RETAIL' } });

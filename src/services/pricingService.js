@@ -245,6 +245,56 @@ const quantityLabel = (milli) => (milli % 1000 === 0
   ? String(milli / 1000)
   : (milli / 1000).toFixed(3).replace(/0+$/, '').replace(/\.$/, ''));
 
+// ── PR-107 / PR-108 — a sari-sari store's counter (TASK-070) ───────────────
+
+/** PR-107: the levels a walk-in's cart may be switched to. Dealer is an account's only. */
+const CART_LEVELS = Object.freeze(['RETAIL', 'WHOLESALE']);
+
+/**
+ * PR-107 — the customer prices are resolved for: the sale's customer, or, for a walk-in
+ * switched to wholesale, a customer of no one at that level.
+ *
+ * A chosen customer's own level wins over the switch. The screen sets the switch to it,
+ * and a switch left on wholesale must not give a retail account wholesale prices.
+ */
+function pricingCustomer(customer, priceLevel) {
+  if (customer) return customer;
+  const level = priceLevel ? String(priceLevel).toUpperCase() : 'RETAIL';
+  if (!CART_LEVELS.includes(level)) {
+    throw errors.badRequest(`A sale's price level is ${CART_LEVELS.join(' or ')}.`, { ruleId: 'PR-107' });
+  }
+  if (level === 'RETAIL') return null;
+  if (!settingsService.get('wholesale_switch_enabled')) {
+    throw errors.conflict(
+      'This store does not sell to walk-ins at wholesale. The owner turns it on in Settings, '
+      + 'or choose a wholesale customer.',
+      { ruleId: 'PR-107' }
+    );
+  }
+  return { id: null, price_level: level };
+}
+
+/**
+ * PR-108 — a pack's own price, where it has one.
+ *
+ * At the line's level first. A wholesale line whose pack has no wholesale price sells
+ * per unit at wholesale where the product has a wholesale unit price, and only then falls
+ * back to the pack's retail price, so switching to wholesale never makes a pack dearer
+ * than the unit arithmetic would. A customer-specific price (PR-103) overrides everything,
+ * per unit, as it always has.
+ */
+function resolvePackPrice({ productId, packUnitId, customer, at }) {
+  if (!packUnitId) return null;
+  if (resolveCustomerPrice({ productId, customer, at })) return null;
+  const level = (customer && customer.price_level) || 'RETAIL';
+  const own = productRepository.packPriceAt(productId, packUnitId, level, at);
+  if (own) return { price_centavos: own.price_centavos, level, effective_from: own.effective_from };
+  if (level === 'RETAIL') return null;
+  if (productRepository.priceAt(productId, level, at)) return null;
+  const retail = productRepository.packPriceAt(productId, packUnitId, 'RETAIL', at);
+  return retail ? { price_centavos: retail.price_centavos, level: 'RETAIL', effective_from: retail.effective_from } : null;
+}
+
 /** The v1.1 levels, named so a caller can see what is not yet resolving. */
 function precedenceLevels() {
   return PRECEDENCE.map(({ level, rule, release }) => ({ level, rule_id: rule, release }));
@@ -573,10 +623,14 @@ function assertWithinLine(discountCentavos, baseCentavos, productName) {
  * treatment per line (TAX-002).
  */
 function priceCart({
-  lines, customer = null, taxMode, actorRole = null, approverRole = null,
+  lines, customer: saleCustomer = null, taxMode, actorRole = null, approverRole = null,
   transactionDiscountCentavos = 0, statutory = null, at = null, serviceChargeBp = 0,
+  priceLevel = null,
 }) {
   taxService.assertMode(taxMode);
+  // PR-107: who the prices are for. A walk-in switched to wholesale is priced as a
+  // wholesale customer of no one; everything below reads `customer` as before.
+  const customer = pricingCustomer(saleCustomer, priceLevel);
   if (!Array.isArray(lines) || lines.length === 0) {
     throw errors.badRequest('A cart needs at least one line', { ruleId: 'POS-101' });
   }
@@ -596,7 +650,26 @@ function priceCart({
       throw errors.conflict(`${product.name} is withdrawn and cannot be sold.`, { ruleId: 'INV-105' });
     }
 
-    const listed = resolvePrice({ product, customer, qtyMilli: line.qtyMilli, at: when });
+    // PR-108: a line sold in a pack with a price of its own is charged per pack. Its
+    // `priceQty` is then the number of packs, not the base quantity.
+    const packPrice = line.packUnitId && line.packQtyMilli
+      ? resolvePackPrice({ productId: product.id, packUnitId: line.packUnitId, customer, at: when })
+      : null;
+    const requested = (customer && customer.price_level) || 'RETAIL';
+    const listed = packPrice
+      ? {
+        price_centavos: packPrice.price_centavos,
+        requested_level: requested,
+        resolved_level: packPrice.level,
+        precedence: 'PACK_PRICE',
+        rule_id: 'PR-108',
+        effective_from: packPrice.effective_from,
+        fell_through: packPrice.level !== requested,
+        band: null,
+        note: null,
+      }
+      : resolvePrice({ product, customer, qtyMilli: line.qtyMilli, at: when });
+    const priceQty = packPrice ? line.packQtyMilli : line.qtyMilli;
 
     // PR-202's ceiling for this line, joined onto the product rather than looked up
     // per line: twenty cart lines would otherwise be twenty round trips.
@@ -649,7 +722,7 @@ function priceCart({
     const underStatutory = statutoryReaches(claim, product);
     const statutory_ = underStatutory
       ? taxService.statutoryLine({
-        amountCentavos: money.mulQty(price.price_centavos, line.qtyMilli),
+        amountCentavos: money.mulQty(price.price_centavos, priceQty),
         taxClass: product.tax_class,
         taxMode,
       })
@@ -674,12 +747,12 @@ function priceCart({
         // The gross is still what the shelf says: unit price × quantity. What the
         // exemption removes is VAT the store never charged, and it is not a discount —
         // it is carried separately so no report or receipt can call it one.
-        gross: money.mulQty(price.price_centavos, line.qtyMilli),
+        gross: money.mulQty(price.price_centavos, priceQty),
         discount,
         net: statutory_.base_centavos - pick.applied_centavos,
       }
       : money.computeLineTotal({
-        unitPrice: price.price_centavos, qtyMilli: line.qtyMilli, lineDiscount: discount,
+        unitPrice: price.price_centavos, qtyMilli: priceQty, lineDiscount: discount,
       });
 
     // What a discount is measured against, and what PR-205 and PR-201 bound it by. On
@@ -712,9 +785,12 @@ function priceCart({
     // authorisation prompt exists to tell.
     const costDecision = evaluateBelowCost({
       unitPriceCentavos: price.price_centavos,
-      qtyMilli: line.qtyMilli,
+      qtyMilli: priceQty,
       discountCentavos: totals.gross - totals.net,
-      avgCostCentavos: product.avg_cost_centavos,
+      // PR-108: a pack price is weighed against what a pack cost, not what a piece did.
+      avgCostCentavos: packPrice
+        ? money.mulQty(product.avg_cost_centavos, Math.round((line.qtyMilli * 1000) / line.packQtyMilli))
+        : product.avg_cost_centavos,
       actorRole,
       authorisedByRole: approverRole,
     });
@@ -735,7 +811,12 @@ function priceCart({
       // INV-114: whether selling it takes anything off a shelf.
       is_stocked: product.is_stocked !== 0,
       qty_milli: line.qtyMilli,
+      // PR-108: the price is per pack, and `priced_qty_milli` is how many packs, where
+      // `priced_per_pack`; otherwise the price is per base unit and the two quantities agree.
       unit_price_centavos: price.price_centavos,
+      priced_per_pack: Boolean(packPrice),
+      priced_qty_milli: priceQty,
+      pack_unit_id: line.packUnitId || null,
       price_level: price.resolved_level,
       price_fell_through: price.fell_through,
       // PR-101's last sentence, with the detail behind it: which band, or what was
@@ -933,6 +1014,8 @@ function priceCart({
     priced_at: when,
     tax_mode: taxMode,
     customer_price_level: (customer && customer.price_level) || 'RETAIL',
+    // PR-107: whether the level came from the switch rather than from an account.
+    price_level_from_switch: !saleCustomer && Boolean(customer),
     lines: priced,
     subtotal_centavos: subtotal,
     pre_discount_subtotal_centavos: preDiscountSubtotal,
@@ -976,7 +1059,8 @@ function priceCart({
 }
 
 module.exports = {
-  PRICE_LEVELS, PRECEDENCE, CEILING_KEYS,
+  PRICE_LEVELS, PRECEDENCE, CEILING_KEYS, CART_LEVELS,
+  pricingCustomer, resolvePackPrice,
   resolvePrice, precedenceLevels, automaticLineDiscount, quantityBreakSaving,
   resolveCustomerPrice, resolveQuantityBreak,
   roleCeilingBp, effectiveCeilingBp, evaluateDiscount, assertDiscountAllowed,

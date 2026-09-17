@@ -263,7 +263,7 @@ test('adding or removing a pack answers in the same shape the product detail spe
   const fromDetail = productService.get(product.id, sessions.OWNER).packs;
 
   assert.deepEqual(added, fromDetail, 'the same rows, said the same way');
-  assert.deepEqual(Object.keys(added[0]).sort(), ['factor_milli', 'id', 'is_default_sell', 'unit']);
+  assert.deepEqual(Object.keys(added[0]).sort(), ['factor_milli', 'id', 'is_default_sell', 'prices', 'unit']);
   assert.equal(added[0].unit.id, ref.sack.id);
   assert.equal(added[0].unit.code, 'SACK');
   assert.equal(added[0].is_default_sell, false, 'a boolean, not a 0');

@@ -165,6 +165,8 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
       code: row.base_unit_code,
       name: row.base_unit_name,
       allows_fraction: Boolean(row.base_unit_allows_fraction),
+      // TASK-070: what a sale by amount rounds down to, or null for a thousandth.
+      step_milli: row.base_unit_step_milli ?? null,
     },
     description: row.description,
     tax_class: row.tax_class,
@@ -198,7 +200,7 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
   }
 
   if (barcodes) product.barcodes = barcodes.map(presentBarcode);
-  if (packs) product.packs = packs.map(presentPack);
+  if (packs) product.packs = packs.map((p) => (p.unit && p.prices ? p : presentPack(p)));
   if (prices) product.prices = prices;
 
   return product;
@@ -214,19 +216,32 @@ function toPublic(row, session = null, { barcodes = null, packs = null, prices =
  * written; only the answer was the wrong shape, which is the kind of defect that
  * survives a passing API test and a working reload.
  */
-const presentPack = (p) => ({
+const presentPack = (p, packPrices = null) => ({
   id: p.id,
   unit: { id: p.unit_id, code: p.unit_code, name: p.unit_name },
   factor_milli: p.factor_milli,
   is_default_sell: Boolean(p.is_default_sell),
+  // PR-108 (TASK-070): the pack's own price per level, where it has one. A level with none
+  // sells the pack at its contents × the unit price.
+  prices: {
+    RETAIL: packPrices?.RETAIL ?? null,
+    WHOLESALE: packPrices?.WHOLESALE ?? null,
+    DEALER: packPrices?.DEALER ?? null,
+  },
 });
+
+/** Every pack of a product, with its current prices. */
+function packsOf(productId, at = clock.nowUtc()) {
+  const prices = productRepository.currentPackPrices(productId, at);
+  return productRepository.packsFor(productId).map((p) => presentPack(p, prices[p.unit_id]));
+}
 
 /** The whole product, as SCR-202's five tabs need it. */
 function detail(row, session, { at = clock.nowUtc() } = {}) {
   const prices = productRepository.currentPrices(row.id, at);
   return toPublic(row, session, {
     barcodes: productRepository.barcodesFor(row.id),
-    packs: productRepository.packsFor(row.id),
+    packs: packsOf(row.id, at),
     prices: {
       RETAIL: prices.RETAIL ? prices.RETAIL.price_centavos : null,
       WHOLESALE: prices.WHOLESALE ? prices.WHOLESALE.price_centavos : null,
@@ -746,7 +761,7 @@ function addPackWithin(productId, input, actor) {
     after: { pack_unit: pack.unitCode, factor_milli: pack.factorMilli },
     reason: `Pack added: 1 ${pack.unitCode} = ${quantity.format(pack.factorMilli, baseUnit.code)}`,
   });
-  return productRepository.packsFor(productId).map(presentPack);
+  return packsOf(productId);
 }
 
 const addPack = (productId, input, actor) => db.transaction(() => addPackWithin(productId, input, actor));
@@ -769,6 +784,13 @@ function removePack(productId, packId, actor) {
 
   return db.transaction(() => {
     productRepository.deletePack(packId);
+    // PR-108: a pack added again later starts with no price of its own, rather than the
+    // one it had before it was removed.
+    const at = clock.nowUtc();
+    const had = productRepository.currentPackPrices(productId, at)[pack.unit_id] || {};
+    for (const level of Object.keys(had)) {
+      writePackPrice(productId, pack.unit_id, level, null, { at, actor });
+    }
     auditService.write({
       actor,
       action: 'PRODUCT_MODIFIED',
@@ -777,7 +799,7 @@ function removePack(productId, packId, actor) {
       before: { pack_unit: pack.unit_code, factor_milli: pack.factor_milli },
       reason: 'Pack removed',
     });
-    return productRepository.packsFor(productId).map(presentPack);
+    return packsOf(productId, at);
   });
 }
 
@@ -795,6 +817,65 @@ function writePrice(productId, level, priceCentavos, { at, actor, effectiveFrom 
     effective_from: effectiveFrom || at,
     created_at: at,
     created_by: actor.id || null,
+  });
+}
+
+function writePackPrice(productId, unitId, level, priceCentavos, { at, actor, effectiveFrom = null }) {
+  return productRepository.insertPackPrice({
+    id: ids.uuidv7(),
+    product_id: productId,
+    unit_id: unitId,
+    price_level: level,
+    price_centavos: priceCentavos,
+    effective_from: effectiveFrom || at,
+    created_at: at,
+    created_by: actor.id || null,
+  });
+}
+
+/**
+ * PR-108 — a pack's own price, per level (TASK-070). TX-411, as every price.
+ *
+ * `levels` is `{ RETAIL: 18000, WHOLESALE: null }`: a number sets the level's price, `null`
+ * clears it (the pack then sells at its contents × the unit price), and a level left out
+ * is unchanged. Like a unit price, a row is never updated: a new one supersedes it.
+ */
+function setPackPrices(productId, packId, levels, actor, session = actor, { reason = null } = {}) {
+  const product = productRepository.findById(productId);
+  if (!product) throw errors.notFound('No such product');
+  const pack = productRepository.packsFor(productId).find((p) => p.id === packId);
+  if (!pack) throw errors.notFound('No such pack on this product');
+
+  const at = clock.nowUtc();
+  const current = productRepository.currentPackPrices(productId, at)[pack.unit_id] || {};
+  const changes = [];
+  for (const [key, raw] of Object.entries(levels || {})) {
+    const level = text(key, { max: 20 }).toUpperCase();
+    if (!PRICE_LEVELS.includes(level)) {
+      throw errors.badRequest(`Price level must be one of ${PRICE_LEVELS.join(', ')}`, { ruleId: 'PR-108' });
+    }
+    const price = raw === null || raw === '' ? null
+      : validateCentavos(raw, `The ${pack.unit_code} ${level.toLowerCase()} price`, 'VR-203');
+    const before = current[level] ?? null;
+    if (before === price) continue;
+    changes.push({ level, price, before });
+  }
+  if (changes.length === 0) return detail(product, session, { at });
+
+  return db.transaction(() => {
+    for (const change of changes) {
+      writePackPrice(productId, pack.unit_id, change.level, change.price, { at, actor });
+      auditService.write({
+        actor,
+        action: 'PRICE_CHANGED',
+        entityType: 'products',
+        entityId: productId,
+        before: { pack_unit: pack.unit_code, [change.level]: change.before },
+        after: { pack_unit: pack.unit_code, [change.level]: change.price },
+        reason: reason || `${pack.unit_code} ${change.level} price ${change.price === null ? 'cleared' : 'changed'}`,
+      });
+    }
+    return detail(productRepository.findById(productId), session, { at });
   });
 }
 
@@ -1057,6 +1138,7 @@ function setCost(productId, avgCostCentavos, actor, session = actor, { reason = 
 }
 
 module.exports = {
+  setPackPrices, packsOf, writePackPrice,
   TAX_CLASSES, PRICE_LEVELS,
   validateSku, validateName, validateTaxClass, validateBarcode, classifyBarcode,
   toPublic, detail, resolvePrice, isSellable,

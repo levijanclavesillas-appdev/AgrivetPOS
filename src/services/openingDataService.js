@@ -170,11 +170,12 @@ const KINDS = Object.freeze({
     sheet: 'Packs',
     required: ['sku', 'unit', 'contains'],
     // TASK-055: the code printed on the box, so scanning the box adds a box.
-    optional: ['default_sell', 'barcode'],
+    // TASK-070 (PR-108): the box's own price, where it is not its contents × the unit price.
+    optional: ['default_sell', 'barcode', 'retail_price', 'wholesale_price'],
     example: [
-      ['sku', 'unit', 'contains', 'default_sell', 'barcode'],
-      ['PARA-500', 'BOX', '100', '', '4800012345685'],
-      ['ASC-500', 'BOX', '100', '', ''],
+      ['sku', 'unit', 'contains', 'default_sell', 'barcode', 'retail_price', 'wholesale_price'],
+      ['PARA-500', 'BOX', '100', '', '4800012345685', '', ''],
+      ['ASC-500', 'BOX', '100', '', '', '450.00', ''],
     ],
   },
   stock: {
@@ -957,7 +958,18 @@ function checkPacks(source, problems, warnings, arriving, declared = NOTHING_DEC
       barcode = classified.barcode;
     }
 
-    accepted.push({ line, sku, unitCode, factorMilli: factor, isDefaultSell, barcode, arriving: Boolean(arrivingRow) });
+    // PR-108: a price of the pack's own, optional at each level.
+    const packPrices = {};
+    let packPriceProblem = null;
+    for (const [column, level] of [['retail_price', 'RETAIL'], ['wholesale_price', 'WHOLESALE']]) {
+      const value = parseMoney(values[column]);
+      if (value === null) continue;
+      if (Number.isNaN(value) || value < 0) { packPriceProblem = `${sku}: "${values[column]}" is not a price for the ${unitCode}.`; break; }
+      packPrices[level] = value;
+    }
+    if (packPriceProblem) { reject(packPriceProblem, 'VR-203'); continue; }
+
+    accepted.push({ line, sku, unitCode, factorMilli: factor, isDefaultSell, barcode, packPrices, arriving: Boolean(arrivingRow) });
   }
   return { rows: table.rows, accepted };
 }
@@ -1173,6 +1185,15 @@ function run({
       for (const pack of list) {
         productService.addPackWithin(productId, pack, actor);
         counts.packs += 1;
+      }
+    }
+    // PR-108: each pack's own prices, now that every pack exists.
+    for (const pack of acceptedOf(dependents.parsed.packs)) {
+      if (!pack.packPrices || Object.keys(pack.packPrices).length === 0) continue;
+      const productId = bySku.get(pack.sku.toUpperCase()) || productRepository.findBySku(pack.sku).id;
+      const unitId = unitIdOf(pack.unitCode);
+      for (const [level, price] of Object.entries(pack.packPrices)) {
+        productService.writePackPrice(productId, unitId, level, price, { at: clock.nowUtc(), actor });
       }
     }
     // TASK-055: each pack's own barcode, now that every pack exists.

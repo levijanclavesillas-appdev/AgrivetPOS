@@ -213,6 +213,28 @@ function createWithin(input, actor) {
 
 const create = (input, actor) => db.transaction(() => createWithin(input, actor));
 
+/**
+ * TASK-070 — a customer added at the counter by name: "Isulat, Aling Nena." A regular,
+ * at retail, credit-eligible at the store's counter limit and terms (the settings
+ * `counter_customer_credit_limit_centavos` and `counter_customer_terms_days`). A limit of
+ * 0 makes an ordinary customer with no credit. Raising the limit afterwards is TX-414's,
+ * as for any customer (CR-106).
+ */
+function quickAdd(input, actor) {
+  const settingsService = require('./settingsService');
+  const limit = settingsService.get('counter_customer_credit_limit_centavos');
+  return create({
+    name: input && input.name,
+    contactNo: input && input.contactNo,
+    customerType: 'REGULAR',
+    priceLevel: 'RETAIL',
+    isCreditEligible: limit > 0,
+    creditLimitCentavos: limit,
+    termsDays: settingsService.get('counter_customer_terms_days'),
+    notes: 'Added at the counter',
+  }, actor);
+}
+
 function update(id, changes, actor) {
   const current = customerRepository.findById(id);
   if (!current) throw errors.notFound('No such customer');
@@ -460,6 +482,7 @@ function assertDeletable(id) {
 }
 
 module.exports = {
+  quickAdd,
   setPrices, priceList,
   TYPES, PRICE_LEVELS,
   validateName, validateContact, validateType, validatePriceLevel,

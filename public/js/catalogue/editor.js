@@ -377,6 +377,9 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
           // cashier keys 2.5 pieces and the store has invented half a sack of feed.
           { name: 'allowsFraction', label: 'This can be sold in fractions — 1.5 of them',
             type: 'checkbox', value: false, hint: 'Millilitres can. Tablets and boxes cannot.' },
+          // TASK-070: "₱20 of rice" rounds down to this. Only for a unit sold in fractions.
+          { name: 'step', label: 'Smallest part sold by amount (optional)', required: false,
+            hint: 'For fractions only: 0.25 sells in quarters. Blank is any amount.' },
         ]
         : [{ name: 'name', label: 'Name', maxLength: 80 }],
     });
@@ -387,6 +390,8 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
       if (!answers.code) return null;
       body.code = answers.code.toUpperCase();
       body.allowsFraction = answers.allowsFraction;
+      const step = Number.parseFloat(String(answers.step || '').trim());
+      if (Number.isFinite(step) && step > 0) body.stepMilli = Math.round(step * 1000);
     }
     try {
       const created = await api.post(`/${kind}`, body);
@@ -489,7 +494,7 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
         ? h('p', { class: 'muted', text: 'No packs. The product is sold in its base unit only.' })
         : h('div', { class: 'table-scroll' }, [h('table', { class: 'catalogue-list' }, [
           h('thead', {}, [h('tr', {}, [
-            h('th', { text: 'Pack' }), h('th', { text: 'Is' }), h('th', { text: '' }),
+            h('th', { text: 'Pack' }), h('th', { text: 'Is' }), h('th', { text: 'Pack price' }), h('th', { text: '' }),
           ])]),
           h('tbody', {}, product.packs.map((pack) => h('tr', {}, [
             h('td', { text: pack.unit.code }),
@@ -497,10 +502,15 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
             // invisible as a number and obvious as a sentence.
             h('td', { text: `1 ${pack.unit.code} = ${quantity(pack.factor_milli)} `
               + `${product.base_unit.code}` }),
-            h('td', {}, [h('button', {
-              class: 'row-action', text: 'Remove',
-              onclick: () => removePack(pack.id),
-            })]),
+            // PR-108 (TASK-070): the pack's own price, or what its contents come to.
+            h('td', { text: packPriceText(pack) }),
+            h('td', {}, [
+              h('button', { class: 'row-action', text: 'Price', onclick: () => packPrices(pack) }),
+              h('button', {
+                class: 'row-action', text: 'Remove',
+                onclick: () => removePack(pack.id),
+              }),
+            ]),
           ]))),
         ])]),
 
@@ -532,6 +542,52 @@ export function createProductEditor({ root, productId, onClose, productDefaults 
         emptyNote,
       ]),
     ]);
+  }
+
+  /** PR-108: "₱180.00 retail · ₱170.00 wholesale", or the arithmetic it falls back to. */
+  function packPriceText(pack) {
+    const own = ['RETAIL', 'WHOLESALE', 'DEALER']
+      .filter((level) => pack.prices && pack.prices[level] !== null)
+      .map((level) => `${money(pack.prices[level])} ${level.toLowerCase()}`);
+    return own.length ? own.join(' · ') : `${quantity(pack.factor_milli)} × the ${product.base_unit.code} price`;
+  }
+
+  /**
+   * PR-108 — the pack's own price at each level. A blank field clears it, and the pack then
+   * sells at its contents × the unit price. TX-411, as every price: the server refuses anyone
+   * else, and says so.
+   */
+  function packPrices(pack) {
+    const fields = ['RETAIL', 'WHOLESALE'].map((level) => ({
+      name: level,
+      label: `${level[0]}${level.slice(1).toLowerCase()} price of 1 ${pack.unit.code} (₱)`,
+      value: pack.prices && pack.prices[level] !== null ? (pack.prices[level] / 100).toFixed(2) : '',
+      required: false,
+    }));
+    ui.ask({
+      title: `${pack.unit.code} price`,
+      message: `1 ${pack.unit.code} = ${quantity(pack.factor_milli)} ${product.base_unit.code}. Leave a price blank `
+        + `to sell the ${pack.unit.code} at ${quantity(pack.factor_milli)} × the ${product.base_unit.code} price.`,
+      fields,
+      submitLabel: 'Save',
+    }).then(async (answers) => {
+      if (!answers) return;
+      const levels = {};
+      for (const level of ['RETAIL', 'WHOLESALE']) {
+        const raw = String(answers[level] ?? '').trim();
+        if (raw === '') { levels[level] = null; continue; }
+        const pesos = Number.parseFloat(raw);
+        if (!Number.isFinite(pesos) || pesos < 0) { ui.toast(`${raw} is not a price.`, { kind: 'error' }); return; }
+        levels[level] = Math.round(pesos * 100);
+      }
+      try {
+        product = (await api.put(`/products/${product.id}/packs/${pack.id}/prices`, levels)).product;
+        ui.toast(`${pack.unit.code} price saved`, { kind: 'success' });
+        render();
+      } catch (err) {
+        ui.toast(err.isRefusal ? `${err.message} (${err.ruleId})` : err.message, { kind: 'error' });
+      }
+    });
   }
 
   async function removePack(packId) {

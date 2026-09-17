@@ -286,3 +286,34 @@ phrase broken (`documentService.neutralise`), never refused.
 
 **Not built, and Chachi Dine's ground if a café asks:** modifiers with prices of their own, split
 bills by item, a floor plan, a kitchen display, and ingredient recipes.
+
+## 14. A sari-sari store, grocery or distributor (`TASK-070`)
+
+The owner (2026-09-17): a wholesale and retail store type, "like a sari sari store". It is
+`RETAIL` at setup, shown as **Sari-sari & wholesale**. Its defaults:
+
+- the senior/PWD discount is off (the grocery benefit is a separate 5%);
+- the wholesale switch and quick keys are on;
+- grocery return reasons and write-off categories;
+- a new product is neither batch-tracked nor senior/PWD-eligible.
+
+What follows is in every store and switched on by these defaults.
+
+| Rule | Statement |
+| :--- | :--- |
+| `PR-107` | A cart has a price level: retail unless the counter switches a walk-in to wholesale (`wholesale_switch_enabled`), or a chosen customer sets it. Every line resolves at it, falling back to retail where a product has no price at that level, and marked so. The level is recorded on the sale and each line. Dealer is an account customer's only. A chosen customer's own level wins over the switch |
+| `PR-108` | A pack may carry its own price per price level (`product_pack_prices`, dated like a unit price). A line sold in that pack is charged per pack at it (`sale_items.priced_per_pack`), and otherwise costs its contents × the unit price. At wholesale, a pack with no wholesale price sells per unit at wholesale where the product has one, and only then at the pack's retail price. A customer-specific price (`PR-103`) still overrides it, per unit. Quantity breaks (`PR-104`) apply to per-unit lines only. The below-cost check (`PR-105`) weighs a pack price against what the pack's contents cost. Stock and cost stay in base units |
+| `POS-113` | Quick keys are the store's own buttons at the counter, up to 24, each a product or a pack of it; pressing one is scanning it. They are arranged under Products by whoever may edit the catalogue (`TX-410`), saved as a whole set, audited (`QUICK_KEYS_CHANGED`) and synced. A new store may take a suggested first set: its products with no barcode |
+
+**Also built:**
+
+- **Selling by amount.** On a loose line of a unit sold in parts, **By amount** turns pesos into
+  a quantity at the line's price. It rounds down to the unit's selling step (`units.step_milli`,
+  for example 250 for quarter-kilos), so the customer is never charged more than they asked for.
+- **A customer added at the counter.** **New customer** in the customer picker (`TX-413`) makes
+  a regular, credit-eligible customer by name. The limit is `counter_customer_credit_limit_centavos`
+  (₱500) and the terms `counter_customer_terms_days` (15). Raising the limit stays `TX-414`'s.
+- **Pack prices in the spreadsheet.** The opening spreadsheet's *Packs* sheet takes
+  `retail_price` and `wholesale_price`.
+
+The schema is `909_wholesale_retail.sql`.

@@ -358,13 +358,9 @@ function ticketForSale(saleId, actor) {
 
 /** Priced now, like a parked cart: what paying for it would cost at this moment. */
 function priceOf({ lines, customer, transactionDiscountCentavos, orderType }) {
-  const { resolveLineQuantity } = require('./saleService');
+  const { pricingLinesOf } = require('./saleService');
   return pricingService.priceCart({
-    lines: lines.map((line) => ({
-      productId: line.productId,
-      qtyMilli: resolveLineQuantity(line).qtyMilli,
-      discountCentavos: line.discountCentavos || 0,
-    })),
+    lines: pricingLinesOf(lines),
     customer,
     taxMode: storeProfileService.taxMode(),
     transactionDiscountCentavos,

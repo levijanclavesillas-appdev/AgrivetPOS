@@ -217,9 +217,65 @@ const INDUSTRIES = Object.freeze({
     code: 'MOTORCYCLE', label: 'Motorcycle shop', blurb: 'Parts, accessories and service shops',
     icon: 'motorbike', available: false,
   }),
+  // TASK-070: the store owner, 2026-09-17 — "set up for wholesale and retail industry like a
+  // sari sari store". A neighbourhood store that sells a sachet, a strip or a case, at retail
+  // or at wholesale to the carinderia next door, and keeps the utang notebook.
   RETAIL: Object.freeze({
-    code: 'RETAIL', label: 'Wholesale & retail', blurb: 'Groceries, general merchandise and distributors',
-    icon: 'store', available: false,
+    code: 'RETAIL',
+    label: 'Sari-sari & wholesale',
+    blurb: 'Sari-sari stores, groceries, general merchandise and distributors',
+    icon: 'store',
+    available: true,
+    settings: Object.freeze({
+      // TAX-004: RA 9994's grocery benefit is a 5% on basic necessities, not the 20% on
+      // everything, and most sari-sari stores are not in the programme. Off, as for an
+      // agrivet; the owner turns it on and flags the products it covers.
+      statutory_discount_enabled: false,
+      // PR-107 and POS-113: the counter's wholesale switch and quick keys.
+      wholesale_switch_enabled: true,
+      quick_keys_enabled: true,
+      return_reasons: Object.freeze([
+        'Expired',
+        'Damaged or dented',
+        'Spoiled',
+        'Wrong item',
+        'Customer changed their mind',
+      ]),
+      // POS-304: food that has left the store is not put back on the shelf.
+      return_write_off_categories: Object.freeze([
+        'Food',
+        'Beverages',
+        'Frozen',
+        'Bread',
+      ]),
+    }),
+    productDefaults: Object.freeze({ isBatchTracked: false, statutoryDiscountEligible: false }),
+    // The neighbours on the utang list are regulars.
+    customerType: 'REGULAR',
+    readme: Object.freeze({
+      categories: 'Coffee, Canned Goods, Rice, Drinks',
+      units: 'PC (piece), PACK, CASE, KG',
+      fractions: 'only for units that can be sold in part, like a kilo of rice. Pieces and cases cannot.',
+      generic: 'generic_name: leave blank. It is for medicines.',
+      batch: ['batch_tracked: leave blank, unless you sell something by its expiry date and need to trace it.'],
+      senior: ['senior_pwd: leave blank. The senior citizen / PWD grocery benefit is a separate 5% on basic',
+        'necessities; ask the store’s accountant before turning it on.'],
+      pack: 'One row per pack: COFFEE-3IN1, BOX, 30 means one box holds 30 sachets, sold at 180.00. The product is still',
+    }),
+    examples: Object.freeze({
+      categories: { name: 'Coffee' },
+      units: { code: 'PC', name: 'Piece' },
+      brands: { name: 'Sample Coffee' },
+      suppliers: { name: 'Mindanao Grocery Supply', code: 'MGS', contact_person: 'Rico Lim', contact_no: '09171234567', terms_days: '15', address: 'Koronadal City' },
+      products: {
+        sku: 'COFFEE-3IN1', name: '3-in-1 coffee sachet', category: 'Coffee', base_unit: 'PC', retail_price: '7.00',
+        generic_name: '', brand: 'Sample Coffee', wholesale_price: '6.50', dealer_price: '', tax_class: 'VATABLE', min_stock: '60',
+        barcode: '4800012345678', batch_tracked: '', senior_pwd: '', made_to_order: '',
+      },
+      packs: { sku: 'COFFEE-3IN1', unit: 'BOX', contains: '30', barcode: '4800098765432', retail_price: '180.00', wholesale_price: '170.00' },
+      stock: { sku: 'COFFEE-3IN1', quantity: '300', unit_cost: '5.40', note: 'Counted 1 Sep', batch_no: '', expiry_date: '', supplier: '' },
+      balances: { customer: 'Aling Nena', balance: '350.00', code: 'NENA', contact_no: '09171234567', credit_limit: '500.00', terms_days: '15', note: 'From the utang notebook' },
+    }),
   }),
 });
 

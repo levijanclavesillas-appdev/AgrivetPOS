@@ -156,6 +156,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'sync_changes', 'sync_devices', 'sync_identity', 'sync_state',
     // 908_cafe — a café's orders before they are paid (TASK-066)
     'open_orders',
+    // 909_wholesale_retail — a sari-sari store's pack prices and quick keys (TASK-070)
+    'product_pack_prices', 'quick_keys',
     // 013_negotiated_pricing
     'customer_prices', 'product_quantity_breaks',
     // 014_batches

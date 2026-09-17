@@ -13,7 +13,7 @@ const db = require('../config/database');
 const TABLES = Object.freeze({
   categories: { columns: 'id, name, max_discount_bp, is_active, created_at', label: 'name' },
   brands: { columns: 'id, name, is_active, created_at', label: 'name' },
-  units: { columns: 'id, code, name, allows_fraction, is_active, created_at', label: 'code' },
+  units: { columns: 'id, code, name, allows_fraction, step_milli, is_active, created_at', label: 'code' },
 });
 
 function assertTable(table) {

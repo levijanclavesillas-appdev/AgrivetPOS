@@ -40,20 +40,16 @@ router.post('/sales/price-check', atTheCounter, (req, res, next) => {
     if (body.customerId && !customer) throw errors.notFound('No such customer');
 
     const result = pricingService.priceCart({
-      lines: lines.map((line) => ({
-        productId: line.productId,
-        // POS-102: a line may be entered in a pack, and a price is per base unit — so
-        // the quantity is resolved to base before it is multiplied by one, through the
-        // **same function POST /sales uses**. Priced raw, two sacks would preview as
-        // two kilos and be charged as a hundred, which is exactly the drift the head of
-        // this file says cannot happen.
-        qtyMilli: saleService.resolveLineQuantity(line).qtyMilli,
-        discountCentavos: line.discountCentavos || 0,
-        // PR-204 records the reason against a manual discount; PR-206 needs it to say
-        // what was suppressed when an automatic one beats it.
-        discountReason: line.discountReason || null,
-      })),
+      // POS-102: a line may be entered in a pack, and a price is per base unit — so the
+      // quantity is resolved to base before it is multiplied by one, through the **same
+      // function POST /sales uses**. Priced raw, two sacks would preview as two kilos and
+      // be charged as a hundred, which is exactly the drift the head of this file says
+      // cannot happen. PR-204's reason travels with a manual discount, because PR-206
+      // needs it to say what was suppressed when an automatic one beats it.
+      lines: saleService.pricingLinesOf(lines),
       customer,
+      // PR-107: a walk-in's cart switched to wholesale.
+      priceLevel: body.priceLevel || null,
       // TAX-001: the mode is the store's, read at the moment of pricing. A client that
       // sent one would be choosing its own tax treatment.
       taxMode: storeProfileService.taxMode(),
@@ -125,6 +121,16 @@ router.get('/sales/pricing-policy', atTheCounter, (req, res, next) => {
         kitchen_printer: settingsService.get('kitchen_printer'),
         table_max: openOrderService.TABLE_MAX,
         note_max: require('../services/cartService').NOTE_MAX,
+      },
+      // TASK-070: a sari-sari store's counter — the wholesale switch, quick keys, and
+      // who may add a customer from the counter.
+      retail: {
+        wholesale_switch: { rule_id: 'PR-107', enabled: settingsService.get('wholesale_switch_enabled'), levels: pricingService.CART_LEVELS },
+        quick_keys: { rule_id: 'POS-113', enabled: settingsService.get('quick_keys_enabled') },
+        counter_customer: {
+          may_add: require('../services/permissions').can(req.session, 'TX-413'),
+          credit_limit_centavos: settingsService.get('counter_customer_credit_limit_centavos'),
+        },
       },
     });
   } catch (err) {

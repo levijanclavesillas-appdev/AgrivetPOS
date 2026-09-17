@@ -25,9 +25,10 @@ router.put('/carts/active', atTheCounter, (req, res, next) => {
   try {
     const {
       lines = [], customerId = null, transactionDiscountCentavos = 0, orderType = null, tableLabel = null, openOrderId = null,
+      priceLevel = null,
     } = req.body || {};
     res.json(cartService.save({
-      lines, customerId, transactionDiscountCentavos, orderType, tableLabel, openOrderId,
+      lines, customerId, transactionDiscountCentavos, orderType, tableLabel, openOrderId, priceLevel,
     }, req.session));
   } catch (err) {
     next(err);

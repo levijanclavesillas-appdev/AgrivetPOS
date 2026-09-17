@@ -48,6 +48,8 @@ const ACTIONS = Object.freeze({
   // not a mutation of money or stock — but a renamed category silently re-labels every
   // report that groups by it, so the change is recorded rather than invisible.
   REFERENCE_DATA_CHANGED: { what: 'Category, brand or unit changed', rule: 'VR-209' },
+  // TASK-070: the counter's buttons. Not money, but what a cashier presses to charge it.
+  QUICK_KEYS_CHANGED: { what: 'Quick keys arranged', rule: 'POS-113' },
 
   // ── AUD-601: inventory ────────────────────────────────────────────────────
   INVENTORY_ADJUSTED: { what: 'Inventory adjusted', rule: 'AUD-601' },

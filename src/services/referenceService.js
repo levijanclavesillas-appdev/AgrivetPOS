@@ -20,6 +20,22 @@ const KINDS = Object.freeze({
   units: { singular: 'Unit', entity: 'units', labelField: 'code' },
 });
 
+/**
+ * TASK-070 — a unit's selling step: the smallest part a sale by amount rounds down to, in
+ * thousandths (250 is a quarter). Blank is none. A whole-number unit has no step to take.
+ */
+function stepOf(value, fractional) {
+  if (value === null || value === undefined || value === '') return null;
+  const step = Number(value);
+  if (!Number.isInteger(step) || step <= 0 || step > 1000) {
+    throw errors.badRequest('A selling step is a whole number of thousandths from 1 to 1000; 250 is a quarter.', { ruleId: 'VR-209' });
+  }
+  if (!fractional) {
+    throw errors.badRequest('Only a unit that can be sold in part has a selling step.', { ruleId: 'VR-209' });
+  }
+  return step;
+}
+
 function assertKind(kind) {
   if (!KINDS[kind]) throw new RangeError(`unknown reference kind: ${kind}`);
   return kind;
@@ -70,6 +86,8 @@ function createWithin(kind, input, actor) {
     // Whether a quantity in this unit may carry decimals. Kilos may; pieces may not,
     // and a UI that lets a cashier key 2.5 pieces has invented half a sack of feed.
     row.allows_fraction = input.allowsFraction ? 1 : 0;
+    // TASK-070: what a sale by amount rounds down to; only a fractional unit has one.
+    row.step_milli = stepOf(input.stepMilli, row.allows_fraction);
   } else {
     const name = text(input.name, { max: 80 });
     if (name.length < 2) throw errors.badRequest(`A ${KINDS[kind].singular.toLowerCase()} name is required`, { ruleId: 'VR-209' });
@@ -135,6 +153,10 @@ function update(kind, id, changes, actor) {
   }
   if (kind === 'units' && changes.allowsFraction !== undefined) {
     move('allows_fraction', changes.allowsFraction ? 1 : 0);
+  }
+  if (kind === 'units' && changes.stepMilli !== undefined) {
+    const fractional = changes.allowsFraction !== undefined ? changes.allowsFraction : Boolean(current.allows_fraction);
+    move('step_milli', stepOf(changes.stepMilli, fractional));
   }
   if (kind === 'categories' && changes.maxDiscountBp !== undefined) {
     move('max_discount_bp', normaliseCeiling(changes.maxDiscountBp));

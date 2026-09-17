@@ -669,3 +669,25 @@
 .payment-order, .receipt-order {
   margin: 0 0 var(--space-2); font-size: var(--type-title-md-size); font-weight: 600; color: var(--md-primary);
 }
+
+/* PR-107 (TASK-070): Retail | Wholesale for a walk-in, the same segmented look as the order type. */
+.price-switch { margin: var(--space-2) 0 0; }
+
+/* POS-113 (TASK-070): the store's own buttons, for goods with no barcode. Every one a
+   touch target (NFR_4.3); the grid wraps to however many fit the width. */
+.quick-keys-host { margin: var(--space-2) 0; }
+.quick-keys-toggle {
+  min-height: var(--touch); border: 0; background: none; box-shadow: none;
+  color: var(--md-primary); padding: 0 var(--space-1);
+}
+.quick-keys {
+  display: grid; gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+.quick-key {
+  min-height: calc(var(--touch) + 12px); padding: var(--space-1) var(--space-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: var(--shape-md); text-align: center; line-height: 1.2;
+}
+.quick-key-label { font-weight: 600; overflow-wrap: anywhere; }
+.quick-key-pack { color: var(--md-on-surface-muted); font-size: var(--type-label-sm-size, 0.75rem); }

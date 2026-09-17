@@ -23,6 +23,8 @@ export function createCart() {
   let orderType = null;
   let tableLabel = '';
   let openOrder = null;          // { id, order_no, lines (as loaded) }
+  // PR-107 (TASK-070): a walk-in's sale at wholesale. Per sale: a new cart is retail.
+  let priceLevel = 'RETAIL';
 
   /** A line's identity: product, unit, and — since a note makes a line its own — its note. */
   const keyOf = (productId, packUnitId, note) => `${productId}:${packUnitId || 'base'}${note ? `:${note}` : ''}`;
@@ -173,6 +175,7 @@ export function createCart() {
     statutory = null;
     tableLabel = '';
     openOrder = null;
+    priceLevel = 'RETAIL';
     // The order type is kept: a café serving dine-in serves the next table dine-in too.
   }
 
@@ -206,6 +209,8 @@ export function createCart() {
       orderType,
       tableLabel: tableLabel || null,
       openOrderId: openOrder ? openOrder.id : null,
+      // PR-107: only a walk-in's switch is sent; a customer's own level is the server's.
+      priceLevel: customer ? null : priceLevel,
     };
   }
 
@@ -215,6 +220,7 @@ export function createCart() {
     customer = saved.customer ?? null;
     transactionDiscountCentavos = saved.transaction_discount_centavos || 0;
     if (saved.order_type) orderType = saved.order_type;
+    priceLevel = saved.price_level === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
     tableLabel = saved.table_label || '';
 
     for (const line of saved.lines || []) {
@@ -296,5 +302,7 @@ export function createCart() {
     get tableLabel() { return tableLabel; },
     set tableLabel(value) { tableLabel = String(value || ''); },
     get openOrder() { return openOrder; },
+    get priceLevel() { return customer ? (customer.price_level || 'RETAIL') : priceLevel; },
+    set priceLevel(value) { priceLevel = value === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL'; },
   };
 }

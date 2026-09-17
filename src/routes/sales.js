@@ -63,6 +63,8 @@ router.post('/sales', atTheCounter, async (req, res, next) => {
       orderType: body.orderType || null,
       tableLabel: body.tableLabel ?? null,
       openOrderId: body.openOrderId || null,
+      // PR-107 (TASK-070): a walk-in's cart switched to wholesale.
+      priceLevel: body.priceLevel || null,
     }, req.session);
 
     // FR_3.7 / INT-1: the receipt prints now, after the sale has committed — until

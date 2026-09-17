@@ -46,6 +46,9 @@ const EXPORTABLE = Object.freeze([
   'product_packs',
   'product_prices',
   'product_quantity_breaks',
+  // TASK-070: a pack's own price, and the counter's buttons.
+  'product_pack_prices',
+  'quick_keys',
   // Customers and their credit.
   'customers',
   'customer_credit_accounts',

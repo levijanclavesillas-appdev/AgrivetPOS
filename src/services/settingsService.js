@@ -104,6 +104,29 @@ const REGISTRY = Object.freeze({
     what: 'Service charge on a dine-in bill, in basis points; 0 is none', min: 0, max: 2000,
   },
 
+  // ── A sari-sari store's counter (TASK-070) ────────────────────────────────
+  // PR-107: the Retail | Wholesale switch on a walk-in's cart. Off for a pharmacy or a café,
+  // where a wholesale price belongs to an account customer; on for a sari-sari store.
+  wholesale_switch_enabled: {
+    type: 'BOOL', value: false, group: 'PRICING', ruleId: 'PR-107', ownerOnly: true,
+    what: 'Let the counter switch a walk-in sale to wholesale prices',
+  },
+  // POS-113: the counter's own buttons for goods with no barcode.
+  quick_keys_enabled: {
+    type: 'BOOL', value: false, group: 'SALES', ruleId: 'POS-113', ownerOnly: true,
+    what: 'Show quick keys at the counter: buttons for goods without a barcode',
+  },
+  // A customer added at the counter by name (TASK-070): the utang notebook's new page. The
+  // owner or a manager raises the limit afterwards, as for any customer (CR-102).
+  counter_customer_credit_limit_centavos: {
+    type: 'INT', value: 50000, group: 'CREDIT', ruleId: 'CR-101', ownerOnly: true,
+    what: 'Credit limit for a customer added at the counter, in centavos; 0 is no credit', min: 0, max: 100000000,
+  },
+  counter_customer_terms_days: {
+    type: 'INT', value: 15, group: 'CREDIT', ruleId: 'CR-101', ownerOnly: true,
+    what: 'Payment terms for a customer added at the counter, in days', min: 0, max: 365,
+  },
+
   // ── Reports and alerts (RPT-*, OPS-007) ───────────────────────────────────
   // Both of these were constants in reportService and alertService until TC-UT-06
   // caught them, which is the guard doing exactly its job: how long an alert nags and

@@ -58,7 +58,7 @@ test('every migration below 900 is a base migration this branch has recorded, by
 
 test('this edition\'s own migrations are numbered from 900', () => {
   const edition = migrate.available().filter((m) => m.version >= migrate.EDITION_FLOOR);
-  assert.deepEqual(edition.map((m) => m.file), ['900_generic_name.sql', '901_licence.sql', '902_product_images.sql', '903_batch_recall.sql', '904_store_industry.sql', '905_pack_barcodes.sql', '906_po_close_short.sql', '907_sync.sql', '908_cafe.sql']);
+  assert.deepEqual(edition.map((m) => m.file), ['900_generic_name.sql', '901_licence.sql', '902_product_images.sql', '903_batch_recall.sql', '904_store_industry.sql', '905_pack_barcodes.sql', '906_po_close_short.sql', '907_sync.sql', '908_cafe.sql', '909_wholesale_retail.sql']);
 });
 
 /** A database built from a chosen set of this build's migration files. */

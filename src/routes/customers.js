@@ -174,6 +174,15 @@ router.get('/customers/:id/statement/export.csv',
     }
   });
 
+// TASK-070: from the counter, by name, at the store's counter credit limit.
+router.post('/customers/quick', editCustomers, (req, res, next) => {
+  try {
+    res.status(201).json({ customer: customerService.quickAdd(req.body || {}, req.session) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/customers', editCustomers, (req, res, next) => {
   try {
     res.status(201).json({ customer: customerService.create(req.body || {}, req.session) });

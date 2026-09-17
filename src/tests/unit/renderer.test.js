@@ -246,6 +246,8 @@ test('the cart request is the shape POST /sales takes', async () => {
     orderType: null,
     tableLabel: null,
     openOrderId: null,
+    // PR-107: a customer's level is the server's to resolve, so no switch is sent.
+    priceLevel: null,
   });
 
   // TAX-004's claim travels in the same request — and out of the cart the moment it is
@@ -254,6 +256,53 @@ test('the cart request is the shape POST /sales takes', async () => {
   assert.deepEqual(cart.toRequest().statutory, { idType: 'SENIOR_CITIZEN', idNo: '12-3456789', name: 'Lolo Ambrosio Cruz' });
   cart.clear();
   assert.equal(cart.toRequest().statutory, null);
+});
+
+test('PR-107: a walk-in cart carries its wholesale switch, and a chosen customer\'s level wins', async () => {
+  const { createCart } = await load('js/pos/cart.js');
+  const cart = createCart();
+  cart.add({ product: feed, qtyMilli: 1000 });
+  assert.equal(cart.toRequest().priceLevel, 'RETAIL');
+  cart.priceLevel = 'WHOLESALE';
+  assert.equal(cart.toRequest().priceLevel, 'WHOLESALE');
+  cart.priceLevel = 'DEALER';
+  assert.equal(cart.priceLevel, 'RETAIL', 'dealer is an account\'s, never the switch\'s');
+
+  cart.priceLevel = 'WHOLESALE';
+  cart.customer = { id: 'c1', name: 'Aling Nena', price_level: 'RETAIL' };
+  assert.equal(cart.priceLevel, 'RETAIL', 'the customer\'s own level');
+  assert.equal(cart.toRequest().priceLevel, null, 'and nothing sent for the server to weigh');
+
+  cart.clear();
+  assert.equal(cart.priceLevel, 'RETAIL', 'a new sale starts at retail');
+  cart.restore({ lines: [], price_level: 'WHOLESALE' });
+  assert.equal(cart.priceLevel, 'WHOLESALE', 'a parked cart comes back as it was');
+});
+
+test('TASK-070: selling by amount rounds down, to the unit\'s step, and never to nothing', async () => {
+  const { quantityForAmount } = await load('js/pos/by-amount.js');
+  assert.equal(quantityForAmount({ amountCentavos: 2000, unitPriceCentavos: 5200 }), 384, '₱20 of rice at ₱52: 0.384 kg');
+  assert.equal(quantityForAmount({ amountCentavos: 2000, unitPriceCentavos: 5200, stepMilli: 250 }), 250, 'a quarter where quarters are the step');
+  assert.equal(quantityForAmount({ amountCentavos: 1000, unitPriceCentavos: 5200, stepMilli: 250 }), null, '₱10 buys less than a quarter');
+  assert.equal(quantityForAmount({ amountCentavos: 0, unitPriceCentavos: 5200 }), null);
+  assert.equal(quantityForAmount({ amountCentavos: 2000, unitPriceCentavos: 0 }), null);
+  assert.equal(/unit_?price|price_centavos/i.test(codeOf('js/pos/cart.js')), false, 'and the cart still holds no price');
+});
+
+test('TASK-070: the counter shows the switch, the quick keys, By amount and New customer only where the server says', () => {
+  const code = codeOf('js/pos/view.js');
+  assert.match(code, /const wholesaleOn = \(\) => Boolean\(policy\?\.retail\?\.wholesale_switch\?\.enabled\)/);
+  assert.match(code, /wholesaleOn\(\) && !customer\s*\? priceSwitch\(\)/, 'a chosen customer\'s level is shown, not switched');
+  assert.match(code, /const quickOn = \(\) => Boolean\(policy\?\.retail\?\.quick_keys\?\.enabled\)/);
+  assert.match(code, /pricedLine\.priced_per_pack \? line\.packUnitCode : line\.baseUnit/, 'PR-108: ₱180.00/BOX');
+  assert.match(code, /policy\?\.retail\?\.counter_customer\?\.may_add/);
+  assert.match(code, /api\.post\('\/customers\/quick', \{ name \}\)/);
+  // POS-113 / NFR_4.3: every quick key is a touch target.
+  assert.match(fs.readFileSync(path.join(root, 'public', 'css', 'pos.css'), 'utf8'), /\.quick-key \{[^}]*min-height: calc\(var\(--touch\) \+ 12px\)/);
+  // The owner arranges them from Products, behind TX-410.
+  assert.match(codeOf('js/shell/app.js'), /onQuickKeys: may\(session\.role, 'TX-410'\) \? \(\) => showQuickKeys\(\) : null/);
+  assert.match(codeOf('js/catalogue/quick-keys.js'), /api\.put\('\/quick-keys', \{/);
+  assert.match(codeOf('js/catalogue/editor.js'), /api\.put\(`\/products\/\$\{product\.id\}\/packs\/\$\{pack\.id\}\/prices`, levels\)/);
 });
 
 test('TASK-066: a note makes a line its own, and a café cart carries its order', async () => {

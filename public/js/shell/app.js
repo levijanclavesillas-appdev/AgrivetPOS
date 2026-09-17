@@ -31,6 +31,7 @@ import { createAdjustment } from '../catalogue/adjustment.js';
 import { createBatchList } from '../catalogue/batches.js';
 import { createRecall } from '../catalogue/recall.js';
 import { createStockCount } from '../catalogue/count.js';
+import { createQuickKeys } from '../catalogue/quick-keys.js';
 import { createCustomerList } from '../customers/list.js';
 import { createCustomerProfile } from '../customers/profile.js';
 import { createStatement } from '../customers/statement.js';
@@ -88,6 +89,8 @@ const GRANTS = {
   'TX-401': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-406': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-409': ['OWNER', 'MANAGER', 'INVENTORY'],
+  // TASK-070: arranging the counter's quick keys is editing the catalogue.
+  'TX-410': ['OWNER', 'MANAGER', 'INVENTORY'],
   'TX-413': ['OWNER', 'MANAGER', 'CASHIER', 'INVENTORY'],
   'TX-418': ['OWNER', 'MANAGER', 'CASHIER'],
   'TX-421': ['OWNER', 'MANAGER', 'CASHIER'],
@@ -405,6 +408,8 @@ export function createApp({ root }) {
       onBatches: (id) => showBatches(id),
       onValuation: () => showReport('valuation'),
       onCount: () => showStockCount(),
+      // POS-113: arranging them is editing the catalogue (TX-410).
+      onQuickKeys: may(session.role, 'TX-410') ? () => showQuickKeys() : null,
       // SCR-204 is a filter of this list, so it is reachable from it — and not only
       // from a dashboard the inventory clerk cannot open (04_UX_SPEC.md §2.1).
       onMode: (next) => show(next === 'low-stock' ? 'low-stock' : 'products'),
@@ -594,6 +599,15 @@ export function createApp({ root }) {
       countId: id,
       onBack: () => showProducts(),
     });
+    current.mount();
+    return current;
+  }
+
+  /** POS-113 (TASK-070) — the counter's quick keys, reached from the products list. */
+  function showQuickKeys() {
+    if (current?.unmount) current.unmount();
+    renderRail('products');
+    current = createQuickKeys({ root: host(), onBack: () => showProducts() });
     current.mount();
     return current;
   }

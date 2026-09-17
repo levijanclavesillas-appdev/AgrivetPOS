@@ -27,6 +27,7 @@ const collectionRoutes = require('./routes/collections');
 const printRoutes = require('./routes/print');
 const cartRoutes = require('./routes/carts');
 const openOrderRoutes = require('./routes/openOrders');
+const quickKeyRoutes = require('./routes/quickKeys');
 const reportRoutes = require('./routes/reports');
 const reconciliationRoutes = require('./routes/reconciliations');
 const backupRoutes = require('./routes/backups');
@@ -100,6 +101,7 @@ function createApp() {
   app.use(API_BASE, printRoutes);
   app.use(API_BASE, cartRoutes);
   app.use(API_BASE, openOrderRoutes);
+  app.use(API_BASE, quickKeyRoutes);
   app.use(API_BASE, reportRoutes);
   app.use(API_BASE, reconciliationRoutes);
   app.use(API_BASE, backupRoutes);

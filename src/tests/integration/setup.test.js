@@ -318,12 +318,12 @@ test('TASK-053: setup asks what kind of store, offers what is available, and ref
   const status = setupService.status();
   assert.equal(status.product_name, 'Chachi POS');
   assert.deepEqual(status.industries.map((i) => [i.code, i.available]),
-    [['PHARMACY', true], ['AGRIVET', true], ['CAFE', true], ['MOTORCYCLE', false], ['RETAIL', false]]);
+    [['PHARMACY', true], ['AGRIVET', true], ['CAFE', true], ['MOTORCYCLE', false], ['RETAIL', true]]);
   assert.equal(status.industry, null, 'nothing is chosen before setup');
 
   for (const industry of [undefined, '', 'HARDWARE', 'MOTORCYCLE']) {
     assert.throws(() => setupService.complete(validPayload(`industry-${industry}`, { industry })),
-      (err) => err.status === 400 && /Choose what kind of store this is: Pharmacy, Agrivet or Café \/ Restaurant/.test(err.message),
+      (err) => err.status === 400 && /Choose what kind of store this is: Pharmacy, Agrivet, Café \/ Restaurant or Sari-sari & wholesale/.test(err.message),
       String(industry));
   }
   assert.equal(storeProfileRepository.count(), 0, 'and nothing was written');

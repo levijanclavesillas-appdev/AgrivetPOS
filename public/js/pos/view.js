@@ -14,6 +14,7 @@ import { h, clear } from '../shell/ui.js';
 import { money, quantity, packAndBase } from '../shell/format.js';
 import { productPicture } from '../shell/pictures.js';
 import { createCart } from './cart.js';
+import { quantityForAmount } from './by-amount.js';
 import { createScanner } from '../shell/scanner.js';
 import { KEYMAP, HELP_ORDER, actionFor, isMapped } from '../shell/keymap.js';
 
@@ -43,6 +44,10 @@ export function createPos({ root, session, onPay }) {
   // Its own host, because the bar's contents depend on the policy the server has not
   // sent yet when the screen is first drawn.
   const helpHost = h('div', { class: 'pos-help-host' });
+  // POS-113 (TASK-070): the store's own buttons, for goods with no barcode.
+  const quickHost = h('div', { class: 'quick-keys-host' });
+  let quickKeys = [];
+  let quickShown = true;
 
   // The scanner only detects scans. What a person types is already in the search
   // field, and the input listener below searches on it.
@@ -92,7 +97,10 @@ export function createPos({ root, session, onPay }) {
           h('span', { class: 'sep', text: '×' }),
           h('span', {
             class: 'unit-price',
-            text: pricedLine ? `${money(pricedLine.unit_price_centavos)}/${line.baseUnit}` : '—',
+            // PR-108: a line priced per pack says so — ₱180.00/BOX, not per sachet.
+            text: pricedLine
+              ? `${money(pricedLine.unit_price_centavos)}/${pricedLine.priced_per_pack ? line.packUnitCode : line.baseUnit}`
+              : '—',
           }),
           // PR-101: the resolved level is named, so "why is this ₱58" is answerable.
           // Since TASK-024 the top two levels can win, and neither reads as an English
@@ -276,7 +284,9 @@ export function createPos({ root, session, onPay }) {
         h('h2', { text: 'Customer' }),
         h('p', { class: 'rail-customer', text: customer ? customer.name : 'Walk-in' }),
         h('button', { class: 'rail-action', text: 'Change  F2', onclick: () => chooseCustomer() }),
-        h('p', { class: 'rail-level', text: `Price: ${customer?.price_level || 'RETAIL'}` }),
+        wholesaleOn() && !customer
+          ? priceSwitch()
+          : h('p', { class: 'rail-level', text: `Price: ${customer?.price_level || 'RETAIL'}` }),
       ]),
       h('div', { class: 'rail-block rail-totals' }, [
         row('Subtotal', priced ? money(priced.subtotal_centavos) : money(0)),
@@ -334,6 +344,95 @@ export function createPos({ root, session, onPay }) {
       // PR-105 and PR-203 surfaced where they happen (§6), not at Complete.
       priced?.requires_authorisation ? authorisations() : null,
     ].filter(Boolean));
+  }
+
+  // ── TASK-070: a sari-sari store's counter ─────────────────────────────────
+
+  /** PR-107: whether a walk-in's cart may be switched to wholesale. The server's answer. */
+  const wholesaleOn = () => Boolean(policy?.retail?.wholesale_switch?.enabled);
+  const quickOn = () => Boolean(policy?.retail?.quick_keys?.enabled);
+
+  /** PR-107: Retail | Wholesale, for a walk-in. A chosen customer's level is their own. */
+  function priceSwitch() {
+    return h('div', { class: 'order-types price-switch', role: 'group', 'aria-label': 'Price level' },
+      [['RETAIL', 'Retail'], ['WHOLESALE', 'Wholesale']].map(([code, label]) => h('button', {
+        type: 'button',
+        class: `order-type${cart.priceLevel === code ? ' is-on' : ''}`,
+        'aria-pressed': String(cart.priceLevel === code),
+        text: label,
+        onclick: async () => { cart.priceLevel = code; await reprice(); },
+      })));
+  }
+
+  /** POS-113: the grid, where the store has keys. Pressing one is scanning that product. */
+  function renderQuickKeys() {
+    clear(quickHost);
+    if (!quickOn() || quickKeys.length === 0) return;
+    quickHost.append(
+      h('button', {
+        type: 'button', class: 'quick-keys-toggle', 'aria-expanded': String(quickShown),
+        text: quickShown ? 'Hide quick keys' : `Quick keys (${quickKeys.length})`,
+        onclick: () => { quickShown = !quickShown; renderQuickKeys(); },
+      }),
+      quickShown
+        ? h('div', { class: 'quick-keys', role: 'group', 'aria-label': 'Quick keys' }, quickKeys.map((key) => h('button', {
+          type: 'button', class: 'quick-key', disabled: !key.usable,
+          title: key.usable ? key.product_name : `${key.product_name} can no longer be sold`,
+          onclick: () => pressQuickKey(key),
+        }, [
+          h('span', { class: 'quick-key-label', text: key.label }),
+          key.pack_unit_code ? h('small', { class: 'quick-key-pack', text: key.pack_unit_code }) : null,
+        ])))
+        : null,
+    );
+  }
+
+  async function pressQuickKey(key) {
+    try {
+      const { product } = await api.get(`/products/${key.product_id}`);
+      await addProduct(product, { packUnitId: key.pack_unit_id || null });
+    } catch (err) {
+      ui.toast(err.message, { kind: 'error' });
+    }
+  }
+
+  async function refreshQuickKeys() {
+    if (!quickOn()) return;
+    try {
+      ({ keys: quickKeys } = await api.get('/quick-keys'));
+    } catch { quickKeys = []; }
+    renderQuickKeys();
+  }
+
+  /**
+   * "₱20 of rice" (TASK-070): the quantity the amount buys at this line's price, rounded
+   * down to the unit's selling step. Only for a loose line of a unit sold in parts.
+   */
+  function sellByAmount() {
+    const line = selected();
+    if (!line) return;
+    const index = cart.lines.findIndex((l) => l.key === line.key);
+    const pricedLine = priced?.lines?.[index];
+    if (!line.baseUnitAllowsFraction || line.packUnitId || !pricedLine || pricedLine.priced_per_pack) {
+      ui.toast(`${line.name} is not sold by amount. Enter a quantity instead.`, { kind: 'error' });
+      return;
+    }
+    const step = catalogue.get(line.productId)?.base_unit?.step_milli ?? null;
+    prompt({
+      title: `By amount — ${line.name}`,
+      label: `Pesos of ${line.baseUnit} at ${money(pricedLine.unit_price_centavos)}/${line.baseUnit}`,
+      onSubmit: async (raw) => {
+        const pesos = Number.parseFloat(raw);
+        const qty = Number.isFinite(pesos)
+          ? quantityForAmount({ amountCentavos: Math.round(pesos * 100), unitPriceCentavos: pricedLine.unit_price_centavos, stepMilli: step })
+          : null;
+        if (!qty) return ui.toast('That amount buys less than the smallest quantity sold.', { kind: 'error' });
+        cart.setQuantity(line.key, qty);
+        await reprice();
+        ui.toast(`${quantity(qty, line.baseUnit)} of ${line.name}.`);
+        return undefined;
+      },
+    });
   }
 
   /** A rate the server sent, in words. The figure is never this screen's (OPS-005). */
@@ -979,11 +1078,41 @@ export function createPos({ root, session, onPay }) {
       h('label', { text: 'Search' }, [input]),
       hits,
       h('div', { class: 'prompt-actions' }, [
+        // TASK-070: "Isulat, Aling Nena" — a customer added here by name, at the store's
+        // counter credit limit. Only for a cashier who may add customers (TX-413).
+        policy?.retail?.counter_customer?.may_add
+          ? h('button', { icon: 'user-plus', text: 'New customer', onclick: () => newCustomer(input.value.trim(), close) })
+          : null,
         h('button', { text: 'Walk-in', onclick: async () => { cart.customer = null; close(); await reprice(); } }),
         h('button', { text: 'Cancel', onclick: close }),
       ]),
     ]));
     queueMicrotask(() => input.focus());
+  }
+
+  /** TASK-070: a customer added at the counter by name. */
+  function newCustomer(typed, closePicker) {
+    const limit = policy?.retail?.counter_customer?.credit_limit_centavos || 0;
+    closePicker();
+    prompt({
+      title: 'New customer',
+      label: limit > 0 ? `Name — they may buy on credit up to ${money(limit)}` : 'Name',
+      value: typed,
+      inputmode: 'text',
+      maxlength: '120',
+      onSubmit: async (name) => {
+        if (name.length < 2) return ui.toast('Enter the customer\'s name.', { kind: 'error' });
+        try {
+          const { customer } = await api.post('/customers/quick', { name });
+          cart.customer = customer;
+          ui.toast(`${customer.name} added.`);
+          await reprice();
+        } catch (err) {
+          ui.toast(err.message, { kind: 'error' });
+        }
+        return undefined;
+      },
+    });
   }
 
   function authorise(auth) {
@@ -1082,6 +1211,12 @@ export function createPos({ root, session, onPay }) {
         type: 'button', class: 'pos-action', disabled: empty, onclick: () => actions.note(),
       }, [h('span', { text: 'Note' })]));
     }
+    // TASK-070: "₱20 of rice", where a line is sold in parts. A button only, like Note.
+    if (cart.lines.some((l) => l.baseUnitAllowsFraction && !l.packUnitId)) {
+      buttons.splice(1, 0, h('button', {
+        type: 'button', class: 'pos-action', onclick: () => sellByAmount(),
+      }, [h('span', { text: 'By amount' })]));
+    }
     const hints = HELP_ORDER.filter((key) => !TOUCH_ACTIONS.includes(key))
       .map((key) => h('span', { class: 'help-key' }, [h('kbd', { text: key }), h('span', { text: labelOf(key) })]));
     return h('div', { class: 'pos-help' }, [
@@ -1095,6 +1230,7 @@ export function createPos({ root, session, onPay }) {
       h('div', { class: 'pos' }, [
         h('div', { class: 'pos-main' }, [
           h('div', { class: 'pos-searchbar' }, [search, results]),
+          quickHost,
           attachBar,
           linesHost,
           panelHost,
@@ -1121,6 +1257,7 @@ export function createPos({ root, session, onPay }) {
 
     render();
     refreshOrders();
+    refreshQuickKeys();
 
     // POS-105: come back to the cart that was open.
     try {
