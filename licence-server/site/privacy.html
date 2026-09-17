@@ -85,9 +85,11 @@
             <td>The app runs its own POS server on the device and talks to it. It prints receipts to a printer on the
               store's network. It checks the store's licence with this website. If the store chooses, it keeps the
               device in step with the store's web copy.</td></tr>
-          <tr><td>Storage (all files access)</td>
-            <td>To save the store's backups to a folder the store chooses, outside the app, and to restore from one.
-              The app reads and writes only its own backup files there.</td></tr>
+          <tr><td>Storage</td>
+            <td>To save the store's backups in Documents/ChachiPOS Backups, outside the app, so they survive the app
+              being removed. On Android 11 and later this needs no permission; on Android 10 and older the app asks for
+              the ordinary storage permission. The app reads and writes only its own backup files there. A backup is
+              restored through Android's own file picker, which opens only the file the user chooses.</td></tr>
           <tr><td>The camera app</td>
             <td>Only when someone taps the button to take a product's photo. The photo is taken by the phone's camera
               app and saved with the product.</td></tr>

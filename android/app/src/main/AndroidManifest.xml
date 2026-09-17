@@ -7,11 +7,10 @@
          TCP on port 9100 (INT-1). Nothing here reaches the internet (NFR_3.1). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- OPS-001: backups outside the app's own storage. "All files access" on Android 11+;
-         the ordinary storage permission before that. A sideloaded POS may ask for both. -->
-    <uses-permission
-        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <!-- OPS-001: backups outside the app's own storage, in Documents/ChachiPOS Backups. On
+         Android 11+ an app writes its own files there with no permission; Android 8–10 needs
+         the ordinary storage permission. No "all files access": Google Play does not permit it
+         for a point of sale, and the app only ever touches its own backups. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />

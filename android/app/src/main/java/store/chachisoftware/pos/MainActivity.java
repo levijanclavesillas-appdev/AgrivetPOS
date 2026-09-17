@@ -2,7 +2,6 @@ package store.chachisoftware.pos;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -15,7 +14,6 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
-import android.provider.Settings;
 import android.util.Base64;
 import android.util.Log;
 import android.view.WindowManager;
@@ -178,12 +176,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (!hasSharedStorage() && !askedForStorage) {
-            // Asked once, before the server starts, because the server is told the backup
-            // folder when it starts. Either answer comes back through onResume.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !hasSharedStorage() && !askedForStorage) {
+            // Android 8–10 only: the ordinary storage permission, asked once, before the server
+            // starts, because the server is told the backup folder when it starts. Either answer
+            // comes back through onResume.
             askedForStorage = true;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) askForSharedStorage();
-            else requestPermissions(new String[] {android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2);
+            requestPermissions(new String[] {android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2);
             return;
         }
         startServer();
@@ -191,39 +189,44 @@ public class MainActivity extends Activity {
 
     /**
      * OPS-001: backups go outside the application's own storage, so they survive the app
-     * being cleared or uninstalled. On Android 11 and later that is "all files access",
-     * which a sideloaded point of sale may ask for. Without it the backups go to the app's
-     * own folder on shared storage, which is visible over USB but removed on uninstall —
-     * the wizard still refuses a folder inside the data directory either way.
+     * being cleared or uninstalled — to Documents/ChachiPOS Backups.
+     *
+     * No "all files access" (removed for Google Play): on Android 11 and later an app may
+     * create and write its own files in Documents with no permission at all, and the backups
+     * are its own files. What it cannot do is see files another installation made, so after a
+     * reinstall an old backup is opened with Restore from a file (Android's picker), not from
+     * the Backups list. On Android 8–10 the ordinary storage permission covers the same folder.
      */
-    private void askForSharedStorage() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.storage_title)
-                .setMessage(R.string.storage_message)
-                .setPositiveButton(R.string.storage_allow, (d, w) -> {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:" + getPackageName()));
-                    try {
-                        startActivity(intent);
-                    } catch (Exception e) {
-                        startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
-                    }
-                })
-                .setNegativeButton(R.string.storage_later, (d, w) -> startServer())
-                .setCancelable(false)
-                .show();
-    }
-
     private boolean hasSharedStorage() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return Environment.isExternalStorageManager();
-        // Android 8–10: the ordinary storage permission, with legacy storage on 10.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return canWrite(sharedFolder());
         return checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
+    private File sharedFolder() {
+        return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), BACKUP_FOLDER_NAME);
+    }
+
+    /** Whether this app can create a file in `folder` now: a probe written and removed. */
+    private static boolean canWrite(File folder) {
+        try {
+            //noinspection ResultOfMethodCallIgnored
+            folder.mkdirs();
+            File probe = new File(folder, ".chachi-write-test");
+            try (OutputStream out = new FileOutputStream(probe)) {
+                out.write(1);
+            }
+            return probe.delete();
+        } catch (Exception e) {
+            Log.w(TAG, "Documents is not writable here: " + e.getMessage());
+            return false;
+        }
+    }
+
     private String backupFolder() {
-        File shared = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-                BACKUP_FOLDER_NAME);
+        File shared = sharedFolder();
         if (hasSharedStorage()) return shared.getAbsolutePath();
+        // Refused (Android 8–10 said no, or a device that keeps apps out of Documents): the
+        // app's own folder on shared storage, visible over USB but removed on uninstall.
         File own = getExternalFilesDir(BACKUP_FOLDER_NAME);
         return own != null ? own.getAbsolutePath() : shared.getAbsolutePath();
     }

@@ -131,3 +131,25 @@ the same conditions, throws exactly the phone's error.
 
 **Status — 2026-09-14:** built and committed on the `pharmacy` branch; not yet run on a
 device.
+
+## Addendum, 2026-09-17: no "all files access"
+
+Google Play asked for a declaration of `MANAGE_EXTERNAL_STORAGE`, which it permits only for
+file managers, backup apps and the like. A point of sale is not one of those, so the permission
+was removed.
+
+- **Where backups go.** Still `Documents/ChachiPOS Backups`.
+- **Android 11 and later.** An app creates and writes its own files there with no permission.
+  `MainActivity` checks with a probe file at launch, and uses the app's own folder if the probe
+  fails.
+- **Android 8–10.** The app keeps `WRITE_EXTERNAL_STORAGE` (`maxSdkVersion` 29) and legacy
+  storage.
+- **What is lost.** After a reinstall, the Backups list does not show the backups the previous
+  install made, because they are not this install's files. *Restore from a file* opens them
+  through Android's picker, which needs no permission.
+- **What is gone.** The first-launch dialog on Android 11+ and its strings.
+- **Checked here.** A debug build succeeds, and its merged manifest has no
+  `MANAGE_EXTERNAL_STORAGE`.
+- **Still to do.** Confirm on a real phone (Android 11+) that a backup lands in Documents, and
+  that *Restore from a file* opens one after a reinstall.
+

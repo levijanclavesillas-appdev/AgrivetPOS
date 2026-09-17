@@ -63,10 +63,16 @@ app, so it does not update to this one. Move a tablet across with a backup and r
 
 ## On the tablet
 
-- **First launch** asks where backups may go. Allow *all files access*: backups then go to
-  `Documents/ChachiPOS Backups`, which survives the app being removed and can be
-  copied off over USB. If you say *Not now*, backups go to the app's own folder and are
-  **deleted if the app is uninstalled**. `05_TECH_SPEC.md` §7 still applies: a copy off the
+- **Backups** go to `Documents/ChachiPOS Backups`, which survives the app being removed and
+  can be copied off over USB. There is no "all files access": Google Play does not permit it
+  for a point of sale, and it is not needed.
+  - **Android 11 and later.** The app writes its own files there with no permission. It cannot
+    see backups another installation made, so after a reinstall an old backup is opened with
+    *Restore from a file*.
+  - **Android 8–10.** The first launch asks for the ordinary storage permission. If it is
+    refused, backups go to the app's own folder and are **deleted if the app is uninstalled**.
+  - **If Documents cannot be written** (a probe at launch fails), backups also go to the app's
+    own folder. `05_TECH_SPEC.md` §7 still applies: a copy off the
   tablet is the owner's job, and matters more when the tablet is the only machine.
 - **The setup wizard** is the same as on Windows, including step 6, the Excel workbook. The
   workbook is chosen with Android's file picker. A downloaded template or export goes to
@@ -89,7 +95,7 @@ app, so it does not update to this one. Move a tablet across with a backup and r
 | `node/main.js` | The server's entry point on the tablet. Everything after it is `src/` |
 | `app/src/main/cpp/` | `native-lib` starts Node on its own thread; `better_sqlite3` is better-sqlite3's addon compiled for the tablet |
 | `NodeRuntime.java` | Unpacks the server on first launch and after updates, sets its environment, starts it once |
-| `MainActivity.java` | The WebView, the file picker, saving downloads, and the backup-folder question |
+| `MainActivity.java` | The WebView, the file picker, saving downloads, the backup folder, and the camera scanner |
 
 The server learns everything about the tablet from its environment: `AGRIVET_DATA_DIR` (the
 app's private storage), `AGRIVET_PORT`, `AGRIVET_SQLITE_ADDON` (`src/config/sqlite.js`) and
