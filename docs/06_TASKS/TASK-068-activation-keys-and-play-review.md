@@ -93,6 +93,7 @@ The owner (2026-09-17): "yes proceed with the activation keys and set up the rev
     `https://pos.chachisoftware.store/s/play-review/`, set up as a Pharmacy with tax mode `NONE`.
   - **Its owner.** The login is `reviewer`.
   - **Its products.** Six OTC products with stock and barcodes, loaded through the opening data.
+    They are named by generic name, with no third-party brands (renamed 2026-09-17, for Play's metadata policy).
 - **Its licence.** On the licence server it is *Chachi POS Review Store*:
   - **Plan.** One-time, not a trial, as Play requires.
   - **Registered to.** `chachisoftware@gmail.com`.
@@ -100,7 +101,7 @@ The owner (2026-09-17): "yes proceed with the activation keys and set up the rev
   - **The web copy.** It was linked with the key.
 - **The credentials.** The password, the recovery code and the key are in
   `/root/play-review/credentials.txt`, readable by root only.
-- **Checked on the web copy.** A shift opened, and a sale of two Biogesic tablets went through as
+- **Checked on the web copy.** A shift opened, and a sale of two paracetamol tablets went through as
   `SALE-20260917-000001` (₱12.00, ₱8.00 change). The shift was then closed.
 - **Checked as a reviewer's phone would do it.** A fresh local POS stood in for the phone:
   1. It connected to `pos.chachisoftware.store/s/play-review` as `reviewer`.
