@@ -57,6 +57,19 @@ and build with `./gradlew assembleRelease`. The APK is
 key). Its package name is `store.chachisoftware.pharmacypos`, the one Play Console holds for
 the app, and it cannot change. Raise `versionCode` in `app/build.gradle.kts` for every upload.
 
+### Which devices can see it
+
+The bundle carries **arm64-v8a, armeabi-v7a and x86_64**. The middle one matters more than
+it looks: Google Play **filters its listing by the native platforms in the upload**, so a
+32-bit tablet — which is what a good deal of budget Android 8–10 hardware still is — is not
+shown an incompatibility it could act on. It is shown *item not found*, which from the
+tablet is indistinguishable from the app never having been published.
+
+Adding it costs no device anything, because `bundleRelease` splits the bundle per ABI and a
+tablet downloads only its own `libnode.so` (~46–54 MB). A plain `assembleRelease` APK
+carries all three and is about 60 MB — which is a reason to send Play the bundle rather
+than the APK.
+
 An APK built before 2026-09-17 is `store.chachisoftware.pos`. To Android that is a different
 app, so it does not update to this one. Move a tablet across with a backup and restore
 (Admin → Backups), then uninstall the old app.
