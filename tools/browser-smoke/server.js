@@ -34,6 +34,16 @@ async function api(pathname, { method = 'GET', body = null, token = null } = {})
     method: 'POST',
     body: {
       store: { storeName: 'Chachi Agrivet', address: 'Poblacion, Sultan Kudarat', contactNo: '09171234567', tin: '123-456-789-000' },
+      // TASK-053 made the industry step 1 of the wizard and required by
+      // setupService.complete(). This walk predates it, so /setup answered 400 and every
+      // call after it answered SETUP_REQUIRED — the seed then read `.id` off an undefined
+      // unit and the whole smoke died before Electron was ever started.
+      //
+      // PHARMACY, though the store here is named for an agrivet: the walk asserts this
+      // edition's own defaults, and `statutory_discount_enabled` is one of them
+      // (PHARMACY_EDITION.md P-1, industries.js). Under AGRIVET it ships off, and the
+      // TAX-004 step rightly fails. The name is cosmetic; the industry is not.
+      industry: 'PHARMACY',
       taxMode: 'NON_VAT',
       owner: { username: 'chachi', fullName: 'Chachi Dela Cruz', password: 'sack-of-feed-2026', pin: '441703' },
       backupFolder: backupRoot,

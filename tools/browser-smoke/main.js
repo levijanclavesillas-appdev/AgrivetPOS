@@ -1090,7 +1090,14 @@ app.whenReady().then(async () => {
   const signInAs = async (username, password) => {
     await run(`document.querySelector('.rail-user').click()`);
     await settle(300);
-    await clickOn('.lock-different', '/Different user/');
+    // TASK-058 put an account dialog behind the rail's user button — lock, sign out,
+    // password, PIN, recovery code. Before it, that button raised SCR-102's PIN lock
+    // directly and the way past was "Different user", which is what this walk clicked.
+    // The lock is now one item inside the dialog and "Sign out" is the door to another
+    // user, so the old selector matched nothing, the wait timed out, and every step that
+    // needed a different role failed after it.
+    if (!await waitFor(`!!document.querySelector('.account-items')`, { label: 'the account dialog' })) return false;
+    await clickOn('.account-item.sign-out', '/Sign out/');
     const at = await waitFor(`!!document.querySelector('.signin form')`, { label: 'the sign-in form' });
     if (!at) return false;
     await run(`(() => {
@@ -2150,7 +2157,16 @@ app.whenReady().then(async () => {
   // The row and its own button, not the row alone: the panel renders the list first and
   // fills the actions a tick later, and reading in that gap is how this step found one
   // row and no way to restore it.
-  await waitFor(`!!document.querySelector('.backup-list .restore')`, { label: 'the restore control' });
+  //
+  // Twenty seconds, not the default ten, and for the same reason the wait above it has
+  // twenty: the button appears only once the backup is **verified** (OPS-002 —
+  // `b.verified && b.on_disk`), and verifying means opening the zip and running an
+  // integrity check over it. The row lands as soon as the file is written; the button
+  // waits for the check. On a loaded machine that gap is longer than ten seconds, which
+  // made this step fail perhaps one run in two — as a timeout, so it read like a missing
+  // button rather than a slow one.
+  await waitFor(`!!document.querySelector('.backup-list .restore')`,
+    { label: 'the restore control', timeoutMs: 20000 });
   const restoreButtons = await run(`document.querySelectorAll('.backup-list .restore').length`);
   if (restoreButtons === 0) {
     console.log('        row html:', String(await run(
