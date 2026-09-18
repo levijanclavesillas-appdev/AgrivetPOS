@@ -31,6 +31,7 @@
 // export, backup and restore work throughout.
 
 const crypto = require('crypto');
+const db = require('../config/database');
 const clock = require('../config/clock');
 const licenceConfig = require('../config/licence');
 const errors = require('./errors');
@@ -42,6 +43,11 @@ const PREFIX = 'CPL1';
 
 const DAY = 86400e3;
 const later = (a, b) => (!b || a > b ? a : b);
+
+// TASK-073 §7. `state()` is called on every dashboard mount and was writing twice each
+// time; these hold what it no longer has to ask the database for.
+const SEEN_WRITE_INTERVAL_MS = 60_000;
+let rowEnsuredForGeneration = null;
 const plusDays = (iso, days) => new Date(new Date(iso).getTime() + days * DAY).toISOString();
 const daysUntil = (iso, at) => Math.ceil((new Date(iso) - new Date(at)) / DAY);
 
@@ -68,10 +74,44 @@ const planOf = (payload) => (String(payload.plan || '').toUpperCase() === 'ONE_T
 function state({ at = clock.nowUtc() } = {}) {
   if (!enforced()) return { enforced: false, state: 'OFF' };
 
-  const row = licenceRepository.ensure(crypto.randomUUID(), at);
+  // TASK-073 §7: `state()` is a read, and it was performing two writes and a UUID
+  // generation on every call — including every dashboard mount.
+  //
+  // The row is created once per connection rather than asked for on every call; after
+  // that a plain read is enough, since nothing deletes it. `ensure()` still runs first
+  // on a fresh database and after a restore, because the generation changes with the
+  // connection.
+  let row;
+  if (rowEnsuredForGeneration === db.currentGeneration()) {
+    row = licenceRepository.get();
+  }
+  if (!row) {
+    row = licenceRepository.ensure(crypto.randomUUID(), at);
+    rowEnsuredForGeneration = db.currentGeneration();
+  }
+
   // LIC-003: judged against the latest time this installation has seen, never less.
+  //
+  // Throttled to once a minute. The rule is a ratchet against a clock set backwards to
+  // extend a licence, and writing it on every read bought nothing but a write: a
+  // rollback inside the last minute gains a minute, against a licence measured in
+  // months. The ratchet itself is unchanged — `later()` still never moves backwards.
+  // `seen` itself is computed on every call exactly as before, so the ACTIVE / WARNING /
+  // GRACE / LAPSED decision below is unaffected by how often it is persisted.
+  //
+  // The throttle is measured **against the stored value, on the domain clock** — never
+  // against wall time. `max_seen_at` is read back by later calls to `state()` that pass
+  // no `at` of their own (the shift gate is one), so it is load-bearing and not merely a
+  // record: a throttle on wall time would let a clock that has genuinely moved months
+  // forward go unrecorded because the last write happened seconds ago. Comparing stored
+  // to seen keeps the ratchet exact to within a minute and needs no process state, so it
+  // survives a restart and behaves the same on the first call as on the thousandth.
   const seen = later(at, row.max_seen_at);
-  if (seen !== row.max_seen_at) licenceRepository.update({ max_seen_at: seen }, at);
+  const behindMs = row.max_seen_at ? Date.parse(seen) - Date.parse(row.max_seen_at) : Infinity;
+  if (seen !== row.max_seen_at && behindMs >= SEEN_WRITE_INTERVAL_MS) {
+    licenceRepository.update({ max_seen_at: seen }, at);
+    row = { ...row, max_seen_at: seen };
+  }
 
   const pendingLive = row.pending_user_code && row.pending_expires_at > at;
   const base = {

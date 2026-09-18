@@ -306,6 +306,23 @@ const REGISTRY = Object.freeze({
     type: 'INT', value: 1000, group: 'PURCHASING', ruleId: 'PO-205', ownerOnly: true,
     what: 'Receipt cost variance needing authorisation, in basis points', min: 0, max: 10000,
   },
+  // TASK-072. "Order up to twice the minimum" — the target a suggestion aims at, as a
+  // multiple of min_stock_milli. A store that wants its shelf refilled to exactly the
+  // minimum sets 1; one that buys a month at a time sets 4. The screen states the sum on
+  // every row rather than presenting a figure from nowhere, so this is a starting point
+  // and never an instruction.
+  restock_cover_multiplier: {
+    type: 'INT', value: 2, group: 'PURCHASING', ruleId: 'PO-109', ownerOnly: false,
+    what: 'Restocking suggests topping up to this many times the minimum stock', min: 1, max: 12,
+  },
+  // TASK-072. On: a request is submitted and somebody else approves it before it can
+  // become orders — the clerk sees the shelf, the owner holds the money. A store with
+  // one active user self-approves regardless, because there is nobody to ask; that is a
+  // fact about its staffing and is recorded on the request, not a way round this switch.
+  restock_approval_required: {
+    type: 'BOOL', value: true, group: 'PURCHASING', ruleId: 'PO-108', ownerOnly: true,
+    what: 'A restocking request needs a second person to approve it before it becomes orders',
+  },
 
   // ── Printing (INT-1, INT-2) ───────────────────────────────────────────────
   //

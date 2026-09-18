@@ -47,6 +47,7 @@ import { createPurchaseOrders } from '../purchasing/orders.js';
 import { createPurchaseOrder } from '../purchasing/order.js';
 import { createGoodsReceipt } from '../purchasing/receive.js';
 import { createDeliveries } from '../purchasing/deliveries.js';
+import { createRestock } from '../purchasing/restock.js';
 import { createReturn } from '../returns/view.js';
 import { createSuppliers } from '../purchasing/suppliers.js';
 
@@ -526,6 +527,8 @@ export function createApp({ root }) {
       onSuppliers: () => showSuppliers(),
       // SCR-805: what has already arrived.
       onDeliveries: () => showDeliveries(),
+      // SCR-806: what has not, and should.
+      onRestock: () => showRestock(),
     });
     current.mount();
     return current;
@@ -536,6 +539,19 @@ export function createApp({ root }) {
     if (current?.unmount) current.unmount();
     renderRail('buying');
     current = createDeliveries({
+      root: host(),
+      onBack: () => showPurchaseOrders(),
+      onOpenOrder: (id) => showPurchaseOrder(id),
+    });
+    current.mount();
+    return current;
+  }
+
+  /** SCR-806 — what to buy, asked for and approved (TASK-072, PO-107). */
+  function showRestock() {
+    if (current?.unmount) current.unmount();
+    renderRail('buying');
+    current = createRestock({
       root: host(),
       onBack: () => showPurchaseOrders(),
       onOpenOrder: (id) => showPurchaseOrder(id),

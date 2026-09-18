@@ -54,7 +54,20 @@ const CREDENTIAL_REFUSAL = 'Incorrect username or password';
 // A bcrypt hash of a value nobody holds. Verifying against it for an unknown username
 // costs the same as a real check, so response time does not disclose whether an account
 // exists.
-const DUMMY_HASH = bcrypt.hashSync('no such account, this hash never matches', workFactor());
+//
+// TASK-073 §1: computed on first use, never at module load. `bcryptjs` is pure JS and a
+// cost-12 hash measures ~1.3 s on a development machine — and this module is required
+// from createApp(), so hashing here put that on every cold start before the server
+// listened, on the same thread that owns the Electron window. A store that never signs
+// in with an unknown username never pays it at all.
+let dummyHash = null;
+
+function getDummyHash() {
+  if (dummyHash === null) {
+    dummyHash = bcrypt.hashSync('no such account, this hash never matches', workFactor());
+  }
+  return dummyHash;
+}
 
 // ── Credential validation (VR-501, VR-502) ──────────────────────────────────
 
@@ -96,7 +109,7 @@ function validatePin(pin) {
 }
 
 const hashSecretValue = (value, { cost = workFactor() } = {}) => bcrypt.hashSync(value, cost);
-const verifySecretValue = (value, hash) => bcrypt.compareSync(value, hash || DUMMY_HASH);
+const verifySecretValue = (value, hash) => bcrypt.compareSync(value, hash || getDummyHash());
 
 /** SEC-5: a code a person can read off paper and type back in a year's time. */
 function generateRecoveryCode() {
