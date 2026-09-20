@@ -108,9 +108,20 @@ android {
         versionName = appVersion
 
         ndk {
-            // arm64-v8a is every current tablet; x86_64 is the emulator. Add
-            // "armeabi-v7a" here for an old 32-bit device.
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // arm64-v8a is every current tablet; x86_64 is the emulator; armeabi-v7a is
+            // the 32-bit hardware a budget Android 8–10 tablet still ships with.
+            //
+            // **All three, because an ABI that is not here is not a device that installs
+            // late — it is a device that never sees the app at all.** Google Play filters
+            // its listing by the native platforms in the upload, so a 32-bit tablet is
+            // shown "item not found" rather than an incompatibility it could act on. That
+            // is indistinguishable, from the tablet, from never having published.
+            //
+            // It costs no device anything. `bundleRelease` (README.md) splits the bundle
+            // per ABI, so a tablet downloads its own libnode.so (~57–63 MB) and not the
+            // others. A plain `assembleRelease` APK does carry all three, which is a
+            // reason to ship the bundle to Play rather than the APK.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
         externalNativeBuild {
             cmake {

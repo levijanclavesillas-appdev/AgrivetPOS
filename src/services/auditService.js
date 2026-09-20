@@ -128,6 +128,17 @@ const ACTIONS = Object.freeze({
   PURCHASE_ORDER_SUBMITTED: { what: 'Purchase order sent to the supplier', rule: 'PO-102' },
   PURCHASE_ORDER_CANCELLED: { what: 'Purchase order cancelled', rule: 'PO-102' },
   PURCHASE_ORDER_CLOSED_SHORT: { what: 'Purchase order closed short', rule: 'PO-106' },
+  // TASK-072. A restocking request commits nothing and moves nothing (PO-107), so it is
+  // not on AUD-601's list — and it is recorded for the reason the stock count's open is.
+  // The approval is somebody deciding to spend the store's money, and three months on
+  // "why did we buy forty sacks" has no other answer with a name and a date on it.
+  RESTOCK_REQUEST_RAISED: { what: 'Restocking request raised', rule: 'PO-107' },
+  RESTOCK_REQUEST_MODIFIED: { what: 'Restocking request edited in draft', rule: 'PO-107' },
+  RESTOCK_REQUEST_SUBMITTED: { what: 'Restocking request submitted for approval', rule: 'PO-107' },
+  RESTOCK_REQUEST_APPROVED: { what: 'Restocking request approved', rule: 'AUD-603' },
+  RESTOCK_REQUEST_REJECTED: { what: 'Restocking request rejected', rule: 'AUD-601' },
+  RESTOCK_REQUEST_CANCELLED: { what: 'Restocking request cancelled', rule: 'PO-107' },
+  RESTOCK_REQUEST_ORDERED: { what: 'Restocking request converted to purchase orders', rule: 'PO-108' },
   // TASK-062: the whole store's database leaving the server — AUD-601's "data export".
   BACKUP_DOWNLOADED: { what: 'Backup downloaded', rule: 'AUD-601' },
   // TASK-063: a store's devices, and what their sync could not merge as sent.

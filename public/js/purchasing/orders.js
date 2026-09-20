@@ -16,7 +16,7 @@ import { money, manila } from '../shell/format.js';
 
 const PAGE = 50;
 
-export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSuppliers, onDeliveries }) {
+export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSuppliers, onDeliveries, onRestock }) {
   let query = '';
   let status = '';
   let openOnly = true;
@@ -66,6 +66,9 @@ export function createPurchaseOrders({ root, onOpen, onNew, onReceive, onSupplie
       h('button', { class: 'row-action', icon: 'package-plus', text: 'Receive without an order', onclick: () => onReceive(null) }),
       // SCR-805: what has already arrived. A delivery used to be posted and never seen again.
       onDeliveries ? h('button', { class: 'row-action', icon: 'package-check', text: 'Deliveries', onclick: () => onDeliveries() }) : null,
+      // SCR-806: the other half of the question this screen answers. "What is on order"
+      // is here; "what should be" was on paper until TASK-072.
+      onRestock ? h('button', { class: 'row-action', icon: 'clipboard-list', text: 'Restock', onclick: () => onRestock() }) : null,
       h('button', { class: 'primary', icon: 'plus', text: 'New order', onclick: () => onNew() }),
     ]);
   }

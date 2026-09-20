@@ -2841,3 +2841,60 @@ test('TASK-065: no page, script or sheet names an absolute path, so a store work
   assert.deepEqual(offenders, []);
 });
 
+
+// ── SCR-806 — Restock (TASK-072) ────────────────────────────────────────────
+
+test('SCR-806: the screen sends the figure in the box, not the one it derived', () => {
+  const code = codeOf('js/purchasing/restock.js');
+  // The suggestion is a proposal. What is stored is what the buyer left in the field —
+  // otherwise a typed-over quantity would be silently discarded at save.
+  assert.match(code, /qtyMilli: Math\.round\(Number\(l\.qty\) \* MILLI\)/);
+  // …and the derived figure travels beside it, so the request can say what it asked
+  // against and why, three months later.
+  assert.match(code, /suggestedQtyMilli: l\.suggestedQtyMilli \?\? null/);
+  assert.match(code, /onOrderMilli: l\.onOrderMilli \?\? null/);
+  // A row nobody put a quantity against is not asked for.
+  assert.match(code, /\.filter\(\(l\) => Number\(l\.qty\) > 0\)/);
+});
+
+test('SCR-806: what is already coming is on the row, with the sum that used it', () => {
+  const code = codeOf('js/purchasing/restock.js');
+  assert.match(code, /h\('th', \{ class: 'qty', text: 'Coming' \}\)/, 'PO-109 has a column');
+  // The arithmetic is shown, not just its answer: a buyer disagrees with a sum, not
+  // with a number that arrived from nowhere.
+  assert.match(code, /wanted − \$\{qty\(line\.onHandMilli\)\} here/);
+  assert.match(code, /no minimum set — say how many/);
+  assert.match(proseOf('js/purchasing/restock.js'), /orders them twice/i);
+});
+
+test('SCR-806: a product with no minimum is asked about, never guessed at', () => {
+  const code = codeOf('js/purchasing/restock.js');
+  // Null and zero mean different things to a buyer, and the box must not fill itself
+  // with a number for a product nobody set a minimum on.
+  assert.match(code, /qty: p\.suggested_qty_milli === null \? '' : String\(p\.suggested_qty_milli \/ MILLI\)/);
+  assert.match(code, /empty, no minimum set/);
+});
+
+test('SCR-806: a product already asked for does not start on a second list', () => {
+  const code = codeOf('js/purchasing/restock.js');
+  assert.match(code, /\.filter\(\(p\) => !p\.on_open_request\)/);
+});
+
+test('SCR-806: the picker adds a product, and the row is read again for what is coming', () => {
+  const code = codeOf('js/purchasing/restock.js');
+  assert.match(code, /import \{ createProductPicker \} from '\.\.\/shell\/picker\.js'/);
+  assert.match(code, /onPick: \(product\) => \{ picker\.input\.value = ''; addByHand\(product\); \}/);
+  // The picker's own search has no "on order" figure, which is the column this screen
+  // exists for — so a picked product is read again properly.
+  assert.match(code, /api\.post\('\/restock\/context', \{ productIds: \[product\.id\] \}\)/);
+});
+
+test('SCR-806: the server decides what may be done, and the screen draws it', () => {
+  const code = codeOf('js/purchasing/restock.js');
+  for (const flag of ['can_decide', 'can_convert']) {
+    assert.match(code, new RegExp(`r\\.${flag}`), `${flag} comes from the server`);
+  }
+  // SEC-6: the rail entry is cosmetic and TX-409 is re-checked on every request.
+  assert.match(codeOf('js/shell/app.js'), /createRestock\(\{/);
+  assert.match(codeOf('js/purchasing/orders.js'), /onRestock \? h\('button'/);
+});

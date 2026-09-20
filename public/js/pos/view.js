@@ -569,10 +569,24 @@ export function createPos({ root, session, onPay }) {
     };
   }
 
+  // TASK-073 §4. Every other search in the application debounces at 120 ms —
+  // catalogue/list.js:153, customers/list.js:75, shell/picker.js:177 — and the counter,
+  // the one screen a cashier uses all day, did not. Typing "paracetamol" was ten HTTP
+  // requests, each paying the whole middleware stack, and because nothing guarded the
+  // order of the replies a slow early one could land after a fast later one and repaint
+  // the list with matches for a prefix the cashier had already finished typing.
+  let searchTimer = null;
+  let lookupSeq = 0;
+
   async function lookup(term) {
     if (!term || term.length < 2) { results.hidden = true; return; }
+    const seq = lookupSeq + 1;
+    lookupSeq = seq;
     try {
       const { products } = await api.get(`/products?q=${encodeURIComponent(term)}&limit=8`);
+      // A newer keystroke has already been sent; this reply is about a term the cashier
+      // has moved on from, and drawing it would undo what they typed since.
+      if (seq !== lookupSeq) return;
       clear(results);
       if (products.length === 0) {
         results.append(h('p', { class: 'no-results', text: `Nothing matches “${term}”.` }));
@@ -1280,8 +1294,12 @@ export function createPos({ root, session, onPay }) {
     );
 
     search.addEventListener('input', () => {
-      if (search.value.trim().length >= 2) lookup(search.value.trim());
-      else results.hidden = true;
+      clearTimeout(searchTimer);
+      const term = search.value.trim();
+      if (term.length < 2) { results.hidden = true; return; }
+      // NFR_1.2 gives the counter search 500 ms; 120 ms of it is affordable, and it is
+      // what every other search here already waits.
+      searchTimer = setTimeout(() => lookup(term), 120);
     });
     document.addEventListener('keydown', onKeyDown);
 
@@ -1310,6 +1328,9 @@ export function createPos({ root, session, onPay }) {
 
   function unmount() {
     document.removeEventListener('keydown', onKeyDown);
+    // A pending search would otherwise fire into a screen that is gone.
+    clearTimeout(searchTimer);
+    lookupSeq += 1;
   }
 
   return { mount, unmount, cart, reprice, restore, get priced() { return priced; } };

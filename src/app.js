@@ -32,6 +32,7 @@ const reportRoutes = require('./routes/reports');
 const reconciliationRoutes = require('./routes/reconciliations');
 const backupRoutes = require('./routes/backups');
 const purchasingRoutes = require('./routes/purchasing');
+const restockRoutes = require('./routes/restock');
 const returnRoutes = require('./routes/returns');
 const stockCountRoutes = require('./routes/stockCounts');
 const dataRoutes = require('./routes/data');
@@ -106,6 +107,7 @@ function createApp() {
   app.use(API_BASE, reconciliationRoutes);
   app.use(API_BASE, backupRoutes);
   app.use(API_BASE, purchasingRoutes);
+  app.use(API_BASE, restockRoutes);
   app.use(API_BASE, returnRoutes);
   app.use(API_BASE, stockCountRoutes);
   app.use(API_BASE, dataRoutes);
@@ -140,7 +142,24 @@ function createApp() {
     }
   });
 
-  app.use(express.static(PUBLIC_DIR));
+  // TASK-073 §3. Two deliberate restraints here, both because §2's no-build-step
+  // decision means **no filename carries a content hash**:
+  //
+  //  - No `immutable`, and no long max-age on the application's own code. A cached
+  //    `app.js` that cannot be revalidated is an update the store never receives, and
+  //    this application updates itself in place. ETag and Last-Modified are left on, so
+  //    a reload is a 304 with no body rather than a fresh download.
+  //  - `/vendor` is the exception: it holds pinned third-party builds that change only
+  //    when their version does, so it is cached for a week.
+  //
+  // Compression is deliberately absent. Over Electron's loopback it would cost more CPU
+  // than it saves, and for the hosted build it belongs in nginx (web/nginx-shared.conf),
+  // which is where TASK-073 puts it.
+  app.use('/vendor', express.static(path.join(PUBLIC_DIR, 'vendor'), {
+    maxAge: '7d',
+    fallthrough: true,
+  }));
+  app.use(express.static(PUBLIC_DIR, { etag: true, lastModified: true }));
 
   app.use(API_BASE, (req, res) => {
     res.status(404).json({

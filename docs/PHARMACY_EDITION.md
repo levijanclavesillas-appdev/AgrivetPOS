@@ -322,3 +322,52 @@ What follows is in every store and switched on by these defaults.
   `retail_price` and `wholesale_price`.
 
 The schema is `909_wholesale_retail.sql`.
+
+## 15. What to buy (`PO-107`–`PO-109`, `TASK-072`)
+
+The store could always see *what is low* and could never keep a list of *what to buy*.
+`INV-109` is computed at read time and shown on `SCR-201` and the dashboard; all of it is a
+list on a screen that dies when the screen closes. The buyer read it, wrote on paper, and
+keyed the same products into `SCR-802` again, once per supplier.
+
+**`SCR-806` Restock**, from Buying, behind `TX-409` — the owner, the manager and the
+inventory clerk, and never a cashier. `TX-409` rather than `TX-422` because what comes out of
+the screen is a purchase order, and `04_UX_SPEC.md` §120 has already recorded what happens
+when the two are split: *a reorder list the stock role cannot open is a reorder list nobody
+reads.*
+
+- **The list builds itself** from three sources, each labelled on the row: below its minimum
+  (`INV-109`), **empty with no minimum set**, and whatever the buyer adds with the picker.
+- **"Coming" is the column it exists for.** `PO-109`: the suggestion nets off what is already
+  outstanding on `PENDING` and `PARTIALLY_RECEIVED` orders, so a buyer reading the low-stock
+  list twice in a week does not order the same forty sacks twice. The row shows the sum —
+  *100 wanted − 10 here − 40 coming* — rather than handing over a figure from nowhere.
+- **`suggested = max(0, minimum × cover − on hand − on order)`**, where `cover` is
+  `restock_cover_multiplier` (default 2). Every figure is editable and the stored quantity is
+  the one in the box. **A product with no minimum gets no suggestion at all** — the row asks,
+  because inventing a number for a store that never said how many it wants is how the other
+  columns stop being believed.
+- **It is asked for.** `DRAFT → SUBMITTED → APPROVED → ORDERED`, approval per line, with the
+  requester and the approver as distinct actors (`AUD-603`) and a reason on a rejection
+  (`AUD-601`). `restock_approval_required` defaults **on**. A store with one active user has
+  nobody to ask, so it approves its own and the row says `self_approved` — the view `INV-112`
+  takes of a count nobody could double-check.
+- **`PO-108`: it becomes orders.** One `DRAFT` purchase order per supplier, **in one
+  transaction**, linked both ways. A half-converted request is a store that ordered from two
+  of its three suppliers and believes it ordered from three. Lines with no supplier stay on
+  the request and are named, never dropped.
+- **`PO-107`: it moves no stock and commits nothing.** The only thing it creates is a draft
+  order the buyer still checks and sends.
+
+**`INV-109` is amended by this task, and the amendment is the substantive change.**
+`inventoryRepository.lowStock()` requires `min_stock_milli > 0`, so a product nobody set a
+minimum on was invisible to every low-stock surface **including at zero stock** — on a store
+stocked by hand, most of the catalogue. Restock carries an `OUT_OF_STOCK` derivation for
+exactly those. The low-stock surfaces themselves are unchanged.
+
+**The supplier on a line is derived, not stored.** The schema has no `preferred_supplier_id`
+and no `product_suppliers` table, so the default is the most recent `goods_receipt_items` row
+for that product, and the buyer changes it. A product never received has no default, and its
+line says so.
+
+The schema is `910_restock.sql`.

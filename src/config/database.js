@@ -23,6 +23,12 @@ let db = null;
 let dbPath = null;
 let depth = 0;
 
+// TASK-073 §5: bumped every time a connection is opened or closed, so a service that
+// caches a fact about the database can tell that the database underneath it changed.
+// A restore closes the connection and opens another over a different file
+// (restoreService.js:347), which is the case that makes a naive cache wrong.
+let generation = 0;
+
 function applyPragmas(handle) {
   for (const [name, value] of PRAGMAS) handle.pragma(`${name} = ${value}`);
 }
@@ -34,7 +40,13 @@ function open({ path: overridePath, readonly = false } = {}) {
   if (!overridePath) paths.ensureDataDir();
   db = openDatabase(dbPath, { readonly });
   applyPragmas(db);
+  generation += 1;
   return db;
+}
+
+/** The current connection's generation — see the counter's note above. */
+function currentGeneration() {
+  return generation;
 }
 
 function get() {
@@ -51,6 +63,7 @@ function close() {
   db = null;
   dbPath = null;
   depth = 0;
+  generation += 1;
 }
 
 /**
@@ -116,4 +129,5 @@ function currentPath() {
 
 module.exports = {
   PRAGMAS, open, get, isOpen, close, transaction, pragmaState, sizeBytes, currentPath,
+  currentGeneration,
 };

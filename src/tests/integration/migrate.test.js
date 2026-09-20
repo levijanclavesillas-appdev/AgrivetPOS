@@ -158,6 +158,8 @@ test('the migrations create exactly the tables of 05_TECH_SPEC.md §3.4', () => 
     'open_orders',
     // 909_wholesale_retail — a sari-sari store's pack prices and quick keys (TASK-070)
     'product_pack_prices', 'quick_keys',
+    // 910_restock — what to buy, asked for and approved (TASK-072)
+    'restock_requests', 'restock_request_items',
     // 013_negotiated_pricing
     'customer_prices', 'product_quantity_breaks',
     // 014_batches

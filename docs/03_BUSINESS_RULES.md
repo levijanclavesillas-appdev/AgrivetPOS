@@ -84,7 +84,7 @@ configuration, not a build-time assumption.
 | `INV-106` | Average cost is recomputed on `RECEIPT`, `OPENING` and positive `ADJUSTMENT` where a cost is supplied; it is **not** changed by sales, damage, expiry or negative adjustments, which consume at the prevailing average (`MON-004`). | 1.0 |
 | `INV-107` | **A stock-moving document and its movements commit together or not at all.** Sale, receipt, return, adjustment and count posting each run in one database transaction spanning the document, its lines, its movements, the on-hand update and any credit or till effect. | 1.0 |
 | `INV-108` | An adjustment requires a **reason from the configured list** and a user holding `TX-407`. A blank or free-text-only reason is rejected. Adjustments beyond a configured value threshold additionally require owner authorisation. | 1.0 |
-| `INV-109` | A product is **low stock** when `qty_on_hand_milli ≤ min_stock_milli` and it is active. Low stock is computed at read time, not stored. | 1.0 |
+| `INV-109` | A product is **low stock** when `qty_on_hand_milli ≤ min_stock_milli` and it is active. Low stock is computed at read time, not stored. **A product with no minimum set and no stock is *out of stock*, which is reported beside low stock and never silently omitted** — low stock needs a threshold to be under, and having nothing to sell does not (`TASK-072`). | 1.0, amended 1.3 |
 | `INV-110` | A stock count session freezes the counted products' expected quantities at session start and records variance against that snapshot, so that sales during the count do not corrupt the variance. | 1.1 |
 | `INV-111` | Posting a count writes one `COUNT_VARIANCE` movement per varying product, and none for products that matched. | 1.1 |
 | `INV-112` | A count must be **approved by a user other than the counter** where the store has more than one active user. | 1.1 |
@@ -178,6 +178,9 @@ configuration, not a build-time assumption.
 | `PO-205` | A receipt whose unit cost differs from the PO by more than the configured tolerance (default 10%) requires manager authorisation, because a mis-keyed cost silently destroys every margin figure. | 1.1 |
 | `PO-206` | A posted goods receipt is immutable; corrections are adjustments or supplier returns. | 1.1 |
 | `PO-207` | A direct receipt with no PO is permitted, requires a supplier, and follows every other receipt rule. | 1.1 |
+| `PO-107` | **A restocking request moves no stock and commits the store to nothing.** It is a question, not a document the supplier sees. Only a purchase order commits, and only a goods receipt moves stock. | 1.3 |
+| `PO-108` | An approved restocking request converts to one `DRAFT` purchase order per distinct supplier, **in one transaction**; each resulting order cites the request, and each converted line cites its order. A request approved by somebody other than its requester is `AUD-603`'s two actors, except on a store with one active user, where the request records that it approved itself. | 1.3 |
+| `PO-109` | A suggested restocking quantity **nets off the quantity already outstanding on open purchase orders**. A suggestion that ignores what is already coming is a defect, not a convenience. Where a product has no minimum stock, there is no suggestion: the figure is asked for, never inferred. | 1.3 |
 
 ## 9. Validation (`VR-*`)
 
@@ -296,6 +299,11 @@ SHIFT         OPEN ──▶ CLOSED                                     (POS-511
 
 PURCHASE      DRAFT ──▶ PENDING ──▶ PARTIALLY_RECEIVED ──▶ RECEIVED
 ORDER            └──▶ CANCELLED ◀──┘                              (PO-102, PO-105)
+
+RESTOCK       DRAFT ──▶ SUBMITTED ──▶ APPROVED ──▶ ORDERED        (PO-107, PO-108)
+REQUEST                       └──▶ REJECTED    (ORDERED only by the conversion; a store
+              DRAFT, SUBMITTED and APPROVED may each be CANCELLED   with one active user
+              REJECTED and ORDERED are final                        approves its own)
 
 STOCK COUNT   DRAFT ──▶ COUNTING ──▶ REVIEW ──▶ POSTED            (INV-110, INV-112)
                                         └──▶ CANCELLED

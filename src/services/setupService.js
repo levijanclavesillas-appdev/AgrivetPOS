@@ -49,8 +49,30 @@ const STEPS = Object.freeze(['store', 'tax', 'owner', 'recovery', 'backup']);
  * one with an owner and no profile has no tax mode, so either half alone is a state
  * the wizard must finish rather than a state to serve the application from.
  */
+/**
+ * TASK-073 §5: **only the `true` answer is cached, and only for one connection.**
+ *
+ * This is asked on every API request by the setup gate (middleware/setup.js:34), and
+ * answering it cost two COUNT queries every time, forever, about a fact that changes
+ * once in the life of an installation.
+ *
+ * `false` is never cached — it is the state the wizard is in the middle of leaving, and
+ * a cache of it would outlive the step that ends it. `true` is cached against the
+ * database generation, so a restore, which closes the connection and opens another over
+ * a different file, is not served a stale yes.
+ *
+ * **What makes caching `true` safe is `VR-503`**, not an assumption: the store profile
+ * has no delete path, and userService.assertNotLastOwner() refuses to demote or
+ * deactivate the last active owner. So once complete, a given database cannot become
+ * incomplete underneath us. If that rule is ever relaxed, this cache must go with it.
+ */
+let completeForGeneration = null;
+
 function isComplete() {
-  return storeProfileRepository.count() > 0 && userRepository.countActiveOwners() > 0;
+  if (completeForGeneration === db.currentGeneration()) return true;
+  const complete = storeProfileRepository.count() > 0 && userRepository.countActiveOwners() > 0;
+  if (complete) completeForGeneration = db.currentGeneration();
+  return complete;
 }
 
 /**

@@ -325,12 +325,24 @@ function search(opts = {}) {
 
 // ── Raising and editing (PO-101, PO-104) ────────────────────────────────────
 
-function create(input, actor) {
+/**
+ * Raise a DRAFT order **inside a transaction the caller already owns.**
+ *
+ * 05_TECH_SPEC.md §8.3 forbids nesting one transaction in another, and TASK-072 needs to
+ * raise several orders as one unit: PO-108 converts a restocking request into one order
+ * per supplier, and a conversion that wrote two of three would leave a store believing it
+ * had ordered from a supplier it had not. So the body lives here, `create()` wraps it in
+ * a transaction of its own for every ordinary caller, and `convert()` calls this one from
+ * within its own.
+ *
+ * It is not exported for general use: a caller that is not already in a transaction wants
+ * `create()`, and one that is must be certain it owns the whole unit of work.
+ */
+function createWithin(input, actor, { at }) {
   const supplier = supplierService.requireActive(input.supplierId);
   const resolved = resolveLines(input.lines);
-  const at = clock.nowUtc();
 
-  return db.transaction(() => {
+  {
     // Allocated inside the transaction, so a rollback frees the number (VR-103).
     const poNo = sequenceService.next('PURCHASE_ORDER', { at });
 
@@ -368,7 +380,12 @@ function create(input, actor) {
     });
 
     return get(row.id);
-  });
+  }
+}
+
+function create(input, actor) {
+  const at = clock.nowUtc();
+  return db.transaction(() => createWithin(input, actor, { at }));
 }
 
 /**
@@ -651,4 +668,6 @@ module.exports = {
   STATUSES, TRANSITIONS, STATUS_LABELS, OPEN_STATUSES,
   assertTransition, resolveLines, linesDiffer, presentLine, toPublic,
   find, get, search, create, update, submit, cancel, closeShort, refreshStatusAfterReceipt,
+  // TASK-072 / PO-108 only — see its note. Every other caller wants `create`.
+  createWithin,
 };
