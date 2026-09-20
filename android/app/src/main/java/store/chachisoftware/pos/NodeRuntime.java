@@ -78,10 +78,25 @@ final class NodeRuntime {
             // including a Documents path saved by a build that had "all files access".
             if (fixed) Os.setenv("AGRIVET_APP_BACKUP_DIR", backupFolder, true);
             if (copiedTo != null) Os.setenv("AGRIVET_APP_BACKUP_COPY", copiedTo.replaceAll("/+$", ""), true);
-            // OPS-001: where a backup goes if the folder above ever refuses it. The app's own
-            // folder on shared storage is one it can always write, on every Android version.
-            File spare = context.getExternalFilesDir("ChachiPOS Backups");
-            if (spare != null) Os.setenv("AGRIVET_BACKUP_FALLBACK_DIR", spare.getAbsolutePath(), true);
+            // OPS-001: where a backup goes if the folder above ever refuses it.
+            //
+            // **Internal storage, and deliberately not getExternalFilesDir("ChachiPOS
+            // Backups").** That was this line until now, and it is the very folder
+            // `backupFolder()` hands over as the target whenever the app fixes the folder —
+            // which is every Android 11+ device, and every Android 8–10 one where the storage
+            // permission was refused. backupService.fallbackFolder() rejects a spare equal to
+            // its target, quite rightly, so the fallback added for exactly this case was
+            // switched off on the path that needed it most: a write that failed had nowhere
+            // else to go, and the owner was told "the backup could not be written (EACCES)"
+            // with no second folder named and no backup taken.
+            //
+            // getFilesDir() is the one place that cannot refuse: it needs no permission, it is
+            // never unmounted, and it does not depend on the state of shared storage — which
+            // is what the target depends on. It does not survive an uninstall, so it is a last
+            // resort and the Backups screen says so loudly (backupService writes a
+            // BACKUP_FAILED row naming both folders whenever it lands here).
+            File spare = new File(context.getFilesDir(), "backup-fallback");
+            Os.setenv("AGRIVET_BACKUP_FALLBACK_DIR", spare.getAbsolutePath(), true);
             Os.setenv("HOME", context.getFilesDir().getAbsolutePath(), true);
             Os.setenv("TMPDIR", context.getCacheDir().getAbsolutePath(), true);
             // Android has no /etc/localtime for Node to read. The ledger is UTC and the

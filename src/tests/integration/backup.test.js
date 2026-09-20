@@ -769,11 +769,47 @@ test('OPS-001: a folder that refuses the file does not lose the backup — it is
     const trail = require('../../repositories/auditRepository').list({ action: 'BACKUP_FAILED', limit: 5 });
     assert.match(trail[0].reason, /refused the file \(EPERM\); this one was written to/);
 
-    // No spare, and the failure stands, as it did before.
+    // No spare, and the failure stands, as it did before — but it now names the folder
+    // that refused and says why nothing caught it, which is what makes a report of this
+    // answerable without guesswork.
     delete process.env.AGRIVET_BACKUP_FALLBACK_DIR;
     const refused = backupService.run({ trigger: 'MANUAL', actor: owner });
     assert.equal(refused.ok, false);
-    assert.match(refused.error, /could not be written \(EPERM\)/);
+    assert.match(refused.error, /could not be written to \/sys\/chachi-backups-test \(EPERM\)/);
+    assert.match(refused.error, /no spare folder is configured/);
+  } finally {
+    delete process.env.AGRIVET_BACKUP_FALLBACK_DIR;
+    db.transaction(() => settingsService.set('backup_folder', backupFolder, owner));
+  }
+});
+
+/**
+ * The fault this guards is the one that reached a store: on Android the app handed
+ * `getExternalFilesDir("ChachiPOS Backups")` as **both** the backup folder and the spare
+ * whenever it fixed the folder — every Android 11+ device, and every Android 8–10 one
+ * where the storage permission was refused. `fallbackFolder` rightly refuses a spare that
+ * is the folder which just failed, so the fallback was switched off precisely where it was
+ * needed, and the owner saw "the backup could not be written (EACCES)" with no second
+ * folder named, no backup taken, and nothing in the message to work from.
+ */
+test('OPS-001: a spare that is the folder that just refused is no spare, and the message says so', () => {
+  const refuses = '/sys/chachi-backups-same';
+  db.get().prepare("UPDATE system_settings SET value = ? WHERE key = 'backup_folder'").run(refuses);
+  // The Android fault, exactly: the spare and the target are one folder.
+  process.env.AGRIVET_BACKUP_FALLBACK_DIR = refuses;
+  try {
+    const result = backupService.run({ trigger: 'MANUAL', actor: owner });
+    assert.equal(result.ok, false, 'it cannot fall back to the folder that refused it');
+    assert.match(result.error, /could not be written to \/sys\/chachi-backups-same \(EPERM\)/);
+    assert.match(result.error, /the spare folder is the one that refused it/,
+      'the reason the safety net did not catch it is on the message, not left to be deduced');
+
+    // And with a spare that is genuinely elsewhere, the same failure is survived.
+    const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'agrivet-spare-2-'));
+    process.env.AGRIVET_BACKUP_FALLBACK_DIR = elsewhere;
+    const second = backupService.run({ trigger: 'MANUAL', actor: owner });
+    assert.equal(second.ok, true, second.error);
+    assert.equal(path.dirname(second.file_path), elsewhere);
   } finally {
     delete process.env.AGRIVET_BACKUP_FALLBACK_DIR;
     db.transaction(() => settingsService.set('backup_folder', backupFolder, owner));

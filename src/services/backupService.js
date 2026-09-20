@@ -93,10 +93,23 @@ function folder() {
  */
 let lastFallback = null;
 
+/**
+ * Returns the spare folder, or **why there is none** — never a bare null.
+ *
+ * The distinction is the whole point. A spare that is the folder which just refused the
+ * file is no spare at all, and returning null for it silently disabled this fallback on
+ * Android for every fixed-folder install: `NodeRuntime` handed the same
+ * `getExternalFilesDir("ChachiPOS Backups")` as both the target and the spare, so a write
+ * that failed had nowhere to go and the owner was told only that it could not be written.
+ * A misconfiguration that turns a safety net off should say so, not look like no failure.
+ */
 function fallbackFolder(target) {
   const spare = process.env.AGRIVET_BACKUP_FALLBACK_DIR || null;
-  if (!spare) return null;
-  return path.resolve(spare) === path.resolve(target) ? null : spare;
+  if (!spare) return { spare: null, why: 'no spare folder is configured' };
+  if (path.resolve(spare) === path.resolve(target)) {
+    return { spare: null, why: 'the spare folder is the one that refused it' };
+  }
+  return { spare, why: null };
 }
 
 function run({ trigger = 'MANUAL', actor = null, now = clock.nowUtc() } = {}) {
@@ -124,11 +137,17 @@ function run({ trigger = 'MANUAL', actor = null, now = clock.nowUtc() } = {}) {
     // A folder the store can no longer write — Android tightening what a folder allows, a
     // USB stick pulled out, a permission withdrawn. Rather than skip the backup, take it
     // where this installation can always write and say so, loudly, on the Backups screen.
-    const spare = fallbackFolder(target);
+    const { spare, why } = fallbackFolder(target);
     if (!spare) {
+      // **The folder is named, and so is the reason nothing caught it.** This read "The
+      // backup could not be written (EACCES)" and nothing else — true, and almost
+      // useless: it named neither the folder that refused nor the fact that the spare
+      // had been ruled out, so it could not be told apart from the case below and a
+      // store reporting it could only be answered with guesswork.
       return logFailure({
         trigger, at, actor, filePath, filename,
-        error: `The backup could not be written (${err.code || err.message}).`,
+        error: `The backup could not be written to ${target} (${err.code || err.message}), `
+          + `and ${why}.`,
         ruleId: 'OPS-001',
       });
     }
