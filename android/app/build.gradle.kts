@@ -103,8 +103,8 @@ android {
         applicationId = "store.chachisoftware.pharmacypos"
         // Android 8.0. Every tablet sold as a POS in the last several years is newer.
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
+        targetSdk = 36
+        versionCode = 8
         versionName = appVersion
 
         ndk {
@@ -116,8 +116,8 @@ android {
             cmake {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
-                    "-DLIBNODE_DIR=${libnodeDir.absolutePath}",
-                    "-DBETTER_SQLITE3_DIR=${File(repoRoot, "node_modules/better-sqlite3").absolutePath}",
+                    "-DLIBNODE_DIR=${libnodeDir.absolutePath.replace("\\", "/")}",
+                    "-DBETTER_SQLITE3_DIR=${File(repoRoot, "node_modules/better-sqlite3").absolutePath.replace("\\", "/")}",
                 )
             }
         }
