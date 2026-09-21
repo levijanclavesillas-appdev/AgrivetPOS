@@ -11,45 +11,57 @@ import { h, clear, openExternally } from './ui.js';
 import { openAccount, renderRecover } from './account.js';
 import { manila } from './format.js';
 import { setEmptyIcon } from './pictures.js';
-import { createPos } from '../pos/view.js';
-import { createPayment } from '../payment/view.js';
-import { createReceipt } from '../receipt/view.js';
-import { createReceiptList } from '../receipt/list.js';
-import { createDashboard } from '../reports/dashboard.js';
-import { createReport } from '../reports/report.js';
-import { createBackup } from '../admin/backup.js';
-import { createHealth } from '../admin/health.js';
-import { createLicence } from '../admin/licence.js';
-import { createDevices } from '../admin/devices.js';
-import { createUsers } from '../admin/users.js';
-import { createSettings } from '../admin/settings.js';
-import { createAudit } from '../admin/audit.js';
-import { createData } from '../admin/data.js';
-import { createProductList } from '../catalogue/list.js';
-import { createProductEditor } from '../catalogue/editor.js';
-import { createAdjustment } from '../catalogue/adjustment.js';
-import { createBatchList } from '../catalogue/batches.js';
-import { createRecall } from '../catalogue/recall.js';
-import { createStockCount } from '../catalogue/count.js';
-import { createQuickKeys } from '../catalogue/quick-keys.js';
-import { createPriceChange } from '../catalogue/prices.js';
-import { createCustomerList } from '../customers/list.js';
-import { createCustomerProfile } from '../customers/profile.js';
-import { createStatement } from '../customers/statement.js';
-import { createAgeing } from '../reports/ageing.js';
-import { createReconciliation } from '../reports/reconciliation.js';
-import { createAnalysis } from '../reports/analysis.js';
-import { createMovements } from '../reports/movements.js';
-import { createCollection } from '../customers/collection.js';
-import { createShift } from '../shift/view.js';
-import { createShiftSummary } from '../shift/summary.js';
-import { createPurchaseOrders } from '../purchasing/orders.js';
-import { createPurchaseOrder } from '../purchasing/order.js';
-import { createGoodsReceipt } from '../purchasing/receive.js';
-import { createDeliveries } from '../purchasing/deliveries.js';
-import { createRestock } from '../purchasing/restock.js';
-import { createReturn } from '../returns/view.js';
-import { createSuppliers } from '../purchasing/suppliers.js';
+
+/**
+ * The screens, each loaded the first time somebody opens it (TASK-073 §2).
+ *
+ * Importing all of them up front made the browser fetch and parse the whole
+ * application — every screen, 715 KB — before a cashier could type a username.
+ * `import()` is still vanilla ES modules (05_TECH_SPEC.md §2), and the browser keeps a
+ * module once it has it, so a second visit costs what it always did. `boot.test.js`
+ * fails if a screen is imported statically again.
+ */
+const SCREENS = {
+  createPos: () => import('../pos/view.js'),
+  createPayment: () => import('../payment/view.js'),
+  createReceipt: () => import('../receipt/view.js'),
+  createReceiptList: () => import('../receipt/list.js'),
+  createDashboard: () => import('../reports/dashboard.js'),
+  createReport: () => import('../reports/report.js'),
+  createBackup: () => import('../admin/backup.js'),
+  createHealth: () => import('../admin/health.js'),
+  createLicence: () => import('../admin/licence.js'),
+  createDevices: () => import('../admin/devices.js'),
+  createUsers: () => import('../admin/users.js'),
+  createSettings: () => import('../admin/settings.js'),
+  createAudit: () => import('../admin/audit.js'),
+  createData: () => import('../admin/data.js'),
+  createProductList: () => import('../catalogue/list.js'),
+  createProductEditor: () => import('../catalogue/editor.js'),
+  createAdjustment: () => import('../catalogue/adjustment.js'),
+  createBatchList: () => import('../catalogue/batches.js'),
+  createRecall: () => import('../catalogue/recall.js'),
+  createStockCount: () => import('../catalogue/count.js'),
+  createQuickKeys: () => import('../catalogue/quick-keys.js'),
+  createPriceChange: () => import('../catalogue/prices.js'),
+  createCustomerList: () => import('../customers/list.js'),
+  createCustomerProfile: () => import('../customers/profile.js'),
+  createStatement: () => import('../customers/statement.js'),
+  createAgeing: () => import('../reports/ageing.js'),
+  createReconciliation: () => import('../reports/reconciliation.js'),
+  createAnalysis: () => import('../reports/analysis.js'),
+  createMovements: () => import('../reports/movements.js'),
+  createCollection: () => import('../customers/collection.js'),
+  createShift: () => import('../shift/view.js'),
+  createShiftSummary: () => import('../shift/summary.js'),
+  createPurchaseOrders: () => import('../purchasing/orders.js'),
+  createPurchaseOrder: () => import('../purchasing/order.js'),
+  createGoodsReceipt: () => import('../purchasing/receive.js'),
+  createDeliveries: () => import('../purchasing/deliveries.js'),
+  createRestock: () => import('../purchasing/restock.js'),
+  createReturn: () => import('../returns/view.js'),
+  createSuppliers: () => import('../purchasing/suppliers.js'),
+};
 
 /** §2's role → landing screen. */
 // §2's role → landing screen. MANAGER and OWNER land on SCR-601, which lives under
@@ -310,6 +322,7 @@ export function createApp({ root }) {
    * against its shift (POS-105), and the note says so rather than letting it look lost.
    */
   function signOut() {
+    navigation += 1;
     if (current?.unmount) current.unmount();
     current = null;
     const name = session ? session.username : null;
@@ -350,8 +363,47 @@ export function createApp({ root }) {
     return el;
   }
 
+  /**
+   * Which navigation is the latest. A screen's module can take a moment to arrive the
+   * first time it is opened — over the internet on the hosted build — and somebody who
+   * clicked on in the meantime must land where they clicked last, not wherever the
+   * slower load happens to finish.
+   */
+  let navigation = 0;
+
+  /**
+   * Load a screen's module, then swap it in — unless somebody has gone elsewhere since.
+   * `place` is where a failed load says so: an admin tab's own panel, so the tabs stay.
+   */
+  async function open(name, create, place = main) {
+    const turn = ++navigation;
+    // The screen being left goes now, as it did when every module was already loaded:
+    // left standing while the next one arrives, it can still be clicked, and a click on
+    // it would send somebody somewhere they have already decided not to be.
+    if (current?.unmount) current.unmount();
+    current = null;
+    clear(place);
+    let module;
+    try {
+      module = await SCREENS[name]();
+    } catch {
+      if (turn === navigation) {
+        ui.error(place, {
+          message: 'This screen could not be loaded. Check the connection and try again.',
+          retry: () => open(name, create, place),
+        });
+      }
+      return null;
+    }
+    if (turn !== navigation) return null;
+    current = create(module[name]);
+    current.mount();
+    return current;
+  }
+
   async function show(id) {
     if (current?.unmount) current.unmount();
+    current = null;
     clear(main);
     // Low stock is a filter of the products list, not a section of its own, so the
     // rail keeps Products highlighted rather than highlighting nothing.
@@ -384,7 +436,7 @@ export function createApp({ root }) {
 
   /** SCR-601. MANAGER and OWNER land here (04_UX_SPEC.md §2). */
   function showDashboard() {
-    current = createDashboard({
+    return open('createDashboard', (createDashboard) => createDashboard({
       root: host(),
       session,
       // A tile opens either a report or a screen; the low-stock one opens SCR-204.
@@ -395,17 +447,14 @@ export function createApp({ root }) {
       // OPS-007's expiry alerts open SCR-206 on the product they name, which is the
       // difference between being told about expired stock and being able to clear it.
       onOpenBatches: (productId) => { renderRail('products'); showBatches(productId); },
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   // ── SCR-201 – SCR-204 ─────────────────────────────────────────────────────
 
   /** The catalogue list, and the low-stock filter of it (TASK-036). */
   function showProducts({ mode = 'all' } = {}) {
-    if (current?.unmount) current.unmount();
-    current = createProductList({
+    return open('createProductList', (createProductList) => createProductList({
       root: host(),
       mode,
       onOpen: (id) => showProductEditor(id),
@@ -420,14 +469,11 @@ export function createApp({ root }) {
       // SCR-204 is a filter of this list, so it is reachable from it — and not only
       // from a dashboard the inventory clerk cannot open (04_UX_SPEC.md §2.1).
       onMode: (next) => show(next === 'low-stock' ? 'low-stock' : 'products'),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showProductEditor(productId) {
-    if (current?.unmount) current.unmount();
-    current = createProductEditor({
+    return open('createProductEditor', (createProductEditor) => createProductEditor({
       root: host(),
       productId,
       // TASK-053 / P-2: the ticks a new product starts with are the store's industry's.
@@ -436,50 +482,39 @@ export function createApp({ root }) {
       // A newly created product reopens in the editor rather than dropping back to the
       // list: its packs, prices and barcodes are the next four things anybody does.
       onClose: (createdId) => (createdId ? showProductEditor(createdId) : showProducts()),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   // ── SCR-401 – SCR-403 ─────────────────────────────────────────────────────
 
   function showCustomers() {
-    if (current?.unmount) current.unmount();
     renderRail('customers');
-    current = createCustomerList({
+    return open('createCustomerList', (createCustomerList) => createCustomerList({
       root: host(),
       onOpen: (id) => showCustomer(id),
       onCollect: (id) => showCollection(id),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showCustomer(customerId) {
-    if (current?.unmount) current.unmount();
-    current = createCustomerProfile({
+    return open('createCustomerProfile', (createCustomerProfile) => createCustomerProfile({
       root: host(),
       customerId,
       session,
       onBack: () => showCustomers(),
       onCollect: (id) => showCollection(id),
       onStatement: (id) => showStatement(id),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showCollection(customerId) {
-    if (current?.unmount) current.unmount();
-    current = createCollection({
+    return open('createCollection', (createCollection) => createCollection({
       root: host(),
       customerId,
       onBack: () => showCustomer(customerId),
       // Back to the profile, where the new balance and the settled invoices are.
       onDone: (id) => showCustomer(id),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-501 – SCR-503. `shiftId` opens another user's drawer, from the POS-508 alert. */
@@ -488,38 +523,31 @@ export function createApp({ root }) {
     // so it stops knowing. A stale "closed" would send somebody who had just opened
     // their till to the password form instead of the keypad.
     shiftOpen = null;
-    if (current?.unmount) current.unmount();
     renderRail('shift');
-    current = createShift({
+    return open('createShift', (createShift) => createShift({
       root: host(),
       session,
       shiftId,
       onClosed: (result) => showShiftSummary(result),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showShiftSummary(result) {
-    if (current?.unmount) current.unmount();
-    current = createShiftSummary({
+    return open('createShiftSummary', (createShiftSummary) => createShiftSummary({
       root: host(),
       result,
       // POS-511: a closed shift is immutable, so there is nowhere to go back to. The
       // cashier lands where the day starts again.
       onDone: () => show(LANDING[session.role] || 'pos'),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   // ── SCR-801 – SCR-805 ─────────────────────────────────────────────────────
 
   /** SCR-801. The rail lands here; everything else in Buying is reached from it. */
   function showPurchaseOrders() {
-    if (current?.unmount) current.unmount();
     renderRail('buying');
-    current = createPurchaseOrders({
+    return open('createPurchaseOrders', (createPurchaseOrders) => createPurchaseOrders({
       root: host(),
       onOpen: (id) => showPurchaseOrder(id),
       onNew: () => showPurchaseOrder(null),
@@ -529,56 +557,44 @@ export function createApp({ root }) {
       onDeliveries: () => showDeliveries(),
       // SCR-806: what has not, and should.
       onRestock: () => showRestock(),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-805 — the deliveries recorded, and one of them read back (PO-206: never edited). */
   function showDeliveries() {
-    if (current?.unmount) current.unmount();
     renderRail('buying');
-    current = createDeliveries({
+    return open('createDeliveries', (createDeliveries) => createDeliveries({
       root: host(),
       onBack: () => showPurchaseOrders(),
       onOpenOrder: (id) => showPurchaseOrder(id),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-806 — what to buy, asked for and approved (TASK-072, PO-107). */
   function showRestock() {
-    if (current?.unmount) current.unmount();
     renderRail('buying');
-    current = createRestock({
+    return open('createRestock', (createRestock) => createRestock({
       root: host(),
       onBack: () => showPurchaseOrders(),
       onOpenOrder: (id) => showPurchaseOrder(id),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-802. `poId` null raises a new one. */
   function showPurchaseOrder(poId) {
-    if (current?.unmount) current.unmount();
     renderRail('buying');
-    current = createPurchaseOrder({
+    return open('createPurchaseOrder', (createPurchaseOrder) => createPurchaseOrder({
       root: host(),
       poId,
       onBack: () => showPurchaseOrders(),
       onReceive: (id) => showGoodsReceipt(id),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-803. `poId` null is FT-504's counter purchase (PO-207). */
   function showGoodsReceipt(poId) {
-    if (current?.unmount) current.unmount();
     renderRail('buying');
-    current = createGoodsReceipt({
+    return open('createGoodsReceipt', (createGoodsReceipt) => createGoodsReceipt({
       root: host(),
       poId,
       onBack: () => (poId ? showPurchaseOrder(poId) : showPurchaseOrders()),
@@ -587,9 +603,7 @@ export function createApp({ root }) {
       // A delivery against an order lands on the order, which shows what is still
       // outstanding; one without an order lands on the list it has just joined.
       onPosted: (gr) => (gr.po_id ? showPurchaseOrder(gr.po_id) : showDeliveries()),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /**
@@ -599,28 +613,22 @@ export function createApp({ root }) {
    * goods and their slip, and the next thing that happens at that counter is a sale.
    */
   function showReturn(forSaleId = null) {
-    if (current?.unmount) current.unmount();
     renderRail('returns');
-    current = createReturn({
+    return open('createReturn', (createReturn) => createReturn({
       root: host(),
       saleId: forSaleId,
       onBack: () => show(LANDING[session.role] || 'pos'),
       onDone: () => show(LANDING[session.role] || 'pos'),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-804. */
   function showSuppliers() {
-    if (current?.unmount) current.unmount();
     renderRail('buying');
-    current = createSuppliers({
+    return open('createSuppliers', (createSuppliers) => createSuppliers({
       root: host(),
       onBack: () => showPurchaseOrders(),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /**
@@ -630,34 +638,25 @@ export function createApp({ root }) {
    * catalogue, and TX-407's roles are the ones already on that section.
    */
   function showStockCount(id = null) {
-    if (current?.unmount) current.unmount();
     renderRail('products');
-    current = createStockCount({
+    return open('createStockCount', (createStockCount) => createStockCount({
       root: host(),
       session,
       countId: id,
       onBack: () => showProducts(),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-209 — many prices at once (TX-411), reached from the products list. */
   function showPriceChange() {
-    if (current?.unmount) current.unmount();
     renderRail('products');
-    current = createPriceChange({ root: host(), onBack: () => showProducts() });
-    current.mount();
-    return current;
+    return open('createPriceChange', (createPriceChange) => createPriceChange({ root: host(), onBack: () => showProducts() }));
   }
 
   /** POS-113 (TASK-070) — the counter's quick keys, reached from the products list. */
   function showQuickKeys() {
-    if (current?.unmount) current.unmount();
     renderRail('products');
-    current = createQuickKeys({ root: host(), onBack: () => showProducts() });
-    current.mount();
-    return current;
+    return open('createQuickKeys', (createQuickKeys) => createQuickKeys({ root: host(), onBack: () => showProducts() }));
   }
 
   /**
@@ -666,40 +665,31 @@ export function createApp({ root }) {
    * arrives by, because the alert is what told them there was anything to look at.
    */
   function showBatches(productId) {
-    if (current?.unmount) current.unmount();
-    current = createBatchList({
+    return open('createBatchList', (createBatchList) => createBatchList({
       root: host(),
       productId,
       session,
       onClose: () => showProducts(),
       onRecall: (batchId) => showRecall(batchId, productId),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-207. INV-206's list of people, one step from the batch it is about. */
   function showRecall(batchId, productId) {
-    if (current?.unmount) current.unmount();
-    current = createRecall({
+    return open('createRecall', (createRecall) => createRecall({
       root: host(),
       batchId,
       session,
       onClose: () => showBatches(productId),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showAdjustment(productId) {
-    if (current?.unmount) current.unmount();
-    current = createAdjustment({
+    return open('createAdjustment', (createAdjustment) => createAdjustment({
       root: host(),
       productId,
       onClose: () => showProducts(),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /**
@@ -712,19 +702,19 @@ export function createApp({ root }) {
     // Each tab carries the TX it needs, and a role sees the tabs it holds (TASK-059).
     // Inside a tab, what the role may not do is hidden or locked by the tab itself —
     // restore and import are the owner's, and so are the owner-only settings.
-    { id: 'users', label: 'Users', screen: 'SCR-701', tx: 'TX-423', create: createUsers },
-    { id: 'settings', label: 'Settings', screen: 'SCR-702', tx: 'TX-424', create: createSettings },
-    { id: 'audit', label: 'Audit', screen: 'SCR-703', tx: 'TX-429', create: createAudit },
-    { id: 'backup', label: 'Backups', screen: 'SCR-704', tx: 'TX-428', create: createBackup },
+    { id: 'users', label: 'Users', screen: 'SCR-701', tx: 'TX-423', create: 'createUsers' },
+    { id: 'settings', label: 'Settings', screen: 'SCR-702', tx: 'TX-424', create: 'createSettings' },
+    { id: 'audit', label: 'Audit', screen: 'SCR-703', tx: 'TX-429', create: 'createAudit' },
+    { id: 'backup', label: 'Backups', screen: 'SCR-704', tx: 'TX-428', create: 'createBackup' },
     // SCR-706. Beside the backups because they answer the same question from two
     // sides: how a store's data survives this machine.
-    { id: 'data', label: 'Export / import', screen: 'SCR-706', tx: 'TX-426', create: createData },
-    { id: 'health', label: 'Health', screen: 'SCR-705', tx: 'TX-428', create: createHealth },
+    { id: 'data', label: 'Export / import', screen: 'SCR-706', tx: 'TX-426', create: 'createData' },
+    { id: 'health', label: 'Health', screen: 'SCR-705', tx: 'TX-428', create: 'createHealth' },
     // SCR-707 (TASK-048): the store's subscription — linking this POS, and its state.
     // Readable by whoever holds settings; linking and "Check now" are the owner's (LIC-004).
-    { id: 'subscription', label: 'Subscription', screen: 'SCR-707', tx: 'TX-424', create: createLicence },
+    { id: 'subscription', label: 'Subscription', screen: 'SCR-707', tx: 'TX-424', create: 'createLicence' },
     // TASK-063: the store on the web and its devices — the owner's.
-    { id: 'devices', label: 'Web & devices', screen: 'SCR-708', tx: 'TX-423', create: createDevices },
+    { id: 'devices', label: 'Web & devices', screen: 'SCR-708', tx: 'TX-423', create: 'createDevices' },
   ];
   // Users first: on the day a store is installed it is the first thing anybody needs,
   // and leaving it further in is how a store ends up trading on the owner login.
@@ -753,78 +743,59 @@ export function createApp({ root }) {
     if (active && tabs.scrollWidth > tabs.clientWidth) active.scrollIntoView({ block: 'nearest', inline: 'center' });
 
     const chosen = panels.find((panel) => panel.id === adminPanel);
-    if (current?.unmount) current.unmount();
-    current = chosen.create({ root: panelHost, session });
-    current.mount();
-    return current;
+    return open(chosen.create, (create) => create({ root: panelHost, session }), panelHost);
   }
 
   /** SCR-602 – SCR-604, reached from the tile that carries their figure. */
   /** SCR-404. CR-302's document, from the profile it is about. */
   function showStatement(customerId) {
-    if (current?.unmount) current.unmount();
-    current = createStatement({
+    return open('createStatement', (createStatement) => createStatement({
       root: host(),
       customerId,
       onBack: () => showCustomer(customerId),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-605. FT-406's report, and the telephone list a store works from. */
   function showAgeing() {
-    if (current?.unmount) current.unmount();
-    current = createAgeing({
+    return open('createAgeing', (createAgeing) => createAgeing({
       root: host(),
       onBack: () => { renderRail('reports'); showDashboard(); },
       // A row is a customer, and the next thing an owner wants is their statement.
       onOpenCustomer: (customerId) => { renderRail('customers'); showCustomer(customerId); },
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-606. RPT-105's comparison, which changes no figure anywhere. */
   function showReconciliation(range = null) {
-    if (current?.unmount) current.unmount();
-    current = createReconciliation({
+    return open('createReconciliation', (createReconciliation) => createReconciliation({
       root: host(),
       range,
       onBack: () => { renderRail('reports'); showDashboard(); },
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-607. FT-602's v1.2 half — the day's total, in the groupings a store acts on. */
   function showAnalysis(range = null, tab = 'by-category') {
-    if (current?.unmount) current.unmount();
-    current = createAnalysis({
+    return open('createAnalysis', (createAnalysis) => createAnalysis({
       root: host(),
       range,
       tab,
       onBack: () => { renderRail('reports'); showDashboard(); },
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   /** SCR-608. INV-102's ledger read as a report — TX-422, so a different readership. */
   function showMovements(range = null) {
-    if (current?.unmount) current.unmount();
-    current = createMovements({
+    return open('createMovements', (createMovements) => createMovements({
       root: host(),
       range,
       onBack: () => { renderRail('reports'); showDashboard(); },
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showReport(report) {
-    if (current?.unmount) current.unmount();
-    current = createReport({
+    return open('createReport', (createReport) => createReport({
       root: host(),
       session,
       report,
@@ -837,14 +808,13 @@ export function createApp({ root }) {
       // it got there are the same question from two sides.
       onAnalyse: (range) => { renderRail('reports'); showAnalysis(range); },
       onMovements: (range) => { renderRail('reports'); showMovements(range); },
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   async function showPos() {
     // POS-501 / FR_5.1: the POS refuses with an "open your shift" prompt rather than
     // failing at payment.
+    const turn = ++navigation;
     let shift = null;
     try {
       shift = await api.get('/shifts/current');
@@ -853,9 +823,10 @@ export function createApp({ root }) {
       // Stale after an idle period, which is why the refusal is still handled there.
       shiftOpen = Boolean(shift.open);
     } catch (err) {
-      ui.error(main, { message: err.message, retry: () => show('pos') });
+      if (turn === navigation) ui.error(main, { message: err.message, retry: () => show('pos') });
       return null;
     }
+    if (turn !== navigation) return null;
 
     if (!shift.open) {
       // POS-501. The open form lives on SCR-501 and nowhere else: two forms that open
@@ -868,31 +839,26 @@ export function createApp({ root }) {
       return null;
     }
 
-    current = createPos({
+    return open('createPos', (createPos) => createPos({
       root: host(),
       session,
       onPay: ({ cart, priced, approver }) => showPayment({ cart, priced, approver }),
-    });
-    current.mount();
-    return current;
+    }));
   }
 
   function showPayment({ cart, priced, approver }) {
-    if (current?.unmount) current.unmount();
-    current = createPayment({
+    return open('createPayment', (createPayment) => createPayment({
       root: host(),
       cart,
       priced,
       approver,
       onCancel: () => showPos(),
       onComplete: (sale) => showReceipt(sale),
-    });
-    current.mount();
+    }));
   }
 
   function showReceipt(sale, { from = null } = {}) {
-    if (current?.unmount) current.unmount();
-    current = createReceipt({
+    return open('createReceipt', (createReceipt) => createReceipt({
       root: host(),
       sale,
       printed: sale.printed ?? null,
@@ -900,14 +866,12 @@ export function createApp({ root }) {
       // Only when it was opened from the list: reached from a completed sale, SCR-304
       // has one way on and it is the next customer.
       onBack: from === 'receipts' ? () => show('receipts') : null,
-    });
-    current.mount();
+    }));
   }
 
   /** SCR-306. The shift's receipts, and the way back to one after the moment has passed. */
   function showReceipts() {
-    if (current?.unmount) current.unmount();
-    current = createReceiptList({
+    return open('createReceiptList', (createReceiptList) => createReceiptList({
       root: host(),
       onOpenSale: async (saleId) => {
         try {
@@ -921,8 +885,7 @@ export function createApp({ root }) {
         }
       },
       onBack: () => showPos(),
-    });
-    current.mount();
+    }));
   }
 
   function renderRail(activeId) {

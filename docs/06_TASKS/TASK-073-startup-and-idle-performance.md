@@ -4,7 +4,7 @@
 measured on a machine slower than the one these figures came from · **Rules:** `SEC-1`,
 `NFR_1.2`, `NFR_1.4`, `NFR_4.1`; `05_TECH_SPEC.md` §2 (no build step),
 `07_TEST_PLAN.md` §6 (budgets, not assertions) ·
-**Status:** specified 2026-09-18 · **items 1–5 built 2026-09-18**; 6–10 open
+**Status:** specified 2026-09-18 · **items 1–5 built 2026-09-18** · **item 6 and `boot.test.js` built 2026-09-21**; 7–10 open
 
 ---
 
@@ -28,6 +28,31 @@ measured on a machine slower than the one these figures came from · **Rules:** 
 > **Still open:** items 6–10, which are where the remaining time is — the 57-module import
 > graph, native bcrypt, and the `utilityProcess` move. No `boot.test.js` yet, so the import
 > graph is still unguarded and a forty-fifth static import would pass review.
+
+> **✅ Item 6 and `boot.test.js` delivered 2026-09-21.** The 39 screens (the 44 above counted
+> the shell's own five) load through a `SCREENS` table of `import()`s. The sign-in screen's
+> static graph fell from **57 modules / 723 KB to 9 modules / 101 KB**. A navigation
+> counter drops a load that a later click has overtaken, and a module that fails to arrive
+> says so with a retry instead of leaving a blank screen. Unit, integration, e2e and the
+> browser walk (436 checks) all pass.
+>
+> **The one behaviour worth knowing:** the screen being left is cleared the moment
+> somebody navigates, exactly as before. The first version left it standing until the next
+> module arrived, and the browser walk caught the result: the customer profile's
+> `.statement` table was still on screen when the walk looked for SCR-404's. A cashier
+> could have clicked it too.
+>
+> **`src/tests/perf/boot.test.js`**, on an empty store, asserts counts only: no screen in
+> the static graph, and every `SCREENS` entry exporting what the shell calls (a lazy
+> import's typo otherwise surfaces only when somebody opens that screen). It also caps the
+> modules and bytes before sign-in, the requests before the form, and the SQL statements
+> each warm request runs.
+>
+> **Still short of the criterion:** the sign-in form costs **23 requests**, not under 15. The
+> JavaScript is no longer the reason: **11 render-blocking stylesheets (148 KB)** are. Loading
+> a screen's CSS with its module is the next step, and `REQUESTS_CEILING` comes down with it.
+> Also measured: `GET /sales/pricing-policy` runs **18** statements on an empty store, which
+> are point reads of settings. They are cheap, but capped now so they cannot grow unseen.
 
 ---
 
@@ -205,7 +230,7 @@ Worth recording, so nobody re-investigates them:
 | 3 | Debounce the counter search to 120 ms with a sequence guard | `public/js/pos/view.js` | low | **✅ built** |
 | 4 | Memoise `isComplete()` against the database generation | `src/services/setupService.js`, `src/config/database.js` | low | **✅ built** |
 | 5 | `ensure()` once per connection; throttle the `max_seen_at` write | `src/services/licenceService.js` | low | **✅ built** |
-| 6 | The 44 screen imports become dynamic `import()` inside `show()` | `public/js/shell/app.js:14-51`, `:352-381` | medium — mechanical, but touches every screen's entry |
+| 6 | The 44 screen imports become dynamic `import()` inside `show()` | `public/js/shell/app.js:14-51`, `:352-381` | medium — mechanical, but touches every screen's entry | **✅ built** |
 | 7 | Hoist prepared statements to module-level lazily-built maps | 347 sites; start with `productRepository`, `settingsRepository` | medium — large diff, no behaviour change |
 | 8 | Native `bcrypt` at cost 12, rebuilt for Electron and Android | `src/services/authService.js:12`, `package.json`, the Android build | **high — the build, not the code** |
 | 9 | Move the server into a `utilityProcess` so DB and hashing never block the window | `main.js:81`, `src/server.js` | **high — architectural** |
@@ -241,7 +266,7 @@ day somebody adds a forty-fifth static import.
 - [ ] Static assets are served compressed and with cache headers, by Express and by nginx
 - [ ] Typing ten characters into the counter search issues at most two requests, and a late response never overwrites a newer one
 - [ ] `setupService.isComplete()` issues no query on a warm request
-- [ ] `boot.test.js` exists, runs against an empty database, and fails if a screen module is statically imported into `app.js`
+- [x] `boot.test.js` exists, runs against an empty database, and fails if a screen module is statically imported into `app.js`
 - [ ] No behaviour changes: the full unit, integration and e2e suites pass unchanged
 
 ## Tests

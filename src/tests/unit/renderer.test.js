@@ -2812,7 +2812,7 @@ test('TASK-063: the wizard connects a fresh install to a web store; Admin has We
   assert.match(wizard, /document\.querySelector\('\.connect-note'\)\.hidden = true;/, 'a web copy does not connect to another');
 
   const shell = codeOf('js/shell/app.js');
-  assert.match(shell, /\{ id: 'devices', label: 'Web & devices', screen: 'SCR-708', tx: 'TX-423', create: createDevices \}/);
+  assert.match(shell, /\{ id: 'devices', label: 'Web & devices', screen: 'SCR-708', tx: 'TX-423', create: 'createDevices' \}/);
   assert.match(shell, /class: 'rail-item rail-sync', hidden: true/);
   assert.match(shell, /api\.get\('\/sync\/status'\)/);
 
