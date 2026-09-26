@@ -79,6 +79,8 @@ public class MainActivity extends Activity {
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setMediaPlaybackRequiresUserGesture(true);
@@ -135,7 +137,7 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "ChachiAndroid");
-        web.loadData(LOADING, "text/html", "utf-8");
+        web.loadDataWithBaseURL(null, LOADING, "text/html", "utf-8", null);
         setContentView(web);
     }
 
@@ -241,7 +243,7 @@ public class MainActivity extends Activity {
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ? BackupMirror.RELATIVE : null);
             } catch (RuntimeException e) {
                 Log.e(TAG, "The server could not start", e);
-                main.post(() -> web.loadData(failed(e.getMessage()), "text/html", "utf-8"));
+                main.post(() -> web.loadDataWithBaseURL(null, failed(e.getMessage()), "text/html", "utf-8", null));
                 return;
             }
             // Poll /health, so the window never loads against a port nobody answers on —
@@ -257,7 +259,7 @@ public class MainActivity extends Activity {
                     return;
                 }
             }
-            main.post(() -> web.loadData(failed("It did not answer within a minute."), "text/html", "utf-8"));
+            main.post(() -> web.loadDataWithBaseURL(null, failed("It did not answer within a minute."), "text/html", "utf-8", null));
         }, "wait-for-server").start();
     }
 
