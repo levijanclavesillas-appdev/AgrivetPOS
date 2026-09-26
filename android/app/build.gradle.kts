@@ -104,7 +104,7 @@ android {
         // Android 8.0. Every tablet sold as a POS in the last several years is newer.
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
+        versionCode = 13
         versionName = appVersion
 
         ndk {
@@ -188,6 +188,7 @@ android {
 // TASK-069: Google's code scanner. Play services shows its own camera screen and returns only
 // the code read, so the app needs no camera of its own on a phone that has Play services.
 dependencies {
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }
 

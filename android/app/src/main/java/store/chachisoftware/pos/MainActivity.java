@@ -188,13 +188,22 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private static final int PICK_BACKUP_DIRECTORY = 3;
+
     @Override
     protected void onResume() {
         super.onResume();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && getSharedPreferences("pos", MODE_PRIVATE).getString("saf_backup_uri", null) == null && !askedForStorage) {
+            askedForStorage = true;
+            try {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                startActivityForResult(intent, PICK_BACKUP_DIRECTORY);
+            } catch (Exception e) {
+                startServer();
+            }
+            return;
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !hasSharedStorage() && !askedForStorage) {
-            // Android 8–10 only: the ordinary storage permission, asked once, before the server
-            // starts, because the server is told the backup folder when it starts. Either answer
-            // comes back through onResume.
             askedForStorage = true;
             requestPermissions(new String[] {android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2);
             return;
@@ -202,16 +211,6 @@ public class MainActivity extends Activity {
         startServer();
     }
 
-    /**
-     * OPS-001: backups go outside the application's own storage, so they survive the app
-     * being cleared or uninstalled.
-     *
-     * No "all files access" (removed for Google Play). On Android 11 and later a direct write to
-     * Documents is refused (EACCES), so the server writes to the app's own folder on shared
-     * storage and BackupMirror copies each backup into Documents/ChachiPOS Backups through
-     * MediaStore. After a reinstall an old backup is opened with Restore from a file. On
-     * Android 8–10 the ordinary storage permission lets the server write to Documents itself.
-     */
     private boolean hasSharedStorage() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return false;
         return checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
@@ -220,11 +219,9 @@ public class MainActivity extends Activity {
     private String backupFolder() {
         File shared = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), BACKUP_FOLDER_NAME);
         if (hasSharedStorage()) return shared.getAbsolutePath();
-        File own = getExternalFilesDir(BACKUP_FOLDER_NAME);
-        return own != null ? own.getAbsolutePath() : new File(getFilesDir().getParentFile(), "backups").getAbsolutePath();
+        return getDir("backups", MODE_PRIVATE).getAbsolutePath();
     }
 
-    /** Whether the server's backup folder is fixed by the app rather than chosen by the owner. */
     private boolean backupFolderFixed() {
         return !hasSharedStorage();
     }
@@ -239,8 +236,7 @@ public class MainActivity extends Activity {
                 String folder = backupFolder();
                 boolean fixed = backupFolderFixed();
                 if (fixed) BackupMirror.start(getApplicationContext(), new File(folder));
-                NodeRuntime.start(getApplicationContext(), folder, fixed,
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ? BackupMirror.RELATIVE : null);
+                NodeRuntime.start(getApplicationContext(), folder, fixed, null);
             } catch (RuntimeException e) {
                 Log.e(TAG, "The server could not start", e);
                 main.post(() -> web.loadDataWithBaseURL(null, failed(e.getMessage()), "text/html", "utf-8", null));
@@ -279,6 +275,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_BACKUP_DIRECTORY) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                Uri uri = data.getData();
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                getSharedPreferences("pos", MODE_PRIVATE).edit().putString("saf_backup_uri", uri.toString()).apply();
+            }
+            startServer();
+            return;
+        }
         if (pendingPick == null) return;
         if (requestCode == PICK_PICTURE) {
             Uri[] chosen = null;

@@ -75,6 +75,35 @@ final class BackupMirror {
 
     static synchronized void copy(Context context, File file) {
         if (!file.isFile() || file.length() == 0) return;
+        android.content.SharedPreferences prefs = context.getSharedPreferences("pos", Context.MODE_PRIVATE);
+        String uriStr = prefs.getString("saf_backup_uri", null);
+        if (uriStr != null) {
+            try {
+                Uri treeUri = Uri.parse(uriStr);
+                androidx.documentfile.provider.DocumentFile tree = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri);
+                if (tree != null && tree.exists()) {
+                    androidx.documentfile.provider.DocumentFile existing = tree.findFile(file.getName());
+                    if (existing == null) {
+                        androidx.documentfile.provider.DocumentFile target = tree.createFile("application/zip", file.getName());
+                        if (target != null) {
+                            try (InputStream in = new FileInputStream(file); OutputStream out = context.getContentResolver().openOutputStream(target.getUri())) {
+                                if (out != null) {
+                                    byte[] buffer = new byte[64 * 1024];
+                                    for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
+                                    Log.i(TAG, "backup mirror SAF: " + file.getName());
+                                    return;
+                                }
+                            }
+                        }
+                    } else {
+                        return; // Already exists
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "backup mirror SAF failed", e);
+            }
+        }
+        
         ContentResolver resolver = context.getContentResolver();
         if (find(resolver, file.getName()) != null) return;
         for (String relative : new String[] {RELATIVE, FALLBACK_RELATIVE}) {

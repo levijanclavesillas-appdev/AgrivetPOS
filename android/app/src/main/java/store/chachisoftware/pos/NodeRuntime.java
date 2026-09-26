@@ -95,7 +95,7 @@ final class NodeRuntime {
             // is what the target depends on. It does not survive an uninstall, so it is a last
             // resort and the Backups screen says so loudly (backupService writes a
             // BACKUP_FAILED row naming both folders whenever it lands here).
-            File spare = new File(context.getFilesDir(), "backup-fallback");
+            File spare = context.getDir("backup-fallback", Context.MODE_PRIVATE);
             Os.setenv("AGRIVET_BACKUP_FALLBACK_DIR", spare.getAbsolutePath(), true);
             Os.setenv("HOME", context.getFilesDir().getAbsolutePath(), true);
             Os.setenv("TMPDIR", context.getCacheDir().getAbsolutePath(), true);
