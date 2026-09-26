@@ -191,18 +191,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager() && !askedForStorage) {
-            askedForStorage = true;
-            try {
-                Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                intent.setData(Uri.parse("package:" + getPackageName()));
-                startActivity(intent);
-            } catch (Exception e) {
-                Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-                startActivity(intent);
-            }
-            return;
-        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !hasSharedStorage() && !askedForStorage) {
             // Android 8–10 only: the ordinary storage permission, asked once, before the server
             // starts, because the server is told the backup folder when it starts. Either answer
@@ -218,20 +206,22 @@ public class MainActivity extends Activity {
      * OPS-001: backups go outside the application's own storage, so they survive the app
      * being cleared or uninstalled.
      *
-     * We request "All Files Access" (MANAGE_EXTERNAL_STORAGE) to allow Node.js to write directly 
-     * to Documents on Android 11+, which avoids EACCES errors.
+     * No "all files access" (removed for Google Play). On Android 11 and later a direct write to
+     * Documents is refused (EACCES), so the server writes to the app's own folder on shared
+     * storage and BackupMirror copies each backup into Documents/ChachiPOS Backups through
+     * MediaStore. After a reinstall an old backup is opened with Restore from a file. On
+     * Android 8–10 the ordinary storage permission lets the server write to Documents itself.
      */
     private boolean hasSharedStorage() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return Environment.isExternalStorageManager();
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return false;
         return checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
     private String backupFolder() {
         File shared = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), BACKUP_FOLDER_NAME);
         if (hasSharedStorage()) return shared.getAbsolutePath();
-        return new File(getFilesDir(), BACKUP_FOLDER_NAME).getAbsolutePath();
+        File own = getExternalFilesDir(BACKUP_FOLDER_NAME);
+        return own != null ? own.getAbsolutePath() : new File(getFilesDir().getParentFile(), "backups").getAbsolutePath();
     }
 
     /** Whether the server's backup folder is fixed by the app rather than chosen by the owner. */

@@ -14,7 +14,6 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- TASK-069: barcodes read with the camera. Google's code scanner needs no permission; this
          is for the web reader, used only on a phone without Play services, and asked for at
