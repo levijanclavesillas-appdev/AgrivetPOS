@@ -104,7 +104,7 @@ android {
         // Android 8.0. Every tablet sold as a POS in the last several years is newer.
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
+        versionCode = 15
         versionName = appVersion
 
         ndk {
